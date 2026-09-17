@@ -28,7 +28,7 @@ High-net-worth individuals
 - [x] Step 1: Project setup, shadcn/ui, Supabase libraries, Git repository
 - [x] Step 2: Design System Implementation
 - [x] Step 3: Supabase Client & Auth Middleware setup
-- [ ] Step 4: Database schema (Supabase)
+- [x] Step 4: Database Schema Generation
 - [ ] Step 5: Authentication (TOTP 2FA)
 - [ ] Step 6: Manual asset tracking
 - [ ] Step 7: CSV bank uploads
@@ -49,7 +49,12 @@ Dark-mode-first luxury theme — "Midnight Navy & Champagne Gold" — implemente
 - Note: Next.js 16 deprecated the `middleware.ts` file convention in favor of `proxy.ts` (build succeeds with a deprecation warning). Left as `middleware.ts` per current instructions; migrate later with `npx @next/codemod@canary middleware-to-proxy` if desired.
 
 ### Database Tables
-_None yet — to be documented once schema work begins._
+Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the live database):
+- **profiles** — `id` (uuid, PK, references `auth.users`), `first_name`, `last_name`, `default_currency` (default `'USD'`), `created_at`.
+- **asset_categories** — `id` (uuid, PK), `name`, `slug` (unique). Seeded with Real Estate, SCPI, Equities, Crypto, Cash, Liabilities.
+- **assets** — `id` (uuid, PK), `profile_id` (references `profiles`), `category_id` (references `asset_categories`), `name`, `ticker_symbol` (nullable), `quantity` (default `1`), `current_value`, `currency` (default `'USD'`), `is_liability` (default `false`), `created_at`, `updated_at`.
+- **asset_history** — `id` (uuid, PK), `asset_id` (references `assets`), `recorded_date`, `value`, `created_at`.
+- All four tables have Row Level Security enabled. `profiles`, `assets`, and `asset_history` restrict SELECT/INSERT/UPDATE/DELETE to rows owned by `auth.uid()` (directly via `profile_id`/`id`, or transitively for `asset_history` via its parent `assets` row). `asset_categories` is shared reference data, readable by any authenticated user.
 
 ### APIs
 _None yet._
@@ -62,6 +67,9 @@ opes-wealth/
 │   ├── lib/                     # Shared utilities (e.g. utils.ts)
 │   ├── utils/supabase/          # Supabase client/server/middleware helpers
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
+├── supabase/
+│   └── migrations/
+│       └── 0001_initial_schema.sql  # profiles, asset_categories, assets, asset_history + RLS
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 └── PROJECT_TRACKER.md
@@ -72,3 +80,4 @@ opes-wealth/
 - 2026-09-17: PROJECT_TRACKER.md created.
 - 2026-09-17: Implemented Opes Wealth luxury design system (Midnight Navy & Champagne Gold, dark-mode-first, 0px border radii) in `globals.css`.
 - 2026-09-17: Configured Supabase keys (`.env.local`) and implemented Supabase browser/server clients plus auth session-refresh middleware (`src/middleware.ts`). Build verified with zero TS/bundling errors.
+- 2026-09-17: Generated initial wealth-tracking schema migration (`profiles`, `asset_categories`, `assets`, `asset_history`) with Row Level Security policies in `supabase/migrations/0001_initial_schema.sql`. Syntax verified with the real Postgres grammar (`libpg-query`); not yet applied to any database.
