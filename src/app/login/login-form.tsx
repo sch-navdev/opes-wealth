@@ -33,16 +33,26 @@ export function LoginForm() {
     setError(null);
     setIsPasskeyPending(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPasskey();
+    const noPasskeyMessage =
+      "No passkey found. Please log in with your email and password, then register a passkey in your dashboard.";
 
-    if (error) {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPasskey();
+
+      if (error) {
+        setIsPasskeyPending(false);
+        setError(noPasskeyMessage);
+        return;
+      }
+
+      window.location.href = "/dashboard";
+    } catch {
+      // The user cancelled the OS/browser passkey prompt, no passkey was
+      // found on the device, or the browser rejected the request outright.
       setIsPasskeyPending(false);
-      setError(error.message);
-      return;
+      setError(noPasskeyMessage);
     }
-
-    window.location.href = "/dashboard";
   }
 
   return (

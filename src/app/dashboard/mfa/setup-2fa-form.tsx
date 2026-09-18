@@ -78,23 +78,25 @@ export function Setup2faForm() {
     setPasskeyError(null);
     setIsPasskeyLoading(true);
 
-    // `mfa.webauthn.register` enrolls a `webauthn` factor
-    // (`mfa.enroll({ factorType: 'webauthn' })` under the hood), then
-    // drives the browser's `navigator.credentials.create()` prompt and
-    // verifies the resulting credential — completing the full ceremony
-    // in a single call.
-    const { error } = await supabase.auth.mfa.webauthn.register({
-      friendlyName: "Passkey",
-    });
+    try {
+      // Standard passwordless Passkey registration (not an MFA factor):
+      // drives the browser's `navigator.credentials.create()` prompt and
+      // verifies the resulting credential in one call.
+      const { error } = await supabase.auth.registerPasskey();
 
-    setIsPasskeyLoading(false);
+      if (error) {
+        setPasskeyError(error.message);
+        return;
+      }
 
-    if (error) {
-      setPasskeyError(error.message);
-      return;
+      setPasskeySuccess(true);
+    } catch {
+      // The user cancelled the OS/browser passkey prompt, or the browser
+      // rejected the request outright.
+      setPasskeyError("Could not register a passkey. Please try again.");
+    } finally {
+      setIsPasskeyLoading(false);
     }
-
-    setPasskeySuccess(true);
   }
 
   return (
