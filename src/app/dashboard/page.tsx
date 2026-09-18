@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { logout } from "@/app/auth/actions";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -37,17 +38,28 @@ export default async function DashboardPage() {
     redirect("/login/mfa");
   }
 
-  const [{ data: categories }, { data: assets }] = await Promise.all([
-    supabase.from("asset_categories").select("id, name").order("name"),
-    supabase
-      .from("assets")
-      .select(
-        "id, name, quantity, current_value, currency, is_liability, asset_categories(name)",
-      )
-      .eq("profile_id", user.id)
-      .order("created_at", { ascending: false })
-      .returns<AssetRow[]>(),
-  ]);
+  const [{ data: categories }, { data: assets }, { data: profile }] =
+    await Promise.all([
+      supabase.from("asset_categories").select("id, name").order("name"),
+      supabase
+        .from("assets")
+        .select(
+          "id, name, quantity, current_value, currency, is_liability, asset_categories(name)",
+        )
+        .eq("profile_id", user.id)
+        .order("created_at", { ascending: false })
+        .returns<AssetRow[]>(),
+      supabase
+        .from("profiles")
+        .select("first_name, avatar_base64")
+        .eq("id", user.id)
+        .single(),
+    ]);
+
+  const initials =
+    profile?.first_name?.[0]?.toUpperCase() ??
+    user.email?.[0]?.toUpperCase() ??
+    "?";
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -57,17 +69,31 @@ export default async function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="flex items-center justify-between border-b border-border px-8 py-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Welcome back</p>
-          <h1 className="text-xl font-semibold text-foreground">
-            {user.email}
-          </h1>
+        <div className="flex items-center gap-3">
+          <Avatar size="lg">
+            <AvatarImage src={profile?.avatar_base64 || undefined} alt="" />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="text-sm text-muted-foreground">Welcome back</p>
+            <h1 className="text-xl font-semibold text-foreground">
+              {profile?.first_name || user.email}
+            </h1>
+          </div>
         </div>
-        <form action={logout}>
-          <Button type="submit" variant="outline">
-            Sign Out
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/settings"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Profile Settings
+          </Link>
+          <form action={logout}>
+            <Button type="submit" variant="outline">
+              Sign Out
+            </Button>
+          </form>
+        </div>
       </header>
 
       <main className="space-y-6 px-8 py-10">

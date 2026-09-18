@@ -37,7 +37,7 @@ High-net-worth individuals
   - [x] MFA setup page: "← Back to Dashboard" link
   - [x] MFA setup page: Active Authenticators list (TOTP + Passkeys)
 - [x] Step 7: Portfolio Dashboard Foundation (manual asset tracking UI)
-- [ ] Step 8: CSV bank uploads
+  - [x] Profile Settings page (structured address, contact info, Base64 avatar upload, email/phone verification UI)
 - [ ] Step 8: CSV bank uploads
 - [ ] Step 9: Live pricing integration
 - [ ] Step 10: Deployment (Vercel)
@@ -63,6 +63,7 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - **asset_history** — `id` (uuid, PK), `asset_id` (references `assets`), `recorded_date`, `value`, `created_at`.
 - All four tables have Row Level Security enabled. `profiles`, `assets`, and `asset_history` restrict SELECT/INSERT/UPDATE/DELETE to rows owned by `auth.uid()` (directly via `profile_id`/`id`, or transitively for `asset_history` via its parent `assets` row). `asset_categories` is shared reference data, readable by any authenticated user.
 - `supabase/migrations/0002_user_profile_trigger.sql` — `public.handle_new_user()` (a `security definer` trigger function, `search_path` pinned to `public`) inserts a `profiles` row for `new.id`, fired by an `on_auth_user_created` trigger `after insert on auth.users`. Fixes the gap noted after Step 7: without this, `addAsset` failed with a foreign-key violation because no `profiles` row existed for any signed-up user. Not yet applied to the live database.
+- `supabase/migrations/0003_profile_extended_fields.sql` — adds `phone_number`, `address_street`, `address_po_box`, `address_city`, `address_postal_code`, `address_landmark`, `address_country`, and `avatar_base64` (all `text`) to `profiles`. Added proactively because the Profile Settings page needed these columns and they didn't exist yet — without this migration, `updateProfile` would fail with "column does not exist". Not yet applied to the live database.
 
 ### Authentication UI & Protected Routes
 - `src/app/auth/actions.ts` — server actions `login(formData)`, `signup(formData)`, and `logout()`, calling `supabase.auth.signInWithPassword` / `signUp` / `signOut` via the server client from `src/utils/supabase/server.ts`. On success they redirect to `/dashboard` (or `/login` for logout); on failure they return `{ error: string }`.
@@ -93,6 +94,14 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - **Resolved**: the missing-`profiles`-row gap that would have made `addAsset` fail with a foreign-key violation is now fixed by `supabase/migrations/0002_user_profile_trigger.sql` (see Database Tables above).
 - Not yet verified against a live Supabase instance (dev server was only exercised while signed out, since these routes are visible only to newly-verified sessions and no test account/schema deployment was available in this session).
 
+### Profile Settings
+- `src/app/dashboard/settings/actions.ts` — `updateProfile(formData)` extracts first/last name, phone number, the six address fields, and `avatar_base64`, updates the caller's own `profiles` row (`.eq('id', user.id)`), and calls `revalidatePath('/', 'layout')`. `resendEmailVerification(email)` calls `supabase.auth.resend({ type: 'signup', email })`.
+- `src/components/profile-form.tsx` — Client Component. Email shown with a green "Verified" `Badge` (`isEmailVerified`) or a "Send Verification Link" button wired to `resendEmailVerification`. Avatar uploader: a shadcn `Avatar` (image or initials fallback) plus a hidden `<input type="file" accept="image/*">`; on selection, `FileReader.readAsDataURL()` converts the file to Base64, stored in state and mirrored into a hidden form input (`avatar_base64`) so it submits with the rest of the form. First/Last Name row, Phone Number + an outlined "Verify Phone" button (`alert('SMS verification integration coming soon.')` — a stub, no real SMS integration yet), and a "Residential Address" grid (Street, PO Box, City, Postal Code, Landmark, Country). Submission uses the same client-driven `startTransition` + `FormData` pattern as `AddAssetDialog`/`LoginForm`, not the installed `form`/`react-hook-form` component (kept consistent with the rest of the app; `react-hook-form`/`zod` are now installed as a side effect of `npx shadcn add form` but unused elsewhere).
+- `src/app/dashboard/settings/page.tsx` — Server Component; same auth + AAL2 guard as `/dashboard`, queries the caller's `profiles` row, renders a "← Back to Dashboard" link and `<ProfileForm>`.
+- `src/app/dashboard/page.tsx` — header now queries `first_name`/`avatar_base64` and renders an `Avatar` + "Welcome back, {first_name}" (falling back to email), plus a "Profile Settings" link next to "Sign Out".
+- Installed shadcn `form`, `badge`, `avatar` (`input`/`label`/`button` already existed and were left alone); same CLI `cn`-import fix applied to the newly generated files.
+- Not yet verified against a live Supabase instance/real file upload (same limitation as the portfolio dashboard — no authenticated test session available in this environment). Worth noting for later: storing full-resolution images as Base64 `text` in Postgres works but is not space-efficient; Supabase Storage would scale better if avatars turn out to be large.
+
 ### APIs
 _None yet._
 
@@ -107,8 +116,9 @@ opes-wealth/
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
 │   └── migrations/
-│       ├── 0001_initial_schema.sql        # profiles, asset_categories, assets, asset_history + RLS
-│       └── 0002_user_profile_trigger.sql  # auto-create a profiles row on signup
+│       ├── 0001_initial_schema.sql            # profiles, asset_categories, assets, asset_history + RLS
+│       ├── 0002_user_profile_trigger.sql      # auto-create a profiles row on signup
+│       └── 0003_profile_extended_fields.sql   # phone/address/avatar_base64 columns on profiles
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 └── PROJECT_TRACKER.md
@@ -126,3 +136,5 @@ opes-wealth/
 - 2026-09-18: Switched passkey registration from `mfa.webauthn.register()` to `supabase.auth.registerPasskey()` — the project's Supabase instance returns "MFA enroll is disabled for WebAuthn" for the MFA-factor route, confirming passkeys here should use the standard passwordless system, matching `signInWithPasskey()` on the login side. Added try/catch around `signInWithPasskey()` in `login-form.tsx` so a cancelled/failed OS passkey prompt shows "No passkey found. Please log in with your email and password, then register a passkey in your dashboard." instead of leaving the button stuck loading. Build verified with zero TS errors.
 - 2026-09-18: Added `needsMfaStepUp()` helper so a Passkey-authenticated session (`amr` contains `webauthn`) bypasses `/login/mfa` entirely, used by both `login()` and `/dashboard`. Added a "← Back to Dashboard" link and an "Active authenticators" list (TOTP + Passkeys) to the MFA setup page. Built the portfolio dashboard foundation: `addAsset` server action, `AddAssetDialog` (shadcn Dialog/Select), and a shadcn Table of the user's assets on `/dashboard`, backed by queries against `asset_categories`/`assets`. Installed shadcn `dialog`/`select`/`table` (same `cn`-import fix as before). Verified the MFA page's new back-link and factors list visually in the browser; could not exercise the asset table/dialog end-to-end (requires a live authenticated session against real Supabase data, not available in this session) — also flagged a real gap: `addAsset` will fail until signup creates a matching `profiles` row. Build verified with zero TS/bundling errors.
 - 2026-09-18: Added `supabase/migrations/0002_user_profile_trigger.sql` — `handle_new_user()` trigger function + `on_auth_user_created` trigger, auto-creating a `profiles` row for every new `auth.users` row, fixing the foreign-key gap noted above. Syntax verified with `libpg-query`; not yet applied to any database. Removed the dead "Verify with Passkey" button/logic from `src/app/login/mfa/mfa-form.tsx` (Passkey logins bypass this page entirely now) — it's back to a plain TOTP form. Build verified with zero TS/bundling errors.
+- 2026-09-18: Refined `needsMfaStepUp()` to check `getAuthenticatorAssuranceLevel()`'s `currentAuthenticationMethods` for a `passkey`/`webauthn` entry and bypass the MFA step immediately if found, in addition to the existing `amr`-based fallback check. Build verified with zero TS errors.
+- 2026-09-18: Built Profile Settings: added `supabase/migrations/0003_profile_extended_fields.sql` (phone/address/avatar columns on `profiles`, syntax-verified with `libpg-query`), `dashboard/settings/actions.ts` (`updateProfile`, `resendEmailVerification`), `dashboard/settings/page.tsx`, and `components/profile-form.tsx` (email verification badge/CTA, Base64 avatar upload via `FileReader`, name/phone/address fields, phone-verification stub). Updated `/dashboard`'s header to show the user's avatar, first name, and a "Profile Settings" link. Installed shadcn `form`/`badge`/`avatar` (same `cn`-import fix as before). Verified the settings route redirects correctly when signed out; could not exercise the full authenticated form (no live Supabase session available in this environment). Build verified with zero TS/bundling errors.
