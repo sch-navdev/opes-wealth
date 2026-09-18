@@ -38,6 +38,9 @@ High-net-worth individuals
   - [x] MFA setup page: Active Authenticators list (TOTP + Passkeys)
 - [x] Step 7: Portfolio Dashboard Foundation (manual asset tracking UI)
   - [x] Profile Settings page (structured address, contact info, Base64 avatar upload, email/phone verification UI)
+  - [x] Avatar image cropper (react-easy-crop, circular 1:1, downscaled/compressed JPEG output)
+  - [x] Searchable country/phone-code comboboxes (shadcn Popover + Command)
+  - [x] Server Action payload limit raised to 5mb (for avatar uploads)
 - [ ] Step 8: CSV bank uploads
 - [ ] Step 9: Live pricing integration
 - [ ] Step 10: Deployment (Vercel)
@@ -54,6 +57,7 @@ Dark-mode-first luxury theme — "Midnight Navy & Champagne Gold" — implemente
 - `src/middleware.ts` — wires `updateSession` into Next.js middleware, matching all routes except `_next/static`, `_next/image`, `favicon.ico`, and image assets.
 - Env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) live in `.env.local` (gitignored, not committed).
 - Note: Next.js 16 deprecated the `middleware.ts` file convention in favor of `proxy.ts` (build succeeds with a deprecation warning). Left as `middleware.ts` per current instructions; migrate later with `npx @next/codemod@canary middleware-to-proxy` if desired.
+- `next.config.ts` — `experimental.serverActions.bodySizeLimit` raised to `'5mb'` (default is 1MB), so the Base64 avatar upload in the Profile Settings form doesn't get rejected by the server action payload limit.
 
 ### Database Tables
 Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the live database):
@@ -100,7 +104,9 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `src/app/dashboard/settings/page.tsx` — Server Component; same auth + AAL2 guard as `/dashboard`, queries the caller's `profiles` row, renders a "← Back to Dashboard" link and `<ProfileForm>`.
 - `src/app/dashboard/page.tsx` — header now queries `first_name`/`avatar_base64` and renders an `Avatar` + "Welcome back, {first_name}" (falling back to email), plus a "Profile Settings" link next to "Sign Out".
 - Installed shadcn `form`, `badge`, `avatar` (`input`/`label`/`button` already existed and were left alone); same CLI `cn`-import fix applied to the newly generated files.
-- Not yet verified against a live Supabase instance/real file upload (same limitation as the portfolio dashboard — no authenticated test session available in this environment). Worth noting for later: storing full-resolution images as Base64 `text` in Postgres works but is not space-efficient; Supabase Storage would scale better if avatars turn out to be large.
+- **Avatar cropper**: `src/lib/crop-image.ts` (`getCroppedImage`) draws the selected region to an offscreen `<canvas>`, downscales to a max of 400×400, and re-encodes as JPEG (quality 0.8) before it ever becomes the stored Base64 string — keeping payloads small despite raw phone-camera photos being much larger. `profile-form.tsx` opens a shadcn `Dialog` containing a `react-easy-crop` `<Cropper>` (`aspect={1}`, `cropShape="round"`) as soon as a file is selected; "Confirm" runs the crop/compress and writes the result into the hidden `avatar_base64` input, "Cancel" discards it. Verified visually end-to-end (selected a generated test image, cropped it, confirmed the compressed result renders in the `Avatar`) via a disposable local-only preview route, removed before committing.
+- **Searchable country/phone comboboxes**: `src/lib/countries.ts` — a static `Country[]` (name, ISO alpha-2 `code`, `dialCode`) covering ~195 countries/territories. `src/components/country-combobox.tsx` — a shadcn Popover+Command combobox reused for both purposes via a `field: "name" | "dialCode"` prop: the phone row uses it in `dialCode` mode (search by name, selection returns the dial code) next to a plain local-number `Input`; the Residential Address "Country" field uses it in `name` mode. Both are synced into hidden form inputs (`phone_number` = `${dialCode} ${localNumber}`, `address_country`) so `updateProfile`'s `FormData` extraction didn't need to change. On edit, the stored `phone_number` is split back into dial code + local number by matching the longest known dial-code prefix. Verified visually: search filtering, selecting a country, and the resulting field updates all confirmed in the browser.
+- Not yet verified against a live Supabase instance/real file upload beyond the local UI checks above (no authenticated test session or deployed database available in this environment). Worth noting for later: storing full-resolution images as Base64 `text` in Postgres works but is not space-efficient; Supabase Storage would scale better if avatars turn out to be large.
 
 ### APIs
 _None yet._
@@ -110,8 +116,8 @@ _None yet._
 opes-wealth/
 ├── src/
 │   ├── app/                     # Next.js App Router routes
-│   ├── components/              # Shared app components (e.g. add-asset-dialog.tsx)
-│   ├── lib/                     # Shared utilities (e.g. utils.ts)
+│   ├── components/              # Shared app components (e.g. add-asset-dialog.tsx, country-combobox.tsx)
+│   ├── lib/                     # Shared utilities (utils.ts, countries.ts, crop-image.ts)
 │   ├── utils/supabase/          # Supabase client/server/middleware/mfa helpers
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
@@ -138,3 +144,4 @@ opes-wealth/
 - 2026-09-18: Added `supabase/migrations/0002_user_profile_trigger.sql` — `handle_new_user()` trigger function + `on_auth_user_created` trigger, auto-creating a `profiles` row for every new `auth.users` row, fixing the foreign-key gap noted above. Syntax verified with `libpg-query`; not yet applied to any database. Removed the dead "Verify with Passkey" button/logic from `src/app/login/mfa/mfa-form.tsx` (Passkey logins bypass this page entirely now) — it's back to a plain TOTP form. Build verified with zero TS/bundling errors.
 - 2026-09-18: Refined `needsMfaStepUp()` to check `getAuthenticatorAssuranceLevel()`'s `currentAuthenticationMethods` for a `passkey`/`webauthn` entry and bypass the MFA step immediately if found, in addition to the existing `amr`-based fallback check. Build verified with zero TS errors.
 - 2026-09-18: Built Profile Settings: added `supabase/migrations/0003_profile_extended_fields.sql` (phone/address/avatar columns on `profiles`, syntax-verified with `libpg-query`), `dashboard/settings/actions.ts` (`updateProfile`, `resendEmailVerification`), `dashboard/settings/page.tsx`, and `components/profile-form.tsx` (email verification badge/CTA, Base64 avatar upload via `FileReader`, name/phone/address fields, phone-verification stub). Updated `/dashboard`'s header to show the user's avatar, first name, and a "Profile Settings" link. Installed shadcn `form`/`badge`/`avatar` (same `cn`-import fix as before). Verified the settings route redirects correctly when signed out; could not exercise the full authenticated form (no live Supabase session available in this environment). Build verified with zero TS/bundling errors.
+- 2026-09-18: Raised the Server Action body size limit to `5mb` in `next.config.ts` for avatar uploads. Added an `react-easy-crop`-based circular avatar cropper (`src/lib/crop-image.ts` + a new Dialog step in `profile-form.tsx`) that downscales/compresses the result to a small JPEG before it's stored. Added `src/lib/countries.ts` (~195 countries with ISO code + dial code) and `src/components/country-combobox.tsx`, a reusable searchable Popover+Command combobox, used to replace the plain phone-country and address-country text inputs. Installed shadcn `popover`/`command` and `react-easy-crop` (same `cn`-import fix as before). Verified all of it visually end-to-end (search filtering, country selection, uploading/cropping a test image and seeing the compressed result render) via a disposable local-only preview route that was removed before committing. Build verified with zero TS/bundling errors.
