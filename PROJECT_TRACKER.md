@@ -29,11 +29,12 @@ High-net-worth individuals
 - [x] Step 2: Design System Implementation
 - [x] Step 3: Supabase Client & Auth Middleware setup
 - [x] Step 4: Database Schema Generation
-- [ ] Step 5: Authentication (TOTP 2FA)
-- [ ] Step 6: Manual asset tracking
-- [ ] Step 7: CSV bank uploads
-- [ ] Step 8: Live pricing integration
-- [ ] Step 9: Deployment (Vercel)
+- [x] Step 5: Authentication UI & Protected Routes
+- [ ] Step 6: TOTP 2FA
+- [ ] Step 7: Manual asset tracking
+- [ ] Step 8: CSV bank uploads
+- [ ] Step 9: Live pricing integration
+- [ ] Step 10: Deployment (Vercel)
 
 ## Architecture Log
 
@@ -55,6 +56,12 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - **assets** — `id` (uuid, PK), `profile_id` (references `profiles`), `category_id` (references `asset_categories`), `name`, `ticker_symbol` (nullable), `quantity` (default `1`), `current_value`, `currency` (default `'USD'`), `is_liability` (default `false`), `created_at`, `updated_at`.
 - **asset_history** — `id` (uuid, PK), `asset_id` (references `assets`), `recorded_date`, `value`, `created_at`.
 - All four tables have Row Level Security enabled. `profiles`, `assets`, and `asset_history` restrict SELECT/INSERT/UPDATE/DELETE to rows owned by `auth.uid()` (directly via `profile_id`/`id`, or transitively for `asset_history` via its parent `assets` row). `asset_categories` is shared reference data, readable by any authenticated user.
+
+### Authentication UI & Protected Routes
+- `src/app/auth/actions.ts` — server actions `login(formData)`, `signup(formData)`, and `logout()`, calling `supabase.auth.signInWithPassword` / `signUp` / `signOut` via the server client from `src/utils/supabase/server.ts`. On success they redirect to `/dashboard` (or `/login` for logout); on failure they return `{ error: string }`.
+- `src/app/login/page.tsx` + `src/app/login/login-form.tsx` — dark-luxury-themed login card (shadcn `Card`/`Input`/`Label`/`Button`) with separate Login and Sign Up buttons wired to the respective server actions via a client component that surfaces returned error messages.
+- `src/app/dashboard/page.tsx` — Server Component; calls `supabase.auth.getUser()` and redirects unauthenticated visitors to `/login`. Renders a header with the user's email and a Sign Out form bound to the `logout` server action.
+- Installed shadcn `card`, `input`, `button`, `label` components (`src/components/ui/`). Normalized their generated imports to use the project's own `cn` helper from `@/lib/utils` instead of the CLI's default `cn` npm package, so styling utilities stay consistent across the codebase; removed the now-unused `cn` package.
 
 ### APIs
 _None yet._
@@ -81,3 +88,4 @@ opes-wealth/
 - 2026-09-17: Implemented Opes Wealth luxury design system (Midnight Navy & Champagne Gold, dark-mode-first, 0px border radii) in `globals.css`.
 - 2026-09-17: Configured Supabase keys (`.env.local`) and implemented Supabase browser/server clients plus auth session-refresh middleware (`src/middleware.ts`). Build verified with zero TS/bundling errors.
 - 2026-09-17: Generated initial wealth-tracking schema migration (`profiles`, `asset_categories`, `assets`, `asset_history`) with Row Level Security policies in `supabase/migrations/0001_initial_schema.sql`. Syntax verified with the real Postgres grammar (`libpg-query`); not yet applied to any database.
+- 2026-09-18: Implemented authentication UI and protected dashboard: login/signup/logout server actions, `/login` page (shadcn Card/Input/Label/Button, dark luxury theme), and `/dashboard` as a protected Server Component redirecting unauthenticated users to `/login`. Verified visually in the browser (login page renders themed correctly; `/dashboard` redirects to `/login` when signed out). Build verified with zero TS/bundling errors.
