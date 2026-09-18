@@ -17,16 +17,31 @@ export async function needsMfaStepUp(
 ): Promise<boolean> {
   const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
-  if (!aal || aal.nextLevel !== "aal2" || aal.currentLevel === aal.nextLevel) {
+  if (!aal) {
+    return false;
+  }
+
+  // `currentAuthenticationMethods` reflects how this specific session was
+  // established. If a passkey was used, that already satisfies strong
+  // authentication on its own — bypass the step-up immediately.
+  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some(
+    (m: any) => m.method === "passkey" || m.method === "webauthn",
+  );
+
+  if (usedPasskeyMethod) {
+    return false;
+  }
+
+  if (aal.nextLevel !== "aal2" || aal.currentLevel === aal.nextLevel) {
     return false;
   }
 
   const { data: claimsData } = await supabase.auth.getClaims();
   const amr = claimsData?.claims.amr ?? [];
 
-  const usedPasskey = amr.some((entry) =>
+  const usedPasskeyAmr = amr.some((entry) =>
     typeof entry === "string" ? entry === "webauthn" : entry.method === "webauthn",
   );
 
-  return !usedPasskey;
+  return !usedPasskeyAmr;
 }
