@@ -33,7 +33,11 @@ High-net-worth individuals
 - [x] Step 6: TOTP 2FA Implementation
   - [x] Passkeys (WebAuthn sign-in + MFA enrollment/verification)
   - [x] Remember Me (persistent vs. session-only auth cookies)
-- [ ] Step 7: Manual asset tracking
+  - [x] Passkey-satisfies-aal2 bypass (Passkey login skips `/login/mfa` entirely)
+  - [x] MFA setup page: "← Back to Dashboard" link
+  - [x] MFA setup page: Active Authenticators list (TOTP + Passkeys)
+- [x] Step 7: Portfolio Dashboard Foundation (manual asset tracking UI)
+- [ ] Step 8: CSV bank uploads
 - [ ] Step 8: CSV bank uploads
 - [ ] Step 9: Live pricing integration
 - [ ] Step 10: Deployment (Vercel)
@@ -77,7 +81,16 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
   - `src/utils/supabase/client.ts` — browser client enables `auth.experimental.passkey: true`, required for the passkey APIs.
   - `src/app/login/login-form.tsx` — outlined Champagne Gold "Sign in with Passkey" button calling `supabase.auth.signInWithPasskey()` (passwordless sign-in via device passkey), client-side only. Wrapped in try/catch: any thrown error (cancelled OS prompt, no passkey found) clears the loading state and shows "No passkey found. Please log in with your email and password, then register a passkey in your dashboard."
   - `src/app/dashboard/mfa/setup-2fa-form.tsx` — "Register Passkey" button calling `supabase.auth.registerPasskey()` (also try/catch wrapped), which drives the full browser credential-creation ceremony and verification in one call.
-  - **Known gap**: `src/app/login/mfa/mfa-form.tsx` still looks for a verified `webauthn` **MFA factor** via `listFactors()` to show a "Verify with Passkey" step-up button — but since registration no longer creates an MFA factor (it uses the standalone Passkey system instead), that button will never appear. Passkey sign-in currently only works as a full passwordless replacement for the login form, not as a second factor after password login. Needs a follow-up decision on whether step-up-via-passkey is still wanted, and if so how (Supabase's MFA-factor webauthn is disabled on this project).
+  - **Passkey-satisfies-aal2 bypass** (`src/utils/supabase/mfa.ts`, new): `needsMfaStepUp(supabase)` computes the AAL as before, but if a step-up would otherwise be required, it also decodes the session's `amr` (via `supabase.auth.getClaims()`) and treats a `webauthn` entry as sufficient on its own — Supabase's own AAL calculation only credits `mfa/*`-namespaced methods, not the standalone Passkey system, so without this a Passkey login would still get bounced to `/login/mfa`. Used by both `login()` in `actions.ts` and `dashboard/page.tsx`, replacing their previous inline `getAuthenticatorAssuranceLevel()` checks.
+  - **Still-known gap**: `src/app/login/mfa/mfa-form.tsx` still looks for a verified `webauthn` **MFA factor** via `listFactors()` to show a "Verify with Passkey" step-up button — since registration no longer creates an MFA factor, that button will never appear. This no longer matters in practice for the primary flow (passkey logins bypass `/login/mfa` entirely per the bullet above), but the dead code/button should be cleaned up in a follow-up.
+
+### Portfolio Dashboard Foundation
+- `src/app/dashboard/actions.ts` — server action `addAsset(formData)`: reads `name`, `category_id`, `quantity`, `current_value`, `currency` (default `'USD'`) from the form, resolves the current user via `getUser()`, inserts into `assets` with `profile_id` set to that user's id, and calls `revalidatePath('/dashboard')` on success.
+- `src/components/add-asset-dialog.tsx` — Client Component using shadcn `Dialog`/`Select`/`Input`/`Label`. Submits `addAsset` via a client-driven `startTransition` (not a bare form `action`) so it can show inline errors and close the dialog only on success. Category dropdown is populated from the `asset_categories` passed in as a prop.
+- `src/app/dashboard/page.tsx` — now also queries `asset_categories` (all rows, for the dropdown) and the signed-in user's own `assets` (joined with `asset_categories(name)`), in parallel. Renders `AddAssetDialog` at the top of the page and a shadcn `Table` of the user's assets below it (Name / Category / Quantity / Value, liabilities shown in destructive red with a leading `-`). Empty state shown when there are no assets yet.
+- Installed shadcn `dialog`, `select`, `table` components (`src/components/ui/`); fixed the same CLI `cn`-package import issue as previous component installs.
+- **Known gap**: `assets.profile_id` has a foreign key to `profiles.id`, but nothing yet creates a `profiles` row on signup — `addAsset` will fail with a foreign-key violation until a profile exists for the user (e.g. via a signup-time insert or a DB trigger on `auth.users`). Not fixed here since it wasn't part of this task; needs to land before this flow is usable end-to-end.
+- Not yet verified against a live Supabase instance (dev server was only exercised while signed out, since these routes are visible only to newly-verified sessions and no test account/schema deployment was available in this session).
 
 ### APIs
 _None yet._
@@ -87,8 +100,9 @@ _None yet._
 opes-wealth/
 ├── src/
 │   ├── app/                     # Next.js App Router routes
+│   ├── components/              # Shared app components (e.g. add-asset-dialog.tsx)
 │   ├── lib/                     # Shared utilities (e.g. utils.ts)
-│   ├── utils/supabase/          # Supabase client/server/middleware helpers
+│   ├── utils/supabase/          # Supabase client/server/middleware/mfa helpers
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
 │   └── migrations/
@@ -108,3 +122,4 @@ opes-wealth/
 - 2026-09-18: Implemented TOTP 2FA: login-time AAL2 check and redirect to `/login/mfa`, `verifyMfaLogin` server action, `/login/mfa` verification page, `/dashboard/mfa` enrollment page (QR code + activation), and AAL2 enforcement on `/dashboard`. Verified visually in the browser (both new pages render themed correctly). Build verified with zero TS/bundling errors.
 - 2026-09-18: Implemented Passkeys (sign-in, MFA enrollment, MFA login verification) and Remember Me (session-only vs. persistent auth cookie). Substituted the SDK's real passkey APIs (`signInWithPasskey`, `mfa.webauthn.register`, `mfa.webauthn.authenticate`) for the non-existent `signInWithWebAuthn()` named in the request. Verified visually in the browser (Remember Me checkbox and outlined gold Passkey buttons render correctly on `/login` and `/dashboard/mfa`). Build verified with zero TS/bundling errors.
 - 2026-09-18: Switched passkey registration from `mfa.webauthn.register()` to `supabase.auth.registerPasskey()` — the project's Supabase instance returns "MFA enroll is disabled for WebAuthn" for the MFA-factor route, confirming passkeys here should use the standard passwordless system, matching `signInWithPasskey()` on the login side. Added try/catch around `signInWithPasskey()` in `login-form.tsx` so a cancelled/failed OS passkey prompt shows "No passkey found. Please log in with your email and password, then register a passkey in your dashboard." instead of leaving the button stuck loading. Build verified with zero TS errors.
+- 2026-09-18: Added `needsMfaStepUp()` helper so a Passkey-authenticated session (`amr` contains `webauthn`) bypasses `/login/mfa` entirely, used by both `login()` and `/dashboard`. Added a "← Back to Dashboard" link and an "Active authenticators" list (TOTP + Passkeys) to the MFA setup page. Built the portfolio dashboard foundation: `addAsset` server action, `AddAssetDialog` (shadcn Dialog/Select), and a shadcn Table of the user's assets on `/dashboard`, backed by queries against `asset_categories`/`assets`. Installed shadcn `dialog`/`select`/`table` (same `cn`-import fix as before). Verified the MFA page's new back-link and factors list visually in the browser; could not exercise the asset table/dialog end-to-end (requires a live authenticated session against real Supabase data, not available in this session) — also flagged a real gap: `addAsset` will fail until signup creates a matching `profiles` row. Build verified with zero TS/bundling errors.

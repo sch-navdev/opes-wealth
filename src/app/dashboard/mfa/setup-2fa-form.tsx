@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { KeyRound, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +12,18 @@ type EnrollState = {
   qrCode: string;
 } | null;
 
+type ActiveFactor = {
+  id: string;
+  kind: "totp" | "passkey";
+  label: string;
+  createdAt: string;
+};
+
 export function Setup2faForm() {
   const supabase = createClient();
+
+  const [activeFactors, setActiveFactors] = useState<ActiveFactor[]>([]);
+  const [isFactorsLoading, setIsFactorsLoading] = useState(true);
 
   const [enroll, setEnroll] = useState<EnrollState>(null);
   const [code, setCode] = useState("");
@@ -23,6 +34,40 @@ export function Setup2faForm() {
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeySuccess, setPasskeySuccess] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+
+  const loadActiveFactors = useCallback(async () => {
+    setIsFactorsLoading(true);
+
+    const [factorsResult, passkeysResult] = await Promise.all([
+      supabase.auth.mfa.listFactors(),
+      supabase.auth.passkey.list(),
+    ]);
+
+    const totpFactors: ActiveFactor[] = (factorsResult.data?.totp ?? []).map(
+      (factor) => ({
+        id: factor.id,
+        kind: "totp",
+        label: factor.friendly_name || "Authenticator App",
+        createdAt: factor.created_at,
+      }),
+    );
+
+    const passkeys: ActiveFactor[] = (passkeysResult.data ?? []).map(
+      (passkey) => ({
+        id: passkey.id,
+        kind: "passkey",
+        label: passkey.friendly_name || "Passkey",
+        createdAt: passkey.created_at,
+      }),
+    );
+
+    setActiveFactors([...totpFactors, ...passkeys]);
+    setIsFactorsLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadActiveFactors();
+  }, [loadActiveFactors]);
 
   async function handleSetup() {
     setError(null);
@@ -72,6 +117,7 @@ export function Setup2faForm() {
     }
 
     setSuccess(true);
+    loadActiveFactors();
   }
 
   async function handleRegisterPasskey() {
@@ -90,6 +136,7 @@ export function Setup2faForm() {
       }
 
       setPasskeySuccess(true);
+      loadActiveFactors();
     } catch {
       // The user cancelled the OS/browser passkey prompt, or the browser
       // rejected the request outright.
@@ -102,6 +149,41 @@ export function Setup2faForm() {
   return (
     <div className="space-y-8">
       <div>
+        <h3 className="mb-3 text-sm font-medium text-foreground">
+          Active authenticators
+        </h3>
+        {isFactorsLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : activeFactors.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No authenticators or passkeys are linked to your account yet.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border border border-border">
+            {activeFactors.map((factor) => (
+              <li
+                key={factor.id}
+                className="flex items-center gap-3 px-3 py-2.5"
+              >
+                {factor.kind === "totp" ? (
+                  <ShieldCheck className="size-4 text-primary" />
+                ) : (
+                  <KeyRound className="size-4 text-primary" />
+                )}
+                <div>
+                  <p className="text-sm text-foreground">{factor.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Linked{" "}
+                    {new Date(factor.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="border-t border-border pt-6">
         {success ? (
           <p className="text-sm text-success">
             Authenticator app 2FA is now active on your account.

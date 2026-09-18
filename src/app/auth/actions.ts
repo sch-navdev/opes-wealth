@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { needsMfaStepUp } from "@/utils/supabase/mfa";
 
 export async function login(formData: FormData) {
   const rememberMe = formData.get("rememberMe") === "on";
@@ -20,16 +21,9 @@ export async function login(formData: FormData) {
     return { error: error.message };
   }
 
-  const { data, error: aalError } =
-    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-  if (aalError) {
-    return { error: aalError.message };
-  }
-
   revalidatePath("/", "layout");
 
-  if (data.nextLevel === "aal2" && data.nextLevel !== data.currentLevel) {
+  if (await needsMfaStepUp(supabase)) {
     redirect("/login/mfa");
   }
 
