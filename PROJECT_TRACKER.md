@@ -31,6 +31,8 @@ High-net-worth individuals
 - [x] Step 4: Database Schema Generation
 - [x] Step 5: Authentication UI & Protected Routes
 - [x] Step 6: TOTP 2FA Implementation
+  - [x] Passkeys (WebAuthn sign-in + MFA enrollment/verification)
+  - [x] Remember Me (persistent vs. session-only auth cookies)
 - [ ] Step 7: Manual asset tracking
 - [ ] Step 8: CSV bank uploads
 - [ ] Step 9: Live pricing integration
@@ -69,6 +71,14 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `src/app/dashboard/mfa/page.tsx` + `setup-2fa-form.tsx` — 2FA enrollment UI. Client Component calls `supabase.auth.mfa.enroll({ factorType: 'totp' })` (browser client), renders the returned TOTP QR code SVG via `dangerouslySetInnerHTML`, then challenges/verifies the first code to activate the factor.
 - `src/app/dashboard/page.tsx` — now also fetches the AAL level; if `nextLevel === 'aal2'` while `currentLevel === 'aal1'` (password-only session, MFA not yet satisfied), redirects to `/login/mfa` before rendering anything. Added a "Manage two-factor authentication" link to `/dashboard/mfa`.
 
+### Passkeys & Remember Me
+- **Remember Me**: `src/utils/supabase/server.ts`'s `createClient()` now takes `{ rememberMe?: boolean }`. Its `setAll` cookie handler strips `maxAge`/`expires` when `rememberMe` is false, turning the session cookie into a browser-session-only cookie instead of `@supabase/ssr`'s default persistent one. `login()` in `actions.ts` reads the `rememberMe` checkbox from the form and passes it through. Caveat: `src/utils/supabase/middleware.ts` refreshes the session on every request using its own `setAll` (unmodified, always persistent) — a true "session-only" cookie may get re-persisted on the next request; revisit if this matters in practice.
+- **Passkeys**: the task's requested method names (`signInWithWebAuthn()`, and a bare `mfa.enroll({ factorType: 'webauthn' })` completing enrollment by itself) don't exist/aren't sufficient in the installed `@supabase/supabase-js` (`2.116.0`). Implemented with the SDK's actual equivalents instead:
+  - `src/utils/supabase/client.ts` — browser client now enables `auth.experimental.passkey: true`, required for the passkey APIs.
+  - `src/app/login/login-form.tsx` — outlined Champagne Gold "Sign in with Passkey" button calling `supabase.auth.signInWithPasskey()` (passwordless sign-in via device passkey), client-side only.
+  - `src/app/dashboard/mfa/setup-2fa-form.tsx` — "Register Passkey" button calling `supabase.auth.mfa.webauthn.register({ friendlyName })`, which performs `mfa.enroll({ factorType: 'webauthn' })` plus the full browser credential-creation ceremony and verification in one call.
+  - `src/app/login/mfa/mfa-form.tsx` — on mount, calls `listFactors()`; if a verified `webauthn` factor exists, shows a "Verify with Passkey" button calling `supabase.auth.mfa.webauthn.authenticate({ factorId })` (challenge + browser prompt + verify), alongside the existing 6-digit TOTP input.
+
 ### APIs
 _None yet._
 
@@ -96,3 +106,4 @@ opes-wealth/
 - 2026-09-17: Generated initial wealth-tracking schema migration (`profiles`, `asset_categories`, `assets`, `asset_history`) with Row Level Security policies in `supabase/migrations/0001_initial_schema.sql`. Syntax verified with the real Postgres grammar (`libpg-query`); not yet applied to any database.
 - 2026-09-18: Implemented authentication UI and protected dashboard: login/signup/logout server actions, `/login` page (shadcn Card/Input/Label/Button, dark luxury theme), and `/dashboard` as a protected Server Component redirecting unauthenticated users to `/login`. Verified visually in the browser (login page renders themed correctly; `/dashboard` redirects to `/login` when signed out). Build verified with zero TS/bundling errors.
 - 2026-09-18: Implemented TOTP 2FA: login-time AAL2 check and redirect to `/login/mfa`, `verifyMfaLogin` server action, `/login/mfa` verification page, `/dashboard/mfa` enrollment page (QR code + activation), and AAL2 enforcement on `/dashboard`. Verified visually in the browser (both new pages render themed correctly). Build verified with zero TS/bundling errors.
+- 2026-09-18: Implemented Passkeys (sign-in, MFA enrollment, MFA login verification) and Remember Me (session-only vs. persistent auth cookie). Substituted the SDK's real passkey APIs (`signInWithPasskey`, `mfa.webauthn.register`, `mfa.webauthn.authenticate`) for the non-existent `signInWithWebAuthn()` named in the request. Verified visually in the browser (Remember Me checkbox and outlined gold Passkey buttons render correctly on `/login` and `/dashboard/mfa`). Build verified with zero TS/bundling errors.

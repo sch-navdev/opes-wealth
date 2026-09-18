@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 
 export async function login(formData: FormData) {
-  const supabase = await createClient();
+  const rememberMe = formData.get("rememberMe") === "on";
+  const supabase = await createClient({ rememberMe });
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
