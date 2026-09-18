@@ -30,7 +30,7 @@ High-net-worth individuals
 - [x] Step 3: Supabase Client & Auth Middleware setup
 - [x] Step 4: Database Schema Generation
 - [x] Step 5: Authentication UI & Protected Routes
-- [ ] Step 6: TOTP 2FA
+- [x] Step 6: TOTP 2FA Implementation
 - [ ] Step 7: Manual asset tracking
 - [ ] Step 8: CSV bank uploads
 - [ ] Step 9: Live pricing integration
@@ -63,6 +63,12 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `src/app/dashboard/page.tsx` — Server Component; calls `supabase.auth.getUser()` and redirects unauthenticated visitors to `/login`. Renders a header with the user's email and a Sign Out form bound to the `logout` server action.
 - Installed shadcn `card`, `input`, `button`, `label` components (`src/components/ui/`). Normalized their generated imports to use the project's own `cn` helper from `@/lib/utils` instead of the CLI's default `cn` npm package, so styling utilities stay consistent across the codebase; removed the now-unused `cn` package.
 
+### TOTP 2FA
+- `src/app/auth/actions.ts` — `login()` now checks `supabase.auth.mfa.getAuthenticatorAssuranceLevel()` after password sign-in; if `nextLevel === 'aal2'` and MFA hasn't been satisfied yet, redirects to `/login/mfa` instead of `/dashboard`. Added `verifyMfaLogin(code)`, which finds the enrolled TOTP factor via `listFactors()`, opens a `challenge()`, and `verify()`s the submitted code, redirecting to `/dashboard` on success.
+- `src/app/login/mfa/page.tsx` + `mfa-form.tsx` — Client Component form for the 6-digit login-time code, calling `verifyMfaLogin`.
+- `src/app/dashboard/mfa/page.tsx` + `setup-2fa-form.tsx` — 2FA enrollment UI. Client Component calls `supabase.auth.mfa.enroll({ factorType: 'totp' })` (browser client), renders the returned TOTP QR code SVG via `dangerouslySetInnerHTML`, then challenges/verifies the first code to activate the factor.
+- `src/app/dashboard/page.tsx` — now also fetches the AAL level; if `nextLevel === 'aal2'` while `currentLevel === 'aal1'` (password-only session, MFA not yet satisfied), redirects to `/login/mfa` before rendering anything. Added a "Manage two-factor authentication" link to `/dashboard/mfa`.
+
 ### APIs
 _None yet._
 
@@ -89,3 +95,4 @@ opes-wealth/
 - 2026-09-17: Configured Supabase keys (`.env.local`) and implemented Supabase browser/server clients plus auth session-refresh middleware (`src/middleware.ts`). Build verified with zero TS/bundling errors.
 - 2026-09-17: Generated initial wealth-tracking schema migration (`profiles`, `asset_categories`, `assets`, `asset_history`) with Row Level Security policies in `supabase/migrations/0001_initial_schema.sql`. Syntax verified with the real Postgres grammar (`libpg-query`); not yet applied to any database.
 - 2026-09-18: Implemented authentication UI and protected dashboard: login/signup/logout server actions, `/login` page (shadcn Card/Input/Label/Button, dark luxury theme), and `/dashboard` as a protected Server Component redirecting unauthenticated users to `/login`. Verified visually in the browser (login page renders themed correctly; `/dashboard` redirects to `/login` when signed out). Build verified with zero TS/bundling errors.
+- 2026-09-18: Implemented TOTP 2FA: login-time AAL2 check and redirect to `/login/mfa`, `verifyMfaLogin` server action, `/login/mfa` verification page, `/dashboard/mfa` enrollment page (QR code + activation), and AAL2 enforcement on `/dashboard`. Verified visually in the browser (both new pages render themed correctly). Build verified with zero TS/bundling errors.

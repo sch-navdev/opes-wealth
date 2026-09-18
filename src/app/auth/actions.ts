@@ -19,7 +19,19 @@ export async function login(formData: FormData) {
     return { error: error.message };
   }
 
+  const { data, error: aalError } =
+    await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (aalError) {
+    return { error: aalError.message };
+  }
+
   revalidatePath("/", "layout");
+
+  if (data.nextLevel === "aal2" && data.nextLevel !== data.currentLevel) {
+    redirect("/login/mfa");
+  }
+
   redirect("/dashboard");
 }
 
@@ -36,6 +48,45 @@ export async function signup(formData: FormData) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function verifyMfaLogin(code: string) {
+  const supabase = await createClient();
+
+  const { data: factorsData, error: factorsError } =
+    await supabase.auth.mfa.listFactors();
+
+  if (factorsError) {
+    return { error: factorsError.message };
+  }
+
+  const totpFactor = factorsData.totp[0];
+
+  if (!totpFactor) {
+    return { error: "No TOTP factor found for this account." };
+  }
+
+  const factorId = totpFactor.id;
+
+  const { data: challengeData, error: challengeError } =
+    await supabase.auth.mfa.challenge({ factorId });
+
+  if (challengeError) {
+    return { error: challengeError.message };
+  }
+
+  const { error: verifyError } = await supabase.auth.mfa.verify({
+    factorId,
+    challengeId: challengeData.id,
+    code,
+  });
+
+  if (verifyError) {
+    return { error: verifyError.message };
   }
 
   revalidatePath("/", "layout");

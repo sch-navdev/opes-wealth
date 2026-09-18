@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { logout } from "@/app/auth/actions";
@@ -10,6 +11,12 @@ export default async function DashboardPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  if (aal?.nextLevel === "aal2" && aal.currentLevel === "aal1") {
+    redirect("/login/mfa");
   }
 
   return (
@@ -32,6 +39,12 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground">
           Your wealth dashboard will appear here.
         </p>
+        <Link
+          href="/dashboard/mfa"
+          className="mt-4 inline-block text-sm text-primary underline-offset-4 hover:underline"
+        >
+          Manage two-factor authentication
+        </Link>
       </main>
     </div>
   );
