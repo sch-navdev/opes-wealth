@@ -23,6 +23,7 @@ type CountryComboboxProps = {
   placeholder?: string;
   className?: string;
   id?: string;
+  disabled?: boolean;
 };
 
 export function CountryCombobox({
@@ -32,13 +33,14 @@ export function CountryCombobox({
   placeholder = "Select country…",
   className,
   id,
+  disabled = false,
 }: CountryComboboxProps) {
   const [open, setOpen] = useState(false);
 
   const selected = countries.find((country) => country[field] === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={disabled ? false : open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -46,6 +48,7 @@ export function CountryCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          disabled={disabled}
           className={cn("justify-between font-normal", className)}
         >
           <span className="truncate">

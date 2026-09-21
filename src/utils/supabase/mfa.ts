@@ -21,6 +21,10 @@ export async function needsMfaStepUp(
     return false;
   }
 
+  // Temporary debug logging to confirm the exact AMR method string a real
+  // device's passkey login produces. Remove once confirmed.
+  console.log(aal.currentAuthenticationMethods);
+
   // `currentAuthenticationMethods` reflects how this specific session was
   // established. If a passkey was used, that already satisfies strong
   // authentication on its own — bypass the step-up immediately. Entries can

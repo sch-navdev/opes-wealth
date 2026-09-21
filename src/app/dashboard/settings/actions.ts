@@ -62,3 +62,19 @@ export async function resendEmailVerification(email: string) {
 
   return { success: true };
 }
+
+export async function updateEmail(newEmail: string) {
+  const supabase = await createClient();
+
+  // Supabase's native secure email change flow: this does not change the
+  // user's email immediately. It sends a confirmation link to the new
+  // address (and, depending on project settings, to the old one too) and
+  // only applies the change once the link is followed.
+  const { error } = await supabase.auth.updateUser({ email: newEmail });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}

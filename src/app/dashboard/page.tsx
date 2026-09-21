@@ -159,13 +159,6 @@ export default async function DashboardPage() {
             </TableBody>
           </Table>
         </div>
-
-        <Link
-          href="/dashboard/mfa"
-          className="inline-block text-sm text-primary underline-offset-4 hover:underline"
-        >
-          Manage two-factor authentication
-        </Link>
       </main>
     </div>
   );

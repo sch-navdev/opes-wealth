@@ -39,9 +39,17 @@ export default async function SettingsPage() {
       </Link>
 
       <div className="max-w-2xl">
-        <h1 className="mb-6 text-2xl font-semibold tracking-tight text-foreground">
-          Profile Settings
-        </h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Profile Settings
+          </h1>
+          <Link
+            href="/dashboard/mfa"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            Manage Two-Factor Authentication
+          </Link>
+        </div>
 
         <ProfileForm
           profile={profile}

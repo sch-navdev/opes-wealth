@@ -18,7 +18,11 @@ import { Label } from "@/components/ui/label";
 import { CountryCombobox } from "@/components/country-combobox";
 import { countries } from "@/lib/countries";
 import { getCroppedImage } from "@/lib/crop-image";
-import { resendEmailVerification, updateProfile } from "@/app/dashboard/settings/actions";
+import {
+  resendEmailVerification,
+  updateEmail,
+  updateProfile,
+} from "@/app/dashboard/settings/actions";
 
 type Profile = {
   first_name: string | null;
@@ -61,6 +65,8 @@ export function ProfileForm({
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isEditing, setIsEditing] = useState(false);
+
   const [avatarBase64, setAvatarBase64] = useState(
     profile?.avatar_base64 ?? "",
   );
@@ -85,6 +91,12 @@ export function ProfileForm({
   const [phoneVerificationStatus, setPhoneVerificationStatus] = useState<
     string | null
   >(null);
+
+  const [emailInput, setEmailInput] = useState(email);
+  const [emailUpdateStatus, setEmailUpdateStatus] = useState<string | null>(
+    null,
+  );
+  const [isEmailUpdatePending, startEmailUpdateTransition] = useTransition();
 
   // Avatar cropper state
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
@@ -142,7 +154,27 @@ export function ProfileForm({
         return;
       }
       setSuccess(true);
+      setIsEditing(false);
     });
+  }
+
+  function handleEditProfile() {
+    setError(null);
+    setSuccess(false);
+    setIsEditing(true);
+  }
+
+  function handleCancel() {
+    formRef.current?.reset();
+    setAvatarBase64(profile?.avatar_base64 ?? "");
+    setDialCode(initialPhone.dialCode);
+    setPhoneLocal(initialPhone.rest);
+    setAddressCountry(profile?.address_country ?? "");
+    setEmailInput(email);
+    setEmailUpdateStatus(null);
+    setError(null);
+    setSuccess(false);
+    setIsEditing(false);
   }
 
   function handleSendVerification() {
@@ -160,6 +192,21 @@ export function ProfileForm({
 
   function handleVerifyPhone() {
     setPhoneVerificationStatus("SMS verification integration coming soon.");
+  }
+
+  function handleUpdateEmail() {
+    setEmailUpdateStatus(null);
+
+    startEmailUpdateTransition(async () => {
+      const result = await updateEmail(emailInput);
+      if (result?.error) {
+        setEmailUpdateStatus(result.error);
+        return;
+      }
+      setEmailUpdateStatus(
+        "Check your inbox to confirm your new email address.",
+      );
+    });
   }
 
   const fullPhoneNumber = [dialCode, phoneLocal].filter(Boolean).join(" ");
@@ -212,6 +259,7 @@ export function ProfileForm({
               type="button"
               variant="outline"
               size="sm"
+              disabled={!isEditing}
               onClick={() => fileInputRef.current?.click()}
             >
               Change photo
@@ -226,6 +274,33 @@ export function ProfileForm({
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="email_input">Email Address</Label>
+          <div className="flex gap-2">
+            <Input
+              id="email_input"
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              disabled={!isEditing}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!isEditing || isEmailUpdatePending}
+              onClick={handleUpdateEmail}
+            >
+              {isEmailUpdatePending ? "Updating…" : "Update Email"}
+            </Button>
+          </div>
+          {emailUpdateStatus && (
+            <p className="text-xs text-muted-foreground">
+              {emailUpdateStatus}
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="first_name">First Name</Label>
@@ -233,6 +308,7 @@ export function ProfileForm({
               id="first_name"
               name="first_name"
               defaultValue={profile?.first_name ?? ""}
+              disabled={!isEditing}
             />
           </div>
           <div className="space-y-2">
@@ -241,6 +317,7 @@ export function ProfileForm({
               id="last_name"
               name="last_name"
               defaultValue={profile?.last_name ?? ""}
+              disabled={!isEditing}
             />
           </div>
         </div>
@@ -254,15 +331,22 @@ export function ProfileForm({
               onChange={setDialCode}
               placeholder="Code"
               className="w-28 shrink-0"
+              disabled={!isEditing}
             />
             <Input
               id="phone_local"
               type="tel"
               value={phoneLocal}
               onChange={(e) => setPhoneLocal(e.target.value)}
+              disabled={!isEditing}
               className="flex-1"
             />
-            <Button type="button" variant="outline" onClick={handleVerifyPhone}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleVerifyPhone}
+              disabled={!isEditing}
+            >
               Verify Phone
             </Button>
           </div>
@@ -284,6 +368,7 @@ export function ProfileForm({
                 id="address_street"
                 name="address_street"
                 defaultValue={profile?.address_street ?? ""}
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -292,6 +377,7 @@ export function ProfileForm({
                 id="address_po_box"
                 name="address_po_box"
                 defaultValue={profile?.address_po_box ?? ""}
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -300,6 +386,7 @@ export function ProfileForm({
                 id="address_city"
                 name="address_city"
                 defaultValue={profile?.address_city ?? ""}
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -308,6 +395,7 @@ export function ProfileForm({
                 id="address_postal_code"
                 name="address_postal_code"
                 defaultValue={profile?.address_postal_code ?? ""}
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -316,6 +404,7 @@ export function ProfileForm({
                 id="address_landmark"
                 name="address_landmark"
                 defaultValue={profile?.address_landmark ?? ""}
+                disabled={!isEditing}
               />
             </div>
             <div className="space-y-2">
@@ -327,6 +416,7 @@ export function ProfileForm({
                 onChange={setAddressCountry}
                 placeholder="Select country…"
                 className="w-full"
+                disabled={!isEditing}
               />
             </div>
           </div>
@@ -341,9 +431,25 @@ export function ProfileForm({
           <p className="text-sm text-success">Profile saved.</p>
         )}
 
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : "Save Changes"}
-        </Button>
+        {isEditing ? (
+          <div className="flex gap-2">
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Saving…" : "Save Changes"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleCancel}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" onClick={handleEditProfile}>
+            Edit Profile
+          </Button>
+        )}
       </form>
 
       <Dialog open={cropDialogOpen} onOpenChange={setCropDialogOpen}>
