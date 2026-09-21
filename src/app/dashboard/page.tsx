@@ -14,6 +14,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { CurrencySwitcher } from "@/components/currency-switcher";
+import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { cn } from "@/lib/utils";
 
 type AssetRow = {
@@ -26,7 +28,11 @@ type AssetRow = {
   asset_categories: { name: string } | null;
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ currency?: string }>;
+}) {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -39,7 +45,7 @@ export default async function DashboardPage() {
     redirect("/login/mfa");
   }
 
-  const [{ data: categories }, { data: assets }, { data: profile }] =
+  const [{ data: categories }, { data: assets }, { data: profile }, rates] =
     await Promise.all([
       supabase.from("asset_categories").select("id, name").order("name"),
       supabase
@@ -52,10 +58,15 @@ export default async function DashboardPage() {
         .returns<AssetRow[]>(),
       supabase
         .from("profiles")
-        .select("first_name, avatar_base64")
+        .select("first_name, avatar_base64, default_currency")
         .eq("id", user.id)
         .single(),
+      getExchangeRatesFromUsd(),
     ]);
+
+  const { currency: currencyParam } = await searchParams;
+  const displayCurrency =
+    currencyParam || profile?.default_currency || "USD";
 
   const initials =
     profile?.first_name?.[0]?.toUpperCase() ??
@@ -64,7 +75,7 @@ export default async function DashboardPage() {
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: displayCurrency,
   });
 
   return (
@@ -107,7 +118,10 @@ export default async function DashboardPage() {
               Every asset and liability you&apos;re tracking.
             </p>
           </div>
-          <AddAssetDialog categories={categories ?? []} />
+          <div className="flex items-center gap-2">
+            <CurrencySwitcher value={displayCurrency} />
+            <AddAssetDialog categories={categories ?? []} />
+          </div>
         </div>
 
         <div className="border border-border">
@@ -117,7 +131,9 @@ export default async function DashboardPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">Value</TableHead>
+                <TableHead className="text-right">
+                  Value ({displayCurrency})
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -131,30 +147,39 @@ export default async function DashboardPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                assets.map((asset) => (
-                  <TableRow key={asset.id}>
-                    <TableCell className="font-medium text-foreground">
-                      {asset.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {asset.asset_categories?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {asset.quantity}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right",
-                        asset.is_liability
-                          ? "text-destructive"
-                          : "text-foreground",
-                      )}
-                    >
-                      {asset.is_liability ? "-" : ""}
-                      {currencyFormatter.format(asset.current_value)}
-                    </TableCell>
-                  </TableRow>
-                ))
+                assets.map((asset) => {
+                  const convertedValue = convertAmount(
+                    asset.current_value,
+                    asset.currency,
+                    displayCurrency,
+                    rates,
+                  );
+
+                  return (
+                    <TableRow key={asset.id}>
+                      <TableCell className="font-medium text-foreground">
+                        {asset.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {asset.asset_categories?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {asset.quantity}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-right",
+                          asset.is_liability
+                            ? "text-destructive"
+                            : "text-foreground",
+                        )}
+                      >
+                        {asset.is_liability ? "-" : ""}
+                        {currencyFormatter.format(convertedValue)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

@@ -20,6 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RealEstateFields } from "@/components/real-estate-fields";
+import { currencies } from "@/lib/currencies";
+import { EMPTY_REAL_ESTATE_METADATA } from "@/lib/real-estate";
 import { addAsset } from "@/app/dashboard/actions";
 
 type Category = {
@@ -33,6 +36,21 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
+  const [categoryId, setCategoryId] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [realEstateMetadata, setRealEstateMetadata] = useState(
+    EMPTY_REAL_ESTATE_METADATA,
+  );
+
+  const selectedCategory = categories.find((c) => c.id === categoryId);
+  const isRealEstate = selectedCategory?.name === "Real Estate";
+
+  function resetState() {
+    setCategoryId("");
+    setCurrency("USD");
+    setRealEstateMetadata(EMPTY_REAL_ESTATE_METADATA);
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -41,6 +59,10 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
     if (!form) return;
 
     const formData = new FormData(form);
+
+    if (isRealEstate) {
+      formData.set("metadata", JSON.stringify(realEstateMetadata));
+    }
 
     startTransition(async () => {
       const result = await addAsset(formData);
@@ -52,15 +74,22 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
 
       setOpen(false);
       form.reset();
+      resetState();
     });
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) resetState();
+      }}
+    >
       <DialogTrigger asChild>
         <Button>Add Asset</Button>
       </DialogTrigger>
-      <DialogContent className="border-border bg-card">
+      <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card">
         <DialogHeader>
           <DialogTitle className="text-foreground">Add Asset</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -81,7 +110,12 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
 
           <div className="space-y-2">
             <Label htmlFor="category_id">Category</Label>
-            <Select name="category_id" required>
+            <Select
+              name="category_id"
+              required
+              value={categoryId}
+              onValueChange={setCategoryId}
+            >
               <SelectTrigger id="category_id" className="w-full">
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
@@ -95,7 +129,7 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity</Label>
               <Input
@@ -119,7 +153,29 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select name="currency" value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="currency" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {isRealEstate && (
+            <RealEstateFields
+              value={realEstateMetadata}
+              onChange={setRealEstateMetadata}
+            />
+          )}
 
           {error && (
             <p className="text-sm text-destructive" role="alert">

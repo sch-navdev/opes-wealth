@@ -20,6 +20,16 @@ export async function addAsset(formData: FormData) {
   const currentValue = formData.get("current_value") as string;
   const currency = (formData.get("currency") as string) || "USD";
 
+  const metadataRaw = formData.get("metadata") as string | null;
+  let metadata: Record<string, unknown> = {};
+  if (metadataRaw) {
+    try {
+      metadata = JSON.parse(metadataRaw);
+    } catch {
+      return { error: "Invalid metadata payload." };
+    }
+  }
+
   const { error } = await supabase.from("assets").insert({
     profile_id: user.id,
     category_id: categoryId,
@@ -27,6 +37,7 @@ export async function addAsset(formData: FormData) {
     quantity: quantity ? Number(quantity) : 1,
     current_value: Number(currentValue),
     currency,
+    metadata,
   });
 
   if (error) {

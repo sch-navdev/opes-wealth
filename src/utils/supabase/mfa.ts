@@ -21,18 +21,13 @@ export async function needsMfaStepUp(
     return false;
   }
 
-  // Temporary debug logging to confirm the exact AMR method string a real
-  // device's passkey login produces. Remove once confirmed.
-  console.log(aal.currentAuthenticationMethods);
-
   // `currentAuthenticationMethods` reflects how this specific session was
   // established. If a passkey was used, that already satisfies strong
-  // authentication on its own — bypass the step-up immediately. Entries can
-  // be plain strings or `{ method, timestamp }` objects; "webauthn" is the
-  // real AMR value Supabase uses for passkey sign-in (there is no separate
-  // "passkey" value).
-  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some((entry) =>
-    typeof entry === "string" ? entry === "webauthn" : entry.method === "webauthn",
+  // authentication on its own — bypass the step-up immediately and
+  // permanently. Confirmed against a real device: the AMR method string
+  // shows up as "passkey" (not only "webauthn").
+  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some(
+    (m: any) => m.method === "passkey" || m.method === "webauthn",
   );
 
   if (usedPasskeyMethod) {
@@ -47,7 +42,9 @@ export async function needsMfaStepUp(
   const amr = claimsData?.claims.amr ?? [];
 
   const usedPasskeyAmr = amr.some((entry) =>
-    typeof entry === "string" ? entry === "webauthn" : entry.method === "webauthn",
+    typeof entry === "string"
+      ? entry === "passkey" || entry === "webauthn"
+      : entry.method === "passkey" || entry.method === "webauthn",
   );
 
   return !usedPasskeyAmr;
