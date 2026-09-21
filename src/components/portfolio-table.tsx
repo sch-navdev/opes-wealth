@@ -17,6 +17,11 @@ import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { convertAmount } from "@/lib/fx";
 import { cn } from "@/lib/utils";
+import {
+  calculateTotalCost,
+  calculateUnrealizedGain,
+  parseRealEstateMetadata,
+} from "@/lib/real-estate";
 
 type Category = { id: string; name: string };
 
@@ -62,6 +67,7 @@ export function PortfolioTable({
             <TableHead className="text-right">
               Value ({displayCurrency})
             </TableHead>
+            <TableHead className="text-right">Performance</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -69,7 +75,7 @@ export function PortfolioTable({
           {assets.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={5}
+                colSpan={6}
                 className="text-center text-muted-foreground"
               >
                 No assets yet. Add your first one to get started.
@@ -93,6 +99,48 @@ export function PortfolioTable({
                 typeof asset.metadata?.outstanding_balance === "number"
                   ? asset.metadata.outstanding_balance
                   : null;
+
+              // Performance column — total cost basis (contract/purchase
+              // price + registration fee + agency/renovation/furnishing
+              // fees) vs. market valuation. Only meaningful for Real
+              // Estate assets, which are the only category with a cost
+              // basis on file; other categories show "—".
+              const isRealEstate = asset.asset_categories?.name === "Real Estate";
+              const reMetadata = isRealEstate
+                ? parseRealEstateMetadata(asset.metadata)
+                : null;
+              const marketValuation = reMetadata
+                ? reMetadata.market_valuation ?? asset.current_value
+                : asset.current_value;
+              const totalCost = reMetadata
+                ? calculateTotalCost(reMetadata, marketValuation)
+                : null;
+              const unrealizedGain =
+                totalCost != null
+                  ? calculateUnrealizedGain(marketValuation, totalCost)
+                  : null;
+              const convertedGain =
+                unrealizedGain != null
+                  ? convertAmount(
+                      unrealizedGain.amount,
+                      asset.currency,
+                      displayCurrency,
+                      rates,
+                    )
+                  : null;
+              const gainPercent = unrealizedGain?.percent ?? null;
+              const gainColorClass =
+                convertedGain == null || convertedGain === 0
+                  ? "text-muted-foreground"
+                  : convertedGain > 0
+                    ? "text-emerald-500"
+                    : "text-red-500";
+              const gainSign =
+                convertedGain != null && convertedGain !== 0
+                  ? convertedGain > 0
+                    ? "+"
+                    : "-"
+                  : "";
 
               const assetForEdit: AssetForEdit = {
                 id: asset.id,
@@ -177,6 +225,24 @@ export function PortfolioTable({
                           )}
                         </p>
                       )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {convertedGain == null || gainPercent == null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-col">
+                        <span className={gainColorClass}>
+                          {maskValue(
+                            `${gainSign}${currencyFormatter.format(Math.abs(convertedGain))}`,
+                          )}
+                        </span>
+                        <span className={cn("text-sm", gainColorClass)}>
+                          {maskValue(
+                            `${gainPercent >= 0 ? "+" : "-"}${Math.abs(gainPercent).toFixed(2)}%`,
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

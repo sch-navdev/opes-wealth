@@ -570,7 +570,7 @@ export function AssetDetailView({
                   <p className="text-xs text-muted-foreground">
                     Unrealized Gain
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2">
                     <p
                       className={
                         unrealizedGain != null
@@ -591,8 +591,8 @@ export function AssetDetailView({
                         variant="secondary"
                         className={
                           unrealizedGain.amount >= 0
-                            ? "bg-success text-success-foreground"
-                            : "bg-destructive text-destructive-foreground"
+                            ? "whitespace-nowrap bg-success px-2 py-0.5 text-success-foreground"
+                            : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"
                         }
                       >
                         {unrealizedGain.amount >= 0 ? "+" : ""}

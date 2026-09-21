@@ -32,8 +32,15 @@ Verified visually in the browser (via a disposable local-only preview route, rem
 - Verified visually via a disposable preview route (a standalone copy of the details page's JSX with mock off-plan data, since the real route needs a live Supabase session): header, Characteristics, Financials, and the Off-Plan card with its two-row payment-schedule table (one "Paid", one "Pending") all rendered correctly.
 - Not yet verified against a live Supabase instance — in particular, clicking through from a real table row, and `notFound()` behavior for a missing/foreign asset id, haven't been exercised end-to-end.
 
+## Performance Column & Badge Truncation Fix
+- **`src/components/portfolio-table.tsx`** (not `dashboard/page.tsx` — the table was extracted into this Client Component during [[Privacy-Mode|Privacy Mode]] so it could call `usePrivacy()`) gained a "Performance" column between Value and Actions. For Real Estate rows: `calculateTotalCost`/`calculateUnrealizedGain` (from [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]) compute the gain against market valuation, `convertAmount` converts it into the display currency, and the cell renders a `flex flex-col` with the signed amount on top and the signed percentage below, both colored `text-emerald-500`/`text-red-500`/`text-muted-foreground` by sign and passed through `maskValue()`. Non-Real-Estate rows (no cost-basis fields exist for them) show "—".
+- **`asset-detail-view.tsx`**'s Aperçu → Unrealized Gain card: the row wrapping the value and the percentage `Badge` is now `flex w-full flex-wrap items-center gap-2` (was missing `flex-wrap`/`w-full`), and the badge itself gained `whitespace-nowrap px-2 py-0.5` so a value like "+16.0%" can't get clipped by the card's fixed width — it now wraps to its own line on narrow viewports instead of being cut off mid-digit.
+- Verified visually via a disposable preview route: the Performance column showed `+AED 106,000.00` / `+9.27%` in green for a gaining asset, `-AED 244,000.00` / `-21.33%` in red for a losing one (hand-checked against `calculateTotalCost`/`calculateUnrealizedGain`'s own arithmetic), and "—" for a Cash asset; the Unrealized Gain badge rendered fully as "+9.3%" at both desktop width and a 340px mobile width, with no truncation at either.
+- Not yet verified against a live Supabase instance.
+
 ## Related
 - [[Database-Schema|Database Schema]] — `assets` table, `profiles` trigger
-- [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — Real Estate sub-form rendered inside the Add/Edit dialog, FX conversion of the Value column
+- [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — Real Estate sub-form rendered inside the Add/Edit dialog, FX conversion of the Value column, the cost-basis helpers the Performance column reuses
 - [[Design-System|Design System]] — theme tokens used by the table/dialog
 - [[Profile-Settings|Profile & Settings]] — shares the resize/compress-to-Base64 image pipeline with the profile avatar uploader
+- [[Privacy-Mode|Privacy Mode]] — `portfolio-table.tsx`'s extraction into a Client Component, and the `maskValue()` calls in the new Performance column
