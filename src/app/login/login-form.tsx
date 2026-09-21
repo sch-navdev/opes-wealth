@@ -122,7 +122,7 @@ export function LoginForm() {
         variant="outline"
         disabled={isPending || isPasskeyPending}
         onClick={handlePasskeySignIn}
-        className="w-full border-primary text-primary hover:bg-primary/10 hover:text-primary"
+        className="w-full"
       >
         {isPasskeyPending ? "Waiting for passkey…" : "Sign in with Passkey"}
       </Button>

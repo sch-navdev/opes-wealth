@@ -22,6 +22,7 @@ type CountryComboboxProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  id?: string;
 };
 
 export function CountryCombobox({
@@ -30,6 +31,7 @@ export function CountryCombobox({
   onChange,
   placeholder = "Select country…",
   className,
+  id,
 }: CountryComboboxProps) {
   const [open, setOpen] = useState(false);
 
@@ -39,6 +41,7 @@ export function CountryCombobox({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           type="button"
           variant="outline"
           role="combobox"

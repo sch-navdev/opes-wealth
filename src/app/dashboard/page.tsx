@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { cn } from "@/lib/utils";
 
 type AssetRow = {
   id: string;
@@ -68,7 +69,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="flex items-center justify-between border-b border-border px-8 py-6">
+      <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <div className="flex items-center gap-3">
           <Avatar size="lg">
             <AvatarImage src={profile?.avatar_base64 || undefined} alt="" />
@@ -96,8 +97,8 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="space-y-6 px-8 py-10">
-        <div className="flex items-center justify-between">
+      <main className="space-y-6 px-4 py-10 sm:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               Portfolio
@@ -142,12 +143,12 @@ export default async function DashboardPage() {
                       {asset.quantity}
                     </TableCell>
                     <TableCell
-                      className={
-                        "text-right " +
-                        (asset.is_liability
+                      className={cn(
+                        "text-right",
+                        asset.is_liability
                           ? "text-destructive"
-                          : "text-foreground")
-                      }
+                          : "text-foreground",
+                      )}
                     >
                       {asset.is_liability ? "-" : ""}
                       {currencyFormatter.format(asset.current_value)}

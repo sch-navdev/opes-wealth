@@ -49,6 +49,15 @@ export async function signup(formData: FormData) {
   redirect("/dashboard");
 }
 
+/**
+ * Verifies the TOTP step-up code on `/login/mfa`.
+ *
+ * Intentionally TOTP-only: Passkeys are a standalone passwordless sign-in
+ * method, not an MFA factor, and a Passkey login already satisfies strong
+ * authentication on its own — `needsMfaStepUp` (see `utils/supabase/mfa.ts`)
+ * bypasses `/login/mfa` entirely for those sessions, so this action never
+ * needs to handle a passkey-based step-up.
+ */
 export async function verifyMfaLogin(code: string) {
   const supabase = await createClient();
 

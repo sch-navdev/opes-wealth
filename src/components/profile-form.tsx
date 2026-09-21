@@ -82,6 +82,10 @@ export function ProfileForm({
     profile?.address_country ?? "",
   );
 
+  const [phoneVerificationStatus, setPhoneVerificationStatus] = useState<
+    string | null
+  >(null);
+
   // Avatar cropper state
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
@@ -155,7 +159,7 @@ export function ProfileForm({
   }
 
   function handleVerifyPhone() {
-    alert("SMS verification integration coming soon.");
+    setPhoneVerificationStatus("SMS verification integration coming soon.");
   }
 
   const fullPhoneNumber = [dialCode, phoneLocal].filter(Boolean).join(" ");
@@ -179,7 +183,6 @@ export function ProfileForm({
               size="sm"
               disabled={isVerificationPending}
               onClick={handleSendVerification}
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             >
               {isVerificationPending
                 ? "Sending…"
@@ -210,7 +213,6 @@ export function ProfileForm({
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             >
               Change photo
             </Button>
@@ -224,7 +226,7 @@ export function ProfileForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="first_name">First Name</Label>
             <Input
@@ -260,22 +262,22 @@ export function ProfileForm({
               onChange={(e) => setPhoneLocal(e.target.value)}
               className="flex-1"
             />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleVerifyPhone}
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-            >
+            <Button type="button" variant="outline" onClick={handleVerifyPhone}>
               Verify Phone
             </Button>
           </div>
+          {phoneVerificationStatus && (
+            <p className="text-xs text-muted-foreground">
+              {phoneVerificationStatus}
+            </p>
+          )}
         </div>
 
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-foreground">
             Residential Address
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="address_street">Street Name</Label>
               <Input
@@ -317,8 +319,9 @@ export function ProfileForm({
               />
             </div>
             <div className="space-y-2">
-              <Label>Country</Label>
+              <Label htmlFor="address_country">Country</Label>
               <CountryCombobox
+                id="address_country"
                 field="name"
                 value={addressCountry}
                 onChange={setAddressCountry}

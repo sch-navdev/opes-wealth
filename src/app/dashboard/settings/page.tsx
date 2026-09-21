@@ -12,7 +12,7 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (!user || !user.email) {
     redirect("/login");
   }
 
@@ -45,7 +45,7 @@ export default async function SettingsPage() {
 
         <ProfileForm
           profile={profile}
-          email={user.email!}
+          email={user.email}
           isEmailVerified={user.email_confirmed_at != null}
         />
       </div>

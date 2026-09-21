@@ -12,9 +12,8 @@ type EnrollState = {
   qrCode: string;
 } | null;
 
-type ActiveFactor = {
+type LinkedFactor = {
   id: string;
-  kind: "totp" | "passkey";
   label: string;
   createdAt: string;
 };
@@ -22,7 +21,8 @@ type ActiveFactor = {
 export function Setup2faForm() {
   const supabase = createClient();
 
-  const [activeFactors, setActiveFactors] = useState<ActiveFactor[]>([]);
+  const [totpFactors, setTotpFactors] = useState<LinkedFactor[]>([]);
+  const [passkeyFactors, setPasskeyFactors] = useState<LinkedFactor[]>([]);
   const [isFactorsLoading, setIsFactorsLoading] = useState(true);
 
   const [enroll, setEnroll] = useState<EnrollState>(null);
@@ -43,25 +43,22 @@ export function Setup2faForm() {
       supabase.auth.passkey.list(),
     ]);
 
-    const totpFactors: ActiveFactor[] = (factorsResult.data?.totp ?? []).map(
-      (factor) => ({
+    setTotpFactors(
+      (factorsResult.data?.totp ?? []).map((factor) => ({
         id: factor.id,
-        kind: "totp",
         label: factor.friendly_name || "Authenticator App",
         createdAt: factor.created_at,
-      }),
+      })),
     );
 
-    const passkeys: ActiveFactor[] = (passkeysResult.data ?? []).map(
-      (passkey) => ({
+    setPasskeyFactors(
+      (passkeysResult.data ?? []).map((passkey) => ({
         id: passkey.id,
-        kind: "passkey",
         label: passkey.friendly_name || "Passkey",
         createdAt: passkey.created_at,
-      }),
+      })),
     );
 
-    setActiveFactors([...totpFactors, ...passkeys]);
     setIsFactorsLoading(false);
   }, [supabase]);
 
@@ -148,52 +145,47 @@ export function Setup2faForm() {
 
   return (
     <div className="space-y-8">
+      {/* Authenticator App (TOTP) — a true MFA factor: required as a
+          second step after password login on /login/mfa. */}
       <div>
-        <h3 className="mb-3 text-sm font-medium text-foreground">
-          Active authenticators
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+          <ShieldCheck className="size-4 text-primary" />
+          Authenticator App
         </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Required as a second step after entering your password.
+        </p>
+
         {isFactorsLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : activeFactors.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No authenticators or passkeys are linked to your account yet.
-          </p>
-        ) : (
-          <ul className="divide-y divide-border border border-border">
-            {activeFactors.map((factor) => (
+        ) : totpFactors.length > 0 ? (
+          <ul className="mb-4 divide-y divide-border border border-border">
+            {totpFactors.map((factor) => (
               <li
                 key={factor.id}
-                className="flex items-center gap-3 px-3 py-2.5"
+                className="flex items-center justify-between px-3 py-2.5"
               >
-                {factor.kind === "totp" ? (
-                  <ShieldCheck className="size-4 text-primary" />
-                ) : (
-                  <KeyRound className="size-4 text-primary" />
-                )}
-                <div>
-                  <p className="text-sm text-foreground">{factor.label}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Linked{" "}
-                    {new Date(factor.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
+                <p className="text-sm text-foreground">{factor.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  Linked {new Date(factor.createdAt).toLocaleDateString()}
+                </p>
               </li>
             ))}
           </ul>
-        )}
-      </div>
+        ) : null}
 
-      <div className="border-t border-border pt-6">
         {success ? (
           <p className="text-sm text-success">
             Authenticator app 2FA is now active on your account.
           </p>
         ) : !enroll ? (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Add an extra layer of security by requiring a 6-digit code from
-              an authenticator app each time you sign in.
-            </p>
+            {totpFactors.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Add an extra layer of security by requiring a 6-digit code
+                from an authenticator app each time you sign in.
+              </p>
+            )}
             {error && (
               <p className="text-sm text-destructive" role="alert">
                 {error}
@@ -245,17 +237,50 @@ export function Setup2faForm() {
         )}
       </div>
 
+      {/* Passkeys — a standalone passwordless sign-in method, not an MFA
+          factor. A passkey login already satisfies strong authentication
+          on its own and skips /login/mfa entirely; it's never checked as
+          a second step after a password login. */}
       <div className="border-t border-border pt-6">
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-medium text-foreground">
+          <KeyRound className="size-4 text-primary" />
+          Passkeys
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Sign in without a password. A passkey already counts as strong
+          authentication on its own, so it replaces the authenticator-app
+          step above rather than working alongside it.
+        </p>
+
+        {!isFactorsLoading && passkeyFactors.length > 0 && (
+          <ul className="mb-4 divide-y divide-border border border-border">
+            {passkeyFactors.map((factor) => (
+              <li
+                key={factor.id}
+                className="flex items-center justify-between px-3 py-2.5"
+              >
+                <p className="text-sm text-foreground">{factor.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  Linked {new Date(factor.createdAt).toLocaleDateString()}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+
         {passkeySuccess ? (
           <p className="text-sm text-success">
-            Passkey registered — you can use it to verify at login.
+            Passkey registered — you can now sign in with it directly from
+            the login page.
           </p>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Or register a passkey to verify with your device&apos;s
-              biometrics instead of a 6-digit code.
-            </p>
+            {passkeyFactors.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Register a passkey to sign in with your device&apos;s
+                biometrics instead of a password.
+              </p>
+            )}
             {passkeyError && (
               <p className="text-sm text-destructive" role="alert">
                 {passkeyError}
@@ -265,7 +290,6 @@ export function Setup2faForm() {
               variant="outline"
               onClick={handleRegisterPasskey}
               disabled={isPasskeyLoading}
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
             >
               {isPasskeyLoading ? "Waiting for passkey…" : "Register Passkey"}
             </Button>

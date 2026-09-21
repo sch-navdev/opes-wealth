@@ -23,9 +23,12 @@ export async function needsMfaStepUp(
 
   // `currentAuthenticationMethods` reflects how this specific session was
   // established. If a passkey was used, that already satisfies strong
-  // authentication on its own — bypass the step-up immediately.
-  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some(
-    (m: any) => m.method === "passkey" || m.method === "webauthn",
+  // authentication on its own — bypass the step-up immediately. Entries can
+  // be plain strings or `{ method, timestamp }` objects; "webauthn" is the
+  // real AMR value Supabase uses for passkey sign-in (there is no separate
+  // "passkey" value).
+  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some((entry) =>
+    typeof entry === "string" ? entry === "webauthn" : entry.method === "webauthn",
   );
 
   if (usedPasskeyMethod) {
