@@ -17,9 +17,15 @@ import {
   CONSTRUCTION_YEARS,
   EPC_RATINGS,
   PROPERTY_TYPES,
+  nextMilestoneId,
   type ConditionRatings,
+  type PaymentMilestone,
   type RealEstateMetadata,
 } from "@/lib/real-estate";
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 function Stepper({
   label,
@@ -147,6 +153,79 @@ export function RealEstateFields({
     0,
   );
 
+  // --- Off-plan: contract price / ADM fee -------------------------------
+
+  function applySchedule(nextSchedule: PaymentMilestone[]) {
+    const paidToDate = round2(
+      nextSchedule.reduce(
+        (sum, m) => sum + (m.status === "paid" ? m.amount || 0 : 0),
+        0,
+      ),
+    );
+    const outstanding = round2((value.contract_price ?? 0) - paidToDate);
+
+    onChange({
+      ...value,
+      payment_schedule: nextSchedule,
+      paid_to_date: paidToDate,
+      outstanding_balance: outstanding,
+    });
+  }
+
+  function setContractPrice(next: number | null) {
+    const outstanding = round2((next ?? 0) - value.paid_to_date);
+    const admAmount =
+      next != null && value.adm_fee_percent != null
+        ? round2((next * value.adm_fee_percent) / 100)
+        : value.adm_fee_amount;
+
+    onChange({
+      ...value,
+      contract_price: next,
+      outstanding_balance: outstanding,
+      adm_fee_amount: admAmount,
+    });
+  }
+
+  function setAdmFeePercent(percent: number | null) {
+    const amount =
+      percent != null && value.contract_price != null
+        ? round2((value.contract_price * percent) / 100)
+        : value.adm_fee_amount;
+
+    onChange({ ...value, adm_fee_percent: percent, adm_fee_amount: amount });
+  }
+
+  function setAdmFeeAmount(amount: number | null) {
+    onChange({ ...value, adm_fee_amount: amount });
+  }
+
+  function addMilestone() {
+    applySchedule([
+      ...value.payment_schedule,
+      {
+        id: nextMilestoneId(),
+        milestone: "",
+        due_date: "",
+        amount: 0,
+        percentage: 0,
+        status: "pending",
+      },
+    ]);
+  }
+
+  function updateMilestone(index: number, patch: Partial<PaymentMilestone>) {
+    applySchedule(
+      value.payment_schedule.map((m, i) =>
+        i === index ? { ...m, ...patch } : m,
+      ),
+    );
+  }
+
+  function removeMilestone(index: number) {
+    applySchedule(value.payment_schedule.filter((_, i) => i !== index));
+  }
+
   return (
     <div className="space-y-6 border-t border-border pt-6">
       <h3 className="text-sm font-medium text-foreground">
@@ -182,28 +261,205 @@ export function RealEstateFields({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <ToggleField
-          label="Automatic Estimation"
-          checked={value.automaticEstimation}
-          onChange={(next) => set("automaticEstimation", next)}
-        />
-        <ToggleField
-          label="Elevator"
-          checked={value.elevator}
-          onChange={(next) => set("elevator", next)}
-        />
-        <ToggleField
-          label="New Construction"
-          checked={value.newConstruction}
-          onChange={(next) => set("newConstruction", next)}
-        />
-        <ToggleField
-          label="Furnished"
-          checked={value.furnished}
-          onChange={(next) => set("furnished", next)}
-        />
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-foreground">
+          Characteristics
+        </h4>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <ToggleField
+            label="Automatic Estimation"
+            checked={value.automaticEstimation}
+            onChange={(next) => set("automaticEstimation", next)}
+          />
+          <ToggleField
+            label="Elevator"
+            checked={value.elevator}
+            onChange={(next) => set("elevator", next)}
+          />
+          <ToggleField
+            label="New Construction"
+            checked={value.newConstruction}
+            onChange={(next) => set("newConstruction", next)}
+          />
+          <ToggleField
+            label="Furnished"
+            checked={value.furnished}
+            onChange={(next) => set("furnished", next)}
+          />
+          <ToggleField
+            label="Off-Plan Property"
+            checked={value.is_offplan}
+            onChange={(next) => set("is_offplan", next)}
+          />
+        </div>
       </div>
+
+      {value.is_offplan && (
+        <div className="space-y-4 border border-border p-4">
+          <h4 className="text-sm font-medium text-foreground">
+            Off-Plan Payment Tracking
+          </h4>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <NumberField
+              label="Contract Price (SPA)"
+              value={value.contract_price}
+              onChange={setContractPrice}
+            />
+            <div className="space-y-2">
+              <Label>Municipal / ADM Fee (%)</Label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={value.adm_fee_percent ?? ""}
+                onChange={(e) =>
+                  setAdmFeePercent(
+                    e.target.value === "" ? null : Number(e.target.value),
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Municipal / ADM Fee (Amount)</Label>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                value={value.adm_fee_amount ?? ""}
+                onChange={(e) =>
+                  setAdmFeeAmount(
+                    e.target.value === "" ? null : Number(e.target.value),
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Payment Schedule</Label>
+            </div>
+
+            <div className="space-y-3">
+              {value.payment_schedule.map((milestone, index) => (
+                <div
+                  key={milestone.id}
+                  className="grid grid-cols-2 gap-2 border border-border p-3 sm:grid-cols-6 sm:items-end"
+                >
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label className="text-xs">Milestone</Label>
+                    <Input
+                      placeholder="e.g. Down Payment"
+                      value={milestone.milestone}
+                      onChange={(e) =>
+                        updateMilestone(index, { milestone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Due Date</Label>
+                    <Input
+                      type="date"
+                      value={milestone.due_date}
+                      onChange={(e) =>
+                        updateMilestone(index, { due_date: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Amount</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={milestone.amount}
+                      onChange={(e) =>
+                        updateMilestone(index, {
+                          amount: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Percentage</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="100"
+                      value={milestone.percentage}
+                      onChange={(e) =>
+                        updateMilestone(index, {
+                          percentage: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs">Status</Label>
+                      <Select
+                        value={milestone.status}
+                        onValueChange={(next) =>
+                          updateMilestone(index, {
+                            status: next as "paid" | "pending",
+                          })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => removeMilestone(index)}
+                      aria-label="Remove milestone"
+                    >
+                      <Minus className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addMilestone}
+            >
+              + Add Milestone
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Total Paid to Date
+              </p>
+              <p className="text-sm font-medium text-success">
+                {value.paid_to_date.toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Outstanding Balance
+              </p>
+              <p className="text-sm font-medium text-destructive">
+                {value.outstanding_balance.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField

@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { Badge } from "@/components/ui/badge";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
@@ -159,10 +160,25 @@ export default async function DashboardPage({
                     rates,
                   );
 
+                  const isOffplan = asset.metadata?.is_offplan === true;
+                  const contractPrice =
+                    typeof asset.metadata?.contract_price === "number"
+                      ? asset.metadata.contract_price
+                      : null;
+                  const outstandingBalance =
+                    typeof asset.metadata?.outstanding_balance === "number"
+                      ? asset.metadata.outstanding_balance
+                      : null;
+
                   return (
                     <TableRow key={asset.id}>
                       <TableCell className="font-medium text-foreground">
-                        {asset.name}
+                        <div className="flex items-center gap-2">
+                          {asset.name}
+                          {isOffplan && (
+                            <Badge variant="secondary">Off-Plan</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {asset.asset_categories?.name ?? "—"}
@@ -180,6 +196,30 @@ export default async function DashboardPage({
                       >
                         {asset.is_liability ? "-" : ""}
                         {currencyFormatter.format(convertedValue)}
+                        {isOffplan &&
+                          contractPrice != null &&
+                          outstandingBalance != null && (
+                            <p className="text-xs font-normal text-muted-foreground">
+                              Total:{" "}
+                              {currencyFormatter.format(
+                                convertAmount(
+                                  contractPrice,
+                                  asset.currency,
+                                  displayCurrency,
+                                  rates,
+                                ),
+                              )}{" "}
+                              | Owed:{" "}
+                              {currencyFormatter.format(
+                                convertAmount(
+                                  outstandingBalance,
+                                  asset.currency,
+                                  displayCurrency,
+                                  rates,
+                                ),
+                              )}
+                            </p>
+                          )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

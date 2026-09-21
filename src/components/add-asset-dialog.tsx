@@ -85,7 +85,24 @@ export function AddAssetDialog({
     const formData = new FormData(form);
 
     if (isRealEstate) {
-      formData.set("metadata", JSON.stringify(realEstateMetadata));
+      let metadata = realEstateMetadata;
+
+      if (realEstateMetadata.is_offplan) {
+        // The "Current Market Valuation" input reuses the generic
+        // `current_value` field, but for off-plan assets the DB's
+        // `current_value` column should hold net equity instead
+        // (market valuation minus what's still owed on the contract), so
+        // portfolio totals aren't inflated by debt still outstanding.
+        // The raw market valuation is preserved in metadata so it can be
+        // re-edited later without double-subtracting.
+        const marketValuation = Number(formData.get("current_value"));
+        const netEquity = marketValuation - realEstateMetadata.outstanding_balance;
+
+        metadata = { ...realEstateMetadata, market_valuation: marketValuation };
+        formData.set("current_value", String(netEquity));
+      }
+
+      formData.set("metadata", JSON.stringify(metadata));
     }
 
     startTransition(async () => {
@@ -179,7 +196,11 @@ export function AddAssetDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="current_value">Value</Label>
+              <Label htmlFor="current_value">
+                {isRealEstate && realEstateMetadata.is_offplan
+                  ? "Current Market Valuation"
+                  : "Value"}
+              </Label>
               <Input
                 id="current_value"
                 name="current_value"
@@ -187,9 +208,18 @@ export function AddAssetDialog({
                 step="any"
                 min="0"
                 placeholder="0.00"
-                defaultValue={asset?.current_value ?? ""}
+                defaultValue={
+                  asset && realEstateMetadata.is_offplan
+                    ? realEstateMetadata.market_valuation ?? asset.current_value
+                    : asset?.current_value ?? ""
+                }
                 required
               />
+              {isRealEstate && realEstateMetadata.is_offplan && (
+                <p className="text-xs text-muted-foreground">
+                  Saved as net equity (this minus the outstanding balance).
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>

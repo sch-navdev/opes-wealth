@@ -11,6 +11,15 @@ export type ConditionRatings = {
   general: string;
 };
 
+export type PaymentMilestone = {
+  id: string;
+  milestone: string;
+  due_date: string;
+  amount: number;
+  percentage: number;
+  status: "paid" | "pending";
+};
+
 export type RealEstateMetadata = {
   address: string;
   propertyType: string;
@@ -33,6 +42,19 @@ export type RealEstateMetadata = {
   epcRating: string;
   condition: ConditionRatings;
   ownership: OwnershipEntry[];
+
+  // Off-plan property tracking
+  is_offplan: boolean;
+  /** The property's current fair-market valuation, entered by the user.
+   *  Kept separate from the asset's `current_value` column, which for
+   *  off-plan assets stores the computed net equity instead. */
+  market_valuation: number | null;
+  contract_price: number | null;
+  adm_fee_percent: number | null;
+  adm_fee_amount: number | null;
+  paid_to_date: number;
+  outstanding_balance: number;
+  payment_schedule: PaymentMilestone[];
 };
 
 export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
@@ -63,6 +85,15 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
     general: "",
   },
   ownership: [{ name: "", percentage: 100 }],
+
+  is_offplan: false,
+  market_valuation: null,
+  contract_price: null,
+  adm_fee_percent: 2,
+  adm_fee_amount: null,
+  paid_to_date: 0,
+  outstanding_balance: 0,
+  payment_schedule: [],
 };
 
 /**
@@ -91,7 +122,18 @@ export function parseRealEstateMetadata(
       Array.isArray(r.ownership) && r.ownership.length > 0
         ? r.ownership
         : EMPTY_REAL_ESTATE_METADATA.ownership,
+    payment_schedule: Array.isArray(r.payment_schedule)
+      ? r.payment_schedule
+      : EMPTY_REAL_ESTATE_METADATA.payment_schedule,
   };
+}
+
+let milestoneCounter = 0;
+
+/** Generates a stable-enough client-side id for a new payment milestone row. */
+export function nextMilestoneId(): string {
+  milestoneCounter += 1;
+  return `milestone-${Date.now()}-${milestoneCounter}`;
 }
 
 export const PROPERTY_TYPES = [
