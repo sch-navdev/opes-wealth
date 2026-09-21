@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseRealEstateMetadata } from "@/lib/real-estate";
+import { parseRealEstateMetadata, resolveRegistrationFee } from "@/lib/real-estate";
 
 function parseImages(formData: FormData): string[] {
   const raw = formData.get("images") as string | null;
@@ -58,8 +58,7 @@ async function syncAssetHistory(
   if (isRealEstate) {
     const re = parseRealEstateMetadata(metadata);
     const totalFees =
-      (re.adm_fee_amount ?? 0) +
-      (re.notaryFees ?? 0) +
+      resolveRegistrationFee(re) +
       (re.agencyFees ?? 0) +
       (re.renovationFees ?? 0) +
       (re.furnishingFees ?? 0);

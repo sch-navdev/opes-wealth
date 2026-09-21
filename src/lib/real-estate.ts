@@ -27,6 +27,8 @@ export type LinkedLoan = {
   start_date: string;
 };
 
+export type RegistrationFeeType = "Notary" | "RERA" | "ADM";
+
 export type RealEstateMetadata = {
   address: string;
   propertyType: string;
@@ -36,7 +38,10 @@ export type RealEstateMetadata = {
   furnished: boolean;
   purchasePrice: number | null;
   agencyFees: number | null;
+  /** @deprecated superseded by `registration_fee_type`/`registration_fee_amount`; kept only as a legacy fallback for older saved assets. */
   notaryFees: number | null;
+  registration_fee_type: RegistrationFeeType;
+  registration_fee_amount: number;
   renovationFees: number | null;
   furnishingFees: number | null;
   /** Total floor area — kept in sync as `internal_area + terrace_area` whenever either changes. */
@@ -61,7 +66,9 @@ export type RealEstateMetadata = {
    *  off-plan assets stores the computed net equity instead. */
   market_valuation: number | null;
   contract_price: number | null;
+  /** @deprecated superseded by `registration_fee_type`/`registration_fee_amount`; kept only as a legacy fallback for older saved assets. */
   adm_fee_percent: number | null;
+  /** @deprecated superseded by `registration_fee_type`/`registration_fee_amount`; kept only as a legacy fallback for older saved assets. */
   adm_fee_amount: number | null;
   paid_to_date: number;
   outstanding_balance: number;
@@ -81,6 +88,8 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   purchasePrice: null,
   agencyFees: null,
   notaryFees: null,
+  registration_fee_type: "Notary",
+  registration_fee_amount: 0,
   renovationFees: null,
   furnishingFees: null,
   surfaceArea: null,
@@ -159,11 +168,22 @@ export function parseRealEstateMetadata(
 export const MAX_ASSET_IMAGES = 3;
 
 /**
+ * The single registration/notarization fee paid at signing — `registration_fee_amount`
+ * if it's set, otherwise the sum of the legacy `notaryFees`/`adm_fee_amount`
+ * fields it replaced, so assets saved before this consolidation still cost
+ * out correctly without a data migration.
+ */
+export function resolveRegistrationFee(metadata: RealEstateMetadata): number {
+  if (metadata.registration_fee_amount) return metadata.registration_fee_amount;
+  return (metadata.notaryFees ?? 0) + (metadata.adm_fee_amount ?? 0);
+}
+
+/**
  * All-in cost basis: the contract/purchase price plus every fee paid to
- * acquire the property (ADM/municipal registration, notary, agency,
- * renovation, furnishing). `fallbackValue` is used when neither
- * `contract_price` nor `purchasePrice` is set (e.g. a bare market
- * valuation with no purchase history entered yet).
+ * acquire the property (registration, agency, renovation, furnishing).
+ * `fallbackValue` is used when neither `contract_price` nor `purchasePrice`
+ * is set (e.g. a bare market valuation with no purchase history entered
+ * yet).
  */
 export function calculateTotalCost(
   metadata: RealEstateMetadata,
@@ -172,8 +192,7 @@ export function calculateTotalCost(
   const base = metadata.contract_price ?? metadata.purchasePrice ?? fallbackValue;
   return (
     base +
-    (metadata.adm_fee_amount ?? 0) +
-    (metadata.notaryFees ?? 0) +
+    resolveRegistrationFee(metadata) +
     (metadata.agencyFees ?? 0) +
     (metadata.renovationFees ?? 0) +
     (metadata.furnishingFees ?? 0)
@@ -182,15 +201,14 @@ export function calculateTotalCost(
 
 /**
  * For off-plan properties: actual cash paid out so far — the payment
- * milestones marked "paid" plus every fee (ADM, notary, agency,
+ * milestones marked "paid" plus every fee (registration, agency,
  * renovation, furnishing), which are typically paid up front rather than
  * staged with the contract.
  */
 export function calculateCashInvestedToDate(metadata: RealEstateMetadata): number {
   return (
     (metadata.paid_to_date ?? 0) +
-    (metadata.adm_fee_amount ?? 0) +
-    (metadata.notaryFees ?? 0) +
+    resolveRegistrationFee(metadata) +
     (metadata.agencyFees ?? 0) +
     (metadata.renovationFees ?? 0) +
     (metadata.furnishingFees ?? 0)
@@ -222,6 +240,12 @@ export function nextMilestoneId(): string {
   milestoneCounter += 1;
   return `milestone-${Date.now()}-${milestoneCounter}`;
 }
+
+export const REGISTRATION_FEE_TYPES: RegistrationFeeType[] = [
+  "Notary",
+  "RERA",
+  "ADM",
+];
 
 export const PROPERTY_TYPES = [
   "Apartment",

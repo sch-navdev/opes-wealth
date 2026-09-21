@@ -180,7 +180,6 @@ export function AssetDetailView({
       : null;
 
   const confidenceLevel = metadata.automaticEstimation ? "High" : "Manual";
-  const isUAEAddress = /UAE|United Arab Emirates/i.test(metadata.address);
   const netROI =
     unrealizedGain != null && totalCost
       ? (unrealizedGain.amount / totalCost) * 100
@@ -984,23 +983,15 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="ADM Fee"
+                      label={`${metadata.registration_fee_type} Fee`}
                       value={
-                        metadata.adm_fee_amount != null
-                          ? `${maskValue(currencyFormatter.format(metadata.adm_fee_amount))} (${metadata.adm_fee_percent ?? 0}%)`
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label="Notary Fees"
-                      value={
-                        isUAEAddress
-                          ? maskValue("N/A")
-                          : metadata.notaryFees != null
-                            ? maskValue(
-                                currencyFormatter.format(metadata.notaryFees),
-                              )
-                            : null
+                        metadata.registration_fee_amount
+                          ? maskValue(
+                              currencyFormatter.format(
+                                metadata.registration_fee_amount,
+                              ),
+                            )
+                          : "—"
                       }
                     />
                     <DetailField

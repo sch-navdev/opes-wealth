@@ -18,12 +18,14 @@ import {
   CONSTRUCTION_YEARS,
   EPC_RATINGS,
   PROPERTY_TYPES,
+  REGISTRATION_FEE_TYPES,
   calculateTotalArea,
   nextMilestoneId,
   type ConditionRatings,
   type LinkedLoan,
   type PaymentMilestone,
   type RealEstateMetadata,
+  type RegistrationFeeType,
 } from "@/lib/real-estate";
 
 function round2(n: number): number {
@@ -211,30 +213,12 @@ export function RealEstateFields({
 
   function setContractPrice(next: number | null) {
     const outstanding = round2((next ?? 0) - value.paid_to_date);
-    const admAmount =
-      next != null && value.adm_fee_percent != null
-        ? round2((next * value.adm_fee_percent) / 100)
-        : value.adm_fee_amount;
 
     onChange({
       ...value,
       contract_price: next,
       outstanding_balance: outstanding,
-      adm_fee_amount: admAmount,
     });
-  }
-
-  function setAdmFeePercent(percent: number | null) {
-    const amount =
-      percent != null && value.contract_price != null
-        ? round2((value.contract_price * percent) / 100)
-        : value.adm_fee_amount;
-
-    onChange({ ...value, adm_fee_percent: percent, adm_fee_amount: amount });
-  }
-
-  function setAdmFeeAmount(amount: number | null) {
-    onChange({ ...value, adm_fee_amount: amount });
   }
 
   function addMilestone() {
@@ -344,40 +328,6 @@ export function RealEstateFields({
               onChange={setContractPrice}
               currency={currency}
             />
-            <div className="min-w-0 space-y-2">
-              <Label>Municipal / ADM Fee (%)</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={value.adm_fee_percent ?? ""}
-                onChange={(e) =>
-                  setAdmFeePercent(
-                    e.target.value === "" ? null : Number(e.target.value),
-                  )
-                }
-              />
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label>Municipal / ADM Fee (Amount)</Label>
-              <div className="relative w-full min-w-0">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  {currencySymbol}
-                </span>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  className="w-full pl-12"
-                  value={value.adm_fee_amount ?? ""}
-                  onChange={(e) =>
-                    setAdmFeeAmount(
-                      e.target.value === "" ? null : Number(e.target.value),
-                    )
-                  }
-                />
-              </div>
-            </div>
           </div>
 
           <div className="w-full min-w-0 space-y-3">
@@ -557,12 +507,46 @@ export function RealEstateFields({
           onChange={(next) => set("agencyFees", next)}
           currency={currency}
         />
-        <NumberField
-          label="Notary Fees"
-          value={value.notaryFees}
-          onChange={(next) => set("notaryFees", next)}
-          currency={currency}
-        />
+        <div className="min-w-0 space-y-2">
+          <Label>Registration Fee</Label>
+          <div className="flex w-full min-w-0 gap-2">
+            <Select
+              value={value.registration_fee_type}
+              onValueChange={(next) =>
+                set("registration_fee_type", next as RegistrationFeeType)
+              }
+            >
+              <SelectTrigger className="w-28 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {REGISTRATION_FEE_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative min-w-0 flex-1">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                {currencySymbol}
+              </span>
+              <Input
+                type="number"
+                step="any"
+                min="0"
+                className="w-full pl-12"
+                value={value.registration_fee_amount || ""}
+                onChange={(e) =>
+                  set(
+                    "registration_fee_amount",
+                    e.target.value === "" ? 0 : Number(e.target.value),
+                  )
+                }
+              />
+            </div>
+          </div>
+        </div>
         <NumberField
           label="Renovation Fees"
           value={value.renovationFees}
