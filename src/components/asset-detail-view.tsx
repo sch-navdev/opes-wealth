@@ -180,6 +180,11 @@ export function AssetDetailView({
       : null;
 
   const confidenceLevel = metadata.automaticEstimation ? "High" : "Manual";
+  const isUAEAddress = /UAE|United Arab Emirates/i.test(metadata.address);
+  const netROI =
+    unrealizedGain != null && totalCost
+      ? (unrealizedGain.amount / totalCost) * 100
+      : null;
   const primaryOwnership =
     metadata.ownership.find((o) => o.name) ?? metadata.ownership[0];
   const ownershipPercent = primaryOwnership?.percentage ?? 100;
@@ -544,7 +549,7 @@ export function AssetDetailView({
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card className="border-border bg-card">
                 <CardContent className="space-y-1 py-4">
                   <p className="text-xs text-muted-foreground">
@@ -630,6 +635,28 @@ export function AssetDetailView({
                   </CardContent>
                 </Card>
               )}
+
+              <Card className="border-border bg-card">
+                <CardContent className="space-y-1 py-4">
+                  <p className="text-xs text-muted-foreground">Net ROI</p>
+                  <p
+                    className={
+                      netROI != null
+                        ? netROI >= 0
+                          ? "text-lg font-semibold text-success"
+                          : "text-lg font-semibold text-destructive"
+                        : "text-lg font-semibold text-foreground"
+                    }
+                  >
+                    {netROI != null
+                      ? maskValue(`${netROI.toFixed(2)}%`)
+                      : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Unrealized gain ÷ total cost
+                  </p>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
@@ -868,7 +895,23 @@ export function AssetDetailView({
                     <DetailField label="Address" value={metadata.address} />
                     <DetailField label="Type" value={metadata.propertyType} />
                     <DetailField
-                      label="Surface Area"
+                      label="Internal Area"
+                      value={
+                        metadata.internal_area != null
+                          ? `${metadata.internal_area} m²`
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Terrace Area"
+                      value={
+                        metadata.terrace_area != null
+                          ? `${metadata.terrace_area} m²`
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Total Area"
                       value={
                         metadata.surfaceArea != null
                           ? `${metadata.surfaceArea} m²`
@@ -951,9 +994,13 @@ export function AssetDetailView({
                     <DetailField
                       label="Notary Fees"
                       value={
-                        metadata.notaryFees != null
-                          ? maskValue(currencyFormatter.format(metadata.notaryFees))
-                          : null
+                        isUAEAddress
+                          ? maskValue("N/A")
+                          : metadata.notaryFees != null
+                            ? maskValue(
+                                currencyFormatter.format(metadata.notaryFees),
+                              )
+                            : null
                       }
                     />
                     <DetailField
@@ -981,6 +1028,14 @@ export function AssetDetailView({
                           ? maskValue(
                               currencyFormatter.format(metadata.furnishingFees),
                             )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Total Property Cost"
+                      value={
+                        totalCost != null
+                          ? maskValue(currencyFormatter.format(totalCost))
                           : null
                       }
                     />

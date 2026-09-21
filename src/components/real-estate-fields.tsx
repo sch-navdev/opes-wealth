@@ -18,6 +18,7 @@ import {
   CONSTRUCTION_YEARS,
   EPC_RATINGS,
   PROPERTY_TYPES,
+  calculateTotalArea,
   nextMilestoneId,
   type ConditionRatings,
   type LinkedLoan,
@@ -148,6 +149,22 @@ export function RealEstateFields({
 
   function setLoan(patch: Partial<LinkedLoan>) {
     set("linked_loan", { ...value.linked_loan, ...patch });
+  }
+
+  function setInternalArea(next: number | null) {
+    onChange({
+      ...value,
+      internal_area: next,
+      surfaceArea: calculateTotalArea(next, value.terrace_area),
+    });
+  }
+
+  function setTerraceArea(next: number | null) {
+    onChange({
+      ...value,
+      terrace_area: next,
+      surfaceArea: calculateTotalArea(value.internal_area, next),
+    });
   }
 
   function updateOwner(index: number, patch: Partial<{ name: string; percentage: number }>) {
@@ -560,22 +577,31 @@ export function RealEstateFields({
         />
       </div>
 
-      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
         <NumberField
-          label="Surface Area (m²)"
-          value={value.surfaceArea}
-          onChange={(next) => set("surfaceArea", next)}
+          label="Internal Area (m²)"
+          value={value.internal_area}
+          onChange={setInternalArea}
+        />
+        <NumberField
+          label="Terrace/Balcony Area (m²)"
+          value={value.terrace_area}
+          onChange={setTerraceArea}
         />
         <NumberField
           label="Garden Area (m²)"
           value={value.gardenArea}
           onChange={(next) => set("gardenArea", next)}
         />
-        <NumberField
-          label="Balcony Area (m²)"
-          value={value.balconyArea}
-          onChange={(next) => set("balconyArea", next)}
-        />
+        <div className="min-w-0 space-y-2">
+          <Label>Total Area (m²)</Label>
+          <Input
+            type="number"
+            value={calculateTotalArea(value.internal_area, value.terrace_area)}
+            disabled
+            className="w-full text-muted-foreground"
+          />
+        </div>
       </div>
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">

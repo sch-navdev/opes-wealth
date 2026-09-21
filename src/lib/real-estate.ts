@@ -39,8 +39,12 @@ export type RealEstateMetadata = {
   notaryFees: number | null;
   renovationFees: number | null;
   furnishingFees: number | null;
+  /** Total floor area — kept in sync as `internal_area + terrace_area` whenever either changes. */
   surfaceArea: number | null;
+  internal_area: number | null;
+  terrace_area: number | null;
   gardenArea: number | null;
+  /** @deprecated superseded by `terrace_area`; kept only so older saved assets don't lose this figure. */
   balconyArea: number | null;
   floors: number;
   rooms: number;
@@ -80,6 +84,8 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   renovationFees: null,
   furnishingFees: null,
   surfaceArea: null,
+  internal_area: null,
+  terrace_area: null,
   gardenArea: null,
   balconyArea: null,
   floors: 1,
@@ -199,6 +205,14 @@ export function calculateUnrealizedGain(
   const amount = marketValuation - totalCost;
   const percent = totalCost !== 0 ? (amount / totalCost) * 100 : null;
   return { amount, percent };
+}
+
+/** Total floor area — the sum of the internal and terrace/balcony areas. */
+export function calculateTotalArea(
+  internalArea: number | null,
+  terraceArea: number | null,
+): number {
+  return (internalArea ?? 0) + (terraceArea ?? 0);
 }
 
 let milestoneCounter = 0;
