@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Edit } from "lucide-react";
+import { Edit, X } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { RealEstateFields } from "@/components/real-estate-fields";
 import { currencies } from "@/lib/currencies";
+import { resizeImageToBase64 } from "@/lib/crop-image";
 import {
   EMPTY_REAL_ESTATE_METADATA,
   parseRealEstateMetadata,
@@ -42,6 +44,7 @@ export type AssetForEdit = {
   current_value: number;
   currency: string;
   metadata: Record<string, unknown> | null;
+  image_base64: string | null;
 };
 
 export function AddAssetDialog({
@@ -57,9 +60,11 @@ export function AddAssetDialog({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [categoryId, setCategoryId] = useState(asset?.category_id ?? "");
   const [currency, setCurrency] = useState(asset?.currency ?? "USD");
+  const [imageBase64, setImageBase64] = useState(asset?.image_base64 ?? "");
   const [realEstateMetadata, setRealEstateMetadata] = useState(() =>
     asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
   );
@@ -70,9 +75,21 @@ export function AddAssetDialog({
   function resetState() {
     setCategoryId(asset?.category_id ?? "");
     setCurrency(asset?.currency ?? "USD");
+    setImageBase64(asset?.image_base64 ?? "");
     setRealEstateMetadata(
       asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
     );
+  }
+
+  async function handleImageFileSelected(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const resized = await resizeImageToBase64(file);
+    setImageBase64(resized);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -151,6 +168,46 @@ export function AddAssetDialog({
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+          <input type="hidden" name="image_base64" value={imageBase64} />
+
+          <div className="space-y-2">
+            <Label>Image / Logo</Label>
+            <div className="flex items-center gap-3">
+              <Avatar size="lg" className="rounded-md">
+                <AvatarImage src={imageBase64 || undefined} alt="" />
+                <AvatarFallback className="rounded-md">
+                  {selectedCategory?.name?.[0]?.toUpperCase() ?? "?"}
+                </AvatarFallback>
+              </Avatar>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                {imageBase64 ? "Change Image" : "Upload Image"}
+              </Button>
+              {imageBase64 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Remove image"
+                  onClick={() => setImageBase64("")}
+                >
+                  <X className="size-4" />
+                </Button>
+              )}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageFileSelected}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input

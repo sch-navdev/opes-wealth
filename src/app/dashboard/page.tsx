@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
@@ -29,6 +30,7 @@ type AssetRow = {
   currency: string;
   is_liability: boolean;
   metadata: Record<string, unknown> | null;
+  image_base64: string | null;
   asset_categories: { name: string } | null;
 };
 
@@ -55,7 +57,7 @@ export default async function DashboardPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, image_base64, asset_categories(name)",
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
@@ -174,6 +176,20 @@ export default async function DashboardPage({
                     <TableRow key={asset.id}>
                       <TableCell className="font-medium text-foreground">
                         <div className="flex items-center gap-2">
+                          <Avatar size="sm" className="rounded-md">
+                            <AvatarImage
+                              src={asset.image_base64 || undefined}
+                              alt=""
+                            />
+                            <AvatarFallback className="rounded-md">
+                              {asset.asset_categories?.name === "Real Estate" ? (
+                                <Building2 className="size-3.5" />
+                              ) : (
+                                asset.asset_categories?.name?.[0]?.toUpperCase() ??
+                                "?"
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
                           {asset.name}
                           {isOffplan && (
                             <Badge variant="secondary">Off-Plan</Badge>
@@ -233,6 +249,7 @@ export default async function DashboardPage({
                               current_value: asset.current_value,
                               currency: asset.currency,
                               metadata: asset.metadata,
+                              image_base64: asset.image_base64,
                             }}
                           />
                           <DeleteAssetButton id={asset.id} />

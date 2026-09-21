@@ -19,6 +19,7 @@ export async function addAsset(formData: FormData) {
   const quantity = formData.get("quantity") as string;
   const currentValue = formData.get("current_value") as string;
   const currency = (formData.get("currency") as string) || "USD";
+  const imageBase64 = (formData.get("image_base64") as string) || null;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Record<string, unknown> = {};
@@ -38,6 +39,7 @@ export async function addAsset(formData: FormData) {
     current_value: Number(currentValue),
     currency,
     metadata,
+    image_base64: imageBase64,
   });
 
   if (error) {
@@ -63,6 +65,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const quantity = formData.get("quantity") as string;
   const currentValue = formData.get("current_value") as string;
   const currency = (formData.get("currency") as string) || "USD";
+  const imageBase64 = (formData.get("image_base64") as string) || null;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Record<string, unknown> = {};
@@ -83,6 +86,7 @@ export async function updateAsset(id: string, formData: FormData) {
       current_value: Number(currentValue),
       currency,
       metadata,
+      image_base64: imageBase64,
     })
     .eq("id", id)
     .eq("profile_id", user.id);
