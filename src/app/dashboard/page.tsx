@@ -15,16 +15,19 @@ import {
 } from "@/components/ui/table";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { CurrencySwitcher } from "@/components/currency-switcher";
+import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { cn } from "@/lib/utils";
 
 type AssetRow = {
   id: string;
   name: string;
+  category_id: string;
   quantity: number;
   current_value: number;
   currency: string;
   is_liability: boolean;
+  metadata: Record<string, unknown> | null;
   asset_categories: { name: string } | null;
 };
 
@@ -51,7 +54,7 @@ export default async function DashboardPage({
       supabase
         .from("assets")
         .select(
-          "id, name, quantity, current_value, currency, is_liability, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, asset_categories(name)",
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
@@ -134,13 +137,14 @@ export default async function DashboardPage({
                 <TableHead className="text-right">
                   Value ({displayCurrency})
                 </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!assets || assets.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-center text-muted-foreground"
                   >
                     No assets yet. Add your first one to get started.
@@ -176,6 +180,23 @@ export default async function DashboardPage({
                       >
                         {asset.is_liability ? "-" : ""}
                         {currencyFormatter.format(convertedValue)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <AddAssetDialog
+                            categories={categories ?? []}
+                            asset={{
+                              id: asset.id,
+                              name: asset.name,
+                              category_id: asset.category_id,
+                              quantity: asset.quantity,
+                              current_value: asset.current_value,
+                              currency: asset.currency,
+                              metadata: asset.metadata,
+                            }}
+                          />
+                          <DeleteAssetButton id={asset.id} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

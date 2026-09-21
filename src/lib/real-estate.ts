@@ -65,6 +65,35 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   ownership: [{ name: "", percentage: 100 }],
 };
 
+/**
+ * Merges a raw `assets.metadata` value (as read back from Supabase — may
+ * be `{}`, partially shaped from an older save, or `null`/not an object)
+ * into a complete `RealEstateMetadata`, so the edit form always has every
+ * field defined even if the stored row predates a schema change.
+ */
+export function parseRealEstateMetadata(
+  raw: unknown,
+): RealEstateMetadata {
+  if (!raw || typeof raw !== "object") {
+    return EMPTY_REAL_ESTATE_METADATA;
+  }
+
+  const r = raw as Partial<RealEstateMetadata>;
+
+  return {
+    ...EMPTY_REAL_ESTATE_METADATA,
+    ...r,
+    condition: {
+      ...EMPTY_REAL_ESTATE_METADATA.condition,
+      ...(r.condition ?? {}),
+    },
+    ownership:
+      Array.isArray(r.ownership) && r.ownership.length > 0
+        ? r.ownership
+        : EMPTY_REAL_ESTATE_METADATA.ownership,
+  };
+}
+
 export const PROPERTY_TYPES = [
   "Apartment",
   "House",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,33 +23,56 @@ import {
 } from "@/components/ui/select";
 import { RealEstateFields } from "@/components/real-estate-fields";
 import { currencies } from "@/lib/currencies";
-import { EMPTY_REAL_ESTATE_METADATA } from "@/lib/real-estate";
-import { addAsset } from "@/app/dashboard/actions";
+import {
+  EMPTY_REAL_ESTATE_METADATA,
+  parseRealEstateMetadata,
+} from "@/lib/real-estate";
+import { addAsset, updateAsset } from "@/app/dashboard/actions";
 
 type Category = {
   id: string;
   name: string;
 };
 
-export function AddAssetDialog({ categories }: { categories: Category[] }) {
+export type AssetForEdit = {
+  id: string;
+  name: string;
+  category_id: string;
+  quantity: number;
+  current_value: number;
+  currency: string;
+  metadata: Record<string, unknown> | null;
+};
+
+export function AddAssetDialog({
+  categories,
+  asset,
+}: {
+  categories: Category[];
+  asset?: AssetForEdit;
+}) {
+  const isEditMode = !!asset;
+
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [categoryId, setCategoryId] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [realEstateMetadata, setRealEstateMetadata] = useState(
-    EMPTY_REAL_ESTATE_METADATA,
+  const [categoryId, setCategoryId] = useState(asset?.category_id ?? "");
+  const [currency, setCurrency] = useState(asset?.currency ?? "USD");
+  const [realEstateMetadata, setRealEstateMetadata] = useState(() =>
+    asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
   );
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
 
   function resetState() {
-    setCategoryId("");
-    setCurrency("USD");
-    setRealEstateMetadata(EMPTY_REAL_ESTATE_METADATA);
+    setCategoryId(asset?.category_id ?? "");
+    setCurrency(asset?.currency ?? "USD");
+    setRealEstateMetadata(
+      asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
+    );
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -65,7 +89,9 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
     }
 
     startTransition(async () => {
-      const result = await addAsset(formData);
+      const result = isEditMode
+        ? await updateAsset(asset.id, formData)
+        : await addAsset(formData);
 
       if (result?.error) {
         setError(result.error);
@@ -73,7 +99,7 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
       }
 
       setOpen(false);
-      form.reset();
+      if (!isEditMode) form.reset();
       resetState();
     });
   }
@@ -87,13 +113,23 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
       }}
     >
       <DialogTrigger asChild>
-        <Button>Add Asset</Button>
+        {isEditMode ? (
+          <Button variant="outline" size="icon-sm" aria-label="Edit asset">
+            <Edit className="size-4" />
+          </Button>
+        ) : (
+          <Button>Add Asset</Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Add Asset</DialogTitle>
+          <DialogTitle className="text-foreground">
+            {isEditMode ? "Edit Asset" : "Add Asset"}
+          </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Track a new asset or liability in your portfolio.
+            {isEditMode
+              ? "Update the details for this asset."
+              : "Track a new asset or liability in your portfolio."}
           </DialogDescription>
         </DialogHeader>
 
@@ -104,6 +140,7 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
               id="name"
               name="name"
               placeholder="e.g. Apple Inc."
+              defaultValue={asset?.name ?? ""}
               required
             />
           </div>
@@ -138,7 +175,7 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
                 type="number"
                 step="any"
                 min="0"
-                defaultValue={1}
+                defaultValue={asset?.quantity ?? 1}
               />
             </div>
             <div className="space-y-2">
@@ -150,6 +187,7 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
                 step="any"
                 min="0"
                 placeholder="0.00"
+                defaultValue={asset?.current_value ?? ""}
                 required
               />
             </div>
@@ -185,7 +223,13 @@ export function AddAssetDialog({ categories }: { categories: Category[] }) {
 
           <DialogFooter>
             <Button type="submit" disabled={isPending}>
-              {isPending ? "Adding…" : "Add Asset"}
+              {isPending
+                ? isEditMode
+                  ? "Saving…"
+                  : "Adding…"
+                : isEditMode
+                  ? "Save Changes"
+                  : "Add Asset"}
             </Button>
           </DialogFooter>
         </form>
