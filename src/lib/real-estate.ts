@@ -20,6 +20,13 @@ export type PaymentMilestone = {
   status: "paid" | "pending";
 };
 
+export type LinkedLoan = {
+  amount: number | null;
+  interest_rate: number | null;
+  duration_months: number | null;
+  start_date: string;
+};
+
 export type RealEstateMetadata = {
   address: string;
   propertyType: string;
@@ -55,6 +62,9 @@ export type RealEstateMetadata = {
   paid_to_date: number;
   outstanding_balance: number;
   payment_schedule: PaymentMilestone[];
+
+  // Financing linked to this property, subtracted from Net Equity.
+  linked_loan: LinkedLoan;
 };
 
 export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
@@ -94,6 +104,13 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   paid_to_date: 0,
   outstanding_balance: 0,
   payment_schedule: [],
+
+  linked_loan: {
+    amount: null,
+    interest_rate: null,
+    duration_months: null,
+    start_date: "",
+  },
 };
 
 /**
@@ -125,8 +142,15 @@ export function parseRealEstateMetadata(
     payment_schedule: Array.isArray(r.payment_schedule)
       ? r.payment_schedule
       : EMPTY_REAL_ESTATE_METADATA.payment_schedule,
+    linked_loan: {
+      ...EMPTY_REAL_ESTATE_METADATA.linked_loan,
+      ...(r.linked_loan ?? {}),
+    },
   };
 }
+
+/** Max number of images stored per asset (multi-image carousel). */
+export const MAX_ASSET_IMAGES = 3;
 
 let milestoneCounter = 0;
 

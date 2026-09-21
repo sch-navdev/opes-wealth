@@ -37,6 +37,7 @@ High-net-worth individuals
   - [x] Edit/Delete asset actions — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Asset image/logo upload & portfolio avatar display — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Dedicated asset details page & clickable portfolio rows — [[Portfolio-Dashboard|Portfolio Dashboard]]
+  - [x] Historical graphs, multi-image carousel, linked loans, and Aperçu/Analyse/Paramètres tabs — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
@@ -69,7 +70,9 @@ opes-wealth/
 │       ├── 0001_initial_schema.sql
 │       ├── 0002_user_profile_trigger.sql
 │       ├── 0003_profile_extended_fields.sql
-│       └── 0004_real_estate_and_currency.sql
+│       ├── 0004_real_estate_and_currency.sql
+│       ├── 0005_asset_image.sql
+│       └── 0006_asset_images_loans_history.sql
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 ├── PROJECT_TRACKER.md           # hub note — start here (this file)

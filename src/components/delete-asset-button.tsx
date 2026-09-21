@@ -16,7 +16,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { deleteAsset } from "@/app/dashboard/actions";
 
-export function DeleteAssetButton({ id }: { id: string }) {
+export function DeleteAssetButton({
+  id,
+  onSuccess,
+}: {
+  id: string;
+  onSuccess?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -33,6 +39,7 @@ export function DeleteAssetButton({ id }: { id: string }) {
       }
 
       setOpen(false);
+      onSuccess?.();
     });
   }
 

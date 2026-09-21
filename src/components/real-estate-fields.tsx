@@ -19,6 +19,7 @@ import {
   PROPERTY_TYPES,
   nextMilestoneId,
   type ConditionRatings,
+  type LinkedLoan,
   type PaymentMilestone,
   type RealEstateMetadata,
 } from "@/lib/real-estate";
@@ -128,6 +129,10 @@ export function RealEstateFields({
     next: string,
   ) {
     onChange({ ...value, condition: { ...value.condition, [key]: next } });
+  }
+
+  function setLoan(patch: Partial<LinkedLoan>) {
+    set("linked_loan", { ...value.linked_loan, ...patch });
   }
 
   function updateOwner(index: number, patch: Partial<{ name: string; percentage: number }>) {
@@ -460,6 +465,41 @@ export function RealEstateFields({
           </div>
         </div>
       )}
+
+      <div className="space-y-4 border border-border p-4">
+        <h4 className="text-sm font-medium text-foreground">Linked Loan</h4>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <NumberField
+            label="Total Loan Amount"
+            value={value.linked_loan.amount}
+            onChange={(next) => setLoan({ amount: next })}
+          />
+          <NumberField
+            label="Interest Rate (%)"
+            value={value.linked_loan.interest_rate}
+            onChange={(next) => setLoan({ interest_rate: next })}
+          />
+          <NumberField
+            label="Duration (months)"
+            value={value.linked_loan.duration_months}
+            onChange={(next) => setLoan({ duration_months: next })}
+          />
+          <div className="space-y-2">
+            <Label>Start Date</Label>
+            <Input
+              type="date"
+              value={value.linked_loan.start_date}
+              onChange={(e) => setLoan({ start_date: e.target.value })}
+            />
+          </div>
+        </div>
+        {value.linked_loan.amount ? (
+          <p className="text-xs text-muted-foreground">
+            The outstanding loan principal is subtracted from this
+            property&apos;s Net Equity.
+          </p>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField

@@ -27,6 +27,7 @@ import { currencies } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
 import {
   EMPTY_REAL_ESTATE_METADATA,
+  MAX_ASSET_IMAGES,
   parseRealEstateMetadata,
 } from "@/lib/real-estate";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
@@ -44,7 +45,7 @@ export type AssetForEdit = {
   current_value: number;
   currency: string;
   metadata: Record<string, unknown> | null;
-  image_base64: string | null;
+  images: string[] | null;
 };
 
 export function AddAssetDialog({
@@ -64,7 +65,7 @@ export function AddAssetDialog({
 
   const [categoryId, setCategoryId] = useState(asset?.category_id ?? "");
   const [currency, setCurrency] = useState(asset?.currency ?? "USD");
-  const [imageBase64, setImageBase64] = useState(asset?.image_base64 ?? "");
+  const [images, setImages] = useState<string[]>(asset?.images ?? []);
   const [realEstateMetadata, setRealEstateMetadata] = useState(() =>
     asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
   );
@@ -75,7 +76,7 @@ export function AddAssetDialog({
   function resetState() {
     setCategoryId(asset?.category_id ?? "");
     setCurrency(asset?.currency ?? "USD");
-    setImageBase64(asset?.image_base64 ?? "");
+    setImages(asset?.images ?? []);
     setRealEstateMetadata(
       asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
     );
@@ -86,10 +87,14 @@ export function AddAssetDialog({
   ) {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file) return;
+    if (!file || images.length >= MAX_ASSET_IMAGES) return;
 
     const resized = await resizeImageToBase64(file);
-    setImageBase64(resized);
+    setImages((prev) => [...prev, resized]);
+  }
+
+  function removeImage(index: number) {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -100,25 +105,25 @@ export function AddAssetDialog({
     if (!form) return;
 
     const formData = new FormData(form);
+    formData.set("images", JSON.stringify(images));
 
     if (isRealEstate) {
-      let metadata = realEstateMetadata;
+      // The "Current Market Valuation" input reuses the generic
+      // `current_value` field, but the DB's `current_value` column should
+      // hold net equity instead (market valuation minus any linked loan
+      // principal, and minus what's still owed on an off-plan contract),
+      // so portfolio totals aren't inflated by debt still outstanding.
+      // The raw market valuation is preserved in metadata so it can be
+      // re-edited later without double-subtracting.
+      const marketValuation = Number(formData.get("current_value"));
+      const loanPrincipal = realEstateMetadata.linked_loan.amount ?? 0;
+      const outstandingOffplan = realEstateMetadata.is_offplan
+        ? realEstateMetadata.outstanding_balance
+        : 0;
+      const netEquity = marketValuation - outstandingOffplan - loanPrincipal;
 
-      if (realEstateMetadata.is_offplan) {
-        // The "Current Market Valuation" input reuses the generic
-        // `current_value` field, but for off-plan assets the DB's
-        // `current_value` column should hold net equity instead
-        // (market valuation minus what's still owed on the contract), so
-        // portfolio totals aren't inflated by debt still outstanding.
-        // The raw market valuation is preserved in metadata so it can be
-        // re-edited later without double-subtracting.
-        const marketValuation = Number(formData.get("current_value"));
-        const netEquity = marketValuation - realEstateMetadata.outstanding_balance;
-
-        metadata = { ...realEstateMetadata, market_valuation: marketValuation };
-        formData.set("current_value", String(netEquity));
-      }
-
+      const metadata = { ...realEstateMetadata, market_valuation: marketValuation };
+      formData.set("current_value", String(netEquity));
       formData.set("metadata", JSON.stringify(metadata));
     }
 
@@ -173,34 +178,42 @@ export function AddAssetDialog({
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <input type="hidden" name="image_base64" value={imageBase64} />
-
           <div className="space-y-2">
-            <Label>Image / Logo</Label>
-            <div className="flex items-center gap-3">
-              <Avatar size="lg" className="rounded-md">
-                <AvatarImage src={imageBase64 || undefined} alt="" />
-                <AvatarFallback className="rounded-md">
-                  {selectedCategory?.name?.[0]?.toUpperCase() ?? "?"}
-                </AvatarFallback>
-              </Avatar>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => imageInputRef.current?.click()}
-              >
-                {imageBase64 ? "Change Image" : "Upload Image"}
-              </Button>
-              {imageBase64 && (
+            <Label>Images ({images.length}/{MAX_ASSET_IMAGES})</Label>
+            <div className="flex flex-wrap items-center gap-3">
+              {images.map((src, index) => (
+                <div key={index} className="relative">
+                  <Avatar size="lg" className="rounded-md">
+                    <AvatarImage src={src} alt="" />
+                    <AvatarFallback className="rounded-md">?</AvatarFallback>
+                  </Avatar>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label="Remove image"
+                    className="absolute -right-2 -top-2 size-5 rounded-full bg-card p-0"
+                    onClick={() => removeImage(index)}
+                  >
+                    <X className="size-3" />
+                  </Button>
+                </div>
+              ))}
+              {images.length === 0 && (
+                <Avatar size="lg" className="rounded-md">
+                  <AvatarFallback className="rounded-md">
+                    {selectedCategory?.name?.[0]?.toUpperCase() ?? "?"}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              {images.length < MAX_ASSET_IMAGES && (
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon-sm"
-                  aria-label="Remove image"
-                  onClick={() => setImageBase64("")}
+                  size="sm"
+                  onClick={() => imageInputRef.current?.click()}
                 >
-                  <X className="size-4" />
+                  {images.length === 0 ? "Upload Image" : "Add Image"}
                 </Button>
               )}
               <input
@@ -259,9 +272,7 @@ export function AddAssetDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="current_value">
-                {isRealEstate && realEstateMetadata.is_offplan
-                  ? "Current Market Valuation"
-                  : "Value"}
+                {isRealEstate ? "Current Market Valuation" : "Value"}
               </Label>
               <Input
                 id="current_value"
@@ -271,15 +282,19 @@ export function AddAssetDialog({
                 min="0"
                 placeholder="0.00"
                 defaultValue={
-                  asset && realEstateMetadata.is_offplan
+                  asset && isRealEstate
                     ? realEstateMetadata.market_valuation ?? asset.current_value
                     : asset?.current_value ?? ""
                 }
                 required
               />
-              {isRealEstate && realEstateMetadata.is_offplan && (
+              {isRealEstate && (
                 <p className="text-xs text-muted-foreground">
-                  Saved as net equity (this minus the outstanding balance).
+                  Saved as net equity (this minus any linked loan
+                  {realEstateMetadata.is_offplan
+                    ? " and the outstanding contract balance"
+                    : ""}
+                  ).
                 </p>
               )}
             </div>

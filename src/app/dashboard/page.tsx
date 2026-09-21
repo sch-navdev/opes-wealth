@@ -30,7 +30,7 @@ type AssetRow = {
   currency: string;
   is_liability: boolean;
   metadata: Record<string, unknown> | null;
-  image_base64: string | null;
+  images: string[] | null;
   asset_categories: { name: string } | null;
 };
 
@@ -57,7 +57,7 @@ export default async function DashboardPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, image_base64, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, asset_categories(name)",
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
@@ -184,7 +184,7 @@ export default async function DashboardPage({
                         >
                           <Avatar size="sm" className="rounded-md">
                             <AvatarImage
-                              src={asset.image_base64 || undefined}
+                              src={asset.images?.[0] || undefined}
                               alt=""
                             />
                             <AvatarFallback className="rounded-md">
@@ -255,7 +255,7 @@ export default async function DashboardPage({
                               current_value: asset.current_value,
                               currency: asset.currency,
                               metadata: asset.metadata,
-                              image_base64: asset.image_base64,
+                              images: asset.images,
                             }}
                           />
                           <DeleteAssetButton id={asset.id} />
