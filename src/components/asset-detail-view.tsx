@@ -58,6 +58,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
+import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
+import { usePrivacy } from "@/context/privacy-context";
 import { updateAssetValuation } from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
@@ -136,6 +138,7 @@ export function AssetDetailView({
   ratesFromUsd: Record<string, number>;
 }) {
   const router = useRouter();
+  const { maskValue } = usePrivacy();
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshValue, setRefreshValue] = useState("");
   const [refreshCurrency, setRefreshCurrency] = useState(asset.currency);
@@ -318,9 +321,10 @@ export function AssetDetailView({
                   }
                 >
                   {asset.is_liability ? "-" : ""}
-                  {currencyFormatter.format(netEquity)}
+                  {maskValue(currencyFormatter.format(netEquity))}
                 </p>
               </div>
+              <PrivacyToggleButton />
               <Dialog open={refreshOpen} onOpenChange={setRefreshOpen}>
                 <DialogTrigger asChild>
                   <Button
@@ -484,7 +488,9 @@ export function AssetDetailView({
                         <YAxis
                           stroke="var(--color-muted-foreground)"
                           fontSize={12}
-                          tickFormatter={(v) => currencyFormatter.format(v)}
+                          tickFormatter={(v) =>
+                            maskValue(currencyFormatter.format(v))
+                          }
                           width={90}
                         />
                         <Tooltip
@@ -494,7 +500,7 @@ export function AssetDetailView({
                             color: "var(--color-foreground)",
                           }}
                           formatter={(value) =>
-                            currencyFormatter.format(Number(value))
+                            maskValue(currencyFormatter.format(Number(value)))
                           }
                         />
                         <Area
@@ -528,7 +534,7 @@ export function AssetDetailView({
                   </p>
                   <p className="text-lg font-semibold text-foreground">
                     {totalCost != null
-                      ? currencyFormatter.format(totalCost)
+                      ? maskValue(currencyFormatter.format(totalCost))
                       : "—"}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -553,7 +559,9 @@ export function AssetDetailView({
                       }
                     >
                       {unrealizedGain != null
-                        ? currencyFormatter.format(unrealizedGain.amount)
+                        ? maskValue(
+                            currencyFormatter.format(unrealizedGain.amount),
+                          )
                         : "—"}
                     </p>
                     {unrealizedGain?.percent != null && (
@@ -583,7 +591,7 @@ export function AssetDetailView({
                       Cash Invested to Date
                     </p>
                     <p className="text-lg font-semibold text-foreground">
-                      {currencyFormatter.format(cashInvestedToDate)}
+                      {maskValue(currencyFormatter.format(cashInvestedToDate))}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Paid milestones + fees
@@ -598,7 +606,7 @@ export function AssetDetailView({
                     </p>
                     <p className="text-lg font-semibold text-foreground">
                       {valuePerSqm != null
-                        ? currencyFormatter.format(valuePerSqm)
+                        ? maskValue(currencyFormatter.format(valuePerSqm))
                         : "—"}
                     </p>
                   </CardContent>
@@ -628,13 +636,13 @@ export function AssetDetailView({
                       label="Price / m²"
                       value={
                         valuePerSqm != null
-                          ? currencyFormatter.format(valuePerSqm)
+                          ? maskValue(currencyFormatter.format(valuePerSqm))
                           : null
                       }
                     />
                     <DetailField
                       label="Estimated Market Value"
-                      value={currencyFormatter.format(marketValuation)}
+                      value={maskValue(currencyFormatter.format(marketValuation))}
                     />
                     <DetailField
                       label="Confidence Level"
@@ -653,10 +661,10 @@ export function AssetDetailView({
                     <div className="flex items-end justify-between gap-4">
                       <DetailField
                         label="Ownership"
-                        value={`${ownershipPercent}%`}
+                        value={maskValue(`${ownershipPercent}%`)}
                       />
                       <p className="text-lg font-semibold text-foreground">
-                        {currencyFormatter.format(grossShare)}
+                        {maskValue(currencyFormatter.format(grossShare))}
                       </p>
                     </div>
                     <ProgressBar
@@ -675,8 +683,8 @@ export function AssetDetailView({
                   <CardContent className="space-y-3">
                     <div className="flex items-end justify-between gap-4">
                       <DetailField
-                        label="Net Equity Share"
-                        value={currencyFormatter.format(netShare)}
+                        label={`Net Equity Share (${maskValue(`${equityRatio.toFixed(1)}%`)})`}
+                        value={maskValue(currencyFormatter.format(netShare))}
                       />
                       {hasLoan ? (
                         <div className="text-right">
@@ -684,8 +692,10 @@ export function AssetDetailView({
                             Active Loan Balance
                           </p>
                           <p className="text-sm font-medium text-destructive">
-                            {currencyFormatter.format(
-                              metadata.linked_loan.amount ?? 0,
+                            {maskValue(
+                              currencyFormatter.format(
+                                metadata.linked_loan.amount ?? 0,
+                              ),
                             )}
                           </p>
                         </div>
@@ -760,8 +770,10 @@ export function AssetDetailView({
                                     {milestone.due_date || "—"}
                                   </TableCell>
                                   <TableCell className="text-right text-foreground">
-                                    {currencyFormatter.format(
-                                      milestone.amount,
+                                    {maskValue(
+                                      currencyFormatter.format(
+                                        milestone.amount,
+                                      ),
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right text-muted-foreground">
@@ -901,9 +913,11 @@ export function AssetDetailView({
                       }
                       value={
                         metadata.contract_price ?? metadata.purchasePrice
-                          ? currencyFormatter.format(
-                              (metadata.contract_price ??
-                                metadata.purchasePrice) as number,
+                          ? maskValue(
+                              currencyFormatter.format(
+                                (metadata.contract_price ??
+                                  metadata.purchasePrice) as number,
+                              ),
                             )
                           : null
                       }
@@ -912,7 +926,7 @@ export function AssetDetailView({
                       label="ADM Fee"
                       value={
                         metadata.adm_fee_amount != null
-                          ? `${currencyFormatter.format(metadata.adm_fee_amount)} (${metadata.adm_fee_percent ?? 0}%)`
+                          ? `${maskValue(currencyFormatter.format(metadata.adm_fee_amount))} (${metadata.adm_fee_percent ?? 0}%)`
                           : null
                       }
                     />
@@ -920,7 +934,7 @@ export function AssetDetailView({
                       label="Notary Fees"
                       value={
                         metadata.notaryFees != null
-                          ? currencyFormatter.format(metadata.notaryFees)
+                          ? maskValue(currencyFormatter.format(metadata.notaryFees))
                           : null
                       }
                     />
@@ -928,7 +942,7 @@ export function AssetDetailView({
                       label="Agency Fees"
                       value={
                         metadata.agencyFees != null
-                          ? currencyFormatter.format(metadata.agencyFees)
+                          ? maskValue(currencyFormatter.format(metadata.agencyFees))
                           : null
                       }
                     />
@@ -936,7 +950,9 @@ export function AssetDetailView({
                       label="Renovation Fees"
                       value={
                         metadata.renovationFees != null
-                          ? currencyFormatter.format(metadata.renovationFees)
+                          ? maskValue(
+                              currencyFormatter.format(metadata.renovationFees),
+                            )
                           : null
                       }
                     />
@@ -944,7 +960,9 @@ export function AssetDetailView({
                       label="Furnishing Fees"
                       value={
                         metadata.furnishingFees != null
-                          ? currencyFormatter.format(metadata.furnishingFees)
+                          ? maskValue(
+                              currencyFormatter.format(metadata.furnishingFees),
+                            )
                           : null
                       }
                     />
@@ -962,8 +980,10 @@ export function AssetDetailView({
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                         <DetailField
                           label="Principal"
-                          value={currencyFormatter.format(
-                            metadata.linked_loan.amount ?? 0,
+                          value={maskValue(
+                            currencyFormatter.format(
+                              metadata.linked_loan.amount ?? 0,
+                            ),
                           )}
                         />
                         <DetailField

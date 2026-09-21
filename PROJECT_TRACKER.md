@@ -38,6 +38,7 @@ High-net-worth individuals
   - [x] Asset image/logo upload & portfolio avatar display — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Dedicated asset details page & clickable portfolio rows — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Historical graphs, multi-image carousel, linked loans, and Aperçu/Analyse/Paramètres tabs — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
+  - [x] Global privacy mode toggle with masked financial data — [[Privacy-Mode|Privacy Mode]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
@@ -54,6 +55,7 @@ High-net-worth individuals
 - [[Live-Pricing|Live Pricing]] — planned, Step 9
 - [[Deployment|Deployment]] — planned, Step 10
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
+- [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Changelog|Changelog]] — full chronological history
 
 ## Folder Structure

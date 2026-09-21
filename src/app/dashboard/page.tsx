@@ -1,25 +1,15 @@
 import Link from "next/link";
-import { Building2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { logout } from "@/app/auth/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
-import { Badge } from "@/components/ui/badge";
 import { CurrencySwitcher } from "@/components/currency-switcher";
-import { DeleteAssetButton } from "@/components/delete-asset-button";
+import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
+import { PortfolioTable } from "@/components/portfolio-table";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
-import { cn } from "@/lib/utils";
 
 type AssetRow = {
   id: string;
@@ -84,6 +74,16 @@ export default async function DashboardPage({
     currency: displayCurrency,
   });
 
+  const totalNetWorth = (assets ?? []).reduce((sum, asset) => {
+    const converted = convertAmount(
+      asset.current_value,
+      asset.currency,
+      displayCurrency,
+      rates,
+    );
+    return sum + (asset.is_liability ? -converted : converted);
+  }, 0);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
@@ -99,7 +99,10 @@ export default async function DashboardPage({
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <DashboardHeaderControls
+            totalNetWorthFormatted={currencyFormatter.format(totalNetWorth)}
+          />
           <Link
             href="/dashboard/settings"
             className="text-sm text-primary underline-offset-4 hover:underline"
@@ -130,144 +133,12 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className="border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="text-right">Quantity</TableHead>
-                <TableHead className="text-right">
-                  Value ({displayCurrency})
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!assets || assets.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center text-muted-foreground"
-                  >
-                    No assets yet. Add your first one to get started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                assets.map((asset) => {
-                  const convertedValue = convertAmount(
-                    asset.current_value,
-                    asset.currency,
-                    displayCurrency,
-                    rates,
-                  );
-
-                  const isOffplan = asset.metadata?.is_offplan === true;
-                  const contractPrice =
-                    typeof asset.metadata?.contract_price === "number"
-                      ? asset.metadata.contract_price
-                      : null;
-                  const outstandingBalance =
-                    typeof asset.metadata?.outstanding_balance === "number"
-                      ? asset.metadata.outstanding_balance
-                      : null;
-
-                  return (
-                    <TableRow
-                      key={asset.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                    >
-                      <TableCell className="font-medium text-foreground">
-                        <Link
-                          href={`/dashboard/assets/${asset.id}`}
-                          className="flex items-center gap-2"
-                        >
-                          <Avatar size="sm" className="rounded-md">
-                            <AvatarImage
-                              src={asset.images?.[0] || undefined}
-                              alt=""
-                            />
-                            <AvatarFallback className="rounded-md">
-                              {asset.asset_categories?.name === "Real Estate" ? (
-                                <Building2 className="size-3.5" />
-                              ) : (
-                                asset.asset_categories?.name?.[0]?.toUpperCase() ??
-                                "?"
-                              )}
-                            </AvatarFallback>
-                          </Avatar>
-                          {asset.name}
-                          {isOffplan && (
-                            <Badge variant="secondary">Off-Plan</Badge>
-                          )}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {asset.asset_categories?.name ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {asset.quantity}
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          "text-right",
-                          asset.is_liability
-                            ? "text-destructive"
-                            : "text-foreground",
-                        )}
-                      >
-                        {asset.is_liability ? "-" : ""}
-                        {currencyFormatter.format(convertedValue)}
-                        {isOffplan &&
-                          contractPrice != null &&
-                          outstandingBalance != null && (
-                            <p className="text-xs font-normal text-muted-foreground">
-                              Total:{" "}
-                              {currencyFormatter.format(
-                                convertAmount(
-                                  contractPrice,
-                                  asset.currency,
-                                  displayCurrency,
-                                  rates,
-                                ),
-                              )}{" "}
-                              | Owed:{" "}
-                              {currencyFormatter.format(
-                                convertAmount(
-                                  outstandingBalance,
-                                  asset.currency,
-                                  displayCurrency,
-                                  rates,
-                                ),
-                              )}
-                            </p>
-                          )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <AddAssetDialog
-                            categories={categories ?? []}
-                            asset={{
-                              id: asset.id,
-                              name: asset.name,
-                              category_id: asset.category_id,
-                              quantity: asset.quantity,
-                              current_value: asset.current_value,
-                              currency: asset.currency,
-                              metadata: asset.metadata,
-                              images: asset.images,
-                            }}
-                          />
-                          <DeleteAssetButton id={asset.id} />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <PortfolioTable
+          assets={assets ?? []}
+          categories={categories ?? []}
+          displayCurrency={displayCurrency}
+          rates={rates}
+        />
       </main>
     </div>
   );
