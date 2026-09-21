@@ -99,9 +99,27 @@ function DetailField({
   value: string | null | undefined;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm text-foreground">{value || "—"}</p>
+    </div>
+  );
+}
+
+function ProgressBar({
+  percent,
+  colorClassName,
+}: {
+  percent: number;
+  colorClassName: string;
+}) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <div className="h-2 w-full min-w-0 overflow-hidden bg-muted">
+      <div
+        className={`h-full ${colorClassName}`}
+        style={{ width: `${clamped}%` }}
+      />
     </div>
   );
 }
@@ -157,6 +175,15 @@ export function AssetDetailView({
     isRealEstate && metadata.surfaceArea
       ? marketValuation / metadata.surfaceArea
       : null;
+
+  const confidenceLevel = metadata.automaticEstimation ? "High" : "Manual";
+  const primaryOwnership =
+    metadata.ownership.find((o) => o.name) ?? metadata.ownership[0];
+  const ownershipPercent = primaryOwnership?.percentage ?? 100;
+  const grossShare = (ownershipPercent / 100) * marketValuation;
+  const netShare = (ownershipPercent / 100) * netEquity;
+  const equityRatio = marketValuation !== 0 ? (netEquity / marketValuation) * 100 : 0;
+  const hasLoan = !!metadata.linked_loan.amount;
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
@@ -596,7 +623,7 @@ export function AssetDetailView({
                       Market Performance
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <DetailField
                       label="Price / m²"
                       value={
@@ -606,104 +633,86 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Estimated Value"
+                      label="Estimated Market Value"
                       value={currencyFormatter.format(marketValuation)}
                     />
+                    <DetailField
+                      label="Confidence Level"
+                      value={confidenceLevel}
+                    />
                   </CardContent>
                 </Card>
 
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Ownership
+                      Gross Share
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Owner</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                          <TableHead className="text-right">
-                            Gross Part
-                          </TableHead>
-                          <TableHead className="text-right">
-                            Net Part
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {metadata.ownership.filter((o) => o.name).length ===
-                        0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={4}
-                              className="text-center text-muted-foreground"
-                            >
-                              —
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          metadata.ownership
-                            .filter((o) => o.name)
-                            .map((owner, index) => (
-                              <TableRow key={index}>
-                                <TableCell className="text-foreground">
-                                  {owner.name}
-                                </TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                  {owner.percentage}%
-                                </TableCell>
-                                <TableCell className="text-right text-foreground">
-                                  {currencyFormatter.format(
-                                    (owner.percentage / 100) * marketValuation,
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right text-foreground">
-                                  {currencyFormatter.format(
-                                    (owner.percentage / 100) * netEquity,
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                        )}
-                      </TableBody>
-                    </Table>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-end justify-between gap-4">
+                      <DetailField
+                        label="Ownership"
+                        value={`${ownershipPercent}%`}
+                      />
+                      <p className="text-lg font-semibold text-foreground">
+                        {currencyFormatter.format(grossShare)}
+                      </p>
+                    </div>
+                    <ProgressBar
+                      percent={ownershipPercent}
+                      colorClassName="bg-primary"
+                    />
                   </CardContent>
                 </Card>
 
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Characteristics
+                      Net Share
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <DetailField label="Address" value={metadata.address} />
-                    <DetailField label="Type" value={metadata.propertyType} />
-                    <DetailField
-                      label="Surface Area"
-                      value={
-                        metadata.surfaceArea != null
-                          ? `${metadata.surfaceArea} m²`
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label="Year of Construction"
-                      value={metadata.yearOfConstruction}
-                    />
-                    <DetailField
-                      label="EPC Rating"
-                      value={metadata.epcRating}
-                    />
-                    <DetailField
-                      label="Linked Loan"
-                      value={
-                        metadata.linked_loan.amount
-                          ? `${currencyFormatter.format(metadata.linked_loan.amount)} at ${metadata.linked_loan.interest_rate ?? 0}% / ${metadata.linked_loan.duration_months ?? 0}mo`
-                          : null
-                      }
+                  <CardContent className="space-y-3">
+                    <div className="flex items-end justify-between gap-4">
+                      <DetailField
+                        label="Net Equity Share"
+                        value={currencyFormatter.format(netShare)}
+                      />
+                      {hasLoan ? (
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">
+                            Active Loan Balance
+                          </p>
+                          <p className="text-sm font-medium text-destructive">
+                            {currencyFormatter.format(
+                              metadata.linked_loan.amount ?? 0,
+                            )}
+                          </p>
+                        </div>
+                      ) : (
+                        <AddAssetDialog
+                          categories={categories}
+                          asset={{
+                            id: asset.id,
+                            name: asset.name,
+                            category_id: asset.category_id,
+                            quantity: asset.quantity,
+                            current_value: asset.current_value,
+                            currency: asset.currency,
+                            metadata: asset.metadata,
+                            images: asset.images,
+                          }}
+                          trigger={
+                            <Button type="button" variant="outline" size="sm">
+                              + Add Loan
+                            </Button>
+                          }
+                        />
+                      )}
+                    </div>
+                    <ProgressBar
+                      percent={equityRatio}
+                      colorClassName="bg-success"
                     />
                   </CardContent>
                 </Card>
@@ -712,49 +721,10 @@ export function AssetDetailView({
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle className="text-foreground">
-                        Off-Plan Payment Tracking
+                        Payment Milestones
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                        <DetailField
-                          label="Contract Price"
-                          value={
-                            metadata.contract_price != null
-                              ? currencyFormatter.format(
-                                  metadata.contract_price,
-                                )
-                              : null
-                          }
-                        />
-                        <DetailField
-                          label="ADM Fee"
-                          value={
-                            metadata.adm_fee_amount != null
-                              ? `${currencyFormatter.format(metadata.adm_fee_amount)} (${metadata.adm_fee_percent ?? 0}%)`
-                              : null
-                          }
-                        />
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Total Paid to Date
-                          </p>
-                          <p className="text-sm font-medium text-success">
-                            {currencyFormatter.format(metadata.paid_to_date)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">
-                            Outstanding Balance
-                          </p>
-                          <p className="text-sm font-medium text-destructive">
-                            {currencyFormatter.format(
-                              metadata.outstanding_balance,
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
+                    <CardContent>
                       <div className="border border-border">
                         <Table>
                           <TableHeader>
@@ -828,7 +798,7 @@ export function AssetDetailView({
             )}
           </TabsContent>
 
-          <TabsContent value="settings">
+          <TabsContent value="settings" className="space-y-6">
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-foreground">
@@ -855,6 +825,177 @@ export function AssetDetailView({
                 />
               </CardContent>
             </Card>
+
+            {isRealEstate && (
+              <>
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      Core Property Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <DetailField label="Address" value={metadata.address} />
+                    <DetailField label="Type" value={metadata.propertyType} />
+                    <DetailField
+                      label="Surface Area"
+                      value={
+                        metadata.surfaceArea != null
+                          ? `${metadata.surfaceArea} m²`
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Year of Construction"
+                      value={metadata.yearOfConstruction}
+                    />
+                    <DetailField
+                      label="EPC Rating"
+                      value={metadata.epcRating}
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      Material & Condition Ratings
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <DetailField
+                      label="Kitchen"
+                      value={metadata.condition.kitchen}
+                    />
+                    <DetailField
+                      label="Bathrooms"
+                      value={metadata.condition.bathrooms}
+                    />
+                    <DetailField
+                      label="Flooring"
+                      value={metadata.condition.flooring}
+                    />
+                    <DetailField
+                      label="Windows"
+                      value={metadata.condition.windows}
+                    />
+                    <DetailField
+                      label="General"
+                      value={metadata.condition.general}
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      Cost & Fees Basis
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <DetailField
+                      label={
+                        metadata.contract_price != null
+                          ? "Contract Price"
+                          : "Purchase Price"
+                      }
+                      value={
+                        metadata.contract_price ?? metadata.purchasePrice
+                          ? currencyFormatter.format(
+                              (metadata.contract_price ??
+                                metadata.purchasePrice) as number,
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="ADM Fee"
+                      value={
+                        metadata.adm_fee_amount != null
+                          ? `${currencyFormatter.format(metadata.adm_fee_amount)} (${metadata.adm_fee_percent ?? 0}%)`
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Notary Fees"
+                      value={
+                        metadata.notaryFees != null
+                          ? currencyFormatter.format(metadata.notaryFees)
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Agency Fees"
+                      value={
+                        metadata.agencyFees != null
+                          ? currencyFormatter.format(metadata.agencyFees)
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Renovation Fees"
+                      value={
+                        metadata.renovationFees != null
+                          ? currencyFormatter.format(metadata.renovationFees)
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label="Furnishing Fees"
+                      value={
+                        metadata.furnishingFees != null
+                          ? currencyFormatter.format(metadata.furnishingFees)
+                          : null
+                      }
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      Financing
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {hasLoan ? (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                        <DetailField
+                          label="Principal"
+                          value={currencyFormatter.format(
+                            metadata.linked_loan.amount ?? 0,
+                          )}
+                        />
+                        <DetailField
+                          label="Interest Rate"
+                          value={
+                            metadata.linked_loan.interest_rate != null
+                              ? `${metadata.linked_loan.interest_rate}%`
+                              : null
+                          }
+                        />
+                        <DetailField
+                          label="Duration"
+                          value={
+                            metadata.linked_loan.duration_months != null
+                              ? `${metadata.linked_loan.duration_months} months`
+                              : null
+                          }
+                        />
+                        <DetailField
+                          label="Start Date"
+                          value={metadata.linked_loan.start_date}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No loan attached.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       </div>

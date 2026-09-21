@@ -51,9 +51,12 @@ export type AssetForEdit = {
 export function AddAssetDialog({
   categories,
   asset,
+  trigger,
 }: {
   categories: Category[];
   asset?: AssetForEdit;
+  /** Custom trigger element (e.g. a "+ Add Loan" button elsewhere on the page). Falls back to the default Edit/Add Asset button. */
+  trigger?: React.ReactNode;
 }) {
   const isEditMode = !!asset;
 
@@ -152,20 +155,21 @@ export function AddAssetDialog({
       }}
     >
       <DialogTrigger asChild>
-        {isEditMode ? (
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Edit asset"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Edit className="size-4" />
-          </Button>
-        ) : (
-          <Button>Add Asset</Button>
-        )}
+        {trigger ??
+          (isEditMode ? (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Edit asset"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Edit className="size-4" />
+            </Button>
+          ) : (
+            <Button>Add Asset</Button>
+          ))}
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto border-border bg-card">
+      <DialogContent className="w-[95vw] max-w-2xl border-border bg-card p-6 max-h-[85vh] overflow-y-auto overflow-x-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-foreground">
             {isEditMode ? "Edit Asset" : "Add Asset"}
@@ -178,9 +182,9 @@ export function AddAssetDialog({
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="w-full min-w-0 space-y-2">
             <Label>Images ({images.length}/{MAX_ASSET_IMAGES})</Label>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
               {images.map((src, index) => (
                 <div key={index} className="relative">
                   <Avatar size="lg" className="rounded-md">
@@ -258,8 +262,8 @@ export function AddAssetDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
+          <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="quantity">Quantity</Label>
               <Input
                 id="quantity"
@@ -270,11 +274,11 @@ export function AddAssetDialog({
                 defaultValue={asset?.quantity ?? 1}
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="current_value">
                 {isRealEstate ? "Current Market Valuation" : "Value"}
               </Label>
-              <div className="relative">
+              <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   {getCurrencySymbol(currency)}
                 </span>
@@ -304,7 +308,7 @@ export function AddAssetDialog({
                 </p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="currency">Currency</Label>
               <Select name="currency" value={currency} onValueChange={setCurrency}>
                 <SelectTrigger id="currency" className="w-full">

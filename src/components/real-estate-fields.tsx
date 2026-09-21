@@ -41,9 +41,9 @@ function Stepper({
   min?: number;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="w-full min-w-0 space-y-2">
       <Label>{label}</Label>
-      <div className="flex items-center gap-2">
+      <div className="flex w-full min-w-0 items-center gap-2">
         <Button
           type="button"
           variant="outline"
@@ -53,7 +53,7 @@ function Stepper({
         >
           <Minus className="size-4" />
         </Button>
-        <span className="w-8 text-center text-sm text-foreground">
+        <span className="w-8 shrink-0 text-center text-sm text-foreground">
           {value}
         </span>
         <Button
@@ -82,9 +82,9 @@ function NumberField({
 }) {
   const symbol = currency ? getCurrencySymbol(currency) : null;
   return (
-    <div className="space-y-2">
+    <div className="w-full min-w-0 space-y-2">
       <Label>{label}</Label>
-      <div className="relative">
+      <div className="relative w-full min-w-0">
         {symbol && (
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
             {symbol}
@@ -247,13 +247,13 @@ export function RealEstateFields({
   }
 
   return (
-    <div className="space-y-6 border-t border-border pt-6">
+    <div className="w-full min-w-0 space-y-6 border-t border-border pt-6">
       <h3 className="text-sm font-medium text-foreground">
         Real Estate Details
       </h3>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2 sm:col-span-2">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2 sm:col-span-2">
           <Label htmlFor="re_address">Address</Label>
           <Input
             id="re_address"
@@ -261,7 +261,7 @@ export function RealEstateFields({
             onChange={(e) => set("address", e.target.value)}
           />
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label>Type</Label>
           <Select
             value={value.propertyType}
@@ -285,7 +285,7 @@ export function RealEstateFields({
         <h4 className="text-sm font-medium text-foreground">
           Characteristics
         </h4>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid w-full min-w-0 grid-cols-2 gap-4 sm:grid-cols-4">
           <ToggleField
             label="Automatic Estimation"
             checked={value.automaticEstimation}
@@ -315,19 +315,19 @@ export function RealEstateFields({
       </div>
 
       {value.is_offplan && (
-        <div className="space-y-4 border border-border p-4">
+        <div className="w-full min-w-0 space-y-4 border border-border p-4">
           <h4 className="text-sm font-medium text-foreground">
             Off-Plan Payment Tracking
           </h4>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             <NumberField
               label="Contract Price (SPA)"
               value={value.contract_price}
               onChange={setContractPrice}
               currency={currency}
             />
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Municipal / ADM Fee (%)</Label>
               <Input
                 type="number"
@@ -341,9 +341,9 @@ export function RealEstateFields({
                 }
               />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Municipal / ADM Fee (Amount)</Label>
-              <div className="relative">
+              <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   {currencySymbol}
                 </span>
@@ -351,7 +351,7 @@ export function RealEstateFields({
                   type="number"
                   step="any"
                   min="0"
-                  className="pl-12"
+                  className="w-full pl-12"
                   value={value.adm_fee_amount ?? ""}
                   onChange={(e) =>
                     setAdmFeeAmount(
@@ -363,18 +363,18 @@ export function RealEstateFields({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="w-full min-w-0 space-y-3">
             <div className="flex items-center justify-between">
               <Label>Payment Schedule</Label>
             </div>
 
-            <div className="space-y-3">
+            <div className="w-full min-w-0 space-y-3">
               {value.payment_schedule.map((milestone, index) => (
                 <div
                   key={milestone.id}
-                  className="grid grid-cols-2 gap-2 border border-border p-3 sm:grid-cols-6 sm:items-end"
+                  className="grid w-full min-w-0 grid-cols-2 gap-2 border border-border p-3 sm:grid-cols-6 sm:items-end"
                 >
-                  <div className="space-y-1 sm:col-span-2">
+                  <div className="min-w-0 space-y-1 sm:col-span-2">
                     <Label className="text-xs">Milestone</Label>
                     <Input
                       placeholder="e.g. Down Payment"
@@ -384,17 +384,18 @@ export function RealEstateFields({
                       }
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <Label className="text-xs">Due Date</Label>
                     <Input
                       type="date"
+                      className="w-full min-w-0"
                       value={milestone.due_date}
                       onChange={(e) =>
                         updateMilestone(index, { due_date: e.target.value })
                       }
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <Label className="text-xs">Amount</Label>
                     <Input
                       type="number"
@@ -408,7 +409,7 @@ export function RealEstateFields({
                       }
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <Label className="text-xs">Percentage</Label>
                     <Input
                       type="number"
@@ -423,8 +424,8 @@ export function RealEstateFields({
                       }
                     />
                   </div>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1 space-y-1">
+                  <div className="flex min-w-0 items-end gap-2">
+                    <div className="min-w-0 flex-1 space-y-1">
                       <Label className="text-xs">Status</Label>
                       <Select
                         value={milestone.status}
@@ -447,6 +448,7 @@ export function RealEstateFields({
                       type="button"
                       variant="outline"
                       size="icon-sm"
+                      className="shrink-0"
                       onClick={() => removeMilestone(index)}
                       aria-label="Remove milestone"
                     >
@@ -467,8 +469,8 @@ export function RealEstateFields({
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
-            <div>
+          <div className="grid w-full min-w-0 grid-cols-2 gap-4 border-t border-border pt-4">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
                 Total Paid to Date
               </p>
@@ -476,7 +478,7 @@ export function RealEstateFields({
                 {value.paid_to_date.toLocaleString()}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
                 Outstanding Balance
               </p>
@@ -488,9 +490,9 @@ export function RealEstateFields({
         </div>
       )}
 
-      <div className="space-y-4 border border-border p-4">
+      <div className="w-full min-w-0 space-y-4 border border-border p-4">
         <h4 className="text-sm font-medium text-foreground">Linked Loan</h4>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
           <NumberField
             label="Total Loan Amount"
             value={value.linked_loan.amount}
@@ -507,10 +509,11 @@ export function RealEstateFields({
             value={value.linked_loan.duration_months}
             onChange={(next) => setLoan({ duration_months: next })}
           />
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Start Date</Label>
             <Input
               type="date"
+              className="w-full min-w-0"
               value={value.linked_loan.start_date}
               onChange={(e) => setLoan({ start_date: e.target.value })}
             />
@@ -524,7 +527,7 @@ export function RealEstateFields({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField
           label="Purchase Price"
           value={value.purchasePrice}
@@ -557,7 +560,7 @@ export function RealEstateFields({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
         <NumberField
           label="Surface Area (m²)"
           value={value.surfaceArea}
@@ -575,7 +578,7 @@ export function RealEstateFields({
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
         <Stepper
           label="Floors"
           value={value.floors}
@@ -595,8 +598,8 @@ export function RealEstateFields({
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2">
           <Label>Year of Construction</Label>
           <Select
             value={value.yearOfConstruction}
@@ -614,7 +617,7 @@ export function RealEstateFields({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
+        <div className="min-w-0 space-y-2">
           <Label>EPC Rating</Label>
           <Select
             value={value.epcRating}
@@ -636,7 +639,7 @@ export function RealEstateFields({
 
       <div className="space-y-4">
         <h4 className="text-sm font-medium text-foreground">Condition</h4>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
           {(
             [
               ["kitchen", "Kitchen"],
@@ -646,7 +649,7 @@ export function RealEstateFields({
               ["general", "General"],
             ] as const
           ).map(([key, label]) => (
-            <div key={key} className="space-y-2">
+            <div key={key} className="min-w-0 space-y-2">
               <Label>{label}</Label>
               <Select
                 value={value.condition[key]}
@@ -668,7 +671,7 @@ export function RealEstateFields({
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="w-full min-w-0 space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-foreground">Ownership</h4>
           <p
@@ -682,16 +685,16 @@ export function RealEstateFields({
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="w-full min-w-0 space-y-3">
           {value.ownership.map((owner, index) => (
-            <div key={index} className="flex items-center gap-2">
+            <div key={index} className="flex w-full min-w-0 items-center gap-2">
               <Input
                 placeholder="Owner name"
                 value={owner.name}
                 onChange={(e) =>
                   updateOwner(index, { name: e.target.value })
                 }
-                className="flex-1"
+                className="min-w-0 flex-1"
               />
               <Input
                 type="number"
@@ -703,13 +706,14 @@ export function RealEstateFields({
                     percentage: Number(e.target.value),
                   })
                 }
-                className="w-20"
+                className="w-20 shrink-0"
               />
-              <span className="text-sm text-muted-foreground">%</span>
+              <span className="shrink-0 text-sm text-muted-foreground">%</span>
               <Button
                 type="button"
                 variant="outline"
                 size="icon-sm"
+                className="shrink-0"
                 disabled={value.ownership.length <= 1}
                 onClick={() => removeOwner(index)}
               >
