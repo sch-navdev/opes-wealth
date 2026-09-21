@@ -59,7 +59,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { updateAssetValuation } from "@/app/dashboard/actions";
-import { parseRealEstateMetadata } from "@/lib/real-estate";
+import {
+  calculateCashInvestedToDate,
+  calculateTotalCost,
+  calculateUnrealizedGain,
+  parseRealEstateMetadata,
+} from "@/lib/real-estate";
+import { currencies, getCurrencySymbol } from "@/lib/currencies";
+import { convertAmount } from "@/lib/fx";
 
 export type AssetDetail = {
   id: string;
@@ -103,14 +110,17 @@ export function AssetDetailView({
   asset,
   history,
   categories,
+  ratesFromUsd,
 }: {
   asset: AssetDetail;
   history: AssetHistoryPoint[];
   categories: Category[];
+  ratesFromUsd: Record<string, number>;
 }) {
   const router = useRouter();
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshValue, setRefreshValue] = useState("");
+  const [refreshCurrency, setRefreshCurrency] = useState(asset.currency);
   const [refreshSource, setRefreshSource] = useState<
     "manual" | "dari" | "dubailand"
   >("manual");
@@ -132,16 +142,16 @@ export function AssetDetailView({
     : asset.current_value;
   const netEquity = asset.current_value;
 
-  const investedCapital = isRealEstate
-    ? (metadata.purchasePrice ?? 0) +
-      (metadata.agencyFees ?? 0) +
-      (metadata.notaryFees ?? 0) +
-      (metadata.renovationFees ?? 0) +
-      (metadata.furnishingFees ?? 0)
+  const totalCost = isRealEstate
+    ? calculateTotalCost(metadata, marketValuation)
     : null;
+  const cashInvestedToDate =
+    isRealEstate && metadata.is_offplan
+      ? calculateCashInvestedToDate(metadata)
+      : null;
   const unrealizedGain =
-    isRealEstate && investedCapital != null
-      ? marketValuation - investedCapital
+    isRealEstate && totalCost != null
+      ? calculateUnrealizedGain(marketValuation, totalCost)
       : null;
   const valuePerSqm =
     isRealEstate && metadata.surfaceArea
@@ -159,14 +169,28 @@ export function AssetDetailView({
   function handleRefreshSubmit(e: React.FormEvent) {
     e.preventDefault();
     setRefreshError(null);
-    const value = Number(refreshValue);
-    if (!Number.isFinite(value)) {
+    const enteredValue = Number(refreshValue);
+    if (!Number.isFinite(enteredValue)) {
       setRefreshError("Enter a valid number.");
       return;
     }
 
+    // The dialog lets the user enter the new value in any currency, but
+    // the asset (and its history) is always stored in its own currency —
+    // convert before saving.
+    const valueInAssetCurrency = convertAmount(
+      enteredValue,
+      refreshCurrency,
+      asset.currency,
+      ratesFromUsd,
+    );
+
     startTransition(async () => {
-      const result = await updateAssetValuation(asset.id, value, refreshSource);
+      const result = await updateAssetValuation(
+        asset.id,
+        valueInAssetCurrency,
+        refreshSource,
+      );
       if (result?.error) {
         setRefreshError(result.error);
         return;
@@ -294,15 +318,44 @@ export function AssetDetailView({
                   <form onSubmit={handleRefreshSubmit} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="new_value">New Market Value</Label>
-                      <Input
-                        id="new_value"
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={refreshValue}
-                        onChange={(e) => setRefreshValue(e.target.value)}
-                        required
-                      />
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                            {getCurrencySymbol(refreshCurrency)}
+                          </span>
+                          <Input
+                            id="new_value"
+                            type="number"
+                            step="any"
+                            min="0"
+                            className="pl-12"
+                            value={refreshValue}
+                            onChange={(e) => setRefreshValue(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <Select
+                          value={refreshCurrency}
+                          onValueChange={setRefreshCurrency}
+                        >
+                          <SelectTrigger className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {currencies.map((c) => (
+                              <SelectItem key={c.code} value={c.code}>
+                                {c.code}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {refreshCurrency !== asset.currency && (
+                        <p className="text-xs text-muted-foreground">
+                          Converted to the asset&apos;s currency (
+                          {asset.currency}) before saving.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Source</Label>
@@ -440,47 +493,91 @@ export function AssetDetailView({
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-foreground">Key Metrics</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <DetailField
-                  label="Invested Capital"
-                  value={
-                    investedCapital != null
-                      ? currencyFormatter.format(investedCapital)
-                      : null
-                  }
-                />
-                <div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Card className="border-border bg-card">
+                <CardContent className="space-y-1 py-4">
+                  <p className="text-xs text-muted-foreground">
+                    Total Property Cost
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {totalCost != null
+                      ? currencyFormatter.format(totalCost)
+                      : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    All-in cost basis
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border bg-card">
+                <CardContent className="space-y-1 py-4">
                   <p className="text-xs text-muted-foreground">
                     Unrealized Gain
                   </p>
-                  <p
-                    className={
-                      unrealizedGain != null
-                        ? unrealizedGain >= 0
-                          ? "text-sm font-medium text-success"
-                          : "text-sm font-medium text-destructive"
-                        : "text-sm text-foreground"
-                    }
-                  >
-                    {unrealizedGain != null
-                      ? currencyFormatter.format(unrealizedGain)
-                      : "—"}
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={
+                        unrealizedGain != null
+                          ? unrealizedGain.amount >= 0
+                            ? "text-lg font-semibold text-success"
+                            : "text-lg font-semibold text-destructive"
+                          : "text-lg font-semibold text-foreground"
+                      }
+                    >
+                      {unrealizedGain != null
+                        ? currencyFormatter.format(unrealizedGain.amount)
+                        : "—"}
+                    </p>
+                    {unrealizedGain?.percent != null && (
+                      <Badge
+                        variant="secondary"
+                        className={
+                          unrealizedGain.amount >= 0
+                            ? "bg-success text-success-foreground"
+                            : "bg-destructive text-destructive-foreground"
+                        }
+                      >
+                        {unrealizedGain.amount >= 0 ? "+" : ""}
+                        {unrealizedGain.percent.toFixed(1)}%
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Net gain vs. all-in cost
                   </p>
-                </div>
-                <DetailField
-                  label="Value / m²"
-                  value={
-                    valuePerSqm != null
-                      ? currencyFormatter.format(valuePerSqm)
-                      : null
-                  }
-                />
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {cashInvestedToDate != null ? (
+                <Card className="border-border bg-card">
+                  <CardContent className="space-y-1 py-4">
+                    <p className="text-xs text-muted-foreground">
+                      Cash Invested to Date
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {currencyFormatter.format(cashInvestedToDate)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Paid milestones + fees
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-border bg-card">
+                  <CardContent className="space-y-1 py-4">
+                    <p className="text-xs text-muted-foreground">
+                      Value / m²
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {valuePerSqm != null
+                        ? currencyFormatter.format(valuePerSqm)
+                        : "—"}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/components/asset-detail-view";
+import { getExchangeRatesFromUsd } from "@/lib/fx";
 
 export default async function AssetDetailsPage({
   params,
@@ -24,7 +25,7 @@ export default async function AssetDetailsPage({
     redirect("/login/mfa");
   }
 
-  const [{ data: asset }, { data: history }, { data: categories }] =
+  const [{ data: asset }, { data: history }, { data: categories }, rates] =
     await Promise.all([
       supabase
         .from("assets")
@@ -41,6 +42,7 @@ export default async function AssetDetailsPage({
         .order("recorded_date", { ascending: true })
         .returns<AssetHistoryPoint[]>(),
       supabase.from("asset_categories").select("id, name").order("name"),
+      getExchangeRatesFromUsd(),
     ]);
 
   if (!asset) {
@@ -52,6 +54,7 @@ export default async function AssetDetailsPage({
       asset={asset}
       history={history ?? []}
       categories={categories ?? []}
+      ratesFromUsd={rates}
     />
   );
 }

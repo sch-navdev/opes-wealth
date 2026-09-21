@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RealEstateFields } from "@/components/real-estate-fields";
-import { currencies } from "@/lib/currencies";
+import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
 import {
   EMPTY_REAL_ESTATE_METADATA,
@@ -274,20 +274,26 @@ export function AddAssetDialog({
               <Label htmlFor="current_value">
                 {isRealEstate ? "Current Market Valuation" : "Value"}
               </Label>
-              <Input
-                id="current_value"
-                name="current_value"
-                type="number"
-                step="any"
-                min="0"
-                placeholder="0.00"
-                defaultValue={
-                  asset && isRealEstate
-                    ? realEstateMetadata.market_valuation ?? asset.current_value
-                    : asset?.current_value ?? ""
-                }
-                required
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  {getCurrencySymbol(currency)}
+                </span>
+                <Input
+                  id="current_value"
+                  name="current_value"
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                  className="pl-12"
+                  defaultValue={
+                    asset && isRealEstate
+                      ? realEstateMetadata.market_valuation ?? asset.current_value
+                      : asset?.current_value ?? ""
+                  }
+                  required
+                />
+              </div>
               {isRealEstate && (
                 <p className="text-xs text-muted-foreground">
                   Saved as net equity (this minus any linked loan
@@ -319,6 +325,7 @@ export function AddAssetDialog({
             <RealEstateFields
               value={realEstateMetadata}
               onChange={setRealEstateMetadata}
+              currency={currency}
             />
           )}
 

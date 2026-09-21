@@ -152,6 +152,55 @@ export function parseRealEstateMetadata(
 /** Max number of images stored per asset (multi-image carousel). */
 export const MAX_ASSET_IMAGES = 3;
 
+/**
+ * All-in cost basis: the contract/purchase price plus every fee paid to
+ * acquire the property (ADM/municipal registration, notary, agency,
+ * renovation, furnishing). `fallbackValue` is used when neither
+ * `contract_price` nor `purchasePrice` is set (e.g. a bare market
+ * valuation with no purchase history entered yet).
+ */
+export function calculateTotalCost(
+  metadata: RealEstateMetadata,
+  fallbackValue: number,
+): number {
+  const base = metadata.contract_price ?? metadata.purchasePrice ?? fallbackValue;
+  return (
+    base +
+    (metadata.adm_fee_amount ?? 0) +
+    (metadata.notaryFees ?? 0) +
+    (metadata.agencyFees ?? 0) +
+    (metadata.renovationFees ?? 0) +
+    (metadata.furnishingFees ?? 0)
+  );
+}
+
+/**
+ * For off-plan properties: actual cash paid out so far — the payment
+ * milestones marked "paid" plus every fee (ADM, notary, agency,
+ * renovation, furnishing), which are typically paid up front rather than
+ * staged with the contract.
+ */
+export function calculateCashInvestedToDate(metadata: RealEstateMetadata): number {
+  return (
+    (metadata.paid_to_date ?? 0) +
+    (metadata.adm_fee_amount ?? 0) +
+    (metadata.notaryFees ?? 0) +
+    (metadata.agencyFees ?? 0) +
+    (metadata.renovationFees ?? 0) +
+    (metadata.furnishingFees ?? 0)
+  );
+}
+
+/** Net gain against the full cost basis (not just the raw purchase price), and that gain as a percentage of the cost basis. */
+export function calculateUnrealizedGain(
+  marketValuation: number,
+  totalCost: number,
+): { amount: number; percent: number | null } {
+  const amount = marketValuation - totalCost;
+  const percent = totalCost !== 0 ? (amount / totalCost) * 100 : null;
+  return { amount, percent };
+}
+
 let milestoneCounter = 0;
 
 /** Generates a stable-enough client-side id for a new payment milestone row. */

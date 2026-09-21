@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { getCurrencySymbol } from "@/lib/currencies";
 import {
   CONDITION_RATINGS,
   CONSTRUCTION_YEARS,
@@ -72,23 +73,34 @@ function NumberField({
   label,
   value,
   onChange,
+  currency,
 }: {
   label: string;
   value: number | null;
   onChange: (next: number | null) => void;
+  currency?: string;
 }) {
+  const symbol = currency ? getCurrencySymbol(currency) : null;
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input
-        type="number"
-        step="any"
-        min="0"
-        value={value ?? ""}
-        onChange={(e) =>
-          onChange(e.target.value === "" ? null : Number(e.target.value))
-        }
-      />
+      <div className="relative">
+        {symbol && (
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            {symbol}
+          </span>
+        )}
+        <Input
+          type="number"
+          step="any"
+          min="0"
+          className={symbol ? "pl-12" : undefined}
+          value={value ?? ""}
+          onChange={(e) =>
+            onChange(e.target.value === "" ? null : Number(e.target.value))
+          }
+        />
+      </div>
     </div>
   );
 }
@@ -113,10 +125,13 @@ function ToggleField({
 export function RealEstateFields({
   value,
   onChange,
+  currency,
 }: {
   value: RealEstateMetadata;
   onChange: (next: RealEstateMetadata) => void;
+  currency: string;
 }) {
+  const currencySymbol = getCurrencySymbol(currency);
   function set<K extends keyof RealEstateMetadata>(
     key: K,
     next: RealEstateMetadata[K],
@@ -310,6 +325,7 @@ export function RealEstateFields({
               label="Contract Price (SPA)"
               value={value.contract_price}
               onChange={setContractPrice}
+              currency={currency}
             />
             <div className="space-y-2">
               <Label>Municipal / ADM Fee (%)</Label>
@@ -327,17 +343,23 @@ export function RealEstateFields({
             </div>
             <div className="space-y-2">
               <Label>Municipal / ADM Fee (Amount)</Label>
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                value={value.adm_fee_amount ?? ""}
-                onChange={(e) =>
-                  setAdmFeeAmount(
-                    e.target.value === "" ? null : Number(e.target.value),
-                  )
-                }
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  {currencySymbol}
+                </span>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  className="pl-12"
+                  value={value.adm_fee_amount ?? ""}
+                  onChange={(e) =>
+                    setAdmFeeAmount(
+                      e.target.value === "" ? null : Number(e.target.value),
+                    )
+                  }
+                />
+              </div>
             </div>
           </div>
 
@@ -473,6 +495,7 @@ export function RealEstateFields({
             label="Total Loan Amount"
             value={value.linked_loan.amount}
             onChange={(next) => setLoan({ amount: next })}
+            currency={currency}
           />
           <NumberField
             label="Interest Rate (%)"
@@ -506,26 +529,31 @@ export function RealEstateFields({
           label="Purchase Price"
           value={value.purchasePrice}
           onChange={(next) => set("purchasePrice", next)}
+          currency={currency}
         />
         <NumberField
           label="Agency Fees"
           value={value.agencyFees}
           onChange={(next) => set("agencyFees", next)}
+          currency={currency}
         />
         <NumberField
           label="Notary Fees"
           value={value.notaryFees}
           onChange={(next) => set("notaryFees", next)}
+          currency={currency}
         />
         <NumberField
           label="Renovation Fees"
           value={value.renovationFees}
           onChange={(next) => set("renovationFees", next)}
+          currency={currency}
         />
         <NumberField
           label="Furnishing Fees"
           value={value.furnishingFees}
           onChange={(next) => set("furnishingFees", next)}
+          currency={currency}
         />
       </div>
 
