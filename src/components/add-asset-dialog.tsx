@@ -148,7 +148,12 @@ export function AddAssetDialog({
     >
       <DialogTrigger asChild>
         {isEditMode ? (
-          <Button variant="outline" size="icon-sm" aria-label="Edit asset">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Edit asset"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Edit className="size-4" />
           </Button>
         ) : (

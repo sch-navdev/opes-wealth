@@ -36,6 +36,7 @@ High-net-worth individuals
   - [x] Advanced Real Estate schema, multi-currency, off-plan tracking — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
   - [x] Edit/Delete asset actions — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Asset image/logo upload & portfolio avatar display — [[Portfolio-Dashboard|Portfolio Dashboard]]
+  - [x] Dedicated asset details page & clickable portfolio rows — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]

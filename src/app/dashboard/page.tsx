@@ -173,9 +173,15 @@ export default async function DashboardPage({
                       : null;
 
                   return (
-                    <TableRow key={asset.id}>
+                    <TableRow
+                      key={asset.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
                       <TableCell className="font-medium text-foreground">
-                        <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/assets/${asset.id}`}
+                          className="flex items-center gap-2"
+                        >
                           <Avatar size="sm" className="rounded-md">
                             <AvatarImage
                               src={asset.image_base64 || undefined}
@@ -194,7 +200,7 @@ export default async function DashboardPage({
                           {isOffplan && (
                             <Badge variant="secondary">Off-Plan</Badge>
                           )}
-                        </div>
+                        </Link>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {asset.asset_categories?.name ?? "—"}

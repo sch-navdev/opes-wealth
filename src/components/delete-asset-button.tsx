@@ -39,7 +39,12 @@ export function DeleteAssetButton({ id }: { id: string }) {
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="icon-sm" aria-label="Delete asset">
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="Delete asset"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Trash2 className="size-4" />
         </Button>
       </AlertDialogTrigger>
@@ -61,9 +66,15 @@ export function DeleteAssetButton({ id }: { id: string }) {
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel
+            disabled={isPending}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
+              e.stopPropagation();
               e.preventDefault();
               handleConfirm();
             }}
