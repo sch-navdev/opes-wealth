@@ -190,11 +190,27 @@ export function AssetDetailView({
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
-  const chartData = history.map((h) => ({
-    date: h.recorded_date,
-    value: h.value,
-    netEquity: h.net_equity ?? h.value,
-  }));
+  const chartData = [...history]
+    .sort((a, b) => a.recorded_date.localeCompare(b.recorded_date))
+    .map((h) => ({
+      date: h.recorded_date,
+      value: h.value,
+      netEquity: h.net_equity ?? h.value,
+    }));
+
+  const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  function formatChartDate(isoDate: unknown): string {
+    if (typeof isoDate !== "string") return String(isoDate ?? "");
+    const parsed = new Date(isoDate);
+    return Number.isNaN(parsed.getTime())
+      ? isoDate
+      : axisDateFormatter.format(parsed);
+  }
 
   function handleRefreshSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -484,6 +500,7 @@ export function AssetDetailView({
                           dataKey="date"
                           stroke="var(--color-muted-foreground)"
                           fontSize={12}
+                          tickFormatter={formatChartDate}
                         />
                         <YAxis
                           stroke="var(--color-muted-foreground)"
@@ -499,6 +516,7 @@ export function AssetDetailView({
                             border: "1px solid var(--color-border)",
                             color: "var(--color-foreground)",
                           }}
+                          labelFormatter={formatChartDate}
                           formatter={(value) =>
                             maskValue(currencyFormatter.format(Number(value)))
                           }
