@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseRealEstateMetadata, resolveRegistrationFee } from "@/lib/real-estate";
+import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
   const raw = formData.get("images") as string | null;
@@ -35,7 +36,7 @@ async function syncAssetHistory(
   assetId: string,
   currentValue: number,
   categoryName: string | null | undefined,
-  metadata: Record<string, unknown>,
+  metadata: Json,
 ) {
   const points = new Map<
     string,
@@ -114,7 +115,7 @@ export async function addAsset(formData: FormData) {
   const images = parseImages(formData);
 
   const metadataRaw = formData.get("metadata") as string | null;
-  let metadata: Record<string, unknown> = {};
+  let metadata: Json = {};
   if (metadataRaw) {
     try {
       metadata = JSON.parse(metadataRaw);
@@ -172,7 +173,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const images = parseImages(formData);
 
   const metadataRaw = formData.get("metadata") as string | null;
-  let metadata: Record<string, unknown> = {};
+  let metadata: Json = {};
   if (metadataRaw) {
     try {
       metadata = JSON.parse(metadataRaw);
@@ -234,7 +235,7 @@ export async function updateAssetValuation(
     .eq("profile_id", user.id)
     .single<{
       id: string;
-      metadata: Record<string, unknown> | null;
+      metadata: Json | null;
       asset_categories: { name: string } | null;
     }>();
 
