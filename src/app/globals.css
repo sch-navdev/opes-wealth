@@ -2,28 +2,80 @@
 @plugin "tailwindcss-animate";
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --color-background: #06101E;
-  --color-foreground: #FAFAFA;
-  --color-card: #151E32;
-  --color-card-foreground: #FAFAFA;
-  --color-popover: #151E32;
-  --color-popover-foreground: #FAFAFA;
-  --color-primary: #C69B3C;
-  --color-primary-foreground: #06101E;
-  --color-secondary: #1E293B;
-  --color-secondary-foreground: #FAFAFA;
-  --color-muted: #1E293B;
-  --color-muted-foreground: #9CA3AF;
-  --color-accent: #1E293B;
-  --color-accent-foreground: #FAFAFA;
-  --color-destructive: #C41E3A;
-  --color-destructive-foreground: #FAFAFA;
-  --color-success: #10B981;
-  --color-success-foreground: #06101E;
-  --color-border: #1E293B;
-  --color-input: #1E293B;
-  --color-ring: #C69B3C;
+:root {
+  /* Light mode — "Opes Wealth" ivory & navy, same champagne-gold accent */
+  --background: #F7F3EC;
+  --foreground: #101827;
+  --card: #FFFFFF;
+  --card-foreground: #101827;
+  --popover: #FFFFFF;
+  --popover-foreground: #101827;
+  --primary: #A87C1F;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EAE3D6;
+  --secondary-foreground: #101827;
+  --muted: #EAE3D6;
+  --muted-foreground: #6B6455;
+  --accent: #EAE3D6;
+  --accent-foreground: #101827;
+  --destructive: #B0182F;
+  --destructive-foreground: #FFFFFF;
+  --success: #0E9A6E;
+  --success-foreground: #FFFFFF;
+  --border: #DED5C2;
+  --input: #DED5C2;
+  --ring: #A87C1F;
+}
+
+.dark {
+  /* Dark mode — Midnight Navy & Champagne Gold (original brand default) */
+  --background: #06101E;
+  --foreground: #FAFAFA;
+  --card: #151E32;
+  --card-foreground: #FAFAFA;
+  --popover: #151E32;
+  --popover-foreground: #FAFAFA;
+  --primary: #C69B3C;
+  --primary-foreground: #06101E;
+  --secondary: #1E293B;
+  --secondary-foreground: #FAFAFA;
+  --muted: #1E293B;
+  --muted-foreground: #9CA3AF;
+  --accent: #1E293B;
+  --accent-foreground: #FAFAFA;
+  --destructive: #C41E3A;
+  --destructive-foreground: #FAFAFA;
+  --success: #10B981;
+  --success-foreground: #06101E;
+  --border: #1E293B;
+  --input: #1E293B;
+  --ring: #C69B3C;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Sharp, zero-radius corners — a brand constant, not theme-dependent */
   --radius-lg: 0px;
   --radius-md: 0px;
   --radius-sm: 0px;

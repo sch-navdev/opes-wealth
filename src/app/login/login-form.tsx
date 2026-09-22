@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { Fingerprint, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -8,18 +9,23 @@ import { Label } from "@/components/ui/label";
 import { login, signup } from "@/app/auth/actions";
 import { createClient } from "@/utils/supabase/client";
 
+type Mode = "login" | "signup";
+
 export function LoginForm() {
   const formRef = useRef<HTMLFormElement>(null);
+  const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
 
-  function handleSubmit(action: typeof login | typeof signup) {
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
     const form = formRef.current;
     if (!form) return;
 
     const formData = new FormData(form);
+    const action = mode === "login" ? login : signup;
 
     startTransition(async () => {
       const result = await action(formData);
@@ -56,76 +62,99 @@ export function LoginForm() {
   }
 
   return (
-    <form ref={formRef} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="you@example.com"
-          required
-          autoComplete="email"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          placeholder="••••••••"
-          required
-          autoComplete="current-password"
-        />
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Checkbox id="rememberMe" name="rememberMe" />
-        <Label htmlFor="rememberMe" className="cursor-pointer font-normal text-muted-foreground">
-          Remember me
-        </Label>
-      </div>
-
-      {error && (
-        <p className="text-sm text-destructive" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="flex flex-col gap-2 pt-2">
-        <Button
-          type="button"
-          disabled={isPending || isPasskeyPending}
-          onClick={() => handleSubmit(login)}
-        >
-          {isPending ? "Please wait…" : "Login"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isPending || isPasskeyPending}
-          onClick={() => handleSubmit(signup)}
-        >
-          {isPending ? "Please wait…" : "Sign Up"}
-        </Button>
-      </div>
-
-      <div className="relative py-2 text-center text-xs text-muted-foreground">
-        <span className="relative bg-card px-2">or</span>
-        <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-border" />
-      </div>
-
+    <div className="space-y-6">
       <Button
         type="button"
         variant="outline"
         disabled={isPending || isPasskeyPending}
         onClick={handlePasskeySignIn}
-        className="w-full"
+        className="w-full gap-2"
+        size="lg"
       >
+        <Fingerprint className="size-5" />
         {isPasskeyPending ? "Waiting for passkey…" : "Sign in with Passkey"}
       </Button>
-    </form>
+
+      <div className="relative text-center text-xs text-muted-foreground">
+        <span className="relative bg-card px-2">
+          or continue with email
+        </span>
+        <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-border" />
+      </div>
+
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="••••••••"
+              required
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        {mode === "login" && (
+          <div className="flex items-center gap-2">
+            <Checkbox id="rememberMe" name="rememberMe" />
+            <Label
+              htmlFor="rememberMe"
+              className="cursor-pointer font-normal text-muted-foreground"
+            >
+              Remember me
+            </Label>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <Button type="submit" className="w-full" size="lg" disabled={isPending || isPasskeyPending}>
+          {isPending
+            ? "Please wait…"
+            : mode === "login"
+              ? "Login"
+              : "Create Account"}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setMode(mode === "login" ? "signup" : "login");
+          }}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {mode === "login" ? "Sign Up" : "Login"}
+        </button>
+      </p>
+    </div>
   );
 }

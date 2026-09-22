@@ -133,8 +133,8 @@ export function PortfolioTable({
                 convertedGain == null || convertedGain === 0
                   ? "text-muted-foreground"
                   : convertedGain > 0
-                    ? "text-emerald-500"
-                    : "text-red-500";
+                    ? "text-success"
+                    : "text-destructive";
               const gainSign =
                 convertedGain != null && convertedGain !== 0
                   ? convertedGain > 0

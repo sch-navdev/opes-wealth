@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
   return (
@@ -8,9 +9,12 @@ export default function Home() {
         <span className="text-lg font-semibold tracking-tight text-foreground">
           Opes Wealth
         </span>
-        <Button asChild variant="outline">
-          <Link href="/login">Sign In</Link>
-        </Button>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <Button asChild variant="outline">
+            <Link href="/login">Sign In</Link>
+          </Button>
+        </div>
       </header>
 
       <main className="flex flex-1 items-center justify-center px-6">

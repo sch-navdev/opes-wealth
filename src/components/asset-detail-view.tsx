@@ -60,6 +60,7 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
+import { useLanguage } from "@/context/language-context";
 import { updateAssetValuation } from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
@@ -139,6 +140,7 @@ export function AssetDetailView({
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
+  const { t } = useLanguage();
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshValue, setRefreshValue] = useState("");
   const [refreshCurrency, setRefreshCurrency] = useState(asset.currency);
@@ -179,7 +181,9 @@ export function AssetDetailView({
       ? marketValuation / metadata.surfaceArea
       : null;
 
-  const confidenceLevel = metadata.automaticEstimation ? "High" : "Manual";
+  const confidenceLevel = metadata.automaticEstimation
+    ? t("confidence_high")
+    : t("confidence_manual");
   const netROI =
     unrealizedGain != null && totalCost
       ? (unrealizedGain.amount / totalCost) * 100
@@ -257,7 +261,7 @@ export function AssetDetailView({
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        Back to Portfolio
+        {t("back_to_portfolio")}
       </Link>
 
       <div className="mx-auto max-w-3xl space-y-6">
@@ -320,7 +324,7 @@ export function AssetDetailView({
                     {asset.name}
                   </h1>
                   {metadata.is_offplan && isRealEstate && (
-                    <Badge variant="secondary">Off-Plan</Badge>
+                    <Badge variant="secondary">{t("off_plan")}</Badge>
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -331,7 +335,7 @@ export function AssetDetailView({
             <div className="flex items-center gap-4">
               <div className="text-left sm:text-right">
                 <p className="text-xs text-muted-foreground">
-                  {isRealEstate ? "Net Equity" : "Value"}
+                  {isRealEstate ? t("net_equity") : t("value")}
                 </p>
                 <p
                   className={
@@ -359,16 +363,15 @@ export function AssetDetailView({
                 <DialogContent className="border-border bg-card">
                   <DialogHeader>
                     <DialogTitle className="text-foreground">
-                      Refresh Valuation
+                      {t("refresh_valuation")}
                     </DialogTitle>
                     <DialogDescription className="text-muted-foreground">
-                      Record a new market valuation. This updates the asset
-                      and adds a point to the history graph.
+                      {t("refresh_valuation_desc")}
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleRefreshSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="new_value">New Market Value</Label>
+                      <Label htmlFor="new_value">{t("new_market_value")}</Label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
                           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -403,13 +406,12 @@ export function AssetDetailView({
                       </div>
                       {refreshCurrency !== asset.currency && (
                         <p className="text-xs text-muted-foreground">
-                          Converted to the asset&apos;s currency (
-                          {asset.currency}) before saving.
+                          {t("converted_note", { currency: asset.currency })}
                         </p>
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label>Source</Label>
+                      <Label>{t("source")}</Label>
                       <Select
                         value={refreshSource}
                         onValueChange={(next) =>
@@ -420,7 +422,9 @@ export function AssetDetailView({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="manual">Manual Entry</SelectItem>
+                          <SelectItem value="manual">
+                            {t("manual_entry")}
+                          </SelectItem>
                           <SelectItem value="dari">DARI</SelectItem>
                           <SelectItem value="dubailand">
                             Dubai Land Department
@@ -429,9 +433,7 @@ export function AssetDetailView({
                       </Select>
                       {refreshSource !== "manual" && (
                         <p className="text-xs text-muted-foreground">
-                          No live DARI or Dubai Land Department integration
-                          is configured yet — this just tags the source on a
-                          manually entered value.
+                          {t("no_live_integration_note")}
                         </p>
                       )}
                     </div>
@@ -442,7 +444,7 @@ export function AssetDetailView({
                     )}
                     <DialogFooter>
                       <Button type="submit" disabled={isPending}>
-                        {isPending ? "Saving…" : "Save Valuation"}
+                        {isPending ? t("saving") : t("save_valuation")}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -454,23 +456,22 @@ export function AssetDetailView({
 
         <Tabs defaultValue="overview">
           <TabsList>
-            <TabsTrigger value="overview">Aperçu</TabsTrigger>
-            <TabsTrigger value="analysis">Analyse</TabsTrigger>
-            <TabsTrigger value="settings">Paramètres</TabsTrigger>
+            <TabsTrigger value="overview">{t("tab_overview")}</TabsTrigger>
+            <TabsTrigger value="analysis">{t("tab_analysis")}</TabsTrigger>
+            <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-foreground">
-                  Valuation History
+                  {t("valuation_history")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {chartData.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No valuation history yet — use &quot;Refresh
-                    Valuation&quot; above to record the first data point.
+                    {t("no_valuation_history")}
                   </p>
                 ) : (
                   <div className="h-64 w-full">
@@ -552,7 +553,7 @@ export function AssetDetailView({
               <Card className="border-border bg-card">
                 <CardContent className="space-y-1 py-4">
                   <p className="text-xs text-muted-foreground">
-                    Total Property Cost
+                    {t("total_property_cost")}
                   </p>
                   <p className="text-lg font-semibold text-foreground">
                     {totalCost != null
@@ -560,7 +561,7 @@ export function AssetDetailView({
                       : "—"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    All-in cost basis
+                    {t("all_in_cost_basis")}
                   </p>
                 </CardContent>
               </Card>
@@ -568,7 +569,7 @@ export function AssetDetailView({
               <Card className="border-border bg-card">
                 <CardContent className="space-y-1 py-4">
                   <p className="text-xs text-muted-foreground">
-                    Unrealized Gain
+                    {t("unrealized_gain")}
                   </p>
                   <div className="flex w-full flex-wrap items-center gap-2">
                     <p
@@ -601,7 +602,7 @@ export function AssetDetailView({
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Net gain vs. all-in cost
+                    {t("net_gain_vs_cost")}
                   </p>
                 </CardContent>
               </Card>
@@ -610,13 +611,13 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardContent className="space-y-1 py-4">
                     <p className="text-xs text-muted-foreground">
-                      Cash Invested to Date
+                      {t("cash_invested_to_date")}
                     </p>
                     <p className="text-lg font-semibold text-foreground">
                       {maskValue(currencyFormatter.format(cashInvestedToDate))}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Paid milestones + fees
+                      {t("paid_milestones_fees")}
                     </p>
                   </CardContent>
                 </Card>
@@ -624,7 +625,7 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardContent className="space-y-1 py-4">
                     <p className="text-xs text-muted-foreground">
-                      Value / m²
+                      {t("value_per_sqm")}
                     </p>
                     <p className="text-lg font-semibold text-foreground">
                       {valuePerSqm != null
@@ -637,7 +638,7 @@ export function AssetDetailView({
 
               <Card className="border-border bg-card">
                 <CardContent className="space-y-1 py-4">
-                  <p className="text-xs text-muted-foreground">Net ROI</p>
+                  <p className="text-xs text-muted-foreground">{t("net_roi")}</p>
                   <p
                     className={
                       netROI != null
@@ -652,7 +653,7 @@ export function AssetDetailView({
                       : "—"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Unrealized gain ÷ total cost
+                    {t("unrealized_gain_over_cost")}
                   </p>
                 </CardContent>
               </Card>
@@ -663,8 +664,7 @@ export function AssetDetailView({
             {!isRealEstate ? (
               <Card className="border-border bg-card">
                 <CardContent className="py-6 text-sm text-muted-foreground">
-                  Detailed market analysis is available for Real Estate
-                  assets.
+                  {t("analysis_unavailable")}
                 </CardContent>
               </Card>
             ) : (
@@ -672,12 +672,12 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Market Performance
+                      {t("market_performance")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <DetailField
-                      label="Price / m²"
+                      label={t("price_per_sqm")}
                       value={
                         valuePerSqm != null
                           ? maskValue(currencyFormatter.format(valuePerSqm))
@@ -685,11 +685,11 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Estimated Market Value"
+                      label={t("estimated_market_value")}
                       value={maskValue(currencyFormatter.format(marketValuation))}
                     />
                     <DetailField
-                      label="Confidence Level"
+                      label={t("confidence_level")}
                       value={confidenceLevel}
                     />
                   </CardContent>
@@ -698,13 +698,13 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Gross Share
+                      {t("gross_share")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-end justify-between gap-4">
                       <DetailField
-                        label="Ownership"
+                        label={t("ownership")}
                         value={maskValue(`${ownershipPercent}%`)}
                       />
                       <p className="text-lg font-semibold text-foreground">
@@ -721,19 +721,21 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Net Share
+                      {t("net_share")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-end justify-between gap-4">
                       <DetailField
-                        label={`Net Equity Share (${maskValue(`${equityRatio.toFixed(1)}%`)})`}
+                        label={t("net_equity_share", {
+                          percent: maskValue(`${equityRatio.toFixed(1)}%`),
+                        })}
                         value={maskValue(currencyFormatter.format(netShare))}
                       />
                       {hasLoan ? (
                         <div className="text-right">
                           <p className="text-xs text-muted-foreground">
-                            Active Loan Balance
+                            {t("active_loan_balance")}
                           </p>
                           <p className="text-sm font-medium text-destructive">
                             {maskValue(
@@ -758,7 +760,7 @@ export function AssetDetailView({
                           }}
                           trigger={
                             <Button type="button" variant="outline" size="sm">
-                              + Add Loan
+                              {t("add_loan")}
                             </Button>
                           }
                         />
@@ -775,7 +777,7 @@ export function AssetDetailView({
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle className="text-foreground">
-                        Payment Milestones
+                        {t("payment_milestones")}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -783,14 +785,14 @@ export function AssetDetailView({
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Milestone</TableHead>
-                              <TableHead>Due Date</TableHead>
+                              <TableHead>{t("milestone")}</TableHead>
+                              <TableHead>{t("due_date")}</TableHead>
                               <TableHead className="text-right">
-                                Amount
+                                {t("amount")}
                               </TableHead>
                               <TableHead className="text-right">%</TableHead>
                               <TableHead className="text-right">
-                                Status
+                                {t("status")}
                               </TableHead>
                             </TableRow>
                           </TableHeader>
@@ -801,7 +803,7 @@ export function AssetDetailView({
                                   colSpan={5}
                                   className="text-center text-muted-foreground"
                                 >
-                                  No payment milestones recorded.
+                                  {t("no_payment_milestones")}
                                 </TableCell>
                               </TableRow>
                             ) : (
@@ -837,8 +839,8 @@ export function AssetDetailView({
                                       }
                                     >
                                       {milestone.status === "paid"
-                                        ? "Paid"
-                                        : "Pending"}
+                                        ? t("paid")
+                                        : t("pending")}
                                     </Badge>
                                   </TableCell>
                                 </TableRow>
@@ -858,7 +860,7 @@ export function AssetDetailView({
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-foreground">
-                  Asset Settings
+                  {t("asset_settings")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex items-center gap-3">
@@ -887,14 +889,14 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Core Property Details
+                      {t("core_property_details")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <DetailField label="Address" value={metadata.address} />
-                    <DetailField label="Type" value={metadata.propertyType} />
+                    <DetailField label={t("address")} value={metadata.address} />
+                    <DetailField label={t("type")} value={metadata.propertyType} />
                     <DetailField
-                      label="Internal Area"
+                      label={t("internal_area")}
                       value={
                         metadata.internal_area != null
                           ? `${metadata.internal_area} m²`
@@ -902,7 +904,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Terrace Area"
+                      label={t("terrace_area")}
                       value={
                         metadata.terrace_area != null
                           ? `${metadata.terrace_area} m²`
@@ -910,7 +912,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Total Area"
+                      label={t("total_area")}
                       value={
                         metadata.surfaceArea != null
                           ? `${metadata.surfaceArea} m²`
@@ -918,11 +920,11 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Year of Construction"
+                      label={t("year_of_construction")}
                       value={metadata.yearOfConstruction}
                     />
                     <DetailField
-                      label="EPC Rating"
+                      label={t("epc_rating")}
                       value={metadata.epcRating}
                     />
                   </CardContent>
@@ -931,28 +933,28 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Material & Condition Ratings
+                      {t("material_condition_ratings")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <DetailField
-                      label="Kitchen"
+                      label={t("kitchen")}
                       value={metadata.condition.kitchen}
                     />
                     <DetailField
-                      label="Bathrooms"
+                      label={t("bathrooms")}
                       value={metadata.condition.bathrooms}
                     />
                     <DetailField
-                      label="Flooring"
+                      label={t("flooring")}
                       value={metadata.condition.flooring}
                     />
                     <DetailField
-                      label="Windows"
+                      label={t("windows")}
                       value={metadata.condition.windows}
                     />
                     <DetailField
-                      label="General"
+                      label={t("general")}
                       value={metadata.condition.general}
                     />
                   </CardContent>
@@ -961,15 +963,15 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Cost & Fees Basis
+                      {t("cost_fees_basis")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <DetailField
                       label={
                         metadata.contract_price != null
-                          ? "Contract Price"
-                          : "Purchase Price"
+                          ? t("contract_price")
+                          : t("purchase_price")
                       }
                       value={
                         metadata.contract_price ?? metadata.purchasePrice
@@ -983,7 +985,9 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label={`${metadata.registration_fee_type} Fee`}
+                      label={t("registration_fee", {
+                        type: metadata.registration_fee_type,
+                      })}
                       value={
                         metadata.registration_fee_amount
                           ? maskValue(
@@ -995,7 +999,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Agency Fees"
+                      label={t("agency_fees")}
                       value={
                         metadata.agencyFees != null
                           ? maskValue(currencyFormatter.format(metadata.agencyFees))
@@ -1003,7 +1007,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Renovation Fees"
+                      label={t("renovation_fees")}
                       value={
                         metadata.renovationFees != null
                           ? maskValue(
@@ -1013,7 +1017,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Furnishing Fees"
+                      label={t("furnishing_fees")}
                       value={
                         metadata.furnishingFees != null
                           ? maskValue(
@@ -1023,7 +1027,7 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
-                      label="Total Property Cost"
+                      label={t("total_property_cost")}
                       value={
                         totalCost != null
                           ? maskValue(currencyFormatter.format(totalCost))
@@ -1036,14 +1040,14 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
-                      Financing
+                      {t("financing")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {hasLoan ? (
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                         <DetailField
-                          label="Principal"
+                          label={t("principal")}
                           value={maskValue(
                             currencyFormatter.format(
                               metadata.linked_loan.amount ?? 0,
@@ -1051,7 +1055,7 @@ export function AssetDetailView({
                           )}
                         />
                         <DetailField
-                          label="Interest Rate"
+                          label={t("interest_rate")}
                           value={
                             metadata.linked_loan.interest_rate != null
                               ? `${metadata.linked_loan.interest_rate}%`
@@ -1059,21 +1063,23 @@ export function AssetDetailView({
                           }
                         />
                         <DetailField
-                          label="Duration"
+                          label={t("duration")}
                           value={
                             metadata.linked_loan.duration_months != null
-                              ? `${metadata.linked_loan.duration_months} months`
+                              ? t("duration_months", {
+                                  n: metadata.linked_loan.duration_months,
+                                })
                               : null
                           }
                         />
                         <DetailField
-                          label="Start Date"
+                          label={t("start_date")}
                           value={metadata.linked_loan.start_date}
                         />
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        No loan attached.
+                        {t("no_loan_attached")}
                       </p>
                     )}
                   </CardContent>
