@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Fingerprint, Lock, Mail, User } from "lucide-react";
+import { CheckCircle2, Fingerprint, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login, signup } from "@/app/auth/actions";
 import { createClient } from "@/utils/supabase/client";
+import { getPasswordRequirementErrors } from "@/lib/auth-validation";
 
 type Mode = "login" | "signup";
 
@@ -15,8 +16,14 @@ export function LoginForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [passwordTouched, setPasswordTouched] = useState(false);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
+
+  const passwordErrors =
+    mode === "signup" ? getPasswordRequirementErrors(password) : [];
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +34,12 @@ export function LoginForm() {
     const formData = new FormData(form);
 
     if (mode === "signup") {
-      const password = formData.get("password");
+      if (passwordErrors.length > 0) {
+        setPasswordTouched(true);
+        setError("Please meet all password requirements above.");
+        return;
+      }
+
       const confirmPassword = formData.get("confirmPassword");
       if (password !== confirmPassword) {
         setError("Passwords do not match.");
@@ -35,12 +47,15 @@ export function LoginForm() {
       }
     }
 
-    const action = mode === "login" ? login : signup;
-
     startTransition(async () => {
-      const result = await action(formData);
-      if (result?.error) {
+      const result =
+        mode === "login" ? await login(formData) : await signup(formData);
+      if (result && "error" in result) {
         setError(result.error);
+        return;
+      }
+      if (result && "needsEmailVerification" in result) {
+        setNeedsEmailVerification(true);
       }
     });
   }
@@ -69,6 +84,32 @@ export function LoginForm() {
       setIsPasskeyPending(false);
       setError(noPasskeyMessage);
     }
+  }
+
+  if (needsEmailVerification) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-4 text-center">
+        <CheckCircle2 className="size-10 text-success" />
+        <div className="space-y-1.5">
+          <p className="font-medium text-foreground">
+            Account created successfully.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Please check your email to verify your account before logging in.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setNeedsEmailVerification(false);
+            setMode("login");
+          }}
+        >
+          Back to Login
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -152,8 +193,21 @@ export function LoginForm() {
               required
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               className="pl-9"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onBlur={() => setPasswordTouched(true)}
+              aria-invalid={
+                mode === "signup" && passwordTouched && passwordErrors.length > 0
+              }
             />
           </div>
+          {mode === "signup" && passwordTouched && passwordErrors.length > 0 && (
+            <ul className="space-y-0.5 text-xs text-destructive" role="alert">
+              {passwordErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {mode === "signup" && (
@@ -207,6 +261,8 @@ export function LoginForm() {
           type="button"
           onClick={() => {
             setError(null);
+            setPassword("");
+            setPasswordTouched(false);
             setMode(mode === "login" ? "signup" : "login");
           }}
           className="font-medium text-primary underline-offset-4 hover:underline"

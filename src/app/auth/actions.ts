@@ -4,8 +4,24 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
+import { passwordSchema } from "@/lib/auth-validation";
 
-export async function login(formData: FormData) {
+/**
+ * The app's own canonical URL, used for auth email redirect links. Prefers
+ * an explicit env var over Vercel's per-deployment `VERCEL_URL` — this
+ * project has SSO Protection enabled on non-custom-domain deployment URLs,
+ * so a raw `VERCEL_URL` redirect would land a verifying user on Vercel's
+ * auth wall instead of the app.
+ */
+function getSiteURL(): string {
+  const url =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    "http://localhost:3000";
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+export async function login(formData: FormData): Promise<{ error: string }> {
   const rememberMe = formData.get("rememberMe") === "on";
   const supabase = await createClient({ rememberMe });
 
@@ -30,7 +46,9 @@ export async function login(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function signup(formData: FormData) {
+export async function signup(
+  formData: FormData,
+): Promise<{ error: string } | { needsEmailVerification: true }> {
   const supabase = await createClient();
 
   const email = formData.get("email") as string;
@@ -38,16 +56,32 @@ export async function signup(formData: FormData) {
   const firstName = (formData.get("firstName") as string) || undefined;
   const lastName = (formData.get("lastName") as string) || undefined;
 
-  const { error } = await supabase.auth.signUp({
+  // Defense in depth: the form already blocks submission on a weak
+  // password client-side, but a request can always bypass the client.
+  const passwordCheck = passwordSchema.safeParse(password);
+  if (!passwordCheck.success) {
+    return { error: passwordCheck.error.issues[0].message };
+  }
+
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: { first_name: firstName, last_name: lastName },
+      emailRedirectTo: `${getSiteURL()}/auth/callback`,
     },
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Supabase returns a user but no session when email confirmation is
+  // required (project setting) — in that case there's no session to log
+  // the person into yet, so send the UI to a "check your email" state
+  // instead of redirecting to /dashboard.
+  if (data.user && !data.session) {
+    return { needsEmailVerification: true as const };
   }
 
   revalidatePath("/", "layout");

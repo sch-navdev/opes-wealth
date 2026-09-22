@@ -49,6 +49,7 @@ High-net-worth individuals
   - [x] Vehicles/Private Equity: schema (seeded categories) + TypeScript metadata types, no UI yet — [[Database-Schema|Database Schema]]
   - [x] Generated-type reconciliation (`Database` wired into all Supabase clients) + 2 `[TEST]` rows validating the new categories live — [[Database-Schema|Database Schema]]
   - [x] Vehicles/Private Equity Settings-tab detail views, verified live (dark + light) — [[Portfolio-Dashboard|Portfolio Dashboard]]
+  - [x] Zod password complexity + email verification UI + `/auth/callback` route, verified locally (Vercel `NEXT_PUBLIC_SITE_URL` env var still needs manual setup) — [[Authentication-Security|Authentication & Security]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
