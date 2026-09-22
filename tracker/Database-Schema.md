@@ -2,7 +2,9 @@
 
 # Database Schema
 
-**Status:** In progress — Phase 1, Step 4 onward. Supabase/Postgres, migrations not yet applied to the live database.
+**Status:** In progress — Phase 1, Step 4 onward. Supabase/Postgres.
+
+**Update (2026-09-22, verified directly against the live database via the Supabase MCP)**: despite every note below saying "not yet applied," the live schema actually already has nearly all of this structure (`profiles.last_name`/address fields/`avatar_base64`, `assets.metadata`/`images`, `asset_history.net_equity`/`source`) — applied by hand at some point (e.g. via the SQL editor), not through tracked migrations, since Supabase's migration-history table (`list_migrations`) comes back empty. One real divergence: `assets.images` is `jsonb` live, not the `text[]` the `0006` migration file defines. Full current-state summary: [[Architecture|Architecture]]. The per-migration notes below are left as originally written (useful history of *why* each change was made); don't take "not yet applied" in them at face value anymore.
 
 Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the live database):
 - **profiles** — `id` (uuid, PK, references `auth.users`), `first_name`, `last_name`, `default_currency` (default `'USD'`), `created_at`.
@@ -18,6 +20,7 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `supabase/migrations/0007_asset_history_unique_date.sql` — adds `unique (asset_id, recorded_date)` to `asset_history`, enabling `upsert(..., { onConflict: "asset_id,recorded_date" })` so the auto-generated historical timeline (see [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]) can regenerate a date's row in place instead of duplicating it. Syntax-checked with `libpg-query`. Not yet applied to the live database.
 
 ## Related
+- [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas
 - [[Authentication-Security|Authentication & Security]] — `profiles` row creation on signup
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — `assets` table CRUD
 - [[Profile-Settings|Profile & Settings]] — extended `profiles` columns

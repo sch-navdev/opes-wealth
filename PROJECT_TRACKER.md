@@ -43,13 +43,15 @@ High-net-worth individuals
   - [x] Login page redesign (hand-built, 21st.dev unavailable) — [[Authentication-Security|Authentication & Security]]
   - [x] Dashboard metric cards (hand-built, 21st.dev unavailable) — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Light/dark theme toggle (`next-themes`) — [[Design-System|Design System]]
-  - [x] Dev-only mock-auth bypass for `/dashboard` (needs a service role key added locally to actually verify data) — [[Authentication-Security|Authentication & Security]]
+  - [x] Dev-only mock-auth bypass for `/dashboard`, verified against real Manarat Living III data — [[Authentication-Security|Authentication & Security]]
+  - [x] Sign-up form: Confirm Password validation + First/Last Name → `profiles` via updated signup trigger — [[Authentication-Security|Authentication & Security]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
 
 ## Modules
 
+- [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
 - [[Design-System|Design System]] — theme, tokens, shadcn/ui styling
 - [[Authentication-Security|Authentication & Security]] — login/signup, TOTP 2FA, Passkeys, Remember Me, middleware
 - [[Database-Schema|Database Schema]] — Supabase tables, RLS, migrations

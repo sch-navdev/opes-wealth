@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Fingerprint, Lock, Mail } from "lucide-react";
+import { Fingerprint, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,16 @@ export function LoginForm() {
     if (!form) return;
 
     const formData = new FormData(form);
+
+    if (mode === "signup") {
+      const password = formData.get("password");
+      const confirmPassword = formData.get("confirmPassword");
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
+
     const action = mode === "login" ? login : signup;
 
     startTransition(async () => {
@@ -83,6 +93,37 @@ export function LoginForm() {
       </div>
 
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        {mode === "signup" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  placeholder="Jane"
+                  required
+                  autoComplete="given-name"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                type="text"
+                placeholder="Doe"
+                required
+                autoComplete="family-name"
+              />
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">
@@ -114,6 +155,24 @@ export function LoginForm() {
             />
           </div>
         </div>
+
+        {mode === "signup" && (
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                required
+                autoComplete="new-password"
+                className="pl-9"
+              />
+            </div>
+          </div>
+        )}
 
         {mode === "login" && (
           <div className="flex items-center gap-2">
