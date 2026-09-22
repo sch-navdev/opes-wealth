@@ -28,13 +28,20 @@ export async function login(formData: FormData): Promise<{ error: string }> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  let signInError: string | null = null;
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    signInError = error?.message ?? null;
+  } catch (err) {
+    console.error("login: unexpected error calling signInWithPassword", err);
+    return { error: "Something went wrong signing you in. Please try again." };
+  }
 
-  if (error) {
-    return { error: error.message };
+  if (signInError) {
+    return { error: signInError };
   }
 
   revalidatePath("/", "layout");
@@ -63,24 +70,34 @@ export async function signup(
     return { error: passwordCheck.error.issues[0].message };
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { first_name: firstName, last_name: lastName },
-      emailRedirectTo: `${getSiteURL()}/auth/callback`,
-    },
-  });
+  let signUpResult: { user: unknown; session: unknown } | null = null;
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { first_name: firstName, last_name: lastName },
+        emailRedirectTo: `${getSiteURL()}/auth/callback`,
+      },
+    });
 
-  if (error) {
-    return { error: error.message };
+    if (error) {
+      return { error: error.message };
+    }
+
+    signUpResult = data;
+  } catch (err) {
+    console.error("signup: unexpected error calling signUp", err);
+    return {
+      error: "Something went wrong creating your account. Please try again.",
+    };
   }
 
   // Supabase returns a user but no session when email confirmation is
   // required (project setting) — in that case there's no session to log
   // the person into yet, so send the UI to a "check your email" state
   // instead of redirecting to /dashboard.
-  if (data.user && !data.session) {
+  if (signUpResult.user && !signUpResult.session) {
     return { needsEmailVerification: true as const };
   }
 

@@ -12,6 +12,22 @@ import { getPasswordRequirementErrors } from "@/lib/auth-validation";
 
 type Mode = "login" | "signup";
 
+/**
+ * A successful `login()`/`signup()` calls Next's `redirect()` on the server,
+ * which the client-side call re-throws as a special error so the router can
+ * perform the navigation. A blanket try/catch around that call must let this
+ * one specific error through instead of swallowing it as a "real" failure.
+ */
+function isNextRedirectError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "digest" in err &&
+    typeof (err as { digest?: unknown }).digest === "string" &&
+    (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export function LoginForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
@@ -48,14 +64,22 @@ export function LoginForm() {
     }
 
     startTransition(async () => {
-      const result =
-        mode === "login" ? await login(formData) : await signup(formData);
-      if (result && "error" in result) {
-        setError(result.error);
-        return;
-      }
-      if (result && "needsEmailVerification" in result) {
-        setNeedsEmailVerification(true);
+      try {
+        const result =
+          mode === "login" ? await login(formData) : await signup(formData);
+        if (result && "error" in result) {
+          setError(result.error);
+          return;
+        }
+        if (result && "needsEmailVerification" in result) {
+          setNeedsEmailVerification(true);
+        }
+      } catch (err) {
+        if (isNextRedirectError(err)) {
+          throw err;
+        }
+        console.error("Sign-in/up submit failed", err);
+        setError("Something went wrong. Please try again.");
       }
     });
   }
