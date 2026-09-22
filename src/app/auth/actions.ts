@@ -41,7 +41,16 @@ export async function login(formData: FormData): Promise<{ error: string }> {
   }
 
   if (signInError) {
-    return { error: signInError };
+    // Supabase returns the same generic "Invalid login credentials" for a
+    // wrong password AND for a correct-but-unverified account — the second
+    // case reads as "I typed it wrong" when the real issue is an unread
+    // confirmation email, so clarify it rather than passing the raw message
+    // straight through.
+    const message =
+      signInError === "Invalid login credentials"
+        ? "Invalid login credentials. If you just created an account, please check your email to verify it."
+        : signInError;
+    return { error: message };
   }
 
   revalidatePath("/", "layout");

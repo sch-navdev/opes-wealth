@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CheckCircle2, Fingerprint, Lock, Mail, User } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Fingerprint, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -28,12 +28,35 @@ function isNextRedirectError(err: unknown): boolean {
   );
 }
 
+/** A small "eye" button that toggles absolute-positioned inside a password field's right edge. */
+function PasswordVisibilityToggle({
+  visible,
+  onToggle,
+}: {
+  visible: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      tabIndex={-1}
+      aria-label={visible ? "Hide password" : "Show password"}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+    >
+      {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+    </button>
+  );
+}
+
 export function LoginForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [passwordTouched, setPasswordTouched] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
@@ -212,17 +235,21 @@ export function LoginForm() {
             <Input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="••••••••"
               required
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              className="pl-9"
+              className="pl-9 pr-9"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onBlur={() => setPasswordTouched(true)}
               aria-invalid={
                 mode === "signup" && passwordTouched && passwordErrors.length > 0
               }
+            />
+            <PasswordVisibilityToggle
+              visible={showPassword}
+              onToggle={() => setShowPassword((v) => !v)}
             />
           </div>
           {mode === "signup" && passwordTouched && passwordErrors.length > 0 && (
@@ -242,11 +269,15 @@ export function LoginForm() {
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
-                type="password"
+                type={showConfirmPassword ? "text" : "password"}
                 placeholder="••••••••"
                 required
                 autoComplete="new-password"
-                className="pl-9"
+                className="pl-9 pr-9"
+              />
+              <PasswordVisibilityToggle
+                visible={showConfirmPassword}
+                onToggle={() => setShowConfirmPassword((v) => !v)}
               />
             </div>
           </div>
@@ -287,6 +318,8 @@ export function LoginForm() {
             setError(null);
             setPassword("");
             setPasswordTouched(false);
+            setShowPassword(false);
+            setShowConfirmPassword(false);
             setMode(mode === "login" ? "signup" : "login");
           }}
           className="font-medium text-primary underline-offset-4 hover:underline"
