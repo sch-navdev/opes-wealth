@@ -45,6 +45,8 @@ High-net-worth individuals
   - [x] Light/dark theme toggle (`next-themes`) — [[Design-System|Design System]]
   - [x] Dev-only mock-auth bypass for `/dashboard`, verified against real Manarat Living III data — [[Authentication-Security|Authentication & Security]]
   - [x] Sign-up form: Confirm Password validation + First/Last Name → `profiles` via updated signup trigger — [[Authentication-Security|Authentication & Security]]
+  - [x] ADREC/DARI integration design (no code, gate explicitly lifted by user request) — [[Market-Data-Integration|Market Data Integration]]
+  - [x] Vehicles/Private Equity: schema (seeded categories) + TypeScript metadata types, no UI yet — [[Database-Schema|Database Schema]]
 - [ ] Step 8: CSV bank uploads — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
@@ -61,6 +63,7 @@ High-net-worth individuals
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — planned, Step 8
 - [[Live-Pricing|Live Pricing]] — planned, Step 9
 - [[Deployment|Deployment]] — planned, Step 10
+- [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Localization|Localization]] — English/French toggle (partial coverage)
