@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { CheckCircle2, Eye, EyeOff, Fingerprint, Lock, Mail, User } from "lucide-react";
+import { CheckCircle2, Fingerprint, Lock, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login, signup } from "@/app/auth/actions";
+import { PasswordVisibilityToggle } from "@/components/password-visibility-toggle";
+import { login, signup, requestPasswordReset } from "@/app/auth/actions";
 import { createClient } from "@/utils/supabase/client";
 import { getPasswordRequirementErrors } from "@/lib/auth-validation";
 
-type Mode = "login" | "signup";
+type Mode = "login" | "signup" | "forgot";
 
 /**
  * A successful `login()`/`signup()` calls Next's `redirect()` on the server,
@@ -28,27 +29,6 @@ function isNextRedirectError(err: unknown): boolean {
   );
 }
 
-/** A small "eye" button that toggles absolute-positioned inside a password field's right edge. */
-function PasswordVisibilityToggle({
-  visible,
-  onToggle,
-}: {
-  visible: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      tabIndex={-1}
-      aria-label={visible ? "Hide password" : "Show password"}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-    >
-      {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-    </button>
-  );
-}
-
 export function LoginForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
@@ -58,11 +38,21 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [resetLinkSent, setResetLinkSent] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isPasskeyPending, setIsPasskeyPending] = useState(false);
 
   const passwordErrors =
     mode === "signup" ? getPasswordRequirementErrors(password) : [];
+
+  function resetFormState(nextMode: Mode) {
+    setError(null);
+    setPassword("");
+    setPasswordTouched(false);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setMode(nextMode);
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,6 +78,16 @@ export function LoginForm() {
 
     startTransition(async () => {
       try {
+        if (mode === "forgot") {
+          const result = await requestPasswordReset(formData);
+          if ("error" in result) {
+            setError(result.error);
+            return;
+          }
+          setResetLinkSent(true);
+          return;
+        }
+
         const result =
           mode === "login" ? await login(formData) : await signup(formData);
         if (result && "error" in result) {
@@ -145,16 +145,82 @@ export function LoginForm() {
             Please check your email to verify your account before logging in.
           </p>
         </div>
+        <Button type="button" variant="outline" onClick={() => resetFormState("login")}>
+          Back to Login
+        </Button>
+      </div>
+    );
+  }
+
+  if (resetLinkSent) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-4 text-center">
+        <CheckCircle2 className="size-10 text-success" />
+        <div className="space-y-1.5">
+          <p className="font-medium text-foreground">Check your email.</p>
+          <p className="text-sm text-muted-foreground">
+            If an account exists for that address, we&apos;ve sent a link to
+            reset your password.
+          </p>
+        </div>
         <Button
           type="button"
           variant="outline"
           onClick={() => {
-            setNeedsEmailVerification(false);
-            setMode("login");
+            setResetLinkSent(false);
+            resetFormState("login");
           }}
         >
           Back to Login
         </Button>
+      </div>
+    );
+  }
+
+  if (mode === "forgot") {
+    return (
+      <div className="space-y-6">
+        <p className="text-sm text-muted-foreground">
+          Enter the email on your account and we&apos;ll send you a link to
+          reset your password.
+        </p>
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+
+          <Button type="submit" className="w-full" size="lg" disabled={isPending}>
+            {isPending ? "Sending…" : "Send Reset Link"}
+          </Button>
+        </form>
+
+        <p className="text-center text-sm text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => resetFormState("login")}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Back to Login
+          </button>
+        </p>
       </div>
     );
   }
@@ -229,7 +295,18 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => resetFormState("forgot")}
+                className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </button>
+            )}
+          </div>
           <div className="relative">
             <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -314,14 +391,7 @@ export function LoginForm() {
         {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
         <button
           type="button"
-          onClick={() => {
-            setError(null);
-            setPassword("");
-            setPasswordTouched(false);
-            setShowPassword(false);
-            setShowConfirmPassword(false);
-            setMode(mode === "login" ? "signup" : "login");
-          }}
+          onClick={() => resetFormState(mode === "login" ? "signup" : "login")}
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
           {mode === "login" ? "Sign Up" : "Login"}
