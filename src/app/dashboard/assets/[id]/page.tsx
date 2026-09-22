@@ -1,6 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
+import {
+  createMockAdminClient,
+  getMockUserId,
+  isMockAuthEnabled,
+} from "@/utils/supabase/mock-auth";
 import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/components/asset-detail-view";
 import { getExchangeRatesFromUsd } from "@/lib/fx";
 
@@ -11,17 +16,21 @@ export default async function AssetDetailsPage({
 }) {
   const { id } = await params;
 
-  const supabase = await createClient();
+  // DEV-ONLY MOCK AUTH: same narrowly-scoped bypass as dashboard/page.tsx,
+  // extended here so a terminal agent can verify the per-category detail
+  // views without a browser/passkey. Hard-gated on NODE_ENV === "development".
+  const mockUserId = isMockAuthEnabled() ? getMockUserId() : null;
+  const supabase = mockUserId ? createMockAdminClient() : await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = mockUserId
+    ? { id: mockUserId }
+    : (await supabase.auth.getUser()).data.user;
 
   if (!user) {
     redirect("/login");
   }
 
-  if (await needsMfaStepUp(supabase)) {
+  if (!mockUserId && (await needsMfaStepUp(supabase))) {
     redirect("/login/mfa");
   }
 

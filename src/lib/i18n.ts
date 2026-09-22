@@ -127,6 +127,19 @@ const dictionary = {
   duration_months: { en: "{n} months", fr: "{n} mois" },
   start_date: { en: "Start Date", fr: "Date de début" },
   no_loan_attached: { en: "No loan attached.", fr: "Aucun prêt associé." },
+
+  // Vehicles category (Settings tab)
+  vehicle_details: { en: "Vehicle Details", fr: "Détails du véhicule" },
+  make: { en: "Make", fr: "Marque" },
+  model: { en: "Model", fr: "Modèle" },
+  vehicle_year: { en: "Year", fr: "Année" },
+  vin: { en: "VIN", fr: "NIV" },
+
+  // Private Equity category (Settings tab)
+  private_equity_details: { en: "Private Equity Details", fr: "Détails de capital-investissement" },
+  entity_name: { en: "Entity Name", fr: "Nom de l'entité" },
+  ownership_percentage: { en: "Ownership Percentage", fr: "Pourcentage de propriété" },
+  share_class: { en: "Share Class", fr: "Catégorie d'actions" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

@@ -68,6 +68,8 @@ import {
   calculateUnrealizedGain,
   parseRealEstateMetadata,
 } from "@/lib/real-estate";
+import { parseVehicleMetadata } from "@/lib/vehicles";
+import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 
@@ -152,7 +154,13 @@ export function AssetDetailView({
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
+  const isVehicle = categoryName === "Vehicles";
+  const isPrivateEquity = categoryName === "Private Equity";
   const metadata = parseRealEstateMetadata(asset.metadata);
+  const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
+  const privateEquityMetadata = isPrivateEquity
+    ? parsePrivateEquityMetadata(asset.metadata)
+    : null;
   const images = asset.images ?? [];
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -1085,6 +1093,53 @@ export function AssetDetailView({
                   </CardContent>
                 </Card>
               </>
+            )}
+
+            {isVehicle && vehicleMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">
+                    {t("vehicle_details")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <DetailField label={t("make")} value={vehicleMetadata.make} />
+                  <DetailField label={t("model")} value={vehicleMetadata.model} />
+                  <DetailField
+                    label={t("vehicle_year")}
+                    value={vehicleMetadata.year}
+                  />
+                  <DetailField label={t("vin")} value={vehicleMetadata.vin} />
+                </CardContent>
+              </Card>
+            )}
+
+            {isPrivateEquity && privateEquityMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">
+                    {t("private_equity_details")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <DetailField
+                    label={t("entity_name")}
+                    value={privateEquityMetadata.entity_name}
+                  />
+                  <DetailField
+                    label={t("share_class")}
+                    value={privateEquityMetadata.share_class}
+                  />
+                  <DetailField
+                    label={t("ownership_percentage")}
+                    value={
+                      privateEquityMetadata.ownership_percentage != null
+                        ? maskValue(`${privateEquityMetadata.ownership_percentage}%`)
+                        : null
+                    }
+                  />
+                </CardContent>
+              </Card>
             )}
           </TabsContent>
         </Tabs>
