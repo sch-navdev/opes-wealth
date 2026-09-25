@@ -19,6 +19,11 @@
 ## What's NOT translated yet (flagged, not silently skipped)
 `add-asset-dialog.tsx`, `real-estate-fields.tsx`, `profile-form.tsx`, `country-combobox.tsx`, `portfolio-table.tsx`, the settings/login/MFA pages. These are large forms (~2,000 combined lines) with no existing French content — translating them was out of scope for fixing the original 3-string leftover and would be a substantial follow-up task in its own right if the product actually needs full bilingual support, rather than just the asset details page.
 
+**Exception**: the two new category-specific sub-forms added for [[Portfolio-Dashboard|Vehicles & Private Equity]] (`vehicle-fields.tsx`, `private-equity-fields.tsx`) — new work rather than a retrofit, so they were built translated from the start via `useLanguage()`, even though the `add-asset-dialog.tsx` chrome around them (Name/Category/Quantity/Value labels, dialog title) is still English-only per the note above.
+
+## New Keys (Vehicles & Private Equity Forms)
+`i18n.ts` gained placeholder and validation-error keys alongside the existing read-only-display keys (`vehicle_details`, `make`, `model`, `vehicle_year`, `vin`, `private_equity_details`, `entity_name`, `share_class`, `ownership_percentage`): `vehicle_make_placeholder`/`vehicle_model_placeholder`/`vehicle_year_placeholder`/`vehicle_vin_placeholder`, `vehicle_make_required`/`vehicle_model_required`/`vehicle_year_required`/`vehicle_vin_required`, `entity_name_placeholder`/`share_class_placeholder`, `entity_name_required`/`share_class_required`/`ownership_percentage_required`/`ownership_percentage_range`. The validators in `lib/vehicles.ts`/`lib/private-equity.ts` return these as translation-key strings (not raw English text), so the calling form can `t()` them directly — verified both languages render correctly in-browser (English and French error messages both confirmed).
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

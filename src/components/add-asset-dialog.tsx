@@ -23,6 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RealEstateFields } from "@/components/real-estate-fields";
+import { VehicleFields } from "@/components/vehicle-fields";
+import { PrivateEquityFields } from "@/components/private-equity-fields";
+import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
 import {
@@ -30,7 +33,18 @@ import {
   MAX_ASSET_IMAGES,
   parseRealEstateMetadata,
 } from "@/lib/real-estate";
+import {
+  EMPTY_VEHICLE_METADATA,
+  getVehicleMetadataErrors,
+  parseVehicleMetadata,
+} from "@/lib/vehicles";
+import {
+  EMPTY_PRIVATE_EQUITY_METADATA,
+  getPrivateEquityMetadataErrors,
+  parsePrivateEquityMetadata,
+} from "@/lib/private-equity";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
+import type { TranslationKey } from "@/lib/i18n";
 
 type Category = {
   id: string;
@@ -59,6 +73,7 @@ export function AddAssetDialog({
   trigger?: React.ReactNode;
 }) {
   const isEditMode = !!asset;
+  const { t } = useLanguage();
 
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +87,17 @@ export function AddAssetDialog({
   const [realEstateMetadata, setRealEstateMetadata] = useState(() =>
     asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
   );
+  const [vehicleMetadata, setVehicleMetadata] = useState(() =>
+    asset ? parseVehicleMetadata(asset.metadata) : EMPTY_VEHICLE_METADATA,
+  );
+  const [privateEquityMetadata, setPrivateEquityMetadata] = useState(() =>
+    asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
+  );
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
+  const isVehicle = selectedCategory?.name === "Vehicles";
+  const isPrivateEquity = selectedCategory?.name === "Private Equity";
 
   function resetState() {
     setCategoryId(asset?.category_id ?? "");
@@ -82,6 +105,12 @@ export function AddAssetDialog({
     setImages(asset?.images ?? []);
     setRealEstateMetadata(
       asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
+    );
+    setVehicleMetadata(
+      asset ? parseVehicleMetadata(asset.metadata) : EMPTY_VEHICLE_METADATA,
+    );
+    setPrivateEquityMetadata(
+      asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
     );
   }
 
@@ -128,6 +157,20 @@ export function AddAssetDialog({
       const metadata = { ...realEstateMetadata, market_valuation: marketValuation };
       formData.set("current_value", String(netEquity));
       formData.set("metadata", JSON.stringify(metadata));
+    } else if (isVehicle) {
+      const errors = getVehicleMetadataErrors(vehicleMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      formData.set("metadata", JSON.stringify(vehicleMetadata));
+    } else if (isPrivateEquity) {
+      const errors = getPrivateEquityMetadataErrors(privateEquityMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      formData.set("metadata", JSON.stringify(privateEquityMetadata));
     }
 
     startTransition(async () => {
@@ -330,6 +373,17 @@ export function AddAssetDialog({
               value={realEstateMetadata}
               onChange={setRealEstateMetadata}
               currency={currency}
+            />
+          )}
+
+          {isVehicle && (
+            <VehicleFields value={vehicleMetadata} onChange={setVehicleMetadata} />
+          )}
+
+          {isPrivateEquity && (
+            <PrivateEquityFields
+              value={privateEquityMetadata}
+              onChange={setPrivateEquityMetadata}
             />
           )}
 

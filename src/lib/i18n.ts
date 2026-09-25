@@ -135,11 +135,38 @@ const dictionary = {
   vehicle_year: { en: "Year", fr: "Année" },
   vin: { en: "VIN", fr: "NIV" },
 
+  // Vehicles category (Add/Edit form)
+  vehicle_make_placeholder: { en: "e.g. Toyota", fr: "ex. Toyota" },
+  vehicle_model_placeholder: { en: "e.g. Camry", fr: "ex. Camry" },
+  vehicle_year_placeholder: { en: "e.g. 2022", fr: "ex. 2022" },
+  vehicle_vin_placeholder: {
+    en: "e.g. 1HGCM82633A004352",
+    fr: "ex. 1HGCM82633A004352",
+  },
+  vehicle_make_required: { en: "Make is required.", fr: "La marque est requise." },
+  vehicle_model_required: { en: "Model is required.", fr: "Le modèle est requis." },
+  vehicle_year_required: { en: "Year is required.", fr: "L'année est requise." },
+  vehicle_vin_required: { en: "VIN is required.", fr: "Le NIV est requis." },
+
   // Private Equity category (Settings tab)
   private_equity_details: { en: "Private Equity Details", fr: "Détails de capital-investissement" },
   entity_name: { en: "Entity Name", fr: "Nom de l'entité" },
   ownership_percentage: { en: "Ownership Percentage", fr: "Pourcentage de propriété" },
   share_class: { en: "Share Class", fr: "Catégorie d'actions" },
+
+  // Private Equity category (Add/Edit form)
+  entity_name_placeholder: { en: "e.g. Navtec Group", fr: "ex. Navtec Group" },
+  share_class_placeholder: { en: "e.g. Series A", fr: "ex. Série A" },
+  entity_name_required: { en: "Entity name is required.", fr: "Le nom de l'entité est requis." },
+  share_class_required: { en: "Share class is required.", fr: "La catégorie d'actions est requise." },
+  ownership_percentage_required: {
+    en: "Ownership percentage is required.",
+    fr: "Le pourcentage de propriété est requis.",
+  },
+  ownership_percentage_range: {
+    en: "Ownership percentage must be between 0 and 100.",
+    fr: "Le pourcentage de propriété doit être compris entre 0 et 100.",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

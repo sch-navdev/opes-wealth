@@ -1,9 +1,9 @@
 /**
  * Metadata shape for the "Private Equity" asset category, stored in
  * `assets.metadata` (same jsonb-per-category pattern as `RealEstateMetadata`
- * in `real-estate.ts` — no dedicated `private_equity` table). No UI consumes
- * this yet; it exists so a future Private Equity form/detail view has a
- * typed shape to build against.
+ * in `real-estate.ts` — no dedicated `private_equity` table). Consumed by
+ * `private-equity-fields.tsx` (add/edit form) and the Settings tab of
+ * `asset-detail-view.tsx` (read-only display).
  */
 export type PrivateEquityMetadata = {
   share_class: string;
@@ -30,4 +30,32 @@ export function parsePrivateEquityMetadata(raw: unknown): PrivateEquityMetadata 
     ...EMPTY_PRIVATE_EQUITY_METADATA,
     ...(raw as Partial<PrivateEquityMetadata>),
   };
+}
+
+/**
+ * Returns every unmet requirement for a `PrivateEquityMetadata` payload
+ * before it's serialized into `assets.metadata` — same "collect every error"
+ * pattern as `getVehicleMetadataErrors`/`getPasswordRequirementErrors`.
+ */
+export function getPrivateEquityMetadataErrors(
+  metadata: PrivateEquityMetadata,
+): string[] {
+  const errors: string[] = [];
+
+  if (!metadata.entity_name.trim()) errors.push("entity_name_required");
+  if (!metadata.share_class.trim()) errors.push("share_class_required");
+
+  if (
+    metadata.ownership_percentage === null ||
+    Number.isNaN(metadata.ownership_percentage)
+  ) {
+    errors.push("ownership_percentage_required");
+  } else if (
+    metadata.ownership_percentage < 0 ||
+    metadata.ownership_percentage > 100
+  ) {
+    errors.push("ownership_percentage_range");
+  }
+
+  return errors;
 }
