@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,81 @@ export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // A recovery-link session only ever authenticates at aal1. If the account
+  // also has TOTP enrolled, Supabase requires the session to step up to aal2
+  // before `updateUser` will accept a new password — so the password fields
+  // stay hidden until that step-up (if needed) completes.
+  // `null` = still checking, so the form doesn't flash password fields that
+  // then have to be swapped out for the MFA prompt a moment later.
+  const [needsStepUp, setNeedsStepUp] = useState<boolean | null>(null);
+  const [stepUpComplete, setStepUpComplete] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [verifyingMfa, setVerifyingMfa] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
+      if (error) {
+        console.error("ResetPasswordForm: unable to read AAL", error);
+        setNeedsStepUp(false);
+        return;
+      }
+      setNeedsStepUp(
+        data.currentLevel === "aal1" && data.nextLevel === "aal2",
+      );
+    });
+  }, []);
+
+  async function handleVerifyMfa(e: React.FormEvent) {
+    e.preventDefault();
+    setMfaError(null);
+    setVerifyingMfa(true);
+
+    try {
+      const supabase = createClient();
+      const { data: factorsData, error: factorsError } =
+        await supabase.auth.mfa.listFactors();
+
+      if (factorsError) {
+        setMfaError(factorsError.message);
+        return;
+      }
+
+      const totpFactor = factorsData.totp[0];
+      if (!totpFactor) {
+        setMfaError("No authenticator app found for this account.");
+        return;
+      }
+
+      const { data: challengeData, error: challengeError } =
+        await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+
+      if (challengeError) {
+        setMfaError(challengeError.message);
+        return;
+      }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challengeData.id,
+        code: mfaCode,
+      });
+
+      if (verifyError) {
+        setMfaError(verifyError.message);
+        return;
+      }
+
+      setStepUpComplete(true);
+    } catch (err) {
+      console.error("ResetPasswordForm: unexpected error verifying MFA", err);
+      setMfaError("Something went wrong. Please try again.");
+    } finally {
+      setVerifyingMfa(false);
+    }
+  }
 
   const passwordErrors = getPasswordRequirementErrors(password);
 
@@ -67,6 +142,43 @@ export function ResetPasswordForm() {
         <p className="font-medium text-foreground">Password updated.</p>
         <p className="text-sm text-muted-foreground">Taking you to your dashboard…</p>
       </div>
+    );
+  }
+
+  if (needsStepUp === null) {
+    return null;
+  }
+
+  if (needsStepUp && !stepUpComplete) {
+    return (
+      <form onSubmit={handleVerifyMfa} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="mfa-code">Authenticator code</Label>
+          <Input
+            id="mfa-code"
+            name="code"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            placeholder="123456"
+            autoComplete="one-time-code"
+            required
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value)}
+          />
+        </div>
+
+        {mfaError && (
+          <p className="text-sm text-destructive" role="alert">
+            {mfaError}
+          </p>
+        )}
+
+        <Button type="submit" className="w-full" disabled={verifyingMfa}>
+          {verifyingMfa ? "Verifying…" : "Verify"}
+        </Button>
+      </form>
     );
   }
 

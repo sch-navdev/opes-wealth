@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
-const ORDER = ["light", "dark", "system"] as const;
-type ThemeChoice = (typeof ORDER)[number];
+type ThemeChoice = "light" | "dark";
 
 const ICONS: Record<ThemeChoice, React.ReactNode> = {
   light: <Sun className="size-4" />,
   dark: <Moon className="size-4" />,
-  system: <Monitor className="size-4" />,
 };
 
 const LABELS: Record<ThemeChoice, string> = {
   light: "Light",
   dark: "Dark",
-  system: "System",
 };
 
 export function ThemeToggle() {
@@ -29,11 +26,10 @@ export function ThemeToggle() {
   // theme and cause a flash, so render a stable placeholder until mounted.
   useEffect(() => setMounted(true), []);
 
-  const current = (theme as ThemeChoice) ?? "system";
+  const current = (theme as ThemeChoice) ?? "dark";
 
-  function cycle() {
-    const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
-    setTheme(next);
+  function toggle() {
+    setTheme(current === "dark" ? "light" : "dark");
   }
 
   return (
@@ -42,9 +38,9 @@ export function ThemeToggle() {
       variant="outline"
       size="icon-sm"
       aria-label={mounted ? `Switch theme (currently ${LABELS[current]})` : "Switch theme"}
-      onClick={cycle}
+      onClick={toggle}
     >
-      {mounted ? ICONS[current] : <Monitor className="size-4" />}
+      {mounted ? ICONS[current] : <Moon className="size-4" />}
     </Button>
   );
 }
