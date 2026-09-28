@@ -2,7 +2,7 @@
 
 # Live Pricing
 
-**Status:** Built — Phase 1, Step 9, equities/crypto half. Crypto pricing (CoinGecko) is fully real and works today. Equities pricing (Finnhub) is real, working code gated on a secret that hasn't been set yet — see "What's not done yet" below.
+**Status:** Built and deployed — Phase 1, Step 9, equities/crypto half. Crypto pricing (CoinGecko) is fully real and works today. Equities pricing (Finnhub) is real, working code gated on a secret that hasn't been set yet — see "What Steve needs to do" below. The schema migration this depended on has been applied to the live project.
 
 **Not to be confused with** [[Market-Data-Integration|Market Data Integration]] — Step 9's *other* half, Real Estate valuation refresh via ADREC/DARI (a clearly-marked **stub**, since that provider has no confirmed public API). This note is the equities/crypto half, and unlike DARI, both providers here are real, documented, public APIs — no honesty-check caveat needed on the pricing logic itself.
 
@@ -17,7 +17,7 @@ No new tables — same `assets.metadata` jsonb-per-category pattern as every oth
 - `src/lib/crypto.ts` — `CryptoMetadata = { coingecko_id, last_unit_price, last_priced_at, last_price_source }`. `coingecko_id` is **required** and separate from `ticker_symbol` — CoinGecko's API keys on its own slug (e.g. `"bitcoin"`), never a ticker (`"BTC"`), and guessing that mapping wrong would price the wrong asset. `getCryptoMetadataErrors()` enforces it's set before save.
 - `src/components/equity-fields.tsx` / `src/components/crypto-fields.tsx` — the corresponding add/edit form fields, wired into `add-asset-dialog.tsx` (`isEquity`/`isCrypto` branches, same pattern as Vehicles/Private Equity) and `asset-detail-view.tsx`'s Settings tab (read-only `EquityDetails`/`CryptoDetails` cards).
 - `src/lib/asset-history.ts` — `AssetHistorySource` gained `"coingecko" | "finnhub"`.
-- **Migration `0010_market_pricing_sources.sql`** (new) — widens `asset_history_source_check` to include `csv_import`/`coingecko`/`finnhub`. **Not yet applied to the live project** — the Supabase MCP's `apply_migration` call was blocked by this session's permission classifier ("Modify Shared Resources") and wasn't retried per this session's own safety rules (a blocked write is surfaced to the user, not worked around). Practically low-risk right now: a direct `pg_constraint` check on the live DB during this session found **the constraint doesn't currently exist there at all** (likely dropped or never applied outside this migrations directory — the same gap already flagged for `csv_import` before this session), so `coingecko`/`finnhub` inserts will succeed today regardless. Applying `0010` is still worth doing — it locks the DB back down to the exact intended value set — but isn't a functional blocker. **Action needed from Steve**: run this migration (`supabase db push`, the Supabase dashboard SQL editor, or ask again for `apply_migration` to be approved).
+- **Migration `0010_market_pricing_sources.sql`** — widens `asset_history_source_check` to include `csv_import`/`coingecko`/`finnhub`. First blocked by this session's permission classifier when attempted via the Supabase MCP's `apply_migration`, surfaced to Steve rather than worked around; **applied to the live project on his explicit follow-up instruction** (`market_pricing_sources`, version `20260928074335`) — confirmed live via `pg_constraint`: `CHECK ((source = ANY (ARRAY['manual', 'dari', 'dubailand', 'csv_import', 'coingecko', 'finnhub'])))`.
 
 ## Backend
 - **`supabase/functions/refresh-market-price/index.ts`** (new, deployed live, function id `54bb656f-a6ef-4e1f-89ad-71377632e13b`, `verify_jwt: true`). One function, branches on `category: "equities" | "crypto"`:
@@ -44,7 +44,7 @@ No new tables — same `assets.metadata` jsonb-per-category pattern as every oth
 - Live Finnhub pricing itself (vs. its `provider_not_configured` guard, which *was* verified) — no `FINNHUB_API_KEY` is set yet.
 
 ## What Steve needs to do
-1. Apply migration `0010_market_pricing_sources.sql` to the live project (blocked for this session — see above).
+1. ~~Apply migration `0010_market_pricing_sources.sql` to the live project~~ — done (see above).
 2. Get a free Finnhub API key (finnhub.io) and run `supabase secrets set FINNHUB_API_KEY=<key>` against the `lpaollycwokxejrihrap` project. Until then, adding a live price for an Equities asset returns a clear "not configured" error — Crypto works immediately, no key needed.
 
 ## Related

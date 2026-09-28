@@ -53,7 +53,7 @@ High-net-worth individuals
 - [x] Step 8: CSV bank uploads — backend (parser, validation, `importBankCsvHistory`) + dropzone/column-mapping upload UI, verified light/dark + EN/FR — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]
-  - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) is real code gated on a `FINNHUB_API_KEY` secret Steve still needs to set. A schema migration also still needs applying (see the note for both action items) — [[Live-Pricing|Live Pricing]]
+  - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) is real code gated on a `FINNHUB_API_KEY` secret Steve still needs to set. The required schema migration has been applied to the live project — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
 
 ## Modules
