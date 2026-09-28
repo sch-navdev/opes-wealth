@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, CloudDownload, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -13,6 +13,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +84,8 @@ import { parseVehicleMetadata } from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
+import { fetchDariValuation } from "@/lib/market-data/dari";
+import { cn } from "@/lib/utils";
 
 export type AssetDetail = {
   id: string;
@@ -152,6 +165,9 @@ export function AssetDetailView({
   >("manual");
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [dariError, setDariError] = useState<string | null>(null);
+  const [dariMessage, setDariMessage] = useState<string | null>(null);
+  const [isDariPending, startDariTransition] = useTransition();
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
@@ -227,6 +243,33 @@ export function AssetDetailView({
     return Number.isNaN(parsed.getTime())
       ? isoDate
       : axisDateFormatter.format(parsed);
+  }
+
+  function handleRefreshFromDari() {
+    setDariError(null);
+    setDariMessage(null);
+
+    startDariTransition(async () => {
+      const result = await fetchDariValuation({
+        assetId: asset.id,
+        address: metadata.address,
+        propertyType: metadata.propertyType,
+        surfaceArea: metadata.surfaceArea,
+      });
+
+      if (!result.ok) {
+        setDariError(result.error);
+        return;
+      }
+
+      const updateResult = await updateAssetValuation(asset.id, result.value, "dari");
+      if (updateResult?.error) {
+        setDariError(updateResult.error);
+        return;
+      }
+
+      setDariMessage(t("dari_last_updated"));
+    });
   }
 
   function handleRefreshSubmit(e: React.FormEvent) {
@@ -358,6 +401,44 @@ export function AssetDetailView({
                 </p>
               </div>
               <PrivacyToggleButton />
+              {isRealEstate && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label={t("refresh_from_dari")}
+                      disabled={isDariPending}
+                    >
+                      <CloudDownload
+                        className={cn("size-4", isDariPending && "animate-pulse")}
+                      />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border bg-card">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground">
+                        {t("refresh_from_dari")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
+                        {t("refresh_from_dari_notice")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDariPending}>
+                        {t("csv_cancel")}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={isDariPending}
+                        onClick={handleRefreshFromDari}
+                      >
+                        {isDariPending ? t("dari_fetching") : t("refresh_from_dari")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
               <Dialog open={refreshOpen} onOpenChange={setRefreshOpen}>
                 <DialogTrigger asChild>
                   <Button
@@ -462,6 +543,19 @@ export function AssetDetailView({
             </div>
           </CardContent>
         </Card>
+
+        {(dariError || dariMessage) && (
+          <p
+            className={
+              dariError
+                ? "text-sm text-destructive"
+                : "text-sm text-success"
+            }
+            role={dariError ? "alert" : undefined}
+          >
+            {dariError ?? dariMessage}
+          </p>
+        )}
 
         <Tabs defaultValue="overview">
           <TabsList>

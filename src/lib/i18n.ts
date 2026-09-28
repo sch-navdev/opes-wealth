@@ -206,6 +206,18 @@ const dictionary = {
   csv_import_success: { en: "Imported {n} rows successfully.", fr: "{n} lignes importées avec succès." },
   csv_cancel: { en: "Cancel", fr: "Annuler" },
   csv_done: { en: "Done", fr: "Terminé" },
+
+  // Live Pricing — Refresh from DARI (Overview tab, Real Estate only)
+  refresh_from_dari: { en: "Refresh from DARI", fr: "Actualiser depuis DARI" },
+  refresh_from_dari_notice: {
+    en: "Uses placeholder data until ADREC/DARI API access is confirmed with the provider.",
+    fr: "Utilise des données fictives jusqu'à confirmation de l'accès à l'API ADREC/DARI auprès du fournisseur.",
+  },
+  dari_fetching: { en: "Fetching…", fr: "Récupération…" },
+  dari_last_updated: {
+    en: "Updated just now (placeholder data, not a real valuation).",
+    fr: "Mis à jour à l'instant (données fictives, pas une valorisation réelle).",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;
