@@ -14,6 +14,23 @@ A full review pass (frontend/design-system consistency, dead-code/"AI slop", and
 - **Deferred (lower priority, not done in this pass)**: adding a `.env.local.example`, rewriting `README.md` (still generic `create-next-app` boilerplate), and trimming this document's duplication between "Architecture Log" and "Changelog" (superseded by this restructuring into per-module notes). Also noted but intentionally left alone: a handful of unused shadcn sub-exports (`AvatarBadge`, `AvatarGroup`, `AvatarGroupCount`, `CardFooter`, `CardAction`) — normal scaffolding surface area, not worth trimming. Zero automated tests exist anywhere in the project; all verification remains manual (build + browser checks).
 - Verified: `npm run build` after every change (zero TS/bundling errors); the root page, login page (button consistency), and the new two-section MFA setup UI were all checked visually in the browser (the MFA setup UI via a disposable local-only preview route, removed before committing).
 
+## AI-Slop Audit & Remediation Plan (2026-09-28)
+Steve asked for a full codebase review specifically for "AI slop" — accumulated issues that show up in AI-generated code even when each individual session's diff looked clean (duplicated helpers, inconsistent conventions, over-built abstractions, leftover scaffolding, oversized files). Ran a read-only Explore-agent audit across `src/`, `supabase/migrations/`, and top-level config/public files, then turned it into a 4-phase remediation plan (approved via plan mode, saved at `crispy-exploring-blanket.md` in the Claude plans directory) before touching any code.
+
+**Overall audit verdict**: better shape than a typical AI-generated project this size — zero `as any` anywhere, only 2 justified `as unknown as` casts (both at the SheetJS/XLSX boundary), zero `TODO`/`FIXME` comments, `useSyncExternalStore` used consistently everywhere hydration-safety matters, comment/code drift minimal in every spot-checked file (`add-investments-dialog.tsx`, `saxo.ts`, `asset-detail-view.tsx`, `dashboard/actions.ts`). No `clerk_user_id`/Clerk residue exists anywhere in this repo's history, contrary to an initial assumption going in.
+
+**Findings, by severity** (full detail in the plan file):
+- **Medium**: 4 different server-action success/error return-shape conventions in play across `dashboard/actions.ts`/`settings/actions.ts`/`auth/actions.ts`, with inconsistent try/catch coverage around Supabase calls; `asset-detail-view.tsx` (1,435 lines, 5+ responsibilities) and `add-investments-dialog.tsx` (728 lines, 3 import flows in one state machine) are oversized; duplicated `Intl.NumberFormat` currency formatting (4x), duplicated dropzone drag/drop JSX (3x), duplicated `guessColumn`/date-parsing across the CSV/XLSX parsers.
+- **Low-medium**: the DARI/ADREC real-estate-valuation Edge Function + adapter is fully wired but the provider has no confirmed public API, so it's real deployed surface area maintained for a feature that returns a hardcoded mock — flagged as a product decision (finish vs. explicitly park), not a code-change item.
+- **Low**: 5 unused default create-next-app SVGs in `public/`, an empty untracked scratch file at repo root, minor inconsistencies (date-display formatting, XLSX read options between two parsers).
+
+**Executed so far — Phase 1 only** (zero-risk cleanup, approved for execution this session): deleted `public/file.svg`/`globe.svg`/`next.svg`/`vercel.svg`/`window.svg` (confirmed zero references in `src/` before deleting) and the untracked root scratch file `2026-09-28.md`. `npm run build` confirmed clean afterward — no broken references.
+
+**Not yet executed** (plan approved, execution scope explicitly limited to Phase 1 this session — Steve to decide when to proceed):
+- Phase 2 — extract the duplicated helpers above into shared utilities (`formatCurrency` in `lib/currencies.ts`, a shared `guessColumn`, a `<FileDropzone>` component, a shared `parseAssetFormData`). Behavior-preserving.
+- Phase 3 — introduce one shared `ActionResult<T>` discriminated union and migrate every server action to it, plus align try/catch coverage around Supabase calls. Widest-reaching phase (touches every call site), recommended as its own reviewed change.
+- Phase 4 — split `asset-detail-view.tsx` and `add-investments-dialog.tsx` into smaller components. Highest-risk phase, recommended last and as its own follow-up task.
+
 ## Related
 - [[Design-System|Design System]], [[Authentication-Security|Authentication & Security]], [[Profile-Settings|Profile & Settings]] — areas touched by this pass
 - [[Changelog|Changelog]] — dated entries
