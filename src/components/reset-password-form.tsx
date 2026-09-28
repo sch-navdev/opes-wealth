@@ -47,8 +47,7 @@ export function ResetPasswordForm() {
     });
   }, []);
 
-  async function handleVerifyMfa(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitMfaCode(code: string) {
     setMfaError(null);
     setVerifyingMfa(true);
 
@@ -79,7 +78,7 @@ export function ResetPasswordForm() {
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId: totpFactor.id,
         challengeId: challengeData.id,
-        code: mfaCode,
+        code,
       });
 
       if (verifyError) {
@@ -93,6 +92,16 @@ export function ResetPasswordForm() {
       setMfaError("Something went wrong. Please try again.");
     } finally {
       setVerifyingMfa(false);
+    }
+  }
+
+  function handleMfaCodeChange(value: string) {
+    setMfaCode(value);
+    setMfaError(null);
+    // Auto-submit the instant a full 6-digit code is entered — an OTP
+    // input never needs a separate "Verify" click once it's complete.
+    if (value.length === 6 && !verifyingMfa) {
+      submitMfaCode(value);
     }
   }
 
@@ -151,7 +160,7 @@ export function ResetPasswordForm() {
 
   if (needsStepUp && !stepUpComplete) {
     return (
-      <form onSubmit={handleVerifyMfa} className="space-y-4">
+      <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="mfa-code">Authenticator code</Label>
           <Input
@@ -164,8 +173,9 @@ export function ResetPasswordForm() {
             placeholder="123456"
             autoComplete="one-time-code"
             required
+            disabled={verifyingMfa}
             value={mfaCode}
-            onChange={(e) => setMfaCode(e.target.value)}
+            onChange={(e) => handleMfaCodeChange(e.target.value)}
           />
         </div>
 
@@ -175,10 +185,10 @@ export function ResetPasswordForm() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" disabled={verifyingMfa}>
-          {verifyingMfa ? "Verifying…" : "Verify"}
-        </Button>
-      </form>
+        {verifyingMfa && (
+          <p className="text-sm text-muted-foreground">Verifying…</p>
+        )}
+      </div>
     );
   }
 

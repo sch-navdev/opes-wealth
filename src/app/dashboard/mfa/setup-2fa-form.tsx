@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +28,66 @@ type LinkedFactor = {
   label: string;
   createdAt: string;
 };
+
+/**
+ * Confirm-then-remove control shared by the Authenticator App and Passkeys
+ * lists — same double-confirmation pattern as `delete-asset-button.tsx`,
+ * since removing a security factor is at least as consequential as
+ * deleting a portfolio asset. `onConfirm` does the actual API call and
+ * reports back whether it succeeded, so the dialog only closes on success
+ * and stays open (showing the parent's error state) on failure.
+ */
+function RemoveFactorButton({
+  itemLabel,
+  isRemoving,
+  onConfirm,
+}: {
+  itemLabel: string;
+  isRemoving: boolean;
+  onConfirm: () => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  async function handleConfirm() {
+    const succeeded = await onConfirm();
+    if (succeeded) setOpen(false);
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="icon-sm" aria-label={`Remove ${itemLabel}`}>
+          <Trash2 className="size-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent className="border-border bg-card">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-foreground">
+            Remove {itemLabel}?
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-muted-foreground">
+            You won&apos;t be able to use this to sign in anymore. This
+            action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault();
+              handleConfirm();
+            }}
+            disabled={isRemoving}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isRemoving ? "Removing…" : "Remove"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 export function Setup2faForm() {
   const supabase = createClient();
@@ -34,6 +105,12 @@ export function Setup2faForm() {
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [passkeySuccess, setPasskeySuccess] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [totpRemovalError, setTotpRemovalError] = useState<string | null>(null);
+  const [passkeyRemovalError, setPasskeyRemovalError] = useState<string | null>(
+    null,
+  );
 
   const loadActiveFactors = useCallback(async () => {
     setIsFactorsLoading(true);
@@ -117,6 +194,40 @@ export function Setup2faForm() {
     loadActiveFactors();
   }
 
+  async function handleRemoveTotp(factorId: string): Promise<boolean> {
+    setRemovingId(factorId);
+    setTotpRemovalError(null);
+
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+
+    setRemovingId(null);
+
+    if (error) {
+      setTotpRemovalError(error.message);
+      return false;
+    }
+
+    await loadActiveFactors();
+    return true;
+  }
+
+  async function handleRemovePasskey(passkeyId: string): Promise<boolean> {
+    setRemovingId(passkeyId);
+    setPasskeyRemovalError(null);
+
+    const { error } = await supabase.auth.passkey.delete({ passkeyId });
+
+    setRemovingId(null);
+
+    if (error) {
+      setPasskeyRemovalError(error.message);
+      return false;
+    }
+
+    await loadActiveFactors();
+    return true;
+  }
+
   async function handleRegisterPasskey() {
     setPasskeyError(null);
     setIsPasskeyLoading(true);
@@ -163,16 +274,29 @@ export function Setup2faForm() {
             {totpFactors.map((factor) => (
               <li
                 key={factor.id}
-                className="flex items-center justify-between px-3 py-2.5"
+                className="flex items-center justify-between gap-3 px-3 py-2.5"
               >
-                <p className="text-sm text-foreground">{factor.label}</p>
-                <p className="text-xs text-muted-foreground">
-                  Linked {new Date(factor.createdAt).toLocaleDateString()}
-                </p>
+                <div>
+                  <p className="text-sm text-foreground">{factor.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Linked {new Date(factor.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <RemoveFactorButton
+                  itemLabel={factor.label}
+                  isRemoving={removingId === factor.id}
+                  onConfirm={() => handleRemoveTotp(factor.id)}
+                />
               </li>
             ))}
           </ul>
         ) : null}
+
+        {totpRemovalError && (
+          <p className="mb-4 text-sm text-destructive" role="alert">
+            {totpRemovalError}
+          </p>
+        )}
 
         {success ? (
           <p className="text-sm text-success">
@@ -257,15 +381,28 @@ export function Setup2faForm() {
             {passkeyFactors.map((factor) => (
               <li
                 key={factor.id}
-                className="flex items-center justify-between px-3 py-2.5"
+                className="flex items-center justify-between gap-3 px-3 py-2.5"
               >
-                <p className="text-sm text-foreground">{factor.label}</p>
-                <p className="text-xs text-muted-foreground">
-                  Linked {new Date(factor.createdAt).toLocaleDateString()}
-                </p>
+                <div>
+                  <p className="text-sm text-foreground">{factor.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Linked {new Date(factor.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <RemoveFactorButton
+                  itemLabel={factor.label}
+                  isRemoving={removingId === factor.id}
+                  onConfirm={() => handleRemovePasskey(factor.id)}
+                />
               </li>
             ))}
           </ul>
+        )}
+
+        {passkeyRemovalError && (
+          <p className="mb-4 text-sm text-destructive" role="alert">
+            {passkeyRemovalError}
+          </p>
         )}
 
         {passkeySuccess ? (
