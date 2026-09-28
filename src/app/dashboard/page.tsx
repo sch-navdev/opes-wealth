@@ -11,12 +11,16 @@ import { logout } from "@/app/auth/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
 import { DashboardMetricCards } from "@/components/dashboard-metric-cards";
+import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
 import { PortfolioTable } from "@/components/portfolio-table";
 import { T } from "@/components/translated-text";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
+import { parseEquityMetadata } from "@/lib/equities";
+import { buildStackedPerformanceSeries } from "@/lib/portfolio-performance";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
@@ -84,6 +88,38 @@ export default async function DashboardPage({
   const { currency: currencyParam } = await searchParams;
   const displayCurrency =
     currencyParam || profile?.default_currency || "USD";
+
+  // Portfolio Performance chart (Phase 2, Broker Trade Import) — a second
+  // query rather than folding into the assets query above, since it needs
+  // the Equities asset ids first to fetch their `asset_history` rows.
+  const equityAssets = (assets ?? []).filter(
+    (asset) => asset.asset_categories?.name === "Equities",
+  );
+  const { data: equityHistory } =
+    equityAssets.length > 0
+      ? await supabase
+          .from("asset_history")
+          .select("asset_id, recorded_date, value")
+          .in(
+            "asset_id",
+            equityAssets.map((a) => a.id),
+          )
+          .order("recorded_date", { ascending: true })
+          .returns<{ asset_id: string; recorded_date: string; value: number }[]>()
+      : { data: [] as { asset_id: string; recorded_date: string; value: number }[] };
+
+  const performanceSeries = buildStackedPerformanceSeries(
+    equityAssets.map((asset) => ({
+      ticker: asset.ticker_symbol ?? asset.name,
+      exchange: parseEquityMetadata(asset.metadata).exchange || null,
+      history: (equityHistory ?? [])
+        .filter((h) => h.asset_id === asset.id)
+        .map((h) => ({
+          recorded_date: h.recorded_date,
+          value: convertAmount(h.value, asset.currency, displayCurrency, rates),
+        })),
+    })),
+  );
 
   const initials =
     profile?.first_name?.[0]?.toUpperCase() ??
@@ -184,6 +220,8 @@ export default async function DashboardPage({
           }
         />
 
+        <PortfolioPerformanceChart series={performanceSeries} currency={displayCurrency} />
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -195,6 +233,7 @@ export default async function DashboardPage({
           </div>
           <div className="flex items-center gap-2">
             <CurrencySwitcher value={displayCurrency} />
+            <AddInvestmentsDialog />
             <AddAssetDialog categories={categories ?? []} />
           </div>
         </div>

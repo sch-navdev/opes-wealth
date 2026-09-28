@@ -58,6 +58,14 @@ High-net-worth individuals
   - [x] Pre-deployment hardening — `tsc --noEmit` and `eslint .` fully clean (zero errors/warnings project-wide), `npm run build` succeeds with zero errors across all 11 routes — [[Deployment|Deployment]]
   - [ ] Actual deployment to Vercel — not done this session (no deploy credentials used; this is a shared-infrastructure action needing Steve's explicit go-ahead) — [[Deployment|Deployment]]
 
+### Phase 2 — Broker Trade Import & Portfolio Analytics
+- [x] Add Investments UI (broker/file/manual selector, Saxo Bank broker grid, dropzone) — [[Broker-Trade-Import|Broker Trade Import]]
+- [x] Extensible broker parser registry + Saxo Bank parser (`.xlsx`/`.csv`, buy/sell netting) — verified against a real synthetic Saxo-shaped export — [[Broker-Trade-Import|Broker Trade Import]]
+- [x] Generic "Upload via file" CSV mapper + "Individually add trade" manual form, sharing the same aggregation/preview/import flow — [[Broker-Trade-Import|Broker Trade Import]]
+- [x] `importBrokerTrades` server action — upserts Equities assets, dedupes trades on re-import, computed but not yet applied to the live DB (migration blocked, see below) — [[Broker-Trade-Import|Broker Trade Import]]
+- [x] Portfolio Performance stacked area chart (grouped by Equities exchange, forward-filled per-asset history) on the main dashboard, new `--chart-1`..`--chart-5` design tokens — [[Broker-Trade-Import|Broker Trade Import]]
+- [ ] Migration `0011_broker_import_source.sql` (adds `'broker_import'` to `asset_history_source_check`) — **blocked**, not applied to the live project; without it, `importBrokerTrades` will fail on its `asset_history` write until Steve applies it (unlike the last two migrations, this one **is** a functional blocker, since the constraint added in `0010` is now live and enforced) — [[Broker-Trade-Import|Broker Trade Import]]
+
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
@@ -74,6 +82,7 @@ High-net-worth individuals
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Localization|Localization]] — English/French toggle (partial coverage)
+- [[Broker-Trade-Import|Broker Trade Import]] — Phase 2: Add Investments UI, Saxo Bank parser, Portfolio Performance chart. Migration `0011` still needs applying.
 - [[Changelog|Changelog]] — full chronological history
 
 ## Folder Structure

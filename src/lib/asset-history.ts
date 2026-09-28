@@ -12,4 +12,5 @@ export type AssetHistorySource =
   | "dubailand"
   | "csv_import"
   | "coingecko"
-  | "finnhub";
+  | "finnhub"
+  | "broker_import";

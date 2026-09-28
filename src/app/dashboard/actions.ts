@@ -6,6 +6,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseRealEstateMetadata, resolveRegistrationFee } from "@/lib/real-estate";
 import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
+import { parseEquityMetadata, type EquityTrade } from "@/lib/equities";
+import { tradeId } from "@/lib/parsers/broker-registry";
+import type { AggregatedHolding } from "@/lib/parsers/types";
 import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
@@ -483,4 +486,220 @@ export async function refreshMarketPrice(
   revalidatePath(`/dashboard/assets/${id}`);
 
   return { success: true as const, unitPrice, totalValue, asOf: now };
+}
+
+/**
+ * Weighted average cost of the buy lots in `trades`, used as a placeholder
+ * unit price for `current_value` right after an import — the asset's real
+ * live price is only known once "Refresh Market Price" (`refreshMarketPrice`
+ * above) runs, so this is deliberately just "what was actually paid,"
+ * never presented as a live quote. Falls back to the average price across
+ * every trade (including sells) only when there are no buy lots at all —
+ * an edge case (a sell-only import for an instrument this app has no prior
+ * record of), not the common path.
+ */
+function estimateCostBasisUnitPrice(
+  trades: { side: "buy" | "sell"; quantity: number; price: number }[],
+): number | null {
+  const buys = trades.filter((t) => t.side === "buy");
+  const totalBuyQty = buys.reduce((sum, t) => sum + t.quantity, 0);
+  if (totalBuyQty > 0) {
+    const totalBuyCost = buys.reduce((sum, t) => sum + t.quantity * t.price, 0);
+    return totalBuyCost / totalBuyQty;
+  }
+
+  const totalQty = trades.reduce((sum, t) => sum + t.quantity, 0);
+  if (totalQty === 0) return null;
+  const totalCost = trades.reduce((sum, t) => sum + t.quantity * t.price, 0);
+  return totalCost / totalQty;
+}
+
+export type ImportBrokerTradesResult = {
+  ticker: string;
+  status: "created" | "updated" | "unchanged" | "error";
+  message?: string;
+};
+
+/**
+ * Broker Trade Import (Phase 2, `tracker/Broker-Trade-Import.md`) — persists
+ * a broker parser's aggregated holdings (`aggregateTrades()` in
+ * `lib/parsers/broker-registry.ts`) as Equities assets. For each holding:
+ * finds an existing Equities asset with a matching `ticker_symbol` for this
+ * user and appends only the genuinely new trades (deduped via `tradeId()`,
+ * so re-uploading an export that overlaps a previous import doesn't
+ * double-count), or creates a new asset if none exists. `current_value` is
+ * set from `quantity × estimateCostBasisUnitPrice(...)` — cost basis, not a
+ * live price, until "Refresh Market Price" is run. Processes every holding
+ * independently and reports a per-ticker outcome, so one bad row doesn't
+ * abort the whole batch.
+ */
+export async function importBrokerTrades(
+  holdings: AggregatedHolding[],
+): Promise<{ error: string } | { results: ImportBrokerTradesResult[] }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to import broker trades." };
+  }
+
+  const { data: equitiesCategory } = await supabase
+    .from("asset_categories")
+    .select("id")
+    .eq("name", "Equities")
+    .single<{ id: string }>();
+
+  if (!equitiesCategory) {
+    return { error: 'The "Equities" category is missing from this project.' };
+  }
+
+  const source: AssetHistorySource = "broker_import";
+  const today = new Date().toISOString().slice(0, 10);
+  const results: ImportBrokerTradesResult[] = [];
+
+  for (const holding of holdings) {
+    if (holding.trades.length === 0) {
+      results.push({ ticker: holding.ticker, status: "unchanged" });
+      continue;
+    }
+
+    const { data: existing } = await supabase
+      .from("assets")
+      .select("id, quantity, metadata")
+      .eq("profile_id", user.id)
+      .eq("category_id", equitiesCategory.id)
+      .ilike("ticker_symbol", holding.ticker)
+      .maybeSingle<{ id: string; quantity: number; metadata: Json | null }>();
+
+    if (existing) {
+      const existingMetadata = parseEquityMetadata(existing.metadata);
+      const existingIds = new Set(existingMetadata.trades.map((t) => t.id));
+
+      const newTrades: EquityTrade[] = holding.trades
+        .filter((t) => !existingIds.has(tradeId(t)))
+        .map((t) => ({
+          id: tradeId(t),
+          tradeDate: t.tradeDate,
+          side: t.side,
+          quantity: t.quantity,
+          price: t.price,
+          currency: t.currency,
+          source,
+        }));
+
+      if (newTrades.length === 0) {
+        results.push({ ticker: holding.ticker, status: "unchanged" });
+        continue;
+      }
+
+      const quantityDelta = newTrades.reduce(
+        (sum, t) => sum + (t.side === "buy" ? t.quantity : -t.quantity),
+        0,
+      );
+      const newQuantity = existing.quantity + quantityDelta;
+
+      const allTrades = [...existingMetadata.trades, ...newTrades];
+      const unitPrice = existingMetadata.last_unit_price ?? estimateCostBasisUnitPrice(allTrades);
+      const nextMetadata: Json = { ...existingMetadata, trades: allTrades };
+
+      const updatePayload: { metadata: Json; quantity: number; current_value?: number } = {
+        metadata: nextMetadata,
+        quantity: newQuantity,
+      };
+      if (unitPrice != null) {
+        updatePayload.current_value = Math.max(0, newQuantity) * unitPrice;
+      }
+
+      const { error: updateError } = await supabase
+        .from("assets")
+        .update(updatePayload)
+        .eq("id", existing.id)
+        .eq("profile_id", user.id);
+
+      if (updateError) {
+        results.push({ ticker: holding.ticker, status: "error", message: updateError.message });
+        continue;
+      }
+
+      if (updatePayload.current_value != null) {
+        await supabase.from("asset_history").upsert(
+          {
+            asset_id: existing.id,
+            recorded_date: today,
+            value: updatePayload.current_value,
+            net_equity: updatePayload.current_value,
+            source,
+          },
+          { onConflict: "asset_id,recorded_date" },
+        );
+      }
+
+      results.push({ ticker: holding.ticker, status: "updated" });
+    } else {
+      const trades: EquityTrade[] = holding.trades.map((t) => ({
+        id: tradeId(t),
+        tradeDate: t.tradeDate,
+        side: t.side,
+        quantity: t.quantity,
+        price: t.price,
+        currency: t.currency,
+        source,
+      }));
+
+      const unitPrice = estimateCostBasisUnitPrice(trades);
+      const currentValue = unitPrice != null ? Math.max(0, holding.netQuantity) * unitPrice : 0;
+
+      const metadata: Json = {
+        exchange: holding.exchange ?? "",
+        last_unit_price: null,
+        last_priced_at: null,
+        last_price_source: null,
+        trades,
+      };
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("assets")
+        .insert({
+          profile_id: user.id,
+          category_id: equitiesCategory.id,
+          name: holding.instrumentName,
+          quantity: holding.netQuantity,
+          current_value: currentValue,
+          currency: holding.currency,
+          ticker_symbol: holding.ticker,
+          metadata,
+        })
+        .select("id")
+        .single<{ id: string }>();
+
+      if (insertError || !inserted) {
+        results.push({
+          ticker: holding.ticker,
+          status: "error",
+          message: insertError?.message ?? "Could not create this asset.",
+        });
+        continue;
+      }
+
+      await supabase.from("asset_history").upsert(
+        {
+          asset_id: inserted.id,
+          recorded_date: today,
+          value: currentValue,
+          net_equity: currentValue,
+          source,
+        },
+        { onConflict: "asset_id,recorded_date" },
+      );
+
+      results.push({ ticker: holding.ticker, status: "created" });
+    }
+  }
+
+  revalidatePath("/dashboard", "layout");
+
+  return { results };
 }

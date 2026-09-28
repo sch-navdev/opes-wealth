@@ -219,6 +219,83 @@ const dictionary = {
     fr: "Mis à jour à l'instant (données fictives, pas une valorisation réelle).",
   },
 
+  // Broker Trade Import (Phase 2) — Add Investments dialog
+  add_investments: { en: "Add Investments", fr: "Ajouter des investissements" },
+  add_investments_desc: {
+    en: "Import trades from a broker export, a spreadsheet, or add one by hand.",
+    fr: "Importez des transactions depuis un export de courtier, un tableur, ou ajoutez-en une manuellement.",
+  },
+  method_upload_broker: { en: "Upload via broker", fr: "Importer via un courtier" },
+  method_upload_broker_desc: {
+    en: "Pick your broker and drop its trade export.",
+    fr: "Choisissez votre courtier et déposez son export de transactions.",
+  },
+  method_upload_file: { en: "Upload via file", fr: "Importer via un fichier" },
+  method_upload_file_desc: {
+    en: "Any CSV — you map the columns yourself.",
+    fr: "N'importe quel CSV — vous associez vous-même les colonnes.",
+  },
+  method_manual_trade: { en: "Individually add trade", fr: "Ajouter une transaction" },
+  method_manual_trade_desc: {
+    en: "Enter one buy or sell by hand.",
+    fr: "Saisissez un achat ou une vente manuellement.",
+  },
+  back: { en: "Back", fr: "Retour" },
+  investments_dropzone_cta: { en: "Drop your file here", fr: "Déposez votre fichier ici" },
+  investments_dropzone_error_type: {
+    en: "This file type isn't accepted for this broker.",
+    fr: "Ce type de fichier n'est pas accepté pour ce courtier.",
+  },
+  investments_dropzone_error_csv_only: {
+    en: "Only .csv files are accepted here.",
+    fr: "Seuls les fichiers .csv sont acceptés ici.",
+  },
+  investments_manual_instrument_name: { en: "Instrument Name", fr: "Nom de l'instrument" },
+  investments_manual_invalid_quantity: {
+    en: "Enter a valid quantity.",
+    fr: "Saisissez une quantité valide.",
+  },
+  investments_manual_invalid_price: {
+    en: "Enter a valid price.",
+    fr: "Saisissez un prix valide.",
+  },
+  investments_add_trade: { en: "Add Trade", fr: "Ajouter la transaction" },
+  investments_no_trades_found: {
+    en: "No valid trades were found in this file.",
+    fr: "Aucune transaction valide n'a été trouvée dans ce fichier.",
+  },
+  investments_import_button: { en: "Import {n} Holdings", fr: "Importer {n} positions" },
+  investments_importing: { en: "Importing…", fr: "Importation…" },
+  investments_result_status: { en: "Result", fr: "Résultat" },
+  investments_result_created: { en: "New asset created", fr: "Nouvel actif créé" },
+  investments_result_updated: { en: "Existing asset updated", fr: "Actif existant mis à jour" },
+  investments_result_unchanged: { en: "Already up to date", fr: "Déjà à jour" },
+  investments_result_error: { en: "Failed", fr: "Échec" },
+  holding_ticker: { en: "Ticker", fr: "Symbole" },
+  holding_instrument: { en: "Instrument", fr: "Instrument" },
+  holding_net_quantity: { en: "Net Quantity", fr: "Quantité nette" },
+  holding_trades_count: { en: "Trades", fr: "Transactions" },
+  holding_currency: { en: "Currency", fr: "Devise" },
+  column_ticker: { en: "Ticker Column", fr: "Colonne du symbole" },
+  column_side: { en: "Buy/Sell Column", fr: "Colonne achat/vente" },
+  column_quantity: { en: "Quantity Column", fr: "Colonne de quantité" },
+  column_price: { en: "Price Column", fr: "Colonne de prix" },
+  column_date: { en: "Date Column", fr: "Colonne de date" },
+  column_currency: { en: "Currency", fr: "Devise" },
+  side_buy: { en: "Buy", fr: "Achat" },
+  side_sell: { en: "Sell", fr: "Vente" },
+  investments_manual_side: { en: "Buy/Sell", fr: "Achat/Vente" },
+  investments_manual_date: { en: "Trade Date", fr: "Date de la transaction" },
+  investments_manual_quantity: { en: "Quantity", fr: "Quantité" },
+  investments_manual_price: { en: "Price", fr: "Prix" },
+
+  // Portfolio Performance stacked area chart
+  portfolio_performance_title: { en: "Portfolio Performance", fr: "Performance du portefeuille" },
+  portfolio_performance_empty: {
+    en: "No Equities price history yet — import trades and refresh a market price to see this chart fill in.",
+    fr: "Aucun historique de prix d'actions pour l'instant — importez des transactions et actualisez un prix de marché pour voir ce graphique se remplir.",
+  },
+
   // Live Pricing — Equities & Crypto (Phase 1 Step 9, second half)
   ticker_symbol: { en: "Ticker Symbol", fr: "Symbole boursier" },
   ticker_symbol_required: { en: "A ticker symbol is required.", fr: "Un symbole boursier est requis." },

@@ -25,6 +25,15 @@
   --border: #DED5C2;
   --input: #DED5C2;
   --ring: #A87C1F;
+
+  /* Categorical series colors for charts (e.g. Portfolio Performance's
+     stacked area chart, grouped by exchange) — distinct hues at varying
+     lightness so they stay tolerant of colorblindness, not just hue-separated. */
+  --chart-1: #A87C1F;
+  --chart-2: #2D6A4F;
+  --chart-3: #3B5B8C;
+  --chart-4: #7B4B94;
+  --chart-5: #B0673A;
 }
 
 .dark {
@@ -50,6 +59,13 @@
   --border: #1E293B;
   --input: #1E293B;
   --ring: #C69B3C;
+
+  /* Same categorical chart palette as light mode, lifted in lightness to hold contrast against the dark navy background. */
+  --chart-1: #C69B3C;
+  --chart-2: #4EA97D;
+  --chart-3: #6C8FC7;
+  --chart-4: #A87DC2;
+  --chart-5: #D08858;
 }
 
 @theme inline {
@@ -74,6 +90,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 
   /* Sharp, zero-radius corners — a brand constant, not theme-dependent */
   --radius-lg: 0px;

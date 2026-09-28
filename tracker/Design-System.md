@@ -15,6 +15,10 @@ Dark-mode-first luxury theme — "Midnight Navy & Champagne Gold". Sharp, zero-r
 - **Hardcoded-color audit**: grepped the whole `src/` tree for non-semantic Tailwind color classes and raw hex values outside `globals.css`. Found and fixed one: `portfolio-table.tsx`'s Performance column used `text-emerald-500`/`text-red-500` instead of `text-success`/`text-destructive` — switched to the semantic tokens so gain/loss coloring now follows the active theme. Every other color reference in the app (Recharts strokes/fills in `asset-detail-view.tsx`, the login page's radial gradient) already used `var(--color-*)` lookups, so they automatically pick up both palettes with no changes needed.
 - Verified visually in the browser: cycling the toggle through Dark → System → Light on the landing page correctly re-themed the whole page (ivory background, navy headline text, gold accent preserved, buttons still sharp-cornered) with no console errors. Not yet checked against every individual page (asset details, settings, MFA screens) in light mode — worth a pass before relying on it everywhere.
 
+## Categorical chart colors (Phase 2)
+Added `--chart-1` through `--chart-5` (light and dark variants, exposed as `--color-chart-N` via `@theme inline`, same pattern as every other token here) for the new [[Broker-Trade-Import|Portfolio Performance stacked area chart]] — a 5-color categorical palette extending the existing gold/navy/ivory system, varying in lightness (not just hue) for colorblind tolerance. No token of this kind existed before this feature needed one.
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components
+- [[Broker-Trade-Import|Broker Trade Import]] — the new `--chart-*` tokens' first consumer
