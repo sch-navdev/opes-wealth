@@ -39,6 +39,7 @@ type AssetRow = {
   metadata: Record<string, unknown> | null;
   images: string[] | null;
   ticker_symbol: string | null;
+  purchase_date: string;
   asset_categories: { name: string } | null;
 };
 
@@ -73,7 +74,7 @@ export default async function DashboardPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)",
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
@@ -176,7 +177,7 @@ export default async function DashboardPage({
     <div className="min-h-screen bg-background">
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <div className="flex items-center gap-3">
-          <Image src="/logo.png" alt="Opes Wealth" width={32} height={32} priority />
+          <Image src="/logo.png" alt="Opes Wealth" width={40} height={40} className="size-10" priority />
           <Avatar size="lg">
             <AvatarImage src={profile?.avatar_base64 || undefined} alt="" />
             <AvatarFallback>{initials}</AvatarFallback>

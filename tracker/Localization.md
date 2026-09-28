@@ -39,6 +39,12 @@
 ## Updated Keys (Broker Trade Import bugfix, 2026-09-28)
 `method_upload_file_desc` ("Any CSV — you map the columns yourself." → "Any CSV or Excel file — you map the columns yourself.") and `investments_dropzone_error_csv_only` ("Only .csv files are accepted here." → "Only .csv and .xlsx files are accepted here.") updated in both English and French, now that "Upload via file" accepts `.xlsx` as well as `.csv` — see [[Broker-Trade-Import|Broker Trade Import]].
 
+## New Keys (Per-Trade Review Table, 2026-09-28)
+`i18n.ts` gained keys for the Broker Trade Import's new per-trade editable table (replacing the old aggregated-holdings preview): `investments_review_heading`, `investments_review_desc`, `investments_trades_selected` (interpolates `{selected}`/`{total}`), `investments_delete_selected`, and column headers `trade_instrument`/`trade_date`/`trade_type`/`trade_quantity`/`trade_price`/`trade_exchange_rate`/`trade_brokerage`. Reused the existing `side_buy`/`side_sell` keys for the per-row Buy/Sell select rather than adding new ones. See [[Broker-Trade-Import|Broker Trade Import]].
+
+## New Keys (Historical Purchase & Valuation Dates, 2026-09-28)
+`purchase_date` (Add/Edit Asset dialog's new mandatory field) and `valuation_date` (the manual Refresh Valuation dialog's new date picker) added in both English and French. See [[Portfolio-Dashboard|Portfolio Dashboard]].
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

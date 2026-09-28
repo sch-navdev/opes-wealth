@@ -24,6 +24,17 @@ export type ParsedTrade = {
   /** Always a positive magnitude — `side` carries the direction. */
   quantity: number;
   price: number;
+  /**
+   * FX rate applied to this trade and any brokerage/commission fee paid,
+   * both optional since no parser (Saxo, generic CSV, manual entry)
+   * currently reads these from a source file — brokers don't consistently
+   * report either per trade. Filled with UI defaults once a trade lands in
+   * `add-investments-dialog.tsx`'s own state, editable there before import,
+   * and persisted onto `EquityTrade` (`lib/equities.ts`) — not yet factored
+   * into `estimateCostBasisUnitPrice` (`dashboard/actions.ts`).
+   */
+  exchangeRate?: number;
+  brokerage?: number;
 };
 
 export type ParsedTradeRowError = {

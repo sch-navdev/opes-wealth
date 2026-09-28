@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -6,9 +7,12 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex items-center justify-between px-8 py-6">
-        <span className="text-lg font-semibold tracking-tight text-foreground">
-          Opes Wealth
-        </span>
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Opes Wealth" width={32} height={32} priority />
+          <span className="text-lg font-semibold tracking-tight text-foreground">
+            Opes Wealth
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <Button asChild variant="outline">
@@ -19,6 +23,14 @@ export default function Home() {
 
       <main className="flex flex-1 items-center justify-center px-6">
         <div className="max-w-xl text-center">
+          <Image
+            src="/logo.png"
+            alt="Opes Wealth"
+            width={140}
+            height={140}
+            priority
+            className="mx-auto mb-6"
+          />
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
             Private Wealth, Clearly Seen
           </p>

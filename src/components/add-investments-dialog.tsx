@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { ArrowLeft, FileSpreadsheet, Landmark, Plus, Upload } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  ArrowUpDown,
+  FileSpreadsheet,
+  Landmark,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -68,6 +79,47 @@ function guessColumn(headers: string[], keyword: string): string {
   return headers.find((h) => h.toLowerCase().includes(keyword)) ?? "";
 }
 
+type TradeSortKey = "ticker" | "tradeDate" | "side" | "quantity" | "price" | "exchangeRate" | "brokerage";
+
+function compareTradeValues(a: unknown, b: unknown): number {
+  if (typeof a === "number" && typeof b === "number") return a - b;
+  return String(a ?? "").localeCompare(String(b ?? ""));
+}
+
+function SortableHead({
+  label,
+  sortKey,
+  activeKey,
+  direction,
+  onSort,
+  align,
+}: {
+  label: string;
+  sortKey: TradeSortKey;
+  activeKey: TradeSortKey | null;
+  direction: "asc" | "desc";
+  onSort: (key: TradeSortKey) => void;
+  align?: "right";
+}) {
+  const isActive = activeKey === sortKey;
+  const Icon = isActive ? (direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead className={align === "right" ? "text-right" : undefined}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground",
+          align === "right" && "flex-row-reverse",
+        )}
+      >
+        {label}
+        <Icon className="size-3" />
+      </button>
+    </TableHead>
+  );
+}
+
 export function AddInvestmentsDialog() {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +136,9 @@ export function AddInvestmentsDialog() {
   const [parseErrors, setParseErrors] = useState<ParsedTradeRowError[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<ImportBrokerTradesResult[]>([]);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [sortKey, setSortKey] = useState<TradeSortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const [genericHeaders, setGenericHeaders] = useState<string[]>([]);
   const [genericRows, setGenericRows] = useState<Record<string, string>[]>([]);
@@ -106,6 +161,54 @@ export function AddInvestmentsDialog() {
 
   const aggregatedHoldings = useMemo(() => aggregateTrades(trades), [trades]);
 
+  // Original `trades` indices, reordered for display only — sorting never
+  // reorders `trades` itself, so a row's edits always stay attached to the
+  // correct underlying trade regardless of the current sort.
+  const displayOrder = useMemo(() => {
+    const indices = trades.map((_, i) => i);
+    if (!sortKey) return indices;
+    return indices.sort((a, b) => {
+      const result = compareTradeValues(trades[a][sortKey], trades[b][sortKey]);
+      return sortDirection === "asc" ? result : -result;
+    });
+  }, [trades, sortKey, sortDirection]);
+
+  function toggleSort(key: TradeSortKey) {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  }
+
+  function updateTrade<K extends keyof ParsedTrade>(index: number, key: K, value: ParsedTrade[K]) {
+    setTrades((prev) => prev.map((t, i) => (i === index ? { ...t, [key]: value } : t)));
+  }
+
+  function toggleTradeSelected(index: number) {
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIndices((prev) => (prev.size === trades.length ? new Set() : new Set(trades.map((_, i) => i))));
+  }
+
+  function deleteTrade(index: number) {
+    setTrades((prev) => prev.filter((_, i) => i !== index));
+    setSelectedIndices(new Set());
+  }
+
+  function deleteSelectedTrades() {
+    setTrades((prev) => prev.filter((_, i) => !selectedIndices.has(i)));
+    setSelectedIndices(new Set());
+  }
+
   function resetAll() {
     setStage("select");
     setSelectedBroker(null);
@@ -116,6 +219,9 @@ export function AddInvestmentsDialog() {
     setParseErrors([]);
     setImportError(null);
     setImportResults([]);
+    setSelectedIndices(new Set());
+    setSortKey(null);
+    setSortDirection("asc");
     setGenericHeaders([]);
     setGenericRows([]);
     setTickerColumn("");
@@ -159,7 +265,7 @@ export function AddInvestmentsDialog() {
     const result = broker.parse(buffer, file.name);
 
     setFileName(file.name);
-    setTrades(result.trades);
+    setTrades(result.trades.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(result.errors);
     setStage("preview");
   }
@@ -212,7 +318,7 @@ export function AddInvestmentsDialog() {
       dateFormat,
       currency: genericCurrency,
     });
-    setTrades(parsed);
+    setTrades(parsed.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(errors);
     setStage("preview");
   }
@@ -245,6 +351,8 @@ export function AddInvestmentsDialog() {
       side: manualSide,
       quantity,
       price,
+      exchangeRate: 1,
+      brokerage: 0,
     };
 
     setTrades([trade]);
@@ -616,6 +724,10 @@ export function AddInvestmentsDialog() {
 
         {stage === "preview" && (
           <div className="space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-foreground">{t("investments_review_heading")}</h3>
+              <p className="text-xs text-muted-foreground">{t("investments_review_desc")}</p>
+            </div>
             {fileName && (
               <p className="text-xs text-muted-foreground">
                 {t("csv_selected_file")}: {fileName}
@@ -626,44 +738,154 @@ export function AddInvestmentsDialog() {
                 {t("csv_row_errors", { n: parseErrors.length })}
               </p>
             )}
-            {aggregatedHoldings.length === 0 ? (
+            {trades.length === 0 ? (
               <p className="text-sm text-destructive" role="alert">
                 {t("investments_no_trades_found")}
               </p>
             ) : (
-              <div className="border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("holding_ticker")}</TableHead>
-                      <TableHead>{t("holding_instrument")}</TableHead>
-                      <TableHead className="text-right">{t("holding_net_quantity")}</TableHead>
-                      <TableHead className="text-right">{t("holding_trades_count")}</TableHead>
-                      <TableHead className="text-right">{t("holding_currency")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {aggregatedHoldings.map((holding) => (
-                      <TableRow key={`${holding.ticker}:${holding.exchange ?? ""}`}>
-                        <TableCell className="font-medium text-foreground">
-                          {holding.ticker}
-                          {holding.exchange && (
-                            <span className="ml-1 text-xs text-muted-foreground">{holding.exchange}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{holding.instrumentName}</TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground">
-                          {holding.netQuantity}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {holding.trades.length}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">{holding.currency}</TableCell>
+              <>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {t("investments_trades_selected", { selected: selectedIndices.size, total: trades.length })}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={deleteSelectedTrades}
+                    disabled={selectedIndices.size === 0}
+                  >
+                    <Trash2 className="size-4" />
+                    {t("investments_delete_selected")}
+                  </Button>
+                </div>
+                <div role="region" tabIndex={0} className="overflow-x-auto border border-border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <Checkbox
+                            checked={selectedIndices.size > 0 && selectedIndices.size === trades.length}
+                            onCheckedChange={toggleSelectAll}
+                            aria-label={t("investments_trades_selected", {
+                              selected: selectedIndices.size,
+                              total: trades.length,
+                            })}
+                          />
+                        </TableHead>
+                        <SortableHead label={t("trade_instrument")} sortKey="ticker" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                        <SortableHead label={t("trade_date")} sortKey="tradeDate" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                        <SortableHead label={t("trade_type")} sortKey="side" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} />
+                        <SortableHead label={t("trade_quantity")} sortKey="quantity" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} align="right" />
+                        <SortableHead label={t("trade_price")} sortKey="price" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} align="right" />
+                        <SortableHead label={t("trade_exchange_rate")} sortKey="exchangeRate" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} align="right" />
+                        <SortableHead label={t("trade_brokerage")} sortKey="brokerage" activeKey={sortKey} direction={sortDirection} onSort={toggleSort} align="right" />
+                        <TableHead className="w-10" />
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {displayOrder.map((index) => {
+                        const trade = trades[index];
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedIndices.has(index)}
+                                onCheckedChange={() => toggleTradeSelected(index)}
+                                aria-label={trade.ticker}
+                              />
+                            </TableCell>
+                            <TableCell className="min-w-32">
+                              <div className="font-medium text-foreground">
+                                {trade.ticker}
+                                {trade.exchange && (
+                                  <span className="ml-1 text-xs text-muted-foreground">{trade.exchange}</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {trade.instrumentName} · {trade.currency}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="date"
+                                className="w-36"
+                                value={trade.tradeDate}
+                                onChange={(e) => updateTrade(index, "tradeDate", e.target.value)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={trade.side}
+                                onValueChange={(v) => updateTrade(index, "side", v as TradeSide)}
+                              >
+                                <SelectTrigger className="w-24">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="buy">{t("side_buy")}</SelectItem>
+                                  <SelectItem value="sell">{t("side_sell")}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="any"
+                                min="0"
+                                className="w-24 text-right"
+                                value={trade.quantity}
+                                onChange={(e) => updateTrade(index, "quantity", Number(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="w-28 text-right"
+                                value={trade.price}
+                                onChange={(e) => updateTrade(index, "price", Number(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="0.000001"
+                                min="0"
+                                className="w-28 text-right"
+                                value={trade.exchangeRate ?? 1}
+                                onChange={(e) => updateTrade(index, "exchangeRate", Number(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                className="w-24 text-right"
+                                value={trade.brokerage ?? 0}
+                                onChange={(e) => updateTrade(index, "brokerage", Number(e.target.value) || 0)}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => deleteTrade(index)}
+                                aria-label={t("investments_delete_selected")}
+                              >
+                                <Trash2 className="size-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
             {importError && (
               <p className="text-sm text-destructive" role="alert">

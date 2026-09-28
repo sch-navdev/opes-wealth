@@ -23,9 +23,6 @@ export default function LoginPage() {
               "radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 60%)",
           }}
         />
-        <span className="relative">
-          <Image src="/logo.png" alt="Opes Wealth" width={80} height={80} priority />
-        </span>
         <div className="relative max-w-md">
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
             Private Wealth, Clearly Seen

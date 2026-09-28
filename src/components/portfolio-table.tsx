@@ -37,6 +37,7 @@ type AssetRow = {
   metadata: Record<string, unknown> | null;
   images: string[] | null;
   ticker_symbol: string | null;
+  purchase_date: string;
   asset_categories: { name: string } | null;
 };
 
@@ -168,6 +169,7 @@ export function PortfolioTable({
                 metadata: asset.metadata,
                 images: asset.images,
                 ticker_symbol: asset.ticker_symbol,
+                purchase_date: asset.purchase_date,
               };
 
               return (

@@ -92,6 +92,7 @@ export type Database = {
           metadata: Json
           name: string
           profile_id: string
+          purchase_date: string
           quantity: number
           ticker_symbol: string | null
           updated_at: string
@@ -107,6 +108,7 @@ export type Database = {
           metadata?: Json
           name: string
           profile_id: string
+          purchase_date?: string
           quantity?: number
           ticker_symbol?: string | null
           updated_at?: string
@@ -122,6 +124,7 @@ export type Database = {
           metadata?: Json
           name?: string
           profile_id?: string
+          purchase_date?: string
           quantity?: number
           ticker_symbol?: string | null
           updated_at?: string

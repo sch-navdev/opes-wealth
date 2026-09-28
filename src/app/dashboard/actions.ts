@@ -25,16 +25,20 @@ function parseImages(formData: FormData): string[] {
 /**
  * Auto-generates the `asset_history` timeline for an asset whenever it's
  * created or updated: a starting point on the earliest payment milestone's
- * due date (the purchase/contract date — there's no separate purchase-date
- * field, so for off-plan Real Estate this is the down payment milestone),
- * one point per "paid" milestone with the cumulative paid-to-date amount up
- * to that date, and a point for today's market valuation. Since there's no
- * recorded historical market valuation at each past date, the historical
- * points use cumulative cash invested (paid milestones + fees) for both
- * `value` and `net_equity` — a deliberate simplification flagged in the
- * tracker notes, not a claim that net equity equals cash invested in
- * general. Upserts on (asset_id, recorded_date) so re-saving the form
- * regenerates the same points instead of duplicating them.
+ * due date (for off-plan Real Estate, the down payment milestone), one
+ * point per "paid" milestone with the cumulative paid-to-date amount up to
+ * that date, and one "current snapshot" point. That snapshot uses
+ * `explicitDate` when given — `addAsset` passes the user's Purchase Date so
+ * a freshly created asset's curve starts there instead of at row-creation
+ * time — and otherwise falls back to today, which is what `updateAsset`
+ * relies on (editing an asset always re-stamps today's snapshot; it never
+ * moves the original purchase point). Since there's no recorded historical
+ * market valuation at each past milestone date, those historical points use
+ * cumulative cash invested (paid milestones + fees) for both `value` and
+ * `net_equity` — a deliberate simplification flagged in the tracker notes,
+ * not a claim that net equity equals cash invested in general. Upserts on
+ * (asset_id, recorded_date) so re-saving the form regenerates the same
+ * points instead of duplicating them.
  */
 async function syncAssetHistory(
   supabase: SupabaseClient,
@@ -42,7 +46,9 @@ async function syncAssetHistory(
   currentValue: number,
   categoryName: string | null | undefined,
   metadata: Json,
+  explicitDate?: string,
 ) {
+  const snapshotDate = explicitDate || new Date().toISOString().slice(0, 10);
   const points = new Map<
     string,
     { asset_id: string; recorded_date: string; value: number; net_equity: number; source: "manual" }
@@ -88,9 +94,9 @@ async function syncAssetHistory(
     }
 
     const marketValuation = re.market_valuation ?? currentValue;
-    addPoint(new Date().toISOString().slice(0, 10), marketValuation, currentValue);
+    addPoint(snapshotDate, marketValuation, currentValue);
   } else {
-    addPoint(new Date().toISOString().slice(0, 10), currentValue, currentValue);
+    addPoint(snapshotDate, currentValue, currentValue);
   }
 
   const rows = Array.from(points.values());
@@ -119,6 +125,7 @@ export async function addAsset(formData: FormData) {
   const currency = (formData.get("currency") as string) || "USD";
   const images = parseImages(formData);
   const tickerSymbol = (formData.get("ticker_symbol") as string | null) || null;
+  const purchaseDate = formData.get("purchase_date") as string;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Json = {};
@@ -142,6 +149,7 @@ export async function addAsset(formData: FormData) {
       metadata,
       images,
       ticker_symbol: tickerSymbol,
+      purchase_date: purchaseDate,
     })
     .select("id, asset_categories(name)")
     .single<{ id: string; asset_categories: { name: string } | null }>();
@@ -156,6 +164,7 @@ export async function addAsset(formData: FormData) {
     Number(currentValue),
     inserted.asset_categories?.name,
     metadata,
+    purchaseDate,
   );
 
   revalidatePath("/dashboard");
@@ -179,6 +188,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const currency = (formData.get("currency") as string) || "USD";
   const images = parseImages(formData);
   const tickerSymbol = (formData.get("ticker_symbol") as string | null) || null;
+  const purchaseDate = formData.get("purchase_date") as string;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Json = {};
@@ -201,6 +211,7 @@ export async function updateAsset(id: string, formData: FormData) {
       metadata,
       images,
       ticker_symbol: tickerSymbol,
+      purchase_date: purchaseDate,
     })
     .eq("id", id)
     .eq("profile_id", user.id)
@@ -222,10 +233,21 @@ export async function updateAsset(id: string, formData: FormData) {
   revalidatePath("/dashboard", "layout");
 }
 
+/**
+ * Records a new valuation for a manual (non-live-priced) asset. `date`
+ * defaults to today, but the Refresh Valuation dialog lets the user pick a
+ * past date to back-populate the history curve — when they do, this only
+ * inserts the `asset_history` point for that date; it deliberately does
+ * NOT touch `assets.current_value`/`metadata`, since backdating adds a
+ * historical data point rather than redefining what the asset is worth
+ * right now. Only a same-day (today) valuation updates the live figures,
+ * exactly as this action always behaved before the date picker existed.
+ */
 export async function updateAssetValuation(
   id: string,
   newValue: number,
   source: AssetHistorySource,
+  date?: string,
 ) {
   const supabase = await createClient();
 
@@ -253,6 +275,8 @@ export async function updateAssetValuation(
   }
 
   const isRealEstate = asset.asset_categories?.name === "Real Estate";
+  const recordedDate = date || new Date().toISOString().slice(0, 10);
+  const isToday = recordedDate === new Date().toISOString().slice(0, 10);
 
   let netEquity = newValue;
   let nextMetadata = asset.metadata;
@@ -268,23 +292,28 @@ export async function updateAssetValuation(
     nextMetadata = { ...reMetadata, market_valuation: newValue };
   }
 
-  const { error: updateError } = await supabase
-    .from("assets")
-    .update({ current_value: netEquity, metadata: nextMetadata })
-    .eq("id", id)
-    .eq("profile_id", user.id);
+  if (isToday) {
+    const { error: updateError } = await supabase
+      .from("assets")
+      .update({ current_value: netEquity, metadata: nextMetadata })
+      .eq("id", id)
+      .eq("profile_id", user.id);
 
-  if (updateError) {
-    return { error: updateError.message };
+    if (updateError) {
+      return { error: updateError.message };
+    }
   }
 
-  const { error: historyError } = await supabase.from("asset_history").insert({
-    asset_id: id,
-    recorded_date: new Date().toISOString().slice(0, 10),
-    value: newValue,
-    net_equity: netEquity,
-    source,
-  });
+  const { error: historyError } = await supabase.from("asset_history").upsert(
+    {
+      asset_id: id,
+      recorded_date: recordedDate,
+      value: newValue,
+      net_equity: netEquity,
+      source,
+    },
+    { onConflict: "asset_id,recorded_date" },
+  );
 
   if (historyError) {
     return { error: historyError.message };
@@ -588,6 +617,8 @@ export async function importBrokerTrades(
           price: t.price,
           currency: t.currency,
           source,
+          exchangeRate: t.exchangeRate,
+          brokerage: t.brokerage,
         }));
 
       if (newTrades.length === 0) {
@@ -647,6 +678,8 @@ export async function importBrokerTrades(
         price: t.price,
         currency: t.currency,
         source,
+        exchangeRate: t.exchangeRate,
+        brokerage: t.brokerage,
       }));
 
       const unitPrice = estimateCostBasisUnitPrice(trades);

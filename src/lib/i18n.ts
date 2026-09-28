@@ -3,6 +3,9 @@ export type Locale = "en" | "fr";
 export const locales: Locale[] = ["en", "fr"];
 
 const dictionary = {
+  // Add/Edit Asset dialog
+  purchase_date: { en: "Purchase Date", fr: "Date d'achat" },
+
   // Dashboard chrome
   welcome_back: { en: "Welcome back", fr: "Bon retour" },
   portfolio_heading: { en: "Portfolio", fr: "Portefeuille" },
@@ -31,6 +34,7 @@ const dictionary = {
     fr: "Enregistrez une nouvelle valorisation. Cela met à jour l'actif et ajoute un point au graphique historique.",
   },
   new_market_value: { en: "New Market Value", fr: "Nouvelle valeur de marché" },
+  valuation_date: { en: "Valuation Date", fr: "Date de valorisation" },
   converted_note: {
     en: "Converted to the asset's currency ({currency}) before saving.",
     fr: "Converti dans la devise de l'actif ({currency}) avant l'enregistrement.",
@@ -276,6 +280,20 @@ const dictionary = {
   holding_net_quantity: { en: "Net Quantity", fr: "Quantité nette" },
   holding_trades_count: { en: "Trades", fr: "Transactions" },
   holding_currency: { en: "Currency", fr: "Devise" },
+  investments_review_heading: { en: "Review accepted trades", fr: "Vérifiez les transactions acceptées" },
+  investments_review_desc: {
+    en: "Review the trades below and adjust any column before importing.",
+    fr: "Vérifiez les transactions ci-dessous et ajustez les colonnes si besoin avant l'importation.",
+  },
+  investments_trades_selected: { en: "{selected} / {total} trades selected", fr: "{selected} / {total} transactions sélectionnées" },
+  investments_delete_selected: { en: "Delete", fr: "Supprimer" },
+  trade_instrument: { en: "Instrument", fr: "Instrument" },
+  trade_date: { en: "Date", fr: "Date" },
+  trade_type: { en: "Type", fr: "Type" },
+  trade_quantity: { en: "Quantity", fr: "Quantité" },
+  trade_price: { en: "Price", fr: "Prix" },
+  trade_exchange_rate: { en: "Exchange Rate", fr: "Taux de change" },
+  trade_brokerage: { en: "Brokerage", fr: "Courtage" },
   column_ticker: { en: "Ticker Column", fr: "Colonne du symbole" },
   column_side: { en: "Buy/Sell Column", fr: "Colonne achat/vente" },
   column_quantity: { en: "Quantity Column", fr: "Colonne de quantité" },

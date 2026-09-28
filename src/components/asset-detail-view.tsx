@@ -104,6 +104,7 @@ export type AssetDetail = {
   metadata: Record<string, unknown> | null;
   images: string[] | null;
   ticker_symbol: string | null;
+  purchase_date: string;
   asset_categories: { name: string } | null;
 };
 
@@ -182,6 +183,9 @@ export function AssetDetailView({
   const [refreshSource, setRefreshSource] = useState<
     "manual" | "dari" | "dubailand"
   >("manual");
+  const [valuationDate, setValuationDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [dariError, setDariError] = useState<string | null>(null);
@@ -375,6 +379,7 @@ export function AssetDetailView({
         asset.id,
         valueInAssetCurrency,
         refreshSource,
+        valuationDate,
       );
       if (result?.error) {
         setRefreshError(result.error);
@@ -382,6 +387,7 @@ export function AssetDetailView({
       }
       setRefreshOpen(false);
       setRefreshValue("");
+      setValuationDate(new Date().toISOString().slice(0, 10));
     });
   }
 
@@ -601,6 +607,17 @@ export function AssetDetailView({
                           {t("converted_note", { currency: asset.currency })}
                         </p>
                       )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="valuation_date">{t("valuation_date")}</Label>
+                      <Input
+                        id="valuation_date"
+                        type="date"
+                        max={new Date().toISOString().slice(0, 10)}
+                        value={valuationDate}
+                        onChange={(e) => setValuationDate(e.target.value)}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>{t("source")}</Label>
@@ -997,6 +1014,7 @@ export function AssetDetailView({
                             metadata: asset.metadata,
                             images: asset.images,
                             ticker_symbol: asset.ticker_symbol,
+                            purchase_date: asset.purchase_date,
                           }}
                           trigger={
                             <Button type="button" variant="outline" size="sm">
@@ -1116,6 +1134,7 @@ export function AssetDetailView({
                     metadata: asset.metadata,
                     images: asset.images,
                     ticker_symbol: asset.ticker_symbol,
+                    purchase_date: asset.purchase_date,
                   }}
                 />
                 <CsvImportDialog assetId={asset.id} />

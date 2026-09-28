@@ -29,6 +29,9 @@ export type EquityTrade = {
   currency: string;
   /** e.g. "saxo", "manual" — which import produced this lot. */
   source: string;
+  /** See `ParsedTrade` (`lib/parsers/types.ts`) — captured but not yet factored into cost-basis math. */
+  exchangeRate?: number;
+  brokerage?: number;
 };
 
 export type EquityMetadata = {

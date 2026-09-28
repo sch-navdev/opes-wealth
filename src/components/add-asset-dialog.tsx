@@ -54,6 +54,8 @@ import {
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import type { TranslationKey } from "@/lib/i18n";
 
+const todayIso = new Date().toISOString().slice(0, 10);
+
 type Category = {
   id: string;
   name: string;
@@ -69,6 +71,7 @@ export type AssetForEdit = {
   metadata: Record<string, unknown> | null;
   images: string[] | null;
   ticker_symbol?: string | null;
+  purchase_date: string;
 };
 
 export function AddAssetDialog({
@@ -343,6 +346,18 @@ export function AddAssetDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="purchase_date">{t("purchase_date")}</Label>
+            <Input
+              id="purchase_date"
+              name="purchase_date"
+              type="date"
+              max={todayIso}
+              defaultValue={asset?.purchase_date ?? todayIso}
+              required
+            />
           </div>
 
           {(isEquity || isCrypto) && (
