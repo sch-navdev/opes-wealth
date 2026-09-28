@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { KeyRound, ShieldCheck, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -14,6 +14,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/utils/supabase/client";
@@ -112,7 +119,113 @@ export function Setup2faForm() {
     null,
   );
 
-  const loadActiveFactors = useCallback(async () => {
+  // AAL2 step-up gate for passkey management (register/remove) and
+  // authenticator removal — this page has no server-side guard the way
+  // `/dashboard` does (see `needsMfaStepUp` in `utils/supabase/mfa.ts`), so
+  // a session that's only ever reached aal1 could otherwise register a
+  // rogue passkey or remove the real authenticator without ever proving
+  // possession of it. `stepUpResolverRef` holds the pending action's own
+  // resolve callback while the TOTP prompt is open — a ref rather than
+  // state, since a function is never a safe value to store in `useState`
+  // (React re-renders by calling it as an updater) and doing so here broke
+  // the React Compiler's memoization of `loadActiveFactors` below.
+  // `ensureAal2()` is the single entry point every gated action calls
+  // before doing anything.
+  const stepUpResolverRef = useRef<((ok: boolean) => void) | null>(null);
+  const [isStepUpOpen, setIsStepUpOpen] = useState(false);
+  const [stepUpCode, setStepUpCode] = useState("");
+  const [stepUpError, setStepUpError] = useState<string | null>(null);
+  const [stepUpVerifying, setStepUpVerifying] = useState(false);
+
+  async function ensureAal2(): Promise<boolean> {
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    // Mirrors `reset-password-form.tsx`'s same fail-open choice: if the AAL
+    // can't be read, don't block the user on a check that itself failed.
+    if (error || !data) return true;
+
+    const needsStepUp = data.currentLevel === "aal1" && data.nextLevel === "aal2";
+    if (!needsStepUp) return true;
+
+    setStepUpCode("");
+    setStepUpError(null);
+    setIsStepUpOpen(true);
+    return new Promise<boolean>((resolve) => {
+      stepUpResolverRef.current = resolve;
+    });
+  }
+
+  async function submitStepUpCode(code: string) {
+    setStepUpError(null);
+    setStepUpVerifying(true);
+
+    try {
+      const { data: factorsData, error: factorsError } =
+        await supabase.auth.mfa.listFactors();
+
+      if (factorsError) {
+        setStepUpError(factorsError.message);
+        return;
+      }
+
+      const totpFactor = factorsData.totp[0];
+      if (!totpFactor) {
+        setStepUpError("No authenticator app found for this account.");
+        return;
+      }
+
+      const { data: challengeData, error: challengeError } =
+        await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+
+      if (challengeError) {
+        setStepUpError(challengeError.message);
+        return;
+      }
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challengeData.id,
+        code,
+      });
+
+      if (verifyError) {
+        setStepUpError(verifyError.message);
+        return;
+      }
+
+      stepUpResolverRef.current?.(true);
+      stepUpResolverRef.current = null;
+      setIsStepUpOpen(false);
+    } catch (err) {
+      console.error("Setup2faForm: unexpected error during AAL2 step-up", err);
+      setStepUpError("Something went wrong. Please try again.");
+    } finally {
+      setStepUpVerifying(false);
+    }
+  }
+
+  function handleStepUpCodeChange(value: string) {
+    setStepUpCode(value);
+    setStepUpError(null);
+    if (value.length === 6 && !stepUpVerifying) {
+      submitStepUpCode(value);
+    }
+  }
+
+  function cancelStepUp() {
+    stepUpResolverRef.current?.(false);
+    stepUpResolverRef.current = null;
+    setIsStepUpOpen(false);
+    setStepUpCode("");
+    setStepUpError(null);
+  }
+
+  // Plain function rather than `useCallback` — it's called imperatively
+  // from several handlers below, not passed down as a prop, so it doesn't
+  // need referential stability; wrapping it in `useCallback` was tripping
+  // the React Compiler's memoization-preservation check once this
+  // component grew the AAL2 step-up state above.
+  async function loadActiveFactors() {
     setIsFactorsLoading(true);
 
     const [factorsResult, passkeysResult] = await Promise.all([
@@ -137,11 +250,12 @@ export function Setup2faForm() {
     );
 
     setIsFactorsLoading(false);
-  }, [supabase]);
+  }
 
   useEffect(() => {
     loadActiveFactors();
-  }, [loadActiveFactors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only, same as before this was a plain function
+  }, []);
 
   async function handleSetup() {
     setError(null);
@@ -195,6 +309,9 @@ export function Setup2faForm() {
   }
 
   async function handleRemoveTotp(factorId: string): Promise<boolean> {
+    const stepUpOk = await ensureAal2();
+    if (!stepUpOk) return false;
+
     setRemovingId(factorId);
     setTotpRemovalError(null);
 
@@ -212,6 +329,9 @@ export function Setup2faForm() {
   }
 
   async function handleRemovePasskey(passkeyId: string): Promise<boolean> {
+    const stepUpOk = await ensureAal2();
+    if (!stepUpOk) return false;
+
     setRemovingId(passkeyId);
     setPasskeyRemovalError(null);
 
@@ -230,6 +350,10 @@ export function Setup2faForm() {
 
   async function handleRegisterPasskey() {
     setPasskeyError(null);
+
+    const stepUpOk = await ensureAal2();
+    if (!stepUpOk) return;
+
     setIsPasskeyLoading(true);
 
     try {
@@ -433,6 +557,66 @@ export function Setup2faForm() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={isStepUpOpen}
+        onOpenChange={(open) => {
+          if (!open) cancelStepUp();
+        }}
+      >
+        <DialogContent className="border-border bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              Confirm it&apos;s you
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              This account requires a second step for security-sensitive
+              changes. Enter the 6-digit code from your authenticator app to
+              continue.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="step-up-code">Authenticator code</Label>
+              <Input
+                id="step-up-code"
+                name="code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                placeholder="123456"
+                autoComplete="one-time-code"
+                required
+                disabled={stepUpVerifying}
+                value={stepUpCode}
+                onChange={(e) => handleStepUpCodeChange(e.target.value)}
+              />
+            </div>
+
+            {stepUpError && (
+              <p className="text-sm text-destructive" role="alert">
+                {stepUpError}
+              </p>
+            )}
+
+            {stepUpVerifying && (
+              <p className="text-sm text-muted-foreground">Verifying…</p>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={cancelStepUp}
+              disabled={stepUpVerifying}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
