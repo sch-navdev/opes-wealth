@@ -232,8 +232,8 @@ const dictionary = {
   },
   method_upload_file: { en: "Upload via file", fr: "Importer via un fichier" },
   method_upload_file_desc: {
-    en: "Any CSV — you map the columns yourself.",
-    fr: "N'importe quel CSV — vous associez vous-même les colonnes.",
+    en: "Any CSV or Excel file — you map the columns yourself.",
+    fr: "N'importe quel fichier CSV ou Excel — vous associez vous-même les colonnes.",
   },
   method_manual_trade: { en: "Individually add trade", fr: "Ajouter une transaction" },
   method_manual_trade_desc: {
@@ -247,8 +247,8 @@ const dictionary = {
     fr: "Ce type de fichier n'est pas accepté pour ce courtier.",
   },
   investments_dropzone_error_csv_only: {
-    en: "Only .csv files are accepted here.",
-    fr: "Seuls les fichiers .csv sont acceptés ici.",
+    en: "Only .csv and .xlsx files are accepted here.",
+    fr: "Seuls les fichiers .csv et .xlsx sont acceptés ici.",
   },
   investments_manual_instrument_name: { en: "Instrument Name", fr: "Nom de l'instrument" },
   investments_manual_invalid_quantity: {

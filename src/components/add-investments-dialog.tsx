@@ -45,6 +45,7 @@ import { BROKERS, aggregateTrades, type BrokerDefinition } from "@/lib/parsers/b
 import type { ParsedTrade, ParsedTradeRowError, TradeSide } from "@/lib/parsers/types";
 import {
   parseGenericCsvTrades,
+  parseGenericWorkbook,
   type GenericCsvDateFormat,
 } from "@/lib/parsers/generic-csv";
 import { importBrokerTrades, type ImportBrokerTradesResult } from "@/app/dashboard/actions";
@@ -165,13 +166,17 @@ export function AddInvestmentsDialog() {
 
   async function handleGenericFile(file: File) {
     setDropError(null);
-    if (!file.name.toLowerCase().endsWith(".csv")) {
+    const lowerName = file.name.toLowerCase();
+    const isCsv = lowerName.endsWith(".csv");
+    const isExcel = lowerName.endsWith(".xlsx");
+    if (!isCsv && !isExcel) {
       setDropError(t("investments_dropzone_error_csv_only"));
       return;
     }
 
-    const text = await file.text();
-    const parsed = parseCsv(text);
+    const parsed = isExcel
+      ? parseGenericWorkbook(await file.arrayBuffer())
+      : parseCsv(await file.text());
     if (parsed.rows.length === 0) {
       setDropError(t("csv_dropzone_error_empty"));
       return;
@@ -412,12 +417,12 @@ export function AddInvestmentsDialog() {
               <p className="text-sm font-medium text-foreground">
                 {t("investments_dropzone_cta")}
               </p>
-              <p className="text-xs text-muted-foreground">.csv</p>
+              <p className="text-xs text-muted-foreground">.csv, .xlsx</p>
             </div>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];

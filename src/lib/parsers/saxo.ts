@@ -7,6 +7,15 @@
  * `AMZN:xnas`), `Instrument`, `Instrument currency`. Header matching below
  * is case-insensitive/trimmed rather than exact-string, since real exports
  * can vary slightly in capitalization/spacing from a spec.
+ *
+ * A real `.xlsx` export isn't a single table: Saxo stacks multiple tables
+ * (Transactions, Trades, Bookings, …) vertically in the same sheet, each
+ * with its own title row and header row. `findHeaderRowIndex` scans the
+ * whole sheet for the Trades section's header (matched on the
+ * `Trade Event Type` + `Traded Quantity` pair, unique to that table) rather
+ * than assuming row 0 or a fixed search window, and `mapRows` stops
+ * consuming rows at the next section's title row (or a blank row), not just
+ * a blank row, so it doesn't run into Bookings' header/data as bogus trades.
  */
 import * as XLSX from "xlsx";
 import { parseCsv } from "@/lib/csv-parser";
@@ -31,16 +40,38 @@ function normalizeHeader(header: unknown): string {
   return String(header ?? "").trim().toLowerCase();
 }
 
-/** Scans the first N rows for one containing the "trade execution date" header — Saxo exports often have a title/summary block above the real header row. */
+/**
+ * Scans every row for the "Trades" section's header row. Saxo's `.xlsx`
+ * export stacks multiple tables (Transactions, Trades, Bookings, …)
+ * vertically in the same sheet, each with its own title + header row, so
+ * this can't just take row 0 (or even the first row containing a
+ * plausible-looking date column — "Transactions" has its own date column
+ * too). Matching on both "Trade Event Type" and "Traded Quantity" — a pair
+ * unique to the Trades section — avoids false-matching an earlier table.
+ */
 function findHeaderRowIndex(rows: RawRow[]): number {
-  const searchLimit = Math.min(rows.length, 25);
-  for (let i = 0; i < searchLimit; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const normalized = rows[i].map(normalizeHeader);
-    if (normalized.some((cell) => cell === COLUMN_ALIASES.date[0])) {
+    const hasEventType = normalized.includes(COLUMN_ALIASES.eventType[0]);
+    const hasQuantity = normalized.includes(COLUMN_ALIASES.quantity[0]);
+    if (hasEventType && hasQuantity) {
       return i;
     }
   }
   return -1;
+}
+
+/**
+ * True once the row stream has run past the Trades section's data — either
+ * a blank row, or a new section's title row. Saxo's stacked-table sheet
+ * separates sections with a lone-cell title row (e.g. "Bookings"), not
+ * necessarily a blank line, so a single populated cell is treated as a
+ * section break the same as an empty row.
+ */
+function isSectionBreak(row: RawRow | undefined): boolean {
+  if (!row) return true;
+  const nonEmpty = row.filter((cell) => cell !== undefined && cell !== null && cell !== "");
+  return nonEmpty.length <= 1;
 }
 
 function buildColumnIndex(headerRow: RawRow): Partial<Record<ColumnKey, number>> {
@@ -108,8 +139,8 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
 
   for (let i = startRow + 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || row.every((cell) => cell === undefined || cell === null || cell === "")) {
-      continue;
+    if (isSectionBreak(row)) {
+      break;
     }
     const rowIndex = i - startRow - 1;
 
@@ -197,7 +228,7 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
     if (headerRow === -1) {
       return {
         trades: [],
-        errors: [{ rowIndex: 0, message: 'Could not find a "Trade execution date" column — this may not be a Saxo Bank trade export.' }],
+        errors: [{ rowIndex: 0, message: 'Could not find a "Trade Event Type"/"Traded Quantity" header row — this may not be a Saxo Bank trade export.' }],
       };
     }
     return mapRows(rows, headerRow);
@@ -214,7 +245,7 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
   if (!found) {
     return {
       trades: [],
-      errors: [{ rowIndex: 0, message: 'Could not find a "Trades" sheet with a "Trade execution date" column in this workbook.' }],
+      errors: [{ rowIndex: 0, message: 'Could not find a "Trades" section (with "Trade Event Type" and "Traded Quantity" columns) in this workbook.' }],
     };
   }
 

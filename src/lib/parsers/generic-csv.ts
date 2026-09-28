@@ -7,9 +7,49 @@
  * `lib/bank-csv.ts`'s date-format picker) via the UI in
  * `add-investments-dialog.tsx`.
  */
+import * as XLSX from "xlsx";
 import type { ParsedTrade, ParsedTradeRowError, TradeSide } from "./types";
 
 export type GenericCsvDateFormat = "YYYY-MM-DD" | "MM/DD/YYYY" | "DD/MM/YYYY";
+
+/**
+ * Reads an `.xlsx` file's first sheet into the same `{headers, rows}` shape
+ * `parseCsv` produces, so the generic "Upload via file" column-mapping UI
+ * doesn't need to know whether the user dropped a CSV or a spreadsheet.
+ * `raw: false` formats each cell the way Excel displays it (dates, numbers)
+ * so downstream parsing (`parseDate`, `Number(...)`) sees the same kind of
+ * string a hand-written CSV would contain.
+ */
+export function parseGenericWorkbook(buffer: ArrayBuffer): {
+  headers: string[];
+  rows: Record<string, string>[];
+} {
+  const workbook = XLSX.read(buffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
+  if (!sheet) return { headers: [], rows: [] };
+
+  const table = XLSX.utils.sheet_to_json<string[]>(sheet, {
+    header: 1,
+    raw: false,
+    defval: "",
+  }) as unknown as string[][];
+  if (table.length === 0) return { headers: [], rows: [] };
+
+  const headers = table[0].map((h) => String(h ?? "").trim());
+  const rows = table
+    .slice(1)
+    .filter((cells) => cells.some((cell) => String(cell ?? "").trim() !== ""))
+    .map((cells) => {
+      const row: Record<string, string> = {};
+      headers.forEach((header, i) => {
+        row[header] = String(cells[i] ?? "").trim();
+      });
+      return row;
+    });
+
+  return { headers, rows };
+}
 
 export type GenericCsvMapping = {
   tickerColumn: string;

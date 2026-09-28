@@ -36,6 +36,9 @@
 ## New Keys (Broker Trade Import, Phase 2)
 `i18n.ts` gained the full Add Investments dialog's strings: `add_investments`/`add_investments_desc`, the three method cards (`method_upload_broker*`/`method_upload_file*`/`method_manual_trade*`), dropzone/preview/result strings (`investments_dropzone_*`, `holding_*`, `investments_import_button`/`investments_importing`, `investments_result_*`), generic-CSV column-mapping labels (`column_*`, reused from the shared "map your own columns" pattern), the manual-trade form's own dedicated labels (`investments_manual_side`/`investments_manual_date`/`investments_manual_quantity`/`investments_manual_price` — initially the form reused `column_*` labels like "Buy/Sell Column," which read oddly with no actual column involved; caught during live verification and given dedicated keys instead), and the chart (`portfolio_performance_title`/`portfolio_performance_empty`). See [[Broker-Trade-Import|Broker Trade Import]]. Verified live in both English and French (Add Investments dialog, all three method paths, dark and light mode).
 
+## Updated Keys (Broker Trade Import bugfix, 2026-09-28)
+`method_upload_file_desc` ("Any CSV — you map the columns yourself." → "Any CSV or Excel file — you map the columns yourself.") and `investments_dropzone_error_csv_only` ("Only .csv files are accepted here." → "Only .csv and .xlsx files are accepted here.") updated in both English and French, now that "Upload via file" accepts `.xlsx` as well as `.csv` — see [[Broker-Trade-Import|Broker Trade Import]].
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from
