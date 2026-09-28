@@ -36,8 +36,18 @@ const COLUMN_ALIASES = {
 
 type ColumnKey = keyof typeof COLUMN_ALIASES;
 
+/**
+ * Real Saxo `.xlsx` exports mix regular spaces and non-breaking spaces
+ * (U+00A0) within the same multi-word header — e.g. "Trade Event Type"
+ * comes through with a NBSP between every word while "Trade execution
+ * date" doesn't. `.trim()` alone only strips edge whitespace, not an NBSP
+ * sitting between two words, so a plain trim+lowercase silently fails to
+ * match any alias containing a NBSP. Collapsing all whitespace (`\s`
+ * matches NBSP in JS regex) to a single regular space before comparing
+ * fixes this regardless of which headers Saxo happens to affect.
+ */
 function normalizeHeader(header: unknown): string {
-  return String(header ?? "").trim().toLowerCase();
+  return String(header ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 /**
