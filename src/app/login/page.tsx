@@ -1,10 +1,10 @@
+import Image from "next/image";
 import { ShieldCheck } from "lucide-react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { LoginForm } from "./login-form";
 
@@ -19,8 +19,21 @@ export default function LoginPage() {
               "radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 60%)",
           }}
         />
-        <span className="relative text-lg font-semibold tracking-tight text-foreground">
-          Opes Wealth
+        <span className="relative">
+          <Image
+            src="/logo-light.jpg"
+            alt="Opes Wealth"
+            width={80}
+            height={80}
+            className="block dark:hidden"
+          />
+          <Image
+            src="/logo-dark.jpg"
+            alt="Opes Wealth"
+            width={80}
+            height={80}
+            className="hidden dark:block"
+          />
         </span>
         <div className="relative max-w-md">
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
@@ -46,9 +59,20 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <Card className="w-full max-w-sm border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
-              Opes Wealth
-            </CardTitle>
+            <Image
+              src="/logo-light.jpg"
+              alt="Opes Wealth"
+              width={80}
+              height={80}
+              className="block dark:hidden"
+            />
+            <Image
+              src="/logo-dark.jpg"
+              alt="Opes Wealth"
+              width={80}
+              height={80}
+              className="hidden dark:block"
+            />
             <CardDescription className="text-muted-foreground">
               Sign in to access your wealth dashboard.
             </CardDescription>

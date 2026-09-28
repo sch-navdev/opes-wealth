@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -29,6 +30,20 @@ export default async function ResetPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm border-border bg-card">
         <CardHeader>
+          <Image
+            src="/logo-light.jpg"
+            alt="Opes Wealth"
+            width={80}
+            height={80}
+            className="block dark:hidden"
+          />
+          <Image
+            src="/logo-dark.jpg"
+            alt="Opes Wealth"
+            width={80}
+            height={80}
+            className="hidden dark:block"
+          />
           <CardTitle className="text-2xl font-semibold tracking-tight text-foreground">
             Reset Password
           </CardTitle>
