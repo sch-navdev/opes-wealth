@@ -6,11 +6,15 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="relative flex min-h-screen bg-background">
+      <div className="absolute right-4 top-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-border bg-card p-10 lg:flex">
         <div
           className="pointer-events-none absolute inset-0"
@@ -20,20 +24,7 @@ export default function LoginPage() {
           }}
         />
         <span className="relative">
-          <Image
-            src="/logo-light.jpg"
-            alt="Opes Wealth"
-            width={80}
-            height={80}
-            className="block dark:hidden"
-          />
-          <Image
-            src="/logo-dark.jpg"
-            alt="Opes Wealth"
-            width={80}
-            height={80}
-            className="hidden dark:block"
-          />
+          <Image src="/logo.png" alt="Opes Wealth" width={80} height={80} priority />
         </span>
         <div className="relative max-w-md">
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
@@ -59,20 +50,7 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center px-4 py-10">
         <Card className="w-full max-w-sm border-border bg-card">
           <CardHeader>
-            <Image
-              src="/logo-light.jpg"
-              alt="Opes Wealth"
-              width={80}
-              height={80}
-              className="block dark:hidden"
-            />
-            <Image
-              src="/logo-dark.jpg"
-              alt="Opes Wealth"
-              width={80}
-              height={80}
-              className="hidden dark:block"
-            />
+            <Image src="/logo.png" alt="Opes Wealth" width={80} height={80} priority />
             <CardDescription className="text-muted-foreground">
               Sign in to access your wealth dashboard.
             </CardDescription>

@@ -176,20 +176,7 @@ export default async function DashboardPage({
     <div className="min-h-screen bg-background">
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
         <div className="flex items-center gap-3">
-          <Image
-            src="/logo-light.jpg"
-            alt="Opes Wealth"
-            width={32}
-            height={32}
-            className="block dark:hidden"
-          />
-          <Image
-            src="/logo-dark.jpg"
-            alt="Opes Wealth"
-            width={32}
-            height={32}
-            className="hidden dark:block"
-          />
+          <Image src="/logo.png" alt="Opes Wealth" width={32} height={32} priority />
           <Avatar size="lg">
             <AvatarImage src={profile?.avatar_base64 || undefined} alt="" />
             <AvatarFallback>{initials}</AvatarFallback>
