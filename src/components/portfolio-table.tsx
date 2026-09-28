@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -57,8 +58,17 @@ export function PortfolioTable({
   });
 
   return (
-    <div className="border border-border">
+    <div
+      role="region"
+      aria-label="Portfolio holdings table"
+      tabIndex={0}
+      className="border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+    >
       <Table>
+        <TableCaption className="sr-only">
+          Your portfolio holdings, with category, quantity, value and
+          performance. Each row links to that asset&apos;s detail page.
+        </TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -82,7 +92,12 @@ export function PortfolioTable({
               </TableCell>
             </TableRow>
           ) : (
-            assets.map((asset) => {
+            assets.map((asset, index) => {
+              // Cap the stagger so a long portfolio doesn't take seconds to
+              // finish animating in — every row past the first 8 mounts
+              // together instead of queuing further and further behind.
+              const animationDelayMs = Math.min(index, 8) * 40;
+
               const convertedValue = convertAmount(
                 asset.current_value,
                 asset.currency,
@@ -156,7 +171,11 @@ export function PortfolioTable({
               return (
                 <TableRow
                   key={asset.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="cursor-pointer hover:bg-muted/50 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
+                  style={{
+                    animationDelay: `${animationDelayMs}ms`,
+                    animationFillMode: "backwards",
+                  }}
                 >
                   <TableCell className="font-medium text-foreground">
                     <Link
@@ -188,12 +207,12 @@ export function PortfolioTable({
                   <TableCell className="text-muted-foreground">
                     {asset.asset_categories?.name ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
                     {asset.quantity}
                   </TableCell>
                   <TableCell
                     className={cn(
-                      "text-right",
+                      "text-right tabular-nums",
                       asset.is_liability
                         ? "text-destructive"
                         : "text-foreground",
@@ -230,7 +249,7 @@ export function PortfolioTable({
                         </p>
                       )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right tabular-nums">
                     {convertedGain == null || gainPercent == null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (

@@ -11,18 +11,28 @@ function MetricCard({
   value,
   icon,
   valueClassName,
+  animationDelayMs,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   valueClassName?: string;
+  animationDelayMs: number;
 }) {
   return (
-    <Card className="border-border bg-card">
+    <Card
+      className="border-border bg-card animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none"
+      style={{ animationDelay: `${animationDelayMs}ms`, animationFillMode: "backwards" }}
+    >
       <CardContent className="flex items-center justify-between gap-4 py-4">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className={cn("text-lg font-semibold text-foreground", valueClassName)}>
+          <p
+            className={cn(
+              "text-lg font-semibold tabular-nums text-foreground",
+              valueClassName,
+            )}
+          >
             {value}
           </p>
         </div>
@@ -65,17 +75,20 @@ export function DashboardMetricCards({
         label={t("net_worth")}
         value={maskValue(netWorthFormatted)}
         icon={<Wallet className="size-4" />}
+        animationDelayMs={0}
       />
       <MetricCard
         label={t("total_assets")}
         value={maskValue(assetsFormatted)}
         icon={<TrendingUp className="size-4" />}
+        animationDelayMs={75}
       />
       <MetricCard
         label={t("total_liabilities")}
         value={maskValue(liabilitiesFormatted)}
         icon={<TrendingDown className="size-4" />}
         valueClassName={hasLiabilities ? "text-destructive" : undefined}
+        animationDelayMs={150}
       />
       <MetricCard
         label={t("real_estate_unrealized_gain")}
@@ -92,6 +105,7 @@ export function DashboardMetricCards({
           )
         }
         valueClassName={gainColorClass}
+        animationDelayMs={225}
       />
     </div>
   );
