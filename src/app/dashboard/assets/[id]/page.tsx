@@ -39,7 +39,7 @@ export default async function AssetDetailsPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, asset_categories(name)",
         )
         .eq("id", id)
         .eq("profile_id", user.id)

@@ -33,6 +33,7 @@ type AssetRow = {
   is_liability: boolean;
   metadata: Record<string, unknown> | null;
   images: string[] | null;
+  ticker_symbol: string | null;
   asset_categories: { name: string } | null;
 };
 
@@ -67,7 +68,7 @@ export default async function DashboardPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, asset_categories(name)",
+          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, asset_categories(name)",
         )
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })

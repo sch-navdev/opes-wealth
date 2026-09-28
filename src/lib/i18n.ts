@@ -218,6 +218,73 @@ const dictionary = {
     en: "Updated just now (placeholder data, not a real valuation).",
     fr: "Mis à jour à l'instant (données fictives, pas une valorisation réelle).",
   },
+
+  // Live Pricing — Equities & Crypto (Phase 1 Step 9, second half)
+  ticker_symbol: { en: "Ticker Symbol", fr: "Symbole boursier" },
+  ticker_symbol_required: { en: "A ticker symbol is required.", fr: "Un symbole boursier est requis." },
+  ticker_symbol_equity_placeholder: { en: "e.g. AAPL", fr: "ex. AAPL" },
+  ticker_symbol_crypto_placeholder: { en: "e.g. BTC", fr: "ex. BTC" },
+
+  equity_details: { en: "Equity Details", fr: "Détails de l'action" },
+  exchange: { en: "Exchange", fr: "Bourse" },
+  equity_exchange_placeholder: { en: "e.g. NASDAQ", fr: "ex. NASDAQ" },
+
+  crypto_details: { en: "Crypto Details", fr: "Détails de la cryptomonnaie" },
+  coingecko_id: { en: "CoinGecko ID", fr: "Identifiant CoinGecko" },
+  coingecko_id_placeholder: { en: "e.g. bitcoin", fr: "ex. bitcoin" },
+  coingecko_id_hint: {
+    en: "The id from the coin's CoinGecko URL, not its ticker (e.g. \"bitcoin\", not \"BTC\").",
+    fr: "L'identifiant tiré de l'URL CoinGecko de la pièce, pas son symbole (ex. « bitcoin », pas « BTC »).",
+  },
+  crypto_coingecko_id_required: {
+    en: "A CoinGecko ID is required to fetch a live price.",
+    fr: "Un identifiant CoinGecko est requis pour récupérer un prix en direct.",
+  },
+
+  refresh_market_price: { en: "Refresh Market Price", fr: "Actualiser le prix du marché" },
+  unit_price: { en: "Unit Price", fr: "Prix unitaire" },
+  last_updated: { en: "Last Updated", fr: "Dernière mise à jour" },
+  no_market_price_yet: {
+    en: "No live price fetched yet — use the refresh button above.",
+    fr: "Aucun prix en direct récupéré pour l'instant — utilisez le bouton d'actualisation ci-dessus.",
+  },
+  market_price_updated: {
+    en: "Updated to {price} per unit.",
+    fr: "Mis à jour à {price} par unité.",
+  },
+
+  market_price_error_invalid_request: {
+    en: "This asset is missing information needed to fetch a price (ticker or CoinGecko ID).",
+    fr: "Il manque à cet actif des informations nécessaires pour récupérer un prix (symbole ou identifiant CoinGecko).",
+  },
+  market_price_error_invalid_symbol: {
+    en: "This ticker or CoinGecko ID wasn't recognized by the pricing provider. Double-check it in Settings.",
+    fr: "Ce symbole ou identifiant CoinGecko n'a pas été reconnu par le fournisseur de prix. Vérifiez-le dans les paramètres.",
+  },
+  market_price_error_unsupported_currency: {
+    en: "Live equity pricing only supports USD-denominated assets right now.",
+    fr: "La tarification en direct des actions ne prend en charge que les actifs libellés en USD pour l'instant.",
+  },
+  market_price_error_provider_not_configured: {
+    en: "Live equity pricing isn't configured yet — an API key still needs to be set up.",
+    fr: "La tarification en direct des actions n'est pas encore configurée — une clé API doit encore être ajoutée.",
+  },
+  market_price_error_timeout: {
+    en: "The pricing provider took too long to respond. Try again.",
+    fr: "Le fournisseur de prix a mis trop de temps à répondre. Réessayez.",
+  },
+  market_price_error_rate_limited: {
+    en: "The pricing provider's rate limit was hit. Try again shortly.",
+    fr: "La limite de requêtes du fournisseur de prix a été atteinte. Réessayez sous peu.",
+  },
+  market_price_error_invalid_response: {
+    en: "The pricing provider returned an unexpected response.",
+    fr: "Le fournisseur de prix a renvoyé une réponse inattendue.",
+  },
+  market_price_error_network_error: {
+    en: "Couldn't reach the pricing provider. Check your connection and try again.",
+    fr: "Impossible de joindre le fournisseur de prix. Vérifiez votre connexion et réessayez.",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

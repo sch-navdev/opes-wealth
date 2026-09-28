@@ -30,8 +30,12 @@
 ## New Keys (Refresh from DARI — Live Pricing, Phase 1 Step 9)
 `i18n.ts` gained a "Live Pricing — Refresh from DARI" section: `refresh_from_dari`, `refresh_from_dari_notice` (the placeholder-data disclaimer shown in the confirmation dialog), `dari_fetching`, `dari_last_updated`. Consumed via `useLanguage()`'s `t()` in `asset-detail-view.tsx`'s new confirmation dialog — see [[Market-Data-Integration|Market Data Integration]]. Verified live in French (the session's active locale).
 
+## New Keys (Equities & Crypto Live Pricing, Phase 1 Step 9)
+`i18n.ts` gained a "Live Pricing — Equities & Crypto" section: `ticker_symbol`/`ticker_symbol_required`/`ticker_symbol_equity_placeholder`/`ticker_symbol_crypto_placeholder`, `equity_details`/`exchange`/`equity_exchange_placeholder`, `crypto_details`/`coingecko_id`/`coingecko_id_placeholder`/`coingecko_id_hint`/`crypto_coingecko_id_required`, `refresh_market_price`, `unit_price`/`last_updated`/`no_market_price_yet`/`market_price_updated` (interpolates `{price}`), and eight `market_price_error_*` keys — one per error `code` the `refresh-market-price` Edge Function can return (`invalid_request`, `invalid_symbol`, `unsupported_currency`, `provider_not_configured`, `timeout`, `rate_limited`, `invalid_response`, `network_error`). That last group is a step further than the DARI/CSV precedents: those show a raw English error string from the server/adapter as-is, while this feature maps the Edge Function's typed error `code` to a localized key client-side (`MARKET_PRICE_ERROR_KEYS` in `asset-detail-view.tsx`), so every failure mode is genuinely bilingual, not just the happy path. Verified live in French for the Add Asset dialog's new fields; the error-state strings themselves weren't click-tested live (see [[Live-Pricing|Live Pricing]]'s "What's verified" section for why) but were curl-verified to correctly map to every code above.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — the dropzone + column-mapping UI that consumes an earlier batch of keys
-- [[Market-Data-Integration|Market Data Integration]] — the Refresh from DARI dialog that consumes the newest keys
+- [[Market-Data-Integration|Market Data Integration]] — the Refresh from DARI dialog that consumes an earlier batch of keys
+- [[Live-Pricing|Live Pricing]] — the Equities/Crypto ticker fields and Refresh Market Price flow that consume the newest keys

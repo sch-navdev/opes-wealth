@@ -51,9 +51,9 @@ High-net-worth individuals
   - [x] Vehicles/Private Equity Settings-tab detail views, verified live (dark + light) — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Zod password complexity + email verification UI + `/auth/callback` route, verified locally (Vercel `NEXT_PUBLIC_SITE_URL` env var still needs manual setup) — [[Authentication-Security|Authentication & Security]]
 - [x] Step 8: CSV bank uploads — backend (parser, validation, `importBankCsvHistory`) + dropzone/column-mapping upload UI, verified light/dark + EN/FR — [[CSV-Bank-Uploads|CSV Bank Uploads]]
-- [ ] Step 9: Live pricing integration
+- [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]
-  - [ ] Live market pricing for equities/crypto (the module's original scope) — not started — [[Live-Pricing|Live Pricing]]
+  - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) is real code gated on a `FINNHUB_API_KEY` secret Steve still needs to set. A schema migration also still needs applying (see the note for both action items) — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
 
 ## Modules
@@ -66,7 +66,7 @@ High-net-worth individuals
 - [[Profile-Settings|Profile & Settings]] — profile form, avatar, verification
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — real estate metadata, off-plan tracking, FX conversion
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — Step 8, complete (backend + upload UI)
-- [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — planned, not started (see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9, which is built)
+- [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
 - [[Deployment|Deployment]] — planned, Step 10
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes

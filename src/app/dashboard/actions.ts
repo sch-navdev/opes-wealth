@@ -115,6 +115,7 @@ export async function addAsset(formData: FormData) {
   const currentValue = formData.get("current_value") as string;
   const currency = (formData.get("currency") as string) || "USD";
   const images = parseImages(formData);
+  const tickerSymbol = (formData.get("ticker_symbol") as string | null) || null;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Json = {};
@@ -137,6 +138,7 @@ export async function addAsset(formData: FormData) {
       currency,
       metadata,
       images,
+      ticker_symbol: tickerSymbol,
     })
     .select("id, asset_categories(name)")
     .single<{ id: string; asset_categories: { name: string } | null }>();
@@ -173,6 +175,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const currentValue = formData.get("current_value") as string;
   const currency = (formData.get("currency") as string) || "USD";
   const images = parseImages(formData);
+  const tickerSymbol = (formData.get("ticker_symbol") as string | null) || null;
 
   const metadataRaw = formData.get("metadata") as string | null;
   let metadata: Json = {};
@@ -194,6 +197,7 @@ export async function updateAsset(id: string, formData: FormData) {
       currency,
       metadata,
       images,
+      ticker_symbol: tickerSymbol,
     })
     .eq("id", id)
     .eq("profile_id", user.id)
@@ -391,4 +395,92 @@ export async function deleteAsset(id: string) {
   }
 
   revalidatePath("/dashboard", "layout");
+}
+
+/**
+ * Live Pricing (`tracker/Live-Pricing.md`, Phase 1 Step 9) — persists a
+ * freshly-fetched unit price for an Equities/Crypto asset. Unlike
+ * `updateAssetValuation` (which takes a total value the user typed
+ * directly), this takes a *unit* price from `refresh-market-price` and
+ * multiplies by the asset's own `quantity` to get the total, per this
+ * note's requirement that a refresh update "quantity-based total value."
+ * Writes `last_unit_price`/`last_priced_at`/`last_price_source` into
+ * `metadata` (no dedicated DB columns for these — same
+ * store-it-in-metadata pattern as Real Estate's `market_valuation`), and
+ * `.upsert()`s the `asset_history` row (unlike `updateAssetValuation`'s
+ * plain `.insert()`) since a live-price refresh is realistically triggered
+ * more than once a day and would otherwise violate the
+ * `(asset_id, recorded_date)` unique constraint on a same-day re-run.
+ */
+export async function refreshMarketPrice(
+  id: string,
+  unitPrice: number,
+  source: AssetHistorySource,
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to refresh a market price." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, quantity, metadata")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{ id: string; quantity: number; metadata: Json | null }>();
+
+  if (!asset) {
+    return { error: "Asset not found." };
+  }
+
+  const quantity = asset.quantity ?? 1;
+  const totalValue = quantity * unitPrice;
+  const now = new Date().toISOString();
+
+  const existingMetadata =
+    asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
+      ? (asset.metadata as Record<string, Json>)
+      : {};
+
+  const nextMetadata: Json = {
+    ...existingMetadata,
+    last_unit_price: unitPrice,
+    last_priced_at: now,
+    last_price_source: source,
+  };
+
+  const { error: updateError } = await supabase
+    .from("assets")
+    .update({ current_value: totalValue, metadata: nextMetadata })
+    .eq("id", id)
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  const { error: historyError } = await supabase.from("asset_history").upsert(
+    {
+      asset_id: id,
+      recorded_date: now.slice(0, 10),
+      value: totalValue,
+      net_equity: totalValue,
+      source,
+    },
+    { onConflict: "asset_id,recorded_date" },
+  );
+
+  if (historyError) {
+    return { error: historyError.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
+
+  return { success: true as const, unitPrice, totalValue, asOf: now };
 }

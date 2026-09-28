@@ -25,6 +25,8 @@ import {
 import { RealEstateFields } from "@/components/real-estate-fields";
 import { VehicleFields } from "@/components/vehicle-fields";
 import { PrivateEquityFields } from "@/components/private-equity-fields";
+import { EquityFields } from "@/components/equity-fields";
+import { CryptoFields } from "@/components/crypto-fields";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
@@ -43,6 +45,12 @@ import {
   getPrivateEquityMetadataErrors,
   parsePrivateEquityMetadata,
 } from "@/lib/private-equity";
+import { EMPTY_EQUITY_METADATA, parseEquityMetadata } from "@/lib/equities";
+import {
+  EMPTY_CRYPTO_METADATA,
+  getCryptoMetadataErrors,
+  parseCryptoMetadata,
+} from "@/lib/crypto";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -60,6 +68,7 @@ export type AssetForEdit = {
   currency: string;
   metadata: Record<string, unknown> | null;
   images: string[] | null;
+  ticker_symbol?: string | null;
 };
 
 export function AddAssetDialog({
@@ -84,6 +93,7 @@ export function AddAssetDialog({
   const [categoryId, setCategoryId] = useState(asset?.category_id ?? "");
   const [currency, setCurrency] = useState(asset?.currency ?? "USD");
   const [images, setImages] = useState<string[]>(asset?.images ?? []);
+  const [tickerSymbol, setTickerSymbol] = useState(asset?.ticker_symbol ?? "");
   const [realEstateMetadata, setRealEstateMetadata] = useState(() =>
     asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
   );
@@ -93,16 +103,25 @@ export function AddAssetDialog({
   const [privateEquityMetadata, setPrivateEquityMetadata] = useState(() =>
     asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
   );
+  const [equityMetadata, setEquityMetadata] = useState(() =>
+    asset ? parseEquityMetadata(asset.metadata) : EMPTY_EQUITY_METADATA,
+  );
+  const [cryptoMetadata, setCryptoMetadata] = useState(() =>
+    asset ? parseCryptoMetadata(asset.metadata) : EMPTY_CRYPTO_METADATA,
+  );
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
   const isVehicle = selectedCategory?.name === "Vehicles";
   const isPrivateEquity = selectedCategory?.name === "Private Equity";
+  const isEquity = selectedCategory?.name === "Equities";
+  const isCrypto = selectedCategory?.name === "Crypto";
 
   function resetState() {
     setCategoryId(asset?.category_id ?? "");
     setCurrency(asset?.currency ?? "USD");
     setImages(asset?.images ?? []);
+    setTickerSymbol(asset?.ticker_symbol ?? "");
     setRealEstateMetadata(
       asset ? parseRealEstateMetadata(asset.metadata) : EMPTY_REAL_ESTATE_METADATA,
     );
@@ -111,6 +130,12 @@ export function AddAssetDialog({
     );
     setPrivateEquityMetadata(
       asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
+    );
+    setEquityMetadata(
+      asset ? parseEquityMetadata(asset.metadata) : EMPTY_EQUITY_METADATA,
+    );
+    setCryptoMetadata(
+      asset ? parseCryptoMetadata(asset.metadata) : EMPTY_CRYPTO_METADATA,
     );
   }
 
@@ -138,6 +163,12 @@ export function AddAssetDialog({
 
     const formData = new FormData(form);
     formData.set("images", JSON.stringify(images));
+    formData.set("ticker_symbol", tickerSymbol.trim());
+
+    if ((isEquity || isCrypto) && !tickerSymbol.trim()) {
+      setError(t("ticker_symbol_required"));
+      return;
+    }
 
     if (isRealEstate) {
       // The "Current Market Valuation" input reuses the generic
@@ -171,6 +202,15 @@ export function AddAssetDialog({
         return;
       }
       formData.set("metadata", JSON.stringify(privateEquityMetadata));
+    } else if (isEquity) {
+      formData.set("metadata", JSON.stringify(equityMetadata));
+    } else if (isCrypto) {
+      const errors = getCryptoMetadataErrors(cryptoMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      formData.set("metadata", JSON.stringify(cryptoMetadata));
     }
 
     startTransition(async () => {
@@ -305,6 +345,21 @@ export function AddAssetDialog({
             </Select>
           </div>
 
+          {(isEquity || isCrypto) && (
+            <div className="space-y-2">
+              <Label htmlFor="ticker_symbol">{t("ticker_symbol")}</Label>
+              <Input
+                id="ticker_symbol"
+                placeholder={
+                  isCrypto ? t("ticker_symbol_crypto_placeholder") : t("ticker_symbol_equity_placeholder")
+                }
+                value={tickerSymbol}
+                onChange={(e) => setTickerSymbol(e.target.value.toUpperCase())}
+                required
+              />
+            </div>
+          )}
+
           <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="min-w-0 space-y-2">
               <Label htmlFor="quantity">Quantity</Label>
@@ -385,6 +440,14 @@ export function AddAssetDialog({
               value={privateEquityMetadata}
               onChange={setPrivateEquityMetadata}
             />
+          )}
+
+          {isEquity && (
+            <EquityFields value={equityMetadata} onChange={setEquityMetadata} />
+          )}
+
+          {isCrypto && (
+            <CryptoFields value={cryptoMetadata} onChange={setCryptoMetadata} />
           )}
 
           {error && (

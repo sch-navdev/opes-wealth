@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Building2, CloudDownload, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, CloudDownload, LineChart, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -82,10 +82,15 @@ import {
 } from "@/lib/real-estate";
 import { parseVehicleMetadata } from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
+import { parseEquityMetadata } from "@/lib/equities";
+import { parseCryptoMetadata } from "@/lib/crypto";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 import { fetchDariValuation } from "@/lib/market-data/dari";
+import { fetchMarketPrice } from "@/lib/market-data/market-price";
+import { refreshMarketPrice } from "@/app/dashboard/actions";
 import { cn } from "@/lib/utils";
+import type { TranslationKey } from "@/lib/i18n";
 
 export type AssetDetail = {
   id: string;
@@ -97,6 +102,7 @@ export type AssetDetail = {
   is_liability: boolean;
   metadata: Record<string, unknown> | null;
   images: string[] | null;
+  ticker_symbol: string | null;
   asset_categories: { name: string } | null;
 };
 
@@ -109,6 +115,18 @@ export type AssetHistoryPoint = {
 };
 
 type Category = { id: string; name: string };
+
+/** Maps `refresh-market-price`'s error `code` to a localized message key, so the UI never shows the Edge Function's raw (English-only) message text. */
+const MARKET_PRICE_ERROR_KEYS: Record<string, TranslationKey> = {
+  invalid_request: "market_price_error_invalid_request",
+  invalid_symbol: "market_price_error_invalid_symbol",
+  unsupported_currency: "market_price_error_unsupported_currency",
+  provider_not_configured: "market_price_error_provider_not_configured",
+  timeout: "market_price_error_timeout",
+  rate_limited: "market_price_error_rate_limited",
+  invalid_response: "market_price_error_invalid_response",
+  network_error: "market_price_error_network_error",
+};
 
 function DetailField({
   label,
@@ -168,16 +186,23 @@ export function AssetDetailView({
   const [dariError, setDariError] = useState<string | null>(null);
   const [dariMessage, setDariMessage] = useState<string | null>(null);
   const [isDariPending, startDariTransition] = useTransition();
+  const [marketPriceError, setMarketPriceError] = useState<string | null>(null);
+  const [marketPriceMessage, setMarketPriceMessage] = useState<string | null>(null);
+  const [isMarketPricePending, startMarketPriceTransition] = useTransition();
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
   const isVehicle = categoryName === "Vehicles";
   const isPrivateEquity = categoryName === "Private Equity";
+  const isEquity = categoryName === "Equities";
+  const isCrypto = categoryName === "Crypto";
   const metadata = parseRealEstateMetadata(asset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
   const privateEquityMetadata = isPrivateEquity
     ? parsePrivateEquityMetadata(asset.metadata)
     : null;
+  const equityMetadata = isEquity ? parseEquityMetadata(asset.metadata) : null;
+  const cryptoMetadata = isCrypto ? parseCryptoMetadata(asset.metadata) : null;
   const images = asset.images ?? [];
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -237,6 +262,20 @@ export function AssetDetailView({
     year: "numeric",
   });
 
+  const lastPricedAtFormatter = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  function formatLastPricedAt(iso: string | null): string | null {
+    if (!iso) return null;
+    const parsed = new Date(iso);
+    return Number.isNaN(parsed.getTime()) ? null : lastPricedAtFormatter.format(parsed);
+  }
+
   function formatChartDate(isoDate: unknown): string {
     if (typeof isoDate !== "string") return String(isoDate ?? "");
     const parsed = new Date(isoDate);
@@ -269,6 +308,45 @@ export function AssetDetailView({
       }
 
       setDariMessage(t("dari_last_updated"));
+    });
+  }
+
+  function handleRefreshMarketPrice() {
+    setMarketPriceError(null);
+    setMarketPriceMessage(null);
+
+    startMarketPriceTransition(async () => {
+      const result = await fetchMarketPrice(
+        isCrypto
+          ? {
+              assetId: asset.id,
+              category: "crypto",
+              coingeckoId: cryptoMetadata?.coingecko_id,
+              currency: asset.currency,
+            }
+          : {
+              assetId: asset.id,
+              category: "equities",
+              symbol: asset.ticker_symbol ?? undefined,
+              currency: asset.currency,
+            },
+      );
+
+      if (!result.ok) {
+        const key = MARKET_PRICE_ERROR_KEYS[result.code] ?? "market_price_error_network_error";
+        setMarketPriceError(t(key));
+        return;
+      }
+
+      const persistResult = await refreshMarketPrice(asset.id, result.unitPrice, result.source);
+      if (persistResult?.error) {
+        setMarketPriceError(persistResult.error);
+        return;
+      }
+
+      setMarketPriceMessage(
+        t("market_price_updated", { price: currencyFormatter.format(result.unitPrice) }),
+      );
     });
   }
 
@@ -439,6 +517,21 @@ export function AssetDetailView({
                   </AlertDialogContent>
                 </AlertDialog>
               )}
+              {(isEquity || isCrypto) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t("refresh_market_price")}
+                  title={t("refresh_market_price")}
+                  onClick={handleRefreshMarketPrice}
+                  disabled={isMarketPricePending}
+                >
+                  <LineChart
+                    className={cn("size-4", isMarketPricePending && "animate-pulse")}
+                  />
+                </Button>
+              )}
               <Dialog open={refreshOpen} onOpenChange={setRefreshOpen}>
                 <DialogTrigger asChild>
                   <Button
@@ -555,6 +648,40 @@ export function AssetDetailView({
           >
             {dariError ?? dariMessage}
           </p>
+        )}
+
+        {(isEquity || isCrypto) && (
+          <div className="space-y-1">
+            {(() => {
+              const lastPrice = (equityMetadata ?? cryptoMetadata)?.last_unit_price ?? null;
+              const lastPricedAt = formatLastPricedAt(
+                (equityMetadata ?? cryptoMetadata)?.last_priced_at ?? null,
+              );
+              if (lastPrice == null) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    {t("no_market_price_yet")}
+                  </p>
+                );
+              }
+              return (
+                <p className="text-xs text-muted-foreground">
+                  {t("unit_price")}: {maskValue(currencyFormatter.format(lastPrice))}
+                  {lastPricedAt && ` · ${t("last_updated")}: ${lastPricedAt}`}
+                </p>
+              );
+            })()}
+            {(marketPriceError || marketPriceMessage) && (
+              <p
+                className={
+                  marketPriceError ? "text-sm text-destructive" : "text-sm text-success"
+                }
+                role={marketPriceError ? "alert" : undefined}
+              >
+                {marketPriceError ?? marketPriceMessage}
+              </p>
+            )}
+          </div>
         )}
 
         <Tabs defaultValue="overview">
@@ -860,6 +987,7 @@ export function AssetDetailView({
                             currency: asset.currency,
                             metadata: asset.metadata,
                             images: asset.images,
+                            ticker_symbol: asset.ticker_symbol,
                           }}
                           trigger={
                             <Button type="button" variant="outline" size="sm">
@@ -978,6 +1106,7 @@ export function AssetDetailView({
                     currency: asset.currency,
                     metadata: asset.metadata,
                     images: asset.images,
+                    ticker_symbol: asset.ticker_symbol,
                   }}
                 />
                 <CsvImportDialog assetId={asset.id} />
@@ -1233,6 +1362,58 @@ export function AssetDetailView({
                         ? maskValue(`${privateEquityMetadata.ownership_percentage}%`)
                         : null
                     }
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {isEquity && equityMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">
+                    {t("equity_details")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
+                  <DetailField label={t("exchange")} value={equityMetadata.exchange} />
+                  <DetailField
+                    label={t("unit_price")}
+                    value={
+                      equityMetadata.last_unit_price != null
+                        ? maskValue(currencyFormatter.format(equityMetadata.last_unit_price))
+                        : null
+                    }
+                  />
+                  <DetailField
+                    label={t("last_updated")}
+                    value={formatLastPricedAt(equityMetadata.last_priced_at)}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {isCrypto && cryptoMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">
+                    {t("crypto_details")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
+                  <DetailField label={t("coingecko_id")} value={cryptoMetadata.coingecko_id} />
+                  <DetailField
+                    label={t("unit_price")}
+                    value={
+                      cryptoMetadata.last_unit_price != null
+                        ? maskValue(currencyFormatter.format(cryptoMetadata.last_unit_price))
+                        : null
+                    }
+                  />
+                  <DetailField
+                    label={t("last_updated")}
+                    value={formatLastPricedAt(cryptoMetadata.last_priced_at)}
                   />
                 </CardContent>
               </Card>

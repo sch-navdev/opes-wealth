@@ -36,6 +36,7 @@ type AssetRow = {
   is_liability: boolean;
   metadata: Record<string, unknown> | null;
   images: string[] | null;
+  ticker_symbol: string | null;
   asset_categories: { name: string } | null;
 };
 
@@ -166,6 +167,7 @@ export function PortfolioTable({
                 currency: asset.currency,
                 metadata: asset.metadata,
                 images: asset.images,
+                ticker_symbol: asset.ticker_symbol,
               };
 
               return (
