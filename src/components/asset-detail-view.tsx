@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
@@ -885,6 +886,7 @@ export function AssetDetailView({
                     images: asset.images,
                   }}
                 />
+                <CsvImportDialog assetId={asset.id} />
                 <DeleteAssetButton
                   id={asset.id}
                   onSuccess={() => router.push("/dashboard")}

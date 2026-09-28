@@ -50,7 +50,7 @@ High-net-worth individuals
   - [x] Generated-type reconciliation (`Database` wired into all Supabase clients) + 2 `[TEST]` rows validating the new categories live — [[Database-Schema|Database Schema]]
   - [x] Vehicles/Private Equity Settings-tab detail views, verified live (dark + light) — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Zod password complexity + email verification UI + `/auth/callback` route, verified locally (Vercel `NEXT_PUBLIC_SITE_URL` env var still needs manual setup) — [[Authentication-Security|Authentication & Security]]
-- [ ] Step 8: CSV bank uploads — backend done (parser, validation, `importBankCsvHistory`), upload UI not yet built — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Step 8: CSV bank uploads — backend (parser, validation, `importBankCsvHistory`) + dropzone/column-mapping upload UI, verified light/dark + EN/FR — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [ ] Step 9: Live pricing integration — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
 
@@ -63,7 +63,7 @@ High-net-worth individuals
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — asset list, add/edit/delete
 - [[Profile-Settings|Profile & Settings]] — profile form, avatar, verification
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — real estate metadata, off-plan tracking, FX conversion
-- [[CSV-Bank-Uploads|CSV Bank Uploads]] — planned, Step 8
+- [[CSV-Bank-Uploads|CSV Bank Uploads]] — Step 8, complete (backend + upload UI)
 - [[Live-Pricing|Live Pricing]] — planned, Step 9
 - [[Deployment|Deployment]] — planned, Step 10
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet

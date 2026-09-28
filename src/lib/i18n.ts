@@ -167,6 +167,45 @@ const dictionary = {
     en: "Ownership percentage must be between 0 and 100.",
     fr: "Le pourcentage de propriété doit être compris entre 0 et 100.",
   },
+
+  // CSV Bank Uploads (Settings tab)
+  import_bank_history: { en: "Import Bank History (CSV)", fr: "Importer l'historique bancaire (CSV)" },
+  import_bank_history_desc: {
+    en: "Upload a bank-exported CSV with a running balance column to fill in this asset's valuation history.",
+    fr: "Importez un CSV exporté par votre banque avec une colonne de solde courant pour compléter l'historique de valorisation de cet actif.",
+  },
+  csv_dropzone_cta: { en: "Drop your CSV file here", fr: "Déposez votre fichier CSV ici" },
+  csv_dropzone_subtext: { en: "or click to browse — .csv only", fr: "ou cliquez pour parcourir — .csv uniquement" },
+  csv_dropzone_error_type: {
+    en: "Only .csv files are accepted.",
+    fr: "Seuls les fichiers .csv sont acceptés.",
+  },
+  csv_dropzone_error_empty: {
+    en: "This CSV file has no data rows.",
+    fr: "Ce fichier CSV ne contient aucune ligne de données.",
+  },
+  csv_selected_file: { en: "Selected file", fr: "Fichier sélectionné" },
+  csv_choose_different_file: { en: "Choose a different file", fr: "Choisir un autre fichier" },
+  csv_map_columns: { en: "Map Your Columns", fr: "Associer vos colonnes" },
+  csv_map_columns_desc: {
+    en: "Tell us which column holds the date and which holds the account balance.",
+    fr: "Indiquez quelle colonne contient la date et laquelle contient le solde du compte.",
+  },
+  csv_date_column: { en: "Date Column", fr: "Colonne de date" },
+  csv_balance_column: { en: "Balance Column", fr: "Colonne de solde" },
+  csv_date_format: { en: "Date Format", fr: "Format de date" },
+  csv_select_column: { en: "Select a column…", fr: "Sélectionner une colonne…" },
+  csv_preview_rows: { en: "{n} rows detected", fr: "{n} lignes détectées" },
+  csv_row_errors: { en: "{n} rows could not be read and will be skipped", fr: "{n} lignes n'ont pas pu être lues et seront ignorées" },
+  csv_no_valid_rows: {
+    en: "No valid rows found with this column mapping — check your selections.",
+    fr: "Aucune ligne valide trouvée avec cette association de colonnes — vérifiez vos sélections.",
+  },
+  csv_import_button: { en: "Import {n} Rows", fr: "Importer {n} lignes" },
+  csv_importing: { en: "Importing…", fr: "Importation…" },
+  csv_import_success: { en: "Imported {n} rows successfully.", fr: "{n} lignes importées avec succès." },
+  csv_cancel: { en: "Cancel", fr: "Annuler" },
+  csv_done: { en: "Done", fr: "Terminé" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

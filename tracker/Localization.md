@@ -24,6 +24,10 @@
 ## New Keys (Vehicles & Private Equity Forms)
 `i18n.ts` gained placeholder and validation-error keys alongside the existing read-only-display keys (`vehicle_details`, `make`, `model`, `vehicle_year`, `vin`, `private_equity_details`, `entity_name`, `share_class`, `ownership_percentage`): `vehicle_make_placeholder`/`vehicle_model_placeholder`/`vehicle_year_placeholder`/`vehicle_vin_placeholder`, `vehicle_make_required`/`vehicle_model_required`/`vehicle_year_required`/`vehicle_vin_required`, `entity_name_placeholder`/`share_class_placeholder`, `entity_name_required`/`share_class_required`/`ownership_percentage_required`/`ownership_percentage_range`. The validators in `lib/vehicles.ts`/`lib/private-equity.ts` return these as translation-key strings (not raw English text), so the calling form can `t()` them directly — verified both languages render correctly in-browser (English and French error messages both confirmed).
 
+## New Keys (CSV Bank Uploads dropzone + mapping UI)
+`i18n.ts` gained a "CSV Bank Uploads (Settings tab)" section: `import_bank_history`, `import_bank_history_desc`, `csv_dropzone_cta`/`csv_dropzone_subtext`, `csv_dropzone_error_type`/`csv_dropzone_error_empty`, `csv_selected_file`/`csv_choose_different_file`, `csv_map_columns`/`csv_map_columns_desc`, `csv_date_column`/`csv_balance_column`/`csv_date_format`/`csv_select_column`, `csv_preview_rows`/`csv_row_errors`/`csv_no_valid_rows` (interpolate `{n}`), `csv_import_button`/`csv_importing`/`csv_import_success` (interpolate `{n}`), `csv_cancel`/`csv_done`. Consumed via `useLanguage()`'s `t()` in the new `src/components/csv-import-dialog.tsx` — see [[CSV-Bank-Uploads|CSV Bank Uploads]]. Both languages verified live in-browser (French, the session's active locale, confirmed rendering correctly end-to-end).
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from
+- [[CSV-Bank-Uploads|CSV Bank Uploads]] — the dropzone + column-mapping UI that consumes the newest keys
