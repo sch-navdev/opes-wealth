@@ -253,6 +253,13 @@ export function Setup2faForm() {
   }
 
   useEffect(() => {
+    // `isFactorsLoading` already defaults to `true` above, so the
+    // `setIsFactorsLoading(true)` at the top of `loadActiveFactors` is a
+    // same-value no-op on this initial mount call (React bails out of
+    // re-rendering) — not a real cascading render, just one the linter
+    // can't statically prove given this function is also called from
+    // event handlers elsewhere, where a fresh `true` is meaningful.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadActiveFactors();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only, same as before this was a plain function
   }, []);

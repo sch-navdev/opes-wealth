@@ -4,9 +4,8 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from "react";
 import { translate, type Locale, type TranslationKey } from "@/lib/i18n";
 
@@ -20,28 +19,40 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): Locale {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === "en" || stored === "fr" ? stored : "en";
+  } catch {
+    return "en";
+  }
+}
+
+/** The server (and the client's very first paint) always renders "en" — the real value, if different, is only knowable after mount, once `localStorage` exists. */
+function getServerSnapshot(): Locale {
+  return "en";
+}
+
+function writeLocale(next: Locale) {
+  try {
+    localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // ignore write failures
+  }
+  listeners.forEach((listener) => listener());
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
+  const locale = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === "en" || stored === "fr") {
-        setLocaleState(stored);
-      }
-    } catch {
-      // localStorage unavailable — stay on default locale.
-    }
-  }, []);
-
-  const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // ignore write failures
-    }
-  }, []);
+  const setLocale = useCallback((next: Locale) => writeLocale(next), []);
 
   const t = useCallback(
     (key: TranslationKey, vars?: Record<string, string | number>) =>

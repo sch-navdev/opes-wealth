@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Building2, CloudDownload, LineChart, RefreshCw } from "lucide-react";
 import {
@@ -431,11 +432,19 @@ export function AssetDetailView({
                     <CarouselContent>
                       {images.map((src, index) => (
                         <CarouselItem key={index}>
-                          <img
-                            src={src}
-                            alt={`${asset.name} ${index + 1}`}
-                            className="aspect-square w-full rounded-md object-cover"
-                          />
+                          <div className="relative aspect-square w-full overflow-hidden rounded-md">
+                            {/* `unoptimized`: these are already client-resized
+                                base64 data URIs (see `resizeImageToBase64` in
+                                `lib/crop-image.ts`) — there's no remote asset
+                                for Next's image optimizer to fetch/transform. */}
+                            <Image
+                              src={src}
+                              alt={`${asset.name} ${index + 1}`}
+                              fill
+                              unoptimized
+                              className="object-cover"
+                            />
+                          </div>
                         </CarouselItem>
                       ))}
                     </CarouselContent>

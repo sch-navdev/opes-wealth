@@ -4,8 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
+  useSyncExternalStore,
 } from "react";
 
 const STORAGE_KEY = "opes_privacy_mode";
@@ -19,27 +18,40 @@ type PrivacyContextValue = {
 
 const PrivacyContext = createContext<PrivacyContextValue | null>(null);
 
-export function PrivacyProvider({ children }: { children: React.ReactNode }) {
-  const [isPrivate, setIsPrivate] = useState(false);
+const listeners = new Set<() => void>();
 
-  useEffect(() => {
-    try {
-      setIsPrivate(localStorage.getItem(STORAGE_KEY) === "true");
-    } catch {
-      // localStorage unavailable (private browsing, etc.) — stay visible.
-    }
-  }, []);
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** The server (and the client's very first paint) always renders "not private" — the real value, if different, is only knowable after mount, once `localStorage` exists. */
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+function writeIsPrivate(next: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(next));
+  } catch {
+    // ignore write failures
+  }
+  listeners.forEach((listener) => listener());
+}
+
+export function PrivacyProvider({ children }: { children: React.ReactNode }) {
+  const isPrivate = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const togglePrivacy = useCallback(() => {
-    setIsPrivate((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(next));
-      } catch {
-        // ignore write failures
-      }
-      return next;
-    });
+    writeIsPrivate(!getSnapshot());
   }, []);
 
   const maskValue = useCallback(

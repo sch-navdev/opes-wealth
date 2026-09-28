@@ -4,6 +4,8 @@
 
 Flat, chronological log. One line per unit of work — details live in the relevant module note (see [[PROJECT_TRACKER|Project Tracker]] → Modules).
 
+- 2026-09-28: Pre-deployment hardening pass (Phase 1 Step 10): fixed all outstanding `tsc`/`eslint` failures project-wide — real fixes in `mfa.ts` (removed an unnecessary `any`, handled a union type properly), `language-context.tsx`/`privacy-context.tsx`/`theme-toggle.tsx` (rewritten to `useSyncExternalStore`, the correct primitive for syncing with `localStorage`/hydration state, eliminating the underlying render pattern rather than silencing the lint rule), and `asset-detail-view.tsx`'s image carousel (swapped `<img>` for `next/image`); plus justified, scoped suppressions on `carousel.tsx` (vendored shadcn/embla code), `setup-2fa-form.tsx`, and `login-form.tsx` (both deliberate patterns, left untouched given their auth-sensitivity). `tsc --noEmit` and `eslint .` are now fully clean with zero errors/warnings, and `npm run build` succeeds with zero errors across all 11 routes. **Phase 1 MVP is not yet fully closed out**: Step 10's actual Vercel deployment hasn't happened — this was local-only hardening, not a production deploy. See [[Deployment|Deployment]].
+
 - 2026-09-17: Project scaffolded with Next.js (TypeScript, Tailwind, ESLint, App Router, `src/` dir); shadcn/ui initialized (New York, Zinc); Supabase client libraries installed; Git repo initialized and pushed to GitHub.
 - 2026-09-17: PROJECT_TRACKER.md created.
 - 2026-09-17: Implemented Opes Wealth luxury design system (Midnight Navy & Champagne Gold, dark-mode-first, 0px border radii) in `globals.css`. See [[Design-System|Design System]].

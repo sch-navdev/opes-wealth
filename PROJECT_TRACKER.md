@@ -54,7 +54,9 @@ High-net-worth individuals
 - [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]
   - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) is real code gated on a `FINNHUB_API_KEY` secret Steve still needs to set. The required schema migration has been applied to the live project — [[Live-Pricing|Live Pricing]]
-- [ ] Step 10: Deployment (Vercel) — [[Deployment|Deployment]]
+- [ ] Step 10: Deployment (Vercel)
+  - [x] Pre-deployment hardening — `tsc --noEmit` and `eslint .` fully clean (zero errors/warnings project-wide), `npm run build` succeeds with zero errors across all 11 routes — [[Deployment|Deployment]]
+  - [ ] Actual deployment to Vercel — not done this session (no deploy credentials used; this is a shared-infrastructure action needing Steve's explicit go-ahead) — [[Deployment|Deployment]]
 
 ## Modules
 
@@ -67,7 +69,7 @@ High-net-worth individuals
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — real estate metadata, off-plan tracking, FX conversion
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — Step 8, complete (backend + upload UI)
 - [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
-- [[Deployment|Deployment]] — planned, Step 10
+- [[Deployment|Deployment]] — Step 10, pre-deployment hardening done (clean lint/typecheck/build); actual Vercel deployment still pending
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures

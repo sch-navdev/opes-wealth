@@ -26,8 +26,10 @@ export async function needsMfaStepUp(
   // authentication on its own — bypass the step-up immediately and
   // permanently. Confirmed against a real device: the AMR method string
   // shows up as "passkey" (not only "webauthn").
-  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some(
-    (m: any) => m.method === "passkey" || m.method === "webauthn",
+  const usedPasskeyMethod = aal.currentAuthenticationMethods?.some((m) =>
+    typeof m === "string"
+      ? m === "passkey" || m === "webauthn"
+      : m.method === "passkey" || m.method === "webauthn",
   );
 
   if (usedPasskeyMethod) {

@@ -124,6 +124,12 @@ export function LoginForm() {
         return;
       }
 
+      // A hard navigation, not `router.push()`: passkey sign-in sets the
+      // session cookie client-side (no server `redirect()` involved, unlike
+      // the email/password path above), so a full reload is needed to
+      // guarantee the dashboard's server components read that fresh cookie
+      // rather than racing an RSC cache that still reflects the signed-out state.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/dashboard";
     } catch {
       // The user cancelled the OS/browser passkey prompt, no passkey was

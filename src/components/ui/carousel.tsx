@@ -95,6 +95,12 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // embla-carousel-react's own documented integration pattern: `api` is an
+    // imperative handle whose canScrollPrev/canScrollNext only exist once it
+    // mounts, so the initial sync has to happen here rather than in a lazy
+    // initializer or useSyncExternalStore (which would need a stable
+    // subscribe/getSnapshot pair independent of this per-instance `api`).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

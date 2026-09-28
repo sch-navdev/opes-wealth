@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -17,14 +17,26 @@ const LABELS: Record<ThemeChoice, string> = {
   dark: "Dark",
 };
 
+// next-themes can't know the persisted theme until after hydration —
+// rendering a fixed icon before that would mismatch the client's actual
+// theme and cause a flash, so render a stable placeholder until mounted.
+// `mounted` never changes after that, so there's nothing to subscribe to —
+// this just needs the server/first-paint snapshot (false) to differ from
+// every later client snapshot (true), which `useSyncExternalStore` gives
+// for free without an effect-driven extra render.
+function noopSubscribe() {
+  return () => {};
+}
+const getMountedSnapshot = () => true;
+const getServerSnapshot = () => false;
+
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  // next-themes can't know the persisted theme until after hydration —
-  // rendering a fixed icon before that would mismatch the client's actual
-  // theme and cause a flash, so render a stable placeholder until mounted.
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    noopSubscribe,
+    getMountedSnapshot,
+    getServerSnapshot,
+  );
 
   const current = (theme as ThemeChoice) ?? "dark";
 
