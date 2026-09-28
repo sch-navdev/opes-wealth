@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseRealEstateMetadata, resolveRegistrationFee } from "@/lib/real-estate";
+import type { AssetHistorySource } from "@/lib/asset-history";
+import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
@@ -216,7 +218,7 @@ export async function updateAsset(id: string, formData: FormData) {
 export async function updateAssetValuation(
   id: string,
   newValue: number,
-  source: "manual" | "dari" | "dubailand",
+  source: AssetHistorySource,
 ) {
   const supabase = await createClient();
 
@@ -283,6 +285,88 @@ export async function updateAssetValuation(
 
   revalidatePath("/dashboard", "layout");
   revalidatePath(`/dashboard/assets/${id}`);
+}
+
+/**
+ * CSV Bank Uploads (`tracker/CSV-Bank-Uploads.md`, Phase 1 Step 8) —
+ * backend half only, built ahead of the upload UI. Takes rows already
+ * parsed and validated by `parseBankCsvRows` (see `lib/bank-csv.ts`) and
+ * upserts them into `asset_history` for one existing asset, same
+ * `onConflict: "asset_id,recorded_date"` pattern as `syncAssetHistory`'s
+ * auto-generated Real Estate timeline — a re-import regenerates rows in
+ * place instead of duplicating them.
+ *
+ * `current_value` is set to whichever imported row has the latest
+ * `recorded_date` (a CSV need not be in chronological order), matching
+ * `updateAssetValuation`'s existing behavior of trusting the newest
+ * recorded valuation. `net_equity` is set equal to `value` — correct for
+ * a Cash-style account with no separate debt to subtract, same simplification
+ * `syncAssetHistory` already makes for every non-Real-Estate category.
+ */
+export async function importBankCsvHistory(
+  assetId: string,
+  rows: ParsedBankCsvRow[],
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to import bank history." };
+  }
+
+  if (rows.length === 0) {
+    return { error: "No valid rows to import." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{ id: string }>();
+
+  if (!asset) {
+    return { error: "Asset not found." };
+  }
+
+  const source: AssetHistorySource = "csv_import";
+
+  const { error: historyError } = await supabase.from("asset_history").upsert(
+    rows.map((row) => ({
+      asset_id: assetId,
+      recorded_date: row.recorded_date,
+      value: row.value,
+      net_equity: row.value,
+      source,
+    })),
+    { onConflict: "asset_id,recorded_date" },
+  );
+
+  if (historyError) {
+    return { error: historyError.message };
+  }
+
+  const latest = rows.reduce((latest, row) =>
+    row.recorded_date > latest.recorded_date ? row : latest,
+  );
+
+  const { error: updateError } = await supabase
+    .from("assets")
+    .update({ current_value: latest.value })
+    .eq("id", assetId)
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+
+  return { success: true as const, imported: rows.length };
 }
 
 export async function deleteAsset(id: string) {
