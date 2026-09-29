@@ -6,9 +6,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
+  nextPropertyExpenseId,
+  nextTenancyContractId,
   parseRealEstateMetadata,
   resolveOutstandingLoanBalance,
   sumAcquisitionFees,
+  type PropertyExpense,
+  type RealEstateMetadata,
+  type TenancyContract,
 } from "@/lib/real-estate";
 import { canAmortize, getOutstandingPrincipalAt } from "@/lib/amortization";
 import {
@@ -1090,10 +1095,10 @@ export type ImportTenancyContractResult =
 /**
  * Extracts tenancy details from an uploaded Ejari (Dubai) or Tawtheeq
  * (Abu Dhabi) contract PDF — picked via the asset's `metadata.emirate` — and
- * merges any recognized fields into the asset's Real Estate metadata (see
- * `lib/tenancy-parser.ts` for the label-based extraction logic). Only
- * overwrites the fields it actually found; anything the parser couldn't
- * confidently extract is left as whatever was already saved.
+ * appends them as a new entry in `metadata.tenancy_contracts` (see
+ * `lib/tenancy-parser.ts` for the extraction logic). A property is re-let
+ * contract after contract (e.g. 2025-2026, then 2026-2027), so importing a
+ * new PDF always adds a new period rather than overwriting the last one.
  */
 export async function importTenancyContract(
   assetId: string,
@@ -1156,14 +1161,20 @@ export async function importTenancyContract(
     };
   }
 
+  const newContract: TenancyContract = {
+    id: nextTenancyContractId(),
+    tenant_name: extracted.tenant_name ?? "",
+    start_date: extracted.tenancy_start_date ?? "",
+    end_date: extracted.tenancy_end_date ?? "",
+    annual_rent: extracted.annual_rent,
+    contract_value: extracted.tenancy_contract_value,
+    imported_from_file: file.name,
+    uploaded_at: new Date().toISOString().slice(0, 10),
+  };
+
   const nextMetadata = {
     ...metadata,
-    tenant_name: extracted.tenant_name ?? metadata.tenant_name,
-    tenancy_start_date: extracted.tenancy_start_date ?? metadata.tenancy_start_date,
-    tenancy_end_date: extracted.tenancy_end_date ?? metadata.tenancy_end_date,
-    tenancy_contract_value:
-      extracted.tenancy_contract_value ?? metadata.tenancy_contract_value,
-    annual_rent: extracted.annual_rent ?? metadata.annual_rent,
+    tenancy_contracts: [...metadata.tenancy_contracts, newContract],
   };
 
   const { error: updateError } = await supabase
@@ -1290,4 +1301,123 @@ export async function refreshVehicleValuation(
     depreciationTrend: result.depreciation_trend,
     provider: result.provider,
   };
+}
+
+/** Shared load-and-authorize step for the small tenancy-contract/property-expense mutations below — each only ever patches one array inside a Real Estate asset's metadata. */
+async function loadRealEstateMetadataForMutation(
+  assetId: string,
+): Promise<
+  | { ok: true; supabase: SupabaseClient; userId: string; metadata: RealEstateMetadata }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "You must be signed in to update this property." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset) {
+    return { ok: false, error: "Asset not found." };
+  }
+
+  if (asset.asset_categories?.name !== "Real Estate") {
+    return { ok: false, error: "This action is only available for Real Estate assets." };
+  }
+
+  return {
+    ok: true,
+    supabase,
+    userId: user.id,
+    metadata: parseRealEstateMetadata(asset.metadata),
+  };
+}
+
+/** Removes one tenancy period (e.g. a superseded 2025-2026 contract) — the property may have several logged over time, see `importTenancyContract`. */
+export async function deleteTenancyContract(assetId: string, contractId: string) {
+  const loaded = await loadRealEstateMetadataForMutation(assetId);
+  if (!loaded.ok) return { error: loaded.error };
+
+  const nextMetadata = {
+    ...loaded.metadata,
+    tenancy_contracts: loaded.metadata.tenancy_contracts.filter((c) => c.id !== contractId),
+  };
+
+  const { error } = await loaded.supabase
+    .from("assets")
+    .update({ metadata: nextMetadata })
+    .eq("id", assetId)
+    .eq("profile_id", loaded.userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+}
+
+/** Logs one property expense (maintenance, service charges, etc.) — these accumulate in `metadata.property_expenses` rather than being overwritten, since real costs are lumpy and dated, not one flat monthly figure. */
+export async function addPropertyExpense(
+  assetId: string,
+  expense: { description: string; date: string; amount: number },
+) {
+  const loaded = await loadRealEstateMetadataForMutation(assetId);
+  if (!loaded.ok) return { error: loaded.error };
+
+  const newExpense: PropertyExpense = {
+    id: nextPropertyExpenseId(),
+    description: expense.description,
+    date: expense.date,
+    amount: expense.amount,
+  };
+
+  const nextMetadata = {
+    ...loaded.metadata,
+    property_expenses: [...loaded.metadata.property_expenses, newExpense],
+  };
+
+  const { error } = await loaded.supabase
+    .from("assets")
+    .update({ metadata: nextMetadata })
+    .eq("id", assetId)
+    .eq("profile_id", loaded.userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+}
+
+export async function deletePropertyExpense(assetId: string, expenseId: string) {
+  const loaded = await loadRealEstateMetadataForMutation(assetId);
+  if (!loaded.ok) return { error: loaded.error };
+
+  const nextMetadata = {
+    ...loaded.metadata,
+    property_expenses: loaded.metadata.property_expenses.filter((e) => e.id !== expenseId),
+  };
+
+  const { error } = await loaded.supabase
+    .from("assets")
+    .update({ metadata: nextMetadata })
+    .eq("id", assetId)
+    .eq("profile_id", loaded.userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
 }

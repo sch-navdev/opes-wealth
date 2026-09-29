@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, Car, CloudDownload, Landmark, LineChart, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Car, CloudDownload, Landmark, LineChart, Minus, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -88,14 +88,19 @@ import {
   refreshDldValuation,
   refreshVehicleValuation,
   updateAssetValuation,
+  addPropertyExpense,
+  deletePropertyExpense,
+  deleteTenancyContract,
 } from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
   calculateEquity,
   calculateTotalCost,
   calculateUnrealizedGain,
+  findActiveTenancyContract,
   parseRealEstateMetadata,
   resolveOutstandingLoanBalance,
+  sumPropertyExpenses,
 } from "@/lib/real-estate";
 import {
   canAmortize,
@@ -266,6 +271,11 @@ export function AssetDetailView({
   const [vehicleValuationError, setVehicleValuationError] = useState<string | null>(null);
   const [vehicleValuationMessage, setVehicleValuationMessage] = useState<string | null>(null);
   const [isVehicleValuationPending, startVehicleValuationTransition] = useTransition();
+  const [tenancyMutationError, setTenancyMutationError] = useState<string | null>(null);
+  const [isTenancyMutationPending, startTenancyMutationTransition] = useTransition();
+  const [expenseDescription, setExpenseDescription] = useState("");
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [expenseAmount, setExpenseAmount] = useState("");
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
@@ -361,7 +371,13 @@ export function AssetDetailView({
     );
   }
 
-  const rentStartDate = metadata.tenancy_start_date || asset.purchase_date;
+  // The tenancy contract in effect today (a property is re-let contract
+  // after contract — 2025-2026, then 2026-2027, etc. — see
+  // `metadata.tenancy_contracts`), used for the rent figures below.
+  const activeTenancyContract = isRealEstate
+    ? findActiveTenancyContract(metadata.tenancy_contracts, today)
+    : null;
+  const rentStartDate = activeTenancyContract?.start_date || asset.purchase_date;
   // The monthly loan payment used for net rent prefers the amortization
   // engine's current installment (accurate under a hybrid rate) over the
   // manually-entered `monthly_payment`.
@@ -371,18 +387,27 @@ export function AssetDetailView({
   const monthlyLoanPayment = hasLoan
     ? currentInstallment?.paymentAmount ?? loan.monthly_payment ?? 0
     : 0;
-  const monthlyGrossRent = metadata.annual_rent ? metadata.annual_rent / 12 : 0;
-  const monthlyPropertyExpenses = metadata.monthly_property_expenses ?? 0;
-  const monthlyNetRent = monthlyGrossRent - monthlyLoanPayment - monthlyPropertyExpenses;
+  const monthlyGrossRent = activeTenancyContract?.annual_rent
+    ? activeTenancyContract.annual_rent / 12
+    : 0;
+  const monthlyNetRent = monthlyGrossRent - monthlyLoanPayment;
   const monthsOfTenancy = rentStartDate ? monthsBetween(rentStartDate, today) : 0;
   const cumulativeNetRent = monthlyNetRent * monthsOfTenancy;
+  // Logged property expenses (`metadata.property_expenses`) accumulate as a
+  // dated ledger rather than one flat "monthly" figure, so they're summed
+  // and subtracted as a lump total here instead of folded into the
+  // per-month rent rate above.
+  const totalPropertyExpenses = sumPropertyExpenses(metadata.property_expenses);
   const netProfitWithRent =
-    unrealizedGain != null ? unrealizedGain.amount + cumulativeNetRent : null;
+    unrealizedGain != null
+      ? unrealizedGain.amount + cumulativeNetRent - totalPropertyExpenses
+      : null;
 
   // Property-level IRR: initial outlay is the full cost basis, cash flows in
-  // between are the monthly net rent (already net of loan payments), and the
-  // terminal cash flow is today's Equity — the appreciation and rental yield
-  // combined into a single annualized return.
+  // between are the monthly net rent (already net of loan payments) plus
+  // every logged property expense on its actual date, and the terminal cash
+  // flow is today's Equity — the appreciation and rental yield combined
+  // into a single annualized return.
   const irrCashFlows: DatedCashFlow[] = [];
   if (isRealEstate && totalCost != null && asset.purchase_date) {
     irrCashFlows.push({ date: asset.purchase_date, amount: -totalCost });
@@ -393,9 +418,25 @@ export function AssetDetailView({
         irrCashFlows.push({ date: d.toISOString().slice(0, 10), amount: monthlyNetRent });
       }
     }
+    for (const expense of metadata.property_expenses) {
+      if (expense.date) irrCashFlows.push({ date: expense.date, amount: -expense.amount });
+    }
     irrCashFlows.push({ date: today, amount: netEquity });
   }
   const propertyIrr = irrCashFlows.length > 0 ? calculateIrr(irrCashFlows) : null;
+  const sortedTenancyContracts = [...metadata.tenancy_contracts].sort((a, b) =>
+    b.start_date.localeCompare(a.start_date),
+  );
+  const sortedPropertyExpenses = [...metadata.property_expenses].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  );
+
+  function tenancyPeriodLabel(startDate: string, endDate: string): string {
+    const startYear = startDate ? startDate.slice(0, 4) : "";
+    const endYear = endDate ? endDate.slice(0, 4) : "";
+    if (startYear && endYear && startYear !== endYear) return `${startYear} – ${endYear}`;
+    return startYear || endYear || t("tenancy_period_unknown");
+  }
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
@@ -611,6 +652,47 @@ export function AssetDetailView({
           provider: t(result.provider === "autobiz" ? "provider_autobiz" : "provider_la_centrale"),
         }),
       );
+    });
+  }
+
+  function handleDeleteTenancyContract(contractId: string) {
+    setTenancyMutationError(null);
+    startTenancyMutationTransition(async () => {
+      const result = await deleteTenancyContract(asset.id, contractId);
+      if (result?.error) setTenancyMutationError(result.error);
+    });
+  }
+
+  function handleAddPropertyExpense(e: React.FormEvent) {
+    e.preventDefault();
+    setTenancyMutationError(null);
+
+    const amount = Number(expenseAmount);
+    if (!expenseDescription.trim() || !expenseDate || !Number.isFinite(amount)) {
+      setTenancyMutationError(t("property_expense_invalid"));
+      return;
+    }
+
+    startTenancyMutationTransition(async () => {
+      const result = await addPropertyExpense(asset.id, {
+        description: expenseDescription.trim(),
+        date: expenseDate,
+        amount,
+      });
+      if (result?.error) {
+        setTenancyMutationError(result.error);
+        return;
+      }
+      setExpenseDescription("");
+      setExpenseAmount("");
+    });
+  }
+
+  function handleDeletePropertyExpense(expenseId: string) {
+    setTenancyMutationError(null);
+    startTenancyMutationTransition(async () => {
+      const result = await deletePropertyExpense(asset.id, expenseId);
+      if (result?.error) setTenancyMutationError(result.error);
     });
   }
 
@@ -1615,51 +1697,197 @@ export function AssetDetailView({
 
           {isRealEstate && (
             <TabsContent value="tenancy" className="space-y-6">
+              {tenancyMutationError && (
+                <p className="text-sm text-destructive" role="alert">
+                  {tenancyMutationError}
+                </p>
+              )}
+
               <Card className="border-border bg-card">
                 <CardHeader>
-                  <CardTitle className="text-foreground">{t("tenancy")}</CardTitle>
+                  <CardTitle className="text-foreground">{t("tenancy_contracts")}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <DetailField label={t("tenant_name")} value={metadata.tenant_name} />
-                    <DetailField
-                      label={t("tenancy_start_date")}
-                      value={metadata.tenancy_start_date}
-                    />
-                    <DetailField
-                      label={t("tenancy_end_date")}
-                      value={metadata.tenancy_end_date}
-                    />
-                    <DetailField
-                      label={t("annual_rent")}
-                      value={
-                        metadata.annual_rent != null
-                          ? maskValue(currencyFormatter.format(metadata.annual_rent))
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("tenancy_contract_value")}
-                      value={
-                        metadata.tenancy_contract_value != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.tenancy_contract_value),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("monthly_property_expenses")}
-                      value={
-                        metadata.monthly_property_expenses != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.monthly_property_expenses),
-                            )
-                          : null
-                      }
-                    />
-                  </div>
+                  {sortedTenancyContracts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("no_tenancy_contracts")}
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {sortedTenancyContracts.map((contract) => (
+                        <div
+                          key={contract.id}
+                          className="w-full min-w-0 space-y-3 border border-border p-4"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <Badge variant="secondary">
+                              {tenancyPeriodLabel(contract.start_date, contract.end_date)}
+                            </Badge>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon-sm"
+                                  aria-label={t("delete")}
+                                  disabled={isTenancyMutationPending}
+                                >
+                                  <Minus className="size-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="border-border bg-card">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-foreground">
+                                    {t("delete_tenancy_contract_title")}
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="text-muted-foreground">
+                                    {t("delete_tenancy_contract_desc")}
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>{t("csv_cancel")}</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteTenancyContract(contract.id)}
+                                  >
+                                    {t("delete")}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <DetailField label={t("tenant_name")} value={contract.tenant_name} />
+                            <DetailField
+                              label={t("tenancy_start_date")}
+                              value={contract.start_date}
+                            />
+                            <DetailField
+                              label={t("tenancy_end_date")}
+                              value={contract.end_date}
+                            />
+                            <DetailField
+                              label={t("annual_rent")}
+                              value={
+                                contract.annual_rent != null
+                                  ? maskValue(currencyFormatter.format(contract.annual_rent))
+                                  : null
+                              }
+                            />
+                            <DetailField
+                              label={t("tenancy_contract_value")}
+                              value={
+                                contract.contract_value != null
+                                  ? maskValue(
+                                      currencyFormatter.format(contract.contract_value),
+                                    )
+                                  : null
+                              }
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <TenancyContractDialog assetId={asset.id} />
+                </CardContent>
+              </Card>
+
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("property_expenses")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {sortedPropertyExpenses.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("no_property_expenses")}
+                    </p>
+                  ) : (
+                    <div className="border border-border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t("description")}</TableHead>
+                            <TableHead>{t("date")}</TableHead>
+                            <TableHead className="text-right">{t("amount")}</TableHead>
+                            <TableHead className="w-10" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {sortedPropertyExpenses.map((expense) => (
+                            <TableRow key={expense.id}>
+                              <TableCell className="text-foreground">
+                                {expense.description}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {expense.date}
+                              </TableCell>
+                              <TableCell className="text-right text-foreground">
+                                {maskValue(currencyFormatter.format(expense.amount))}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon-sm"
+                                  aria-label={t("delete")}
+                                  disabled={isTenancyMutationPending}
+                                  onClick={() => handleDeletePropertyExpense(expense.id)}
+                                >
+                                  <Minus className="size-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {t("total_property_expenses")}:{" "}
+                    <span className="font-medium text-foreground">
+                      {maskValue(currencyFormatter.format(totalPropertyExpenses))}
+                    </span>
+                  </p>
+
+                  <form
+                    onSubmit={handleAddPropertyExpense}
+                    className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-4 sm:items-end"
+                  >
+                    <div className="min-w-0 space-y-1 sm:col-span-2">
+                      <Label className="text-xs">{t("description")}</Label>
+                      <Input
+                        value={expenseDescription}
+                        onChange={(e) => setExpenseDescription(e.target.value)}
+                        placeholder={t("property_expense_description_placeholder")}
+                      />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <Label className="text-xs">{t("date")}</Label>
+                      <Input
+                        type="date"
+                        value={expenseDate}
+                        onChange={(e) => setExpenseDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <Label className="text-xs">{t("amount")}</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={expenseAmount}
+                        onChange={(e) => setExpenseAmount(e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="sm:col-span-4 sm:w-fit"
+                      disabled={isTenancyMutationPending}
+                    >
+                      {t("add_property_expense")}
+                    </Button>
+                  </form>
                 </CardContent>
               </Card>
 

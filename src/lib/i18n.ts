@@ -219,18 +219,38 @@ const dictionary = {
   equity: { en: "Equity", fr: "Capitaux propres" },
   tab_tenancy: { en: "Tenancy", fr: "Location" },
   tenancy: { en: "Tenancy", fr: "Location" },
-  tenancy_note: {
-    en: "Manual fields, or auto-filled by uploading an Ejari (Dubai) / Tawtheeq (Abu Dhabi) contract PDF from the Tenancy tab.",
-    fr: "Champs manuels, ou remplis automatiquement en important un contrat Ejari (Dubaï) / Tawtheeq (Abou Dabi) au format PDF depuis l'onglet Location.",
+  tenancy_contracts: { en: "Tenancy Contracts", fr: "Contrats de location" },
+  no_tenancy_contracts: {
+    en: "No tenancy contracts yet — import an Ejari or Tawtheeq contract PDF below.",
+    fr: "Aucun contrat de location pour l'instant — importez un contrat Ejari ou Tawtheeq au format PDF ci-dessous.",
+  },
+  tenancy_period_unknown: { en: "Unknown period", fr: "Période inconnue" },
+  delete_tenancy_contract_title: {
+    en: "Delete this tenancy contract?",
+    fr: "Supprimer ce contrat de location ?",
+  },
+  delete_tenancy_contract_desc: {
+    en: "This removes this tenancy period from the property's records. This action cannot be undone.",
+    fr: "Cela supprime cette période de location des données du bien. Cette action est irréversible.",
   },
   tenant_name: { en: "Tenant Name", fr: "Nom du locataire" },
   tenancy_start_date: { en: "Tenancy Start Date", fr: "Date de début de location" },
   tenancy_end_date: { en: "Tenancy End Date", fr: "Date de fin de location" },
   annual_rent: { en: "Annual Rent", fr: "Loyer annuel" },
   tenancy_contract_value: { en: "Contract Value", fr: "Valeur du contrat" },
-  monthly_property_expenses: {
-    en: "Monthly Property Expenses",
-    fr: "Charges mensuelles du bien",
+  property_expenses: { en: "Property Expenses", fr: "Charges du bien" },
+  no_property_expenses: { en: "No property expenses logged yet.", fr: "Aucune charge enregistrée pour l'instant." },
+  description: { en: "Description", fr: "Description" },
+  date: { en: "Date", fr: "Date" },
+  total_property_expenses: { en: "Total logged expenses", fr: "Total des charges enregistrées" },
+  property_expense_description_placeholder: {
+    en: "e.g. AC servicing",
+    fr: "ex. Entretien climatisation",
+  },
+  add_property_expense: { en: "Add Expense", fr: "Ajouter une charge" },
+  property_expense_invalid: {
+    en: "Enter a description, date, and a valid amount.",
+    fr: "Saisissez une description, une date et un montant valide.",
   },
   import_tenancy_contract: { en: "Import Tenancy Contract", fr: "Importer un contrat de location" },
   import_tenancy_contract_desc: {

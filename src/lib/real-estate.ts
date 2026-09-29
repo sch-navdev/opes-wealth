@@ -20,6 +20,28 @@ export type PaymentMilestone = {
   status: "paid" | "pending";
 };
 
+/** One tenancy period for this property — a property is re-let contract after contract (e.g. 2025-2026, then 2026-2027), so these accumulate rather than being overwritten. `imported_from_file`/`uploaded_at` record provenance when a row came from a parsed PDF (`lib/tenancy-parser.ts`) rather than manual entry. */
+export type TenancyContract = {
+  id: string;
+  tenant_name: string;
+  start_date: string;
+  end_date: string;
+  /** Annual rent (Ejari "Annual Amount" / Tawtheeq "Annual Rent"). */
+  annual_rent: number | null;
+  /** Total contract value over the full tenancy term (Ejari "Contract Amount" / Tawtheeq "Contract Value") — may span multiple years and differ from `annual_rent * years`. */
+  contract_value: number | null;
+  imported_from_file: string;
+  uploaded_at: string;
+};
+
+/** A single logged property expense (maintenance, service charges, repairs, etc.) — kept as a running, dated ledger rather than one lump "monthly" figure, since real costs are lumpy and don't accrue evenly. */
+export type PropertyExpense = {
+  id: string;
+  description: string;
+  date: string;
+  amount: number;
+};
+
 /** "fixed" = `interest_rate` applies for the full `duration_months`. "hybrid" = a fixed teaser rate for `fixed_period_months`, then a variable rate for the remainder (the common UAE "salary transfer" mortgage structure). */
 export type LoanRateType = "fixed" | "hybrid";
 
@@ -162,19 +184,14 @@ export type RealEstateMetadata = {
   // Financing linked to this property, subtracted from the market value to get Equity.
   linked_loan: LinkedLoan;
 
-  // Tenancy / rental tracking. `tenant_name`/date/amount fields are typically
-  // filled by parsing an uploaded Ejari (Dubai) or Tawtheeq (Abu Dhabi)
-  // contract PDF (see `lib/tenancy-parser.ts`), but remain plain editable
-  // fields so they also work for a property with no contract on file.
-  tenant_name: string;
-  tenancy_start_date: string;
-  tenancy_end_date: string;
-  /** Total contract value over the full tenancy term (Ejari "Contract Amount" / Tawtheeq "Contract Value") — may span multiple years and differ from `annual_rent * years`. */
-  tenancy_contract_value: number | null;
-  /** Annual rent (Ejari "Annual Amount" / Tawtheeq "Annual Rent"). */
-  annual_rent: number | null;
-  /** Recurring monthly property expenses (service charges, maintenance, etc.) not otherwise tracked — subtracted from gross rent to get net rent. */
-  monthly_property_expenses: number | null;
+  // Tenancy / rental tracking — one entry per tenancy period (a property is
+  // re-let contract after contract, e.g. 2025-2026 then 2026-2027), each
+  // typically filled by parsing an uploaded Ejari (Dubai) or Tawtheeq (Abu
+  // Dhabi) contract PDF (see `lib/tenancy-parser.ts`). Every logged expense
+  // (maintenance, service charges, etc.) is tracked separately so it
+  // accumulates over time rather than being overwritten by the next import.
+  tenancy_contracts: TenancyContract[];
+  property_expenses: PropertyExpense[];
 };
 
 export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
@@ -269,12 +286,8 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
     fallback_rate: null,
   },
 
-  tenant_name: "",
-  tenancy_start_date: "",
-  tenancy_end_date: "",
-  tenancy_contract_value: null,
-  annual_rent: null,
-  monthly_property_expenses: null,
+  tenancy_contracts: [],
+  property_expenses: [],
 };
 
 /**
@@ -310,7 +323,48 @@ export function parseRealEstateMetadata(
       ...EMPTY_REAL_ESTATE_METADATA.linked_loan,
       ...(r.linked_loan ?? {}),
     },
+    tenancy_contracts: Array.isArray(r.tenancy_contracts)
+      ? r.tenancy_contracts
+      : migrateLegacyTenancyContract(raw),
+    property_expenses: Array.isArray(r.property_expenses)
+      ? r.property_expenses
+      : EMPTY_REAL_ESTATE_METADATA.property_expenses,
   };
+}
+
+/**
+ * Reads a single tenancy contract's worth of fields (`tenant_name`,
+ * `tenancy_start_date`, `tenancy_end_date`, `tenancy_contract_value`,
+ * `annual_rent`) that pre-date the `tenancy_contracts` array, so a property
+ * saved before that array existed doesn't silently lose its one contract on
+ * the next read.
+ */
+function migrateLegacyTenancyContract(raw: object): TenancyContract[] {
+  const legacy = raw as {
+    tenant_name?: unknown;
+    tenancy_start_date?: unknown;
+    tenancy_end_date?: unknown;
+    tenancy_contract_value?: unknown;
+    annual_rent?: unknown;
+  };
+
+  const hasLegacyData =
+    typeof legacy.tenant_name === "string" && legacy.tenant_name.trim() !== "";
+  if (!hasLegacyData) return [];
+
+  return [
+    {
+      id: "legacy-tenancy-contract",
+      tenant_name: legacy.tenant_name as string,
+      start_date: typeof legacy.tenancy_start_date === "string" ? legacy.tenancy_start_date : "",
+      end_date: typeof legacy.tenancy_end_date === "string" ? legacy.tenancy_end_date : "",
+      annual_rent: typeof legacy.annual_rent === "number" ? legacy.annual_rent : null,
+      contract_value:
+        typeof legacy.tenancy_contract_value === "number" ? legacy.tenancy_contract_value : null,
+      imported_from_file: "",
+      uploaded_at: "",
+    },
+  ];
 }
 
 /** Max number of images stored per asset (multi-image carousel). */
@@ -416,6 +470,47 @@ let milestoneCounter = 0;
 export function nextMilestoneId(): string {
   milestoneCounter += 1;
   return `milestone-${Date.now()}-${milestoneCounter}`;
+}
+
+let recordCounter = 0;
+
+/** Generates a stable-enough id for a new tenancy contract or property expense row (server-side, unlike `nextMilestoneId`, so no import needed there just for id generation). */
+function nextRecordId(prefix: string): string {
+  recordCounter += 1;
+  return `${prefix}-${Date.now()}-${recordCounter}`;
+}
+
+export function nextTenancyContractId(): string {
+  return nextRecordId("tenancy");
+}
+
+export function nextPropertyExpenseId(): string {
+  return nextRecordId("expense");
+}
+
+/**
+ * The tenancy contract in effect on `onDate` (default today) — the one
+ * whose `start_date`/`end_date` bracket it — falling back to the most
+ * recently started contract if none currently applies (e.g. between leases,
+ * or a contract with no end date on file yet).
+ */
+export function findActiveTenancyContract(
+  contracts: TenancyContract[],
+  onDate: string = new Date().toISOString().slice(0, 10),
+): TenancyContract | null {
+  if (contracts.length === 0) return null;
+
+  const current = contracts.find(
+    (c) => c.start_date && c.start_date <= onDate && (!c.end_date || c.end_date >= onDate),
+  );
+  if (current) return current;
+
+  return [...contracts].sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+}
+
+/** Sum of every logged property expense — a running total, not a "monthly" rate, since real costs are lumpy. */
+export function sumPropertyExpenses(expenses: PropertyExpense[]): number {
+  return expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 }
 
 export const REGISTRATION_FEE_TYPES: RegistrationFeeType[] = [
