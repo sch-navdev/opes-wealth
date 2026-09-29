@@ -21,11 +21,7 @@ import {
   parseTenancyContract,
   type ParsedTenancyContract,
 } from "@/lib/tenancy-parser";
-import { parseVehicleMetadata } from "@/lib/vehicles";
-import {
-  getVehicleValuation,
-  type VehicleValuationErrorCode,
-} from "@/lib/services/vehicle-valuation-client";
+import type { VehicleValuationErrorCode } from "@/lib/services/vehicle-valuation-client";
 import {
   getOqoodProjectStatus,
   getSmartValuation,
@@ -1204,102 +1200,27 @@ export type RefreshVehicleValuationResult =
   | { ok: false; code?: VehicleValuationErrorCode; error: string };
 
 /**
- * French vehicle valuation integration (`lib/services/vehicle-valuation-client.ts`)
- * — follows the same persistence pattern as `refreshDldValuation`'s
- * ready-built branch: the provider always returns a monetary valuation (no
- * off-plan-style "no figure yet" case for vehicles), so this writes
- * `assets.current_value` and an `asset_history` row directly rather than
- * going through `updateAssetValuation` (which only merges Real Estate
- * metadata shape).
+ * French vehicle valuation integration (`lib/services/vehicle-valuation-client.ts`).
+ *
+ * DISABLED (2026-09-29): that client has always been a fully-mocked stub —
+ * there is no real commercial API access to La Centrale/Autobiz — and its
+ * deterministic-hash placeholder numbers were being mistaken for a real
+ * market valuation. This now always returns "under_development" without
+ * touching the provider, the asset lookup, or the database at all, so the
+ * button can never overwrite `assets.current_value`/`asset_history` with a
+ * fabricated figure. The previous real-looking implementation (asset lookup,
+ * `getVehicleValuation()` call, `current_value`/`asset_history` writes) is
+ * preserved in git history and should be restored once real provider
+ * credentials exist.
  */
 export async function refreshVehicleValuation(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept so the call signature (and future re-wiring) don't change
   id: string,
 ): Promise<RefreshVehicleValuationResult> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { ok: false, error: "You must be signed in to refresh a valuation." };
-  }
-
-  const { data: asset } = await supabase
-    .from("assets")
-    .select("id, metadata, asset_categories(name)")
-    .eq("id", id)
-    .eq("profile_id", user.id)
-    .single<{
-      id: string;
-      metadata: Json | null;
-      asset_categories: { name: string } | null;
-    }>();
-
-  if (!asset) {
-    return { ok: false, error: "Asset not found." };
-  }
-
-  if (asset.asset_categories?.name !== "Vehicles") {
-    return {
-      ok: false,
-      error: "Vehicle valuation refresh is only available for Vehicles assets.",
-    };
-  }
-
-  const metadata = parseVehicleMetadata(asset.metadata);
-
-  const result = await getVehicleValuation({
-    licensePlate: metadata.license_plate || undefined,
-    vin: metadata.vin || undefined,
-    mileage: metadata.mileage ?? 0,
-  });
-
-  if (!result.ok) {
-    return { ok: false, code: result.code, error: result.error };
-  }
-
-  const nextMetadata = {
-    ...metadata,
-    market_valuation: result.market_valuation_amount,
-    last_valuation_source: result.provider,
-    last_valuation_date: result.valuation_date,
-  };
-
-  const { error: updateError } = await supabase
-    .from("assets")
-    .update({ current_value: result.market_valuation_amount, metadata: nextMetadata })
-    .eq("id", id)
-    .eq("profile_id", user.id);
-
-  if (updateError) {
-    return { ok: false, error: updateError.message };
-  }
-
-  const { error: historyError } = await supabase.from("asset_history").upsert(
-    {
-      asset_id: id,
-      recorded_date: result.valuation_date,
-      value: result.market_valuation_amount,
-      net_equity: result.market_valuation_amount,
-      source: "vehicle_valuation",
-    },
-    { onConflict: "asset_id,recorded_date" },
-  );
-
-  if (historyError) {
-    return { ok: false, error: historyError.message };
-  }
-
-  revalidatePath("/dashboard", "layout");
-  revalidatePath(`/dashboard/assets/${id}`);
-
   return {
-    ok: true,
-    isMock: result.isMock,
-    value: result.market_valuation_amount,
-    depreciationTrend: result.depreciation_trend,
-    provider: result.provider,
+    ok: false,
+    code: "under_development",
+    error: "Vehicle market value refresh is under development. No data was changed.",
   };
 }
 
@@ -1415,6 +1336,49 @@ export async function deletePropertyExpense(assetId: string, expenseId: string) 
     .update({ metadata: nextMetadata })
     .eq("id", assetId)
     .eq("profile_id", loaded.userId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+}
+
+/**
+ * Removes one point from an asset's valuation log (`asset_history`) — e.g.
+ * to erase a bad automated refresh (a wrong vehicle/DLD/ADREC valuation) or
+ * a mistaken manual entry, for any asset category. Deliberately only deletes
+ * the `asset_history` row: it never touches `assets.current_value` or
+ * `metadata`, since the point being removed isn't necessarily the most
+ * recent one — the headline value is corrected separately via the "Update
+ * Value" dialog (`updateAssetValuation`).
+ */
+export async function deleteAssetHistoryPoint(assetId: string, historyId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to edit the valuation log." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{ id: string }>();
+
+  if (!asset) {
+    return { error: "Asset not found." };
+  }
+
+  const { error } = await supabase
+    .from("asset_history")
+    .delete()
+    .eq("id", historyId)
+    .eq("asset_id", assetId);
 
   if (error) return { error: error.message };
 

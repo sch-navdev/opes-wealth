@@ -91,6 +91,7 @@ import {
   addPropertyExpense,
   deletePropertyExpense,
   deleteTenancyContract,
+  deleteAssetHistoryPoint,
 } from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
@@ -198,6 +199,7 @@ const VEHICLE_VALUATION_ERROR_KEYS: Record<string, TranslationKey> = {
   invalid_response: "vehicle_valuation_error_invalid_response",
   timeout: "vehicle_valuation_error_timeout",
   network_error: "vehicle_valuation_error_network_error",
+  under_development: "vehicle_valuation_under_development",
 };
 
 function DetailField({
@@ -273,6 +275,8 @@ export function AssetDetailView({
   const [isVehicleValuationPending, startVehicleValuationTransition] = useTransition();
   const [tenancyMutationError, setTenancyMutationError] = useState<string | null>(null);
   const [isTenancyMutationPending, startTenancyMutationTransition] = useTransition();
+  const [historyMutationError, setHistoryMutationError] = useState<string | null>(null);
+  const [isHistoryMutationPending, startHistoryMutationTransition] = useTransition();
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -443,6 +447,11 @@ export function AssetDetailView({
   const sortedHistory = [...history].sort((a, b) =>
     a.recorded_date.localeCompare(b.recorded_date),
   );
+
+  // Newest-first for the deletable "Valuation Log" table below the chart —
+  // the point someone wants to erase (a bad refresh) is almost always the
+  // most recent one.
+  const historyLogEntries = [...sortedHistory].reverse();
 
   // Real Estate: the curve should never show a valuation predating the
   // purchase — drop anything earlier, and pin whatever lands on the purchase
@@ -659,6 +668,14 @@ export function AssetDetailView({
           provider: t(result.provider === "autobiz" ? "provider_autobiz" : "provider_la_centrale"),
         }),
       );
+    });
+  }
+
+  function handleDeleteHistoryPoint(historyId: string) {
+    setHistoryMutationError(null);
+    startHistoryMutationTransition(async () => {
+      const result = await deleteAssetHistoryPoint(asset.id, historyId);
+      if (result?.error) setHistoryMutationError(result.error);
     });
   }
 
@@ -1273,6 +1290,86 @@ export function AssetDetailView({
                         )}
                       </AreaChart>
                     </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="text-foreground">{t("valuation_log")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {t("valuation_log_notice")}
+                </p>
+                {historyMutationError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {historyMutationError}
+                  </p>
+                )}
+                {historyLogEntries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {t("no_valuation_log_entries")}
+                  </p>
+                ) : (
+                  <div className="border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("date")}</TableHead>
+                          <TableHead>{t("source")}</TableHead>
+                          <TableHead className="text-right">{t("amount")}</TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {historyLogEntries.map((point) => (
+                          <TableRow key={point.id}>
+                            <TableCell className="text-muted-foreground">
+                              {point.recorded_date}
+                            </TableCell>
+                            <TableCell className="text-foreground">{point.source}</TableCell>
+                            <TableCell className="text-right text-foreground">
+                              {maskValue(currencyFormatter.format(point.value))}
+                            </TableCell>
+                            <TableCell>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon-sm"
+                                    aria-label={t("delete")}
+                                    disabled={isHistoryMutationPending}
+                                  >
+                                    <Minus className="size-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="border-border bg-card">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="text-foreground">
+                                      {t("delete_valuation_point_title")}
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription className="text-muted-foreground">
+                                      {t("delete_valuation_point_desc")}
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>{t("csv_cancel")}</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteHistoryPoint(point.id)}
+                                    >
+                                      {t("delete")}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>

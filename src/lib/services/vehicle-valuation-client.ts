@@ -28,7 +28,8 @@ export type VehicleValuationErrorCode =
   | "provider_not_configured"
   | "invalid_response"
   | "timeout"
-  | "network_error";
+  | "network_error"
+  | "under_development";
 
 export class VehicleValuationServiceError extends Error {
   code: VehicleValuationErrorCode;

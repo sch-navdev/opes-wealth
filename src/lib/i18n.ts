@@ -88,6 +88,23 @@ const dictionary = {
     en: 'No valuation history yet — use "Refresh Valuation" above to record the first data point.',
     fr: "Aucun historique de valorisation pour l'instant — utilisez « Actualiser la valorisation » ci-dessus pour enregistrer le premier point.",
   },
+  valuation_log: { en: "Valuation Log", fr: "Journal de valorisation" },
+  valuation_log_notice: {
+    en: "Every recorded valuation point, oldest first. Remove a wrong or duplicate entry — this only affects the chart above, not the current headline value (use \"Refresh Valuation\" to correct that).",
+    fr: "Chaque point de valorisation enregistré, du plus ancien au plus récent. Supprimez une entrée erronée ou en double — cela n'affecte que le graphique ci-dessus, pas la valeur affichée actuelle (utilisez « Actualiser la valorisation » pour la corriger).",
+  },
+  no_valuation_log_entries: {
+    en: "No valuation points recorded yet.",
+    fr: "Aucun point de valorisation enregistré pour l'instant.",
+  },
+  delete_valuation_point_title: {
+    en: "Delete this valuation point?",
+    fr: "Supprimer ce point de valorisation ?",
+  },
+  delete_valuation_point_desc: {
+    en: "This removes the entry from the valuation log and chart. It cannot be undone.",
+    fr: "Cette action supprime l'entrée du journal de valorisation et du graphique. Elle est irréversible.",
+  },
   total_property_cost: { en: "Total Property Cost", fr: "Coût total du bien" },
   all_in_cost_basis: { en: "All-in cost basis", fr: "Coût total tout compris" },
   unrealized_gain: { en: "Unrealized Gain", fr: "Plus-value latente" },
@@ -516,6 +533,10 @@ const dictionary = {
   vehicle_valuation_error_network_error: {
     en: "Could not reach the vehicle valuation provider.",
     fr: "Impossible de contacter le fournisseur de valorisation.",
+  },
+  vehicle_valuation_under_development: {
+    en: "Vehicle market value refresh is under development — no data was changed.",
+    fr: "L'actualisation de la valeur de marché des véhicules est en cours de développement — aucune donnée n'a été modifiée.",
   },
 
   // Private Equity category (Settings tab)
