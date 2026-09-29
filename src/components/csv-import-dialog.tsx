@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -27,16 +28,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv-parser";
 import {
+  computeRunningBalance,
   parseBankCsvRows,
+  parseTransactionRows,
   type BankCsvDateFormat,
+  type ParsedBankCsvRow,
 } from "@/lib/bank-csv";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
 
 type Stage = "drop" | "map" | "success";
+type Mode = "balance" | "transactions";
+type AmountMode = "single" | "creditDebit";
 
 const dateFormats: BankCsvDateFormat[] = ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"];
 
@@ -44,7 +51,16 @@ function guessColumn(headers: string[], keyword: string): string {
   return headers.find((h) => h.toLowerCase().includes(keyword)) ?? "";
 }
 
-export function CsvImportDialog({ assetId }: { assetId: string }) {
+export function CsvImportDialog({
+  assetId,
+  currentValue,
+  currency,
+}: {
+  assetId: string;
+  /** The asset's current balance — used to anchor a transactions-only import's starting balance (see `Mode` "transactions"), so the derived running balance reconciles to what's on record today. */
+  currentValue: number;
+  currency: string;
+}) {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -63,6 +79,19 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
   const [balanceColumn, setBalanceColumn] = useState("");
   const [dateFormat, setDateFormat] = useState<BankCsvDateFormat>("YYYY-MM-DD");
 
+  const [mode, setMode] = useState<Mode>("balance");
+  const [amountMode, setAmountMode] = useState<AmountMode>("single");
+  const [amountColumn, setAmountColumn] = useState("");
+  const [creditColumn, setCreditColumn] = useState("");
+  const [debitColumn, setDebitColumn] = useState("");
+  const [startingBalance, setStartingBalance] = useState("");
+  const [startingBalanceTouched, setStartingBalanceTouched] = useState(false);
+
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat("en-US", { style: "currency", currency }),
+    [currency],
+  );
+
   function resetState() {
     setStage("drop");
     setIsDragging(false);
@@ -75,6 +104,13 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
     setDateColumn("");
     setBalanceColumn("");
     setDateFormat("YYYY-MM-DD");
+    setMode("balance");
+    setAmountMode("single");
+    setAmountColumn("");
+    setCreditColumn("");
+    setDebitColumn("");
+    setStartingBalance("");
+    setStartingBalanceTouched(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -97,11 +133,31 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
       return;
     }
 
+    const guessedBalance = guessColumn(parsed.headers, "balance");
+    const guessedCredit = guessColumn(parsed.headers, "credit");
+    const guessedDebit = guessColumn(parsed.headers, "debit");
+    const guessedAmount = guessColumn(parsed.headers, "amount");
+
     setFileName(file.name);
     setHeaders(parsed.headers);
     setRows(parsed.rows);
     setDateColumn(guessColumn(parsed.headers, "date"));
-    setBalanceColumn(guessColumn(parsed.headers, "balance"));
+    setBalanceColumn(guessedBalance);
+    setAmountColumn(guessedAmount);
+    setCreditColumn(guessedCredit);
+    setDebitColumn(guessedDebit);
+
+    // Auto-detection fallback: no running-balance-looking column found, but
+    // something that looks like transaction amounts is present — default to
+    // transactions-only mode instead of leaving the user on a Balance
+    // column selector with nothing plausible to pick.
+    if (!guessedBalance && (guessedAmount || (guessedCredit && guessedDebit))) {
+      setMode("transactions");
+      setAmountMode(guessedAmount ? "single" : "creditDebit");
+    } else {
+      setMode("balance");
+    }
+
     setStage("map");
   }
 
@@ -112,10 +168,48 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
     if (file) void handleFile(file);
   }
 
-  const importResult = useMemo(() => {
-    if (!dateColumn || !balanceColumn) return null;
+  const balanceResult = useMemo(() => {
+    if (mode !== "balance" || !dateColumn || !balanceColumn) return null;
     return parseBankCsvRows(rows, { dateColumn, balanceColumn, dateFormat });
-  }, [rows, dateColumn, balanceColumn, dateFormat]);
+  }, [mode, rows, dateColumn, balanceColumn, dateFormat]);
+
+  const transactionResult = useMemo(() => {
+    if (mode !== "transactions" || !dateColumn) return null;
+    if (amountMode === "single") {
+      if (!amountColumn) return null;
+      return parseTransactionRows(rows, { dateColumn, dateFormat, amountMode, amountColumn });
+    }
+    if (!creditColumn || !debitColumn) return null;
+    return parseTransactionRows(rows, { dateColumn, dateFormat, amountMode, creditColumn, debitColumn });
+  }, [mode, rows, dateColumn, dateFormat, amountMode, amountColumn, creditColumn, debitColumn]);
+
+  // Anchors the running balance on the asset's current value: the starting
+  // balance (immediately before the earliest transaction) is derived by
+  // working backwards from today's known total, so the last computed point
+  // reconciles to `currentValue` — editable in case this file isn't the
+  // account's most recent activity.
+  const derivedStartingBalance = useMemo(() => {
+    if (!transactionResult) return null;
+    const totalDelta = transactionResult.validRows.reduce((sum, r) => sum + r.amount, 0);
+    return Math.round((currentValue - totalDelta) * 100) / 100;
+  }, [transactionResult, currentValue]);
+
+  const effectiveStartingBalance =
+    startingBalanceTouched || startingBalance !== ""
+      ? Number(startingBalance)
+      : (derivedStartingBalance ?? 0);
+
+  const transactionRows = useMemo(() => {
+    if (!transactionResult || !Number.isFinite(effectiveStartingBalance)) return null;
+    return computeRunningBalance(transactionResult.validRows, effectiveStartingBalance);
+  }, [transactionResult, effectiveStartingBalance]);
+
+  const importResult: { validRows: ParsedBankCsvRow[]; errors: { rowIndex: number; message: string }[] } | null =
+    mode === "balance"
+      ? balanceResult
+      : transactionResult && transactionRows
+        ? { validRows: transactionRows, errors: transactionResult.errors }
+        : null;
 
   function handleImport() {
     if (!importResult || importResult.validRows.length === 0) return;
@@ -225,45 +319,54 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
               </Button>
             </div>
 
+            <Tabs value={mode} onValueChange={(next) => setMode(next as Mode)}>
+              <TabsList className="w-full">
+                <TabsTrigger value="balance" className="flex-1">
+                  {t("csv_mode_balance")}
+                </TabsTrigger>
+                <TabsTrigger value="transactions" className="flex-1">
+                  {t("csv_mode_transactions")}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <Card className="border-border bg-card">
               <CardHeader>
                 <CardTitle className="text-sm text-foreground">
                   {t("csv_map_columns")}
                 </CardTitle>
-                <CardDescription>{t("csv_map_columns_desc")}</CardDescription>
+                <CardDescription>
+                  {mode === "balance"
+                    ? t("csv_map_columns_desc")
+                    : t("csv_map_columns_desc_transactions")}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {[
-                  {
-                    key: "date",
-                    label: t("csv_date_column"),
-                    value: dateColumn,
-                    onChange: setDateColumn,
-                    options: headers,
-                  },
-                  {
-                    key: "balance",
-                    label: t("csv_balance_column"),
-                    value: balanceColumn,
-                    onChange: setBalanceColumn,
-                    options: headers,
-                  },
-                ].map((field, index) => (
-                  <div
-                    key={field.key}
-                    className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
-                    style={{
-                      animationDelay: `${(index + 1) * 80}ms`,
-                      animationFillMode: "backwards",
-                    }}
-                  >
-                    <Label>{field.label}</Label>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                <div className="space-y-2">
+                  <Label>{t("csv_date_column")}</Label>
+                  <Select value={dateColumn} onValueChange={setDateColumn}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={t("csv_select_column")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {headers.map((header) => (
+                        <SelectItem key={header} value={header}>
+                          {header}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {mode === "balance" ? (
+                  <div className="space-y-2">
+                    <Label>{t("csv_balance_column")}</Label>
+                    <Select value={balanceColumn} onValueChange={setBalanceColumn}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder={t("csv_select_column")} />
                       </SelectTrigger>
                       <SelectContent>
-                        {field.options.map((header) => (
+                        {headers.map((header) => (
                           <SelectItem key={header} value={header}>
                             {header}
                           </SelectItem>
@@ -271,12 +374,98 @@ export function CsvImportDialog({ assetId }: { assetId: string }) {
                       </SelectContent>
                     </Select>
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <Tabs
+                      value={amountMode}
+                      onValueChange={(next) => setAmountMode(next as AmountMode)}
+                    >
+                      <TabsList className="w-full">
+                        <TabsTrigger value="single" className="flex-1">
+                          {t("csv_amount_mode_single")}
+                        </TabsTrigger>
+                        <TabsTrigger value="creditDebit" className="flex-1">
+                          {t("csv_amount_mode_credit_debit")}
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
 
-                <div
-                  className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none"
-                  style={{ animationDelay: "240ms", animationFillMode: "backwards" }}
-                >
+                    {amountMode === "single" ? (
+                      <div className="space-y-2">
+                        <Label>{t("csv_amount_column")}</Label>
+                        <Select value={amountColumn} onValueChange={setAmountColumn}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder={t("csv_select_column")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {headers.map((header) => (
+                              <SelectItem key={header} value={header}>
+                                {header}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>{t("csv_credit_column")}</Label>
+                          <Select value={creditColumn} onValueChange={setCreditColumn}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t("csv_select_column")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {headers.map((header) => (
+                                <SelectItem key={header} value={header}>
+                                  {header}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>{t("csv_debit_column")}</Label>
+                          <Select value={debitColumn} onValueChange={setDebitColumn}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder={t("csv_select_column")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {headers.map((header) => (
+                                <SelectItem key={header} value={header}>
+                                  {header}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label>{t("csv_starting_balance")}</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={
+                          startingBalanceTouched
+                            ? startingBalance
+                            : (derivedStartingBalance ?? "")
+                        }
+                        onChange={(e) => {
+                          setStartingBalanceTouched(true);
+                          setStartingBalance(e.target.value);
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("csv_starting_balance_hint", {
+                          value: currencyFormatter.format(currentValue),
+                        })}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
                   <Label>{t("csv_date_format")}</Label>
                   <Select
                     value={dateFormat}

@@ -21,10 +21,14 @@ export type PaymentMilestone = {
 };
 
 export type LinkedLoan = {
+  lender_name: string;
   amount: number | null;
   interest_rate: number | null;
   duration_months: number | null;
   start_date: string;
+  monthly_payment: number | null;
+  /** Current principal still owed — the actual liability, distinct from `amount` (the original loan). Falls back to `amount` (see `resolveOutstandingLoanBalance`) for loans entered before this field existed. */
+  outstanding_principal: number | null;
 };
 
 export type RegistrationFeeType = "Notary" | "RERA" | "ADM";
@@ -44,6 +48,16 @@ export type RealEstateMetadata = {
   registration_fee_amount: number;
   renovationFees: number | null;
   furnishingFees: number | null;
+  transfer_trustee_fees: number | null;
+  agent_sales_progression_fees: number | null;
+  rera_title_deed_processing_fees: number | null;
+  rera_mortgage_registration_fees: number | null;
+  rera_knowledge_fee: number | null;
+  in_principle_bank_approval_fee: number | null;
+  property_valuation_fee: number | null;
+  bank_processing_fees: number | null;
+  /** Recurring annual cost — not included in the one-time acquisition cost basis. */
+  yearly_insurance_fee: number | null;
   /** Total floor area — kept in sync as `internal_area + terrace_area` whenever either changes. */
   surfaceArea: number | null;
   internal_area: number | null;
@@ -74,6 +88,53 @@ export type RealEstateMetadata = {
   outstanding_balance: number;
   payment_schedule: PaymentMilestone[];
 
+  // Dubai Land Department / RERA property identifiers, used to look up
+  // this property in the DLD integration (`lib/services/dld-client.ts`).
+  /** Ready-built only — Smart Valuation API input. */
+  title_deed_number: string;
+  /** Ready-built only — "Municipality Plot ID / Area ID", Smart Valuation API input. */
+  plot_id: string;
+  /** Off-plan only — Oqood & TAS Project Status API input. */
+  oqood_number: string;
+  /** Off-plan only — Oqood & TAS Project Status API input. */
+  project_number: string;
+  /** Off-plan only — Oqood & TAS Project Status API input. */
+  escrow_id: string;
+  /** Either property type — Ejari Rental Index API's "Area / Community ID" input. */
+  community_id: string;
+
+  // Off-plan project status, last fetched from the Oqood & TAS Project
+  // Status API (`refreshDldValuation` in `dashboard/actions.ts`). Unlike
+  // Smart Valuation, that API returns no monetary figure, so it updates
+  // these fields instead of `market_valuation`/`current_value`.
+  completion_percentage: number | null;
+  escrow_balance_status: string;
+  latest_inspection_date: string;
+
+  // Abu Dhabi Real Estate Centre (ADREC) / DARI property identifiers —
+  // the Abu Dhabi equivalent of the DLD/RERA fields above, used to look up
+  // this property in `lib/services/adrec-client.ts`. Kept as a fully
+  // separate field set rather than reused, since a property is registered
+  // with exactly one emirate's land authority.
+  /** Ready-built only — DARI Certificates API input. */
+  adrec_plot_number: string;
+  /** Ready-built only — DARI Certificates API input. */
+  adrec_unit_id: string;
+  /** Ready-built only — DARI Certificates API input. */
+  adrec_title_deed: string;
+  /** Off-plan only — ADREC Projects & Escrow API input. */
+  adrec_project_id: string;
+  /** Off-plan only — ADREC Projects & Escrow API input. */
+  adrec_developer_id: string;
+
+  // Off-plan project status, last fetched from the ADREC Projects & Escrow
+  // API (`refreshAdrecValuation` in `dashboard/actions.ts`). Same
+  // no-fabricated-valuation rationale as the DLD fields above.
+  adrec_completion_rate: number | null;
+  adrec_escrow_status: string;
+  adrec_construction_stage: string;
+  adrec_inspection_date: string;
+
   // Financing linked to this property, subtracted from Net Equity.
   linked_loan: LinkedLoan;
 };
@@ -92,6 +153,15 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   registration_fee_amount: 0,
   renovationFees: null,
   furnishingFees: null,
+  transfer_trustee_fees: null,
+  agent_sales_progression_fees: null,
+  rera_title_deed_processing_fees: null,
+  rera_mortgage_registration_fees: null,
+  rera_knowledge_fee: null,
+  in_principle_bank_approval_fee: null,
+  property_valuation_fee: null,
+  bank_processing_fees: null,
+  yearly_insurance_fee: null,
   surfaceArea: null,
   internal_area: null,
   terrace_area: null,
@@ -120,11 +190,36 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   outstanding_balance: 0,
   payment_schedule: [],
 
+  title_deed_number: "",
+  plot_id: "",
+  oqood_number: "",
+  project_number: "",
+  escrow_id: "",
+  community_id: "",
+
+  completion_percentage: null,
+  escrow_balance_status: "",
+  latest_inspection_date: "",
+
+  adrec_plot_number: "",
+  adrec_unit_id: "",
+  adrec_title_deed: "",
+  adrec_project_id: "",
+  adrec_developer_id: "",
+
+  adrec_completion_rate: null,
+  adrec_escrow_status: "",
+  adrec_construction_stage: "",
+  adrec_inspection_date: "",
+
   linked_loan: {
+    lender_name: "",
     amount: null,
     interest_rate: null,
     duration_months: null,
     start_date: "",
+    monthly_payment: null,
+    outstanding_principal: null,
   },
 };
 
@@ -179,40 +274,60 @@ export function resolveRegistrationFee(metadata: RealEstateMetadata): number {
 }
 
 /**
+ * The actual liability to subtract for Net Equity/NAV: the loan's current
+ * `outstanding_principal` if it's been entered, otherwise the original
+ * `amount` as a fallback (for loans saved before this field existed, or
+ * simply never updated after origination).
+ */
+export function resolveOutstandingLoanBalance(loan: LinkedLoan): number {
+  return loan.outstanding_principal ?? loan.amount ?? 0;
+}
+
+/**
+ * Sum of every one-time fee paid to acquire the property, excluding the
+ * base price itself. Excludes `yearly_insurance_fee`, which is a recurring
+ * annual cost rather than part of the acquisition cost basis.
+ */
+export function sumAcquisitionFees(metadata: RealEstateMetadata): number {
+  return (
+    resolveRegistrationFee(metadata) +
+    (metadata.agencyFees ?? 0) +
+    (metadata.renovationFees ?? 0) +
+    (metadata.furnishingFees ?? 0) +
+    (metadata.transfer_trustee_fees ?? 0) +
+    (metadata.agent_sales_progression_fees ?? 0) +
+    (metadata.rera_title_deed_processing_fees ?? 0) +
+    (metadata.rera_mortgage_registration_fees ?? 0) +
+    (metadata.rera_knowledge_fee ?? 0) +
+    (metadata.in_principle_bank_approval_fee ?? 0) +
+    (metadata.property_valuation_fee ?? 0) +
+    (metadata.bank_processing_fees ?? 0)
+  );
+}
+
+/**
  * All-in cost basis: the contract/purchase price plus every fee paid to
- * acquire the property (registration, agency, renovation, furnishing).
- * `fallbackValue` is used when neither `contract_price` nor `purchasePrice`
- * is set (e.g. a bare market valuation with no purchase history entered
- * yet).
+ * acquire the property (registration, agency, renovation, furnishing, and
+ * the RERA/bank/transfer fees). `fallbackValue` is used when neither
+ * `contract_price` nor `purchasePrice` is set (e.g. a bare market
+ * valuation with no purchase history entered yet).
  */
 export function calculateTotalCost(
   metadata: RealEstateMetadata,
   fallbackValue: number,
 ): number {
   const base = metadata.contract_price ?? metadata.purchasePrice ?? fallbackValue;
-  return (
-    base +
-    resolveRegistrationFee(metadata) +
-    (metadata.agencyFees ?? 0) +
-    (metadata.renovationFees ?? 0) +
-    (metadata.furnishingFees ?? 0)
-  );
+  return base + sumAcquisitionFees(metadata);
 }
 
 /**
  * For off-plan properties: actual cash paid out so far — the payment
- * milestones marked "paid" plus every fee (registration, agency,
- * renovation, furnishing), which are typically paid up front rather than
- * staged with the contract.
+ * milestones marked "paid" plus every acquisition fee (registration,
+ * agency, renovation, furnishing, RERA/bank/transfer fees), which are
+ * typically paid up front rather than staged with the contract.
  */
 export function calculateCashInvestedToDate(metadata: RealEstateMetadata): number {
-  return (
-    (metadata.paid_to_date ?? 0) +
-    resolveRegistrationFee(metadata) +
-    (metadata.agencyFees ?? 0) +
-    (metadata.renovationFees ?? 0) +
-    (metadata.furnishingFees ?? 0)
-  );
+  return (metadata.paid_to_date ?? 0) + sumAcquisitionFees(metadata);
 }
 
 /** Net gain against the full cost basis (not just the raw purchase price), and that gain as a percentage of the cost basis. */

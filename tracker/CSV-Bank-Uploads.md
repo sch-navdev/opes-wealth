@@ -2,14 +2,14 @@
 
 # CSV Bank Uploads
 
-**Status:** Complete — Phase 1, Step 8. Backend and upload UI both built and verified (light + dark, EN/FR).
+**Status:** Complete — Phase 1, Step 8, including the transactions-only variant (2026-09-29). Backend and upload UI both built and verified (light + dark, EN/FR).
 
 Scope (from the Phase 1 MVP definition): let a user import assets/transactions from a bank-exported CSV file, mapped onto the [[Database-Schema|assets/asset_history schema]]. Built backend-first, deliberately ahead of the upload UI, so a future dropzone component has something real to call.
 
-## What's supported (v1 scope)
-Only the common **running-balance** style bank export — one row per date, with a Balance column that already reflects the account total that day. This maps directly onto `asset_history(recorded_date, value)`, no new tables needed.
-
-**Not supported yet**: a transactions-only export (Date, Description, Amount, no running Balance) — that needs a starting balance plus a cumulative sum to derive a balance per date, a real feature in its own right, not a variant of this one. Flagged clearly rather than silently mishandled.
+## What's supported
+Two export shapes, chosen via a mode toggle in the dialog (see "Transactions-Only Mode" below for the second one):
+- **Running-balance** — one row per date, with a Balance column that already reflects the account total that day. Maps directly onto `asset_history(recorded_date, value)`, no new tables needed.
+- **Transactions-only** (Date + Amount, or Date + separate Credit/Debit columns, no running Balance) — a starting balance is anchored against the asset's current value and a cumulative sum derives one balance point per date. Was explicitly deferred when this note was first written; built as a follow-up, detailed below.
 
 ## Backend (new)
 - `src/lib/csv-parser.ts` — a minimal hand-rolled RFC 4180 CSV parser (no dependency added). Handles quoted fields with embedded commas/newlines/escaped `""` quotes, CRLF/LF, and a missing trailing newline. `parseCsv(text)` → `{ headers, rows: Record<string,string>[] }`.
@@ -32,6 +32,20 @@ Only the common **running-balance** style bank export — one row per date, with
   - Styling: semantic Tailwind tokens only (`bg-card`, `text-foreground`, `border-border`, `bg-muted/30`, `text-destructive`, `text-success` — no hardcoded hex), reusing [[Portfolio-Dashboard|`portfolio-table.tsx`]]'s staggered-entrance pattern (`animate-in fade-in slide-in-from-bottom-1 duration-300 motion-reduce:animate-none` with an incrementing `animationDelay`) for the mapping fields as they appear.
   - Verified live in the browser (dev server, mock-auth session): dropzone accepts a real drag-dropped CSV, auto-guesses `Date`/`Balance` columns from a 3-row test file, live preview updates to match, rejects a `.txt` drop with the correct localized message, and renders correctly in both light and dark theme (toggled via the app's own theme toggle) and in French (the session's active locale) — see [[Localization|Localization]] for the new keys.
 - Also completed as part of this pass: audited the codebase for hardcoded/inconsistent site URLs (`src/app/auth/actions.ts`'s `getSiteURL()` is the only place any absolute URL is built, already reads `NEXT_PUBLIC_SITE_URL` with a sane fallback — nothing else needed fixing). **Reminder still outstanding**: `NEXT_PUBLIC_SITE_URL` must be set manually in the Vercel dashboard before the next deployment (tracked since the prior auth pass — see [[Authentication-Security|Authentication & Security]]).
+
+## Transactions-Only Mode (2026-09-29)
+
+- **`src/lib/bank-csv.ts`** gained a second parsing path, deliberately producing the exact same `ParsedBankCsvRow[]` shape the running-balance path already does — so **neither `importBankCsvHistory` nor the dialog's import call needed to change at all**; both already only ever handle `{recorded_date, value}[]` regardless of which mode derived it:
+  - `parseTransactionRows(rows, mapping)` — `BankCsvTransactionMapping` is a discriminated union on `amountMode`: `"single"` (one signed Amount column) or `"creditDebit"` (separate unsigned Credit/Debit columns, netted as `|credit| - |debit|`). Unlike `parseBankCsvRows`, the same date appearing on multiple rows is expected, not an error — a transactions export routinely has several same-day postings.
+  - `computeRunningBalance(transactions, startingBalance)` — sums same-day transactions into one point per date, then walks the sorted dates accumulating a running total from `startingBalance`. Returns `ParsedBankCsvRow[]`.
+  - Verified directly (`tsx`, not through the browser): a single-Amount-column fixture with two same-day transactions correctly collapsed into one balance point (starting 1000 → 1500 after a +500 credit → 1450 after -100/+50 the same day); a Credit/Debit fixture (200 credit, 30 debit, same day) correctly netted to a single 170 point; a row with both Credit and Debit blank correctly errored rather than silently producing a zero-amount transaction.
+- **`src/components/csv-import-dialog.tsx`** — the map stage gained a `Tabs`-based mode switch ("File includes a running balance column" / "Calculate balance from transaction amounts"), and, only when transactions mode is active, a second nested `Tabs` for `amountMode` (single column vs. credit/debit pair), the corresponding column `Select`(s), and a **Starting Balance** `Input`.
+  - **Anchoring against the current balance** (task's own suggested approach, over prompting blind): the starting balance's default value is derived — `currentValue - sum(all parsed transaction amounts)` — so that after `computeRunningBalance` walks forward through the transactions, the *last* computed point reconciles exactly to the asset's current recorded value. Fully editable (`startingBalanceTouched` tracks whether the user has typed over the derived default) for the case where the uploaded file isn't the account's most recent activity and shouldn't be assumed to end at today's balance.
+  - **Auto-detection fallback**: dropping a file with no column name containing "balance" but one containing "amount" (or both "credit" and "debit") auto-switches the dialog into transactions mode with a best-guess column mapping, rather than leaving the user stuck on a Balance selector with nothing plausible to pick — the explicit mode toggle is still there to override either way.
+  - The dialog's props grew from just `assetId` to also take `currentValue`/`currency` (passed from `asset-detail-view.tsx`'s already-available `asset.current_value`/`asset.currency`) — needed for the starting-balance derivation and its currency-formatted hint text.
+  - New i18n keys: `csv_mode_balance`/`csv_mode_transactions`, `csv_map_columns_desc_transactions`, `csv_amount_mode_single`/`csv_amount_mode_credit_debit`, `csv_amount_column`/`csv_credit_column`/`csv_debit_column`, `csv_starting_balance`/`csv_starting_balance_hint` (interpolated with the formatted current-balance figure).
+- **Verified live** in the browser (dev server, mock auth), in French: dropped a synthetic transactions CSV (Date/Description/Amount, no Balance column) — the dialog auto-switched to transactions mode, auto-selected the Date/Amount columns, correctly showed "2 lignes détectées" (3 raw transactions, 2 distinct dates — one date's two transactions collapsed), and the Starting Balance field showed the correctly-derived €2,894.54 (current value €3,544.54 minus the file's net +€650). Clicking the Credit/Debit toggle correctly swapped in two empty column selects and disabled Import until both were chosen. Clicking Import reached the real `importBankCsvHistory` action, surfacing "You must be signed in to import bank history." — the same mock-auth limitation every other write path in this project hits, confirming the wiring is genuine.
+- `npx tsc --noEmit`, `eslint`, and `npm run build` all clean.
 
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)

@@ -7,9 +7,10 @@
  * needs to change.
  */
 import { parseSaxoWorkbook } from "./saxo";
+import { parseSharesightWorkbook } from "./sharesight";
 import type { AggregatedHolding, BrokerParseResult, ParsedTrade } from "./types";
 
-export type BrokerId = "saxo";
+export type BrokerId = "saxo" | "sharesight";
 
 export type BrokerDefinition = {
   id: BrokerId;
@@ -27,6 +28,13 @@ export const BROKER_REGISTRY: Record<BrokerId, BrokerDefinition> = {
     logoInitial: "S",
     acceptedExtensions: [".xlsx", ".csv"],
     parse: parseSaxoWorkbook,
+  },
+  sharesight: {
+    id: "sharesight",
+    name: "Sharesight",
+    logoInitial: "SH",
+    acceptedExtensions: [".xlsx", ".csv"],
+    parse: parseSharesightWorkbook,
   },
 };
 

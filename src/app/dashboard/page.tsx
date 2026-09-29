@@ -17,7 +17,7 @@ import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
 import { DashboardMetricCards } from "@/components/dashboard-metric-cards";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
-import { PortfolioTable } from "@/components/portfolio-table";
+import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { parseEquityMetadata } from "@/lib/equities";
@@ -241,7 +241,7 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <PortfolioTable
+        <PortfolioGroups
           assets={assets ?? []}
           categories={categories ?? []}
           displayCurrency={displayCurrency}

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, CloudDownload, LineChart, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, CloudDownload, Landmark, LineChart, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -74,20 +74,24 @@ import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
-import { updateAssetValuation } from "@/app/dashboard/actions";
+import {
+  refreshAdrecValuation,
+  refreshDldValuation,
+  updateAssetValuation,
+} from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
   calculateTotalCost,
   calculateUnrealizedGain,
   parseRealEstateMetadata,
+  resolveOutstandingLoanBalance,
 } from "@/lib/real-estate";
 import { parseVehicleMetadata } from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
-import { parseEquityMetadata } from "@/lib/equities";
+import { estimateCostBasisUnitPrice, parseEquityMetadata } from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
-import { fetchDariValuation } from "@/lib/market-data/dari";
 import { fetchMarketPrice } from "@/lib/market-data/market-price";
 import { refreshMarketPrice } from "@/app/dashboard/actions";
 import { cn } from "@/lib/utils";
@@ -128,6 +132,35 @@ const MARKET_PRICE_ERROR_KEYS: Record<string, TranslationKey> = {
   rate_limited: "market_price_error_rate_limited",
   invalid_response: "market_price_error_invalid_response",
   network_error: "market_price_error_network_error",
+};
+
+/** Maps `refreshDldValuation`'s `DldErrorCode` to a localized message key, following the `MARKET_PRICE_ERROR_KEYS` pattern rather than the old DARI stub's flat raw-string errors (that stub has since been superseded by the ADREC/DARI integration below). */
+const DLD_ERROR_KEYS: Record<string, TranslationKey> = {
+  invalid_request: "dld_error_invalid_request",
+  invalid_deed_number: "dld_error_invalid_deed_number",
+  invalid_project_number: "dld_error_invalid_project_number",
+  inactive_project: "dld_error_inactive_project",
+  not_found: "dld_error_not_found",
+  rate_limited: "dld_error_rate_limited",
+  provider_not_configured: "dld_error_provider_not_configured",
+  invalid_response: "dld_error_invalid_response",
+  timeout: "dld_error_timeout",
+  network_error: "dld_error_network_error",
+};
+
+/** Maps `refreshAdrecValuation`'s `AdrecErrorCode` (SCREAMING_SNAKE_CASE, per that module's own convention) to a localized message key. */
+const ADREC_ERROR_KEYS: Record<string, TranslationKey> = {
+  INVALID_REQUEST: "adrec_error_invalid_request",
+  INVALID_PLOT_NUMBER: "adrec_error_invalid_plot_number",
+  INVALID_TITLE_DEED: "adrec_error_invalid_title_deed",
+  PROJECT_NOT_FOUND: "adrec_error_project_not_found",
+  DEVELOPER_BLOCKED: "adrec_error_developer_blocked",
+  NOT_FOUND: "adrec_error_not_found",
+  RATE_LIMITED: "adrec_error_rate_limited",
+  PROVIDER_NOT_CONFIGURED: "adrec_error_provider_not_configured",
+  INVALID_RESPONSE: "adrec_error_invalid_response",
+  TIMEOUT: "adrec_error_timeout",
+  NETWORK_ERROR: "adrec_error_network_error",
 };
 
 function DetailField({
@@ -188,12 +221,15 @@ export function AssetDetailView({
   );
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const [dariError, setDariError] = useState<string | null>(null);
-  const [dariMessage, setDariMessage] = useState<string | null>(null);
-  const [isDariPending, startDariTransition] = useTransition();
+  const [adrecError, setAdrecError] = useState<string | null>(null);
+  const [adrecMessage, setAdrecMessage] = useState<string | null>(null);
+  const [isAdrecPending, startAdrecTransition] = useTransition();
   const [marketPriceError, setMarketPriceError] = useState<string | null>(null);
   const [marketPriceMessage, setMarketPriceMessage] = useState<string | null>(null);
   const [isMarketPricePending, startMarketPriceTransition] = useTransition();
+  const [dldError, setDldError] = useState<string | null>(null);
+  const [dldMessage, setDldMessage] = useState<string | null>(null);
+  const [isDldPending, startDldTransition] = useTransition();
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
@@ -208,6 +244,9 @@ export function AssetDetailView({
     : null;
   const equityMetadata = isEquity ? parseEquityMetadata(asset.metadata) : null;
   const cryptoMetadata = isCrypto ? parseCryptoMetadata(asset.metadata) : null;
+  const avgCostBasis = equityMetadata
+    ? estimateCostBasisUnitPrice(equityMetadata.trades)
+    : null;
   const images = asset.images ?? [];
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
@@ -249,17 +288,56 @@ export function AssetDetailView({
   const grossShare = (ownershipPercent / 100) * marketValuation;
   const netShare = (ownershipPercent / 100) * netEquity;
   const equityRatio = marketValuation !== 0 ? (netEquity / marketValuation) * 100 : 0;
-  const hasLoan = !!metadata.linked_loan.amount;
+  const outstandingLoanBalance = resolveOutstandingLoanBalance(metadata.linked_loan);
+  const hasLoan = !!(metadata.linked_loan.amount || metadata.linked_loan.outstanding_principal);
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
-  const chartData = [...history]
-    .sort((a, b) => a.recorded_date.localeCompare(b.recorded_date))
-    .map((h) => ({
-      date: h.recorded_date,
-      value: h.value,
-      netEquity: h.net_equity ?? h.value,
-    }));
+  const sortedHistory = [...history].sort((a, b) =>
+    a.recorded_date.localeCompare(b.recorded_date),
+  );
+
+  // Real Estate: the curve should never show a valuation predating the
+  // purchase — drop anything earlier, and pin whatever lands on the purchase
+  // date itself to the all-in cost basis (purchase/contract price +
+  // acquisition fees), synthesizing that point if none is stored there yet.
+  // Only done for standard (non-off-plan) purchases: an off-plan property's
+  // earliest point is its down-payment milestone, which is already a more
+  // accurate anchor than the full contract price (not yet paid at signing).
+  // Falls back to the earliest available history point when `purchase_date`
+  // is missing (e.g. an asset saved before it became a mandatory field).
+  const purchaseAnchorDate =
+    isRealEstate && asset.purchase_date ? asset.purchase_date : null;
+
+  let displayHistory = sortedHistory;
+  if (purchaseAnchorDate) {
+    displayHistory = sortedHistory.filter(
+      (h) => h.recorded_date >= purchaseAnchorDate,
+    );
+    if (!metadata.is_offplan && totalCost != null) {
+      const anchorPoint: AssetHistoryPoint = {
+        id: "purchase-anchor",
+        recorded_date: purchaseAnchorDate,
+        value: totalCost,
+        net_equity: totalCost,
+        source: "manual",
+      };
+      const hasAnchorPoint = displayHistory.some(
+        (h) => h.recorded_date === purchaseAnchorDate,
+      );
+      displayHistory = hasAnchorPoint
+        ? displayHistory.map((h) =>
+            h.recorded_date === purchaseAnchorDate ? anchorPoint : h,
+          )
+        : [anchorPoint, ...displayHistory];
+    }
+  }
+
+  const chartData = displayHistory.map((h) => ({
+    date: h.recorded_date,
+    value: h.value,
+    netEquity: h.net_equity ?? h.value,
+  }));
 
   const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -289,30 +367,32 @@ export function AssetDetailView({
       : axisDateFormatter.format(parsed);
   }
 
-  function handleRefreshFromDari() {
-    setDariError(null);
-    setDariMessage(null);
+  function handleRefreshFromAdrec() {
+    setAdrecError(null);
+    setAdrecMessage(null);
 
-    startDariTransition(async () => {
-      const result = await fetchDariValuation({
-        assetId: asset.id,
-        address: metadata.address,
-        propertyType: metadata.propertyType,
-        surfaceArea: metadata.surfaceArea,
-      });
+    startAdrecTransition(async () => {
+      const result = await refreshAdrecValuation(asset.id);
 
       if (!result.ok) {
-        setDariError(result.error);
+        const key = ADREC_ERROR_KEYS[result.code ?? ""] ?? "adrec_error_network_error";
+        setAdrecError(t(key));
         return;
       }
 
-      const updateResult = await updateAssetValuation(asset.id, result.value, "dari");
-      if (updateResult?.error) {
-        setDariError(updateResult.error);
+      if (result.kind === "project_status") {
+        setAdrecMessage(
+          t("adrec_project_status_updated", { percent: result.completionRate }),
+        );
         return;
       }
 
-      setDariMessage(t("dari_last_updated"));
+      setAdrecMessage(
+        t("adrec_valuation_updated", {
+          value: currencyFormatter.format(result.value),
+          ref: result.certificateId,
+        }),
+      );
     });
   }
 
@@ -351,6 +431,35 @@ export function AssetDetailView({
 
       setMarketPriceMessage(
         t("market_price_updated", { price: currencyFormatter.format(result.unitPrice) }),
+      );
+    });
+  }
+
+  function handleRefreshFromDld() {
+    setDldError(null);
+    setDldMessage(null);
+
+    startDldTransition(async () => {
+      const result = await refreshDldValuation(asset.id);
+
+      if (!result.ok) {
+        const key = DLD_ERROR_KEYS[result.code ?? ""] ?? "dld_error_network_error";
+        setDldError(t(key));
+        return;
+      }
+
+      if (result.kind === "project_status") {
+        setDldMessage(
+          t("dld_project_status_updated", { percent: result.completionPercentage }),
+        );
+        return;
+      }
+
+      setDldMessage(
+        t("dld_valuation_updated", {
+          value: currencyFormatter.format(result.value),
+          ref: result.certificateReference,
+        }),
       );
     });
   }
@@ -501,32 +610,70 @@ export function AssetDetailView({
                       type="button"
                       variant="outline"
                       size="icon-sm"
-                      aria-label={t("refresh_from_dari")}
-                      disabled={isDariPending}
+                      aria-label={t("refresh_from_adrec")}
+                      disabled={isAdrecPending}
                     >
                       <CloudDownload
-                        className={cn("size-4", isDariPending && "animate-pulse")}
+                        className={cn("size-4", isAdrecPending && "animate-pulse")}
                       />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent className="border-border bg-card">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-foreground">
-                        {t("refresh_from_dari")}
+                        {t("refresh_from_adrec")}
                       </AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground">
-                        {t("refresh_from_dari_notice")}
+                        {t("refresh_from_adrec_notice")}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isDariPending}>
+                      <AlertDialogCancel disabled={isAdrecPending}>
                         {t("csv_cancel")}
                       </AlertDialogCancel>
                       <AlertDialogAction
-                        disabled={isDariPending}
-                        onClick={handleRefreshFromDari}
+                        disabled={isAdrecPending}
+                        onClick={handleRefreshFromAdrec}
                       >
-                        {isDariPending ? t("dari_fetching") : t("refresh_from_dari")}
+                        {isAdrecPending ? t("adrec_fetching") : t("refresh_from_adrec")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              {isRealEstate && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label={t("refresh_from_dld")}
+                      disabled={isDldPending}
+                    >
+                      <Landmark
+                        className={cn("size-4", isDldPending && "animate-pulse")}
+                      />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border bg-card">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground">
+                        {t("refresh_from_dld")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
+                        {t("refresh_from_dld_notice")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDldPending}>
+                        {t("csv_cancel")}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={isDldPending}
+                        onClick={handleRefreshFromDld}
+                      >
+                        {isDldPending ? t("dld_fetching") : t("refresh_from_dld")}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -537,8 +684,8 @@ export function AssetDetailView({
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  aria-label={t("refresh_market_price")}
-                  title={t("refresh_market_price")}
+                  aria-label={t(isEquity ? "refresh_from_finnhub" : "refresh_from_coingecko")}
+                  title={t(isEquity ? "refresh_from_finnhub" : "refresh_from_coingecko")}
                   onClick={handleRefreshMarketPrice}
                   disabled={isMarketPricePending}
                 >
@@ -663,16 +810,27 @@ export function AssetDetailView({
           </CardContent>
         </Card>
 
-        {(dariError || dariMessage) && (
+        {(adrecError || adrecMessage) && (
           <p
             className={
-              dariError
+              adrecError
                 ? "text-sm text-destructive"
                 : "text-sm text-success"
             }
-            role={dariError ? "alert" : undefined}
+            role={adrecError ? "alert" : undefined}
           >
-            {dariError ?? dariMessage}
+            {adrecError ?? adrecMessage}
+          </p>
+        )}
+
+        {(dldError || dldMessage) && (
+          <p
+            className={
+              dldError ? "text-sm text-destructive" : "text-sm text-success"
+            }
+            role={dldError ? "alert" : undefined}
+          >
+            {dldError ?? dldMessage}
           </p>
         )}
 
@@ -995,9 +1153,7 @@ export function AssetDetailView({
                           </p>
                           <p className="text-sm font-medium text-destructive">
                             {maskValue(
-                              currencyFormatter.format(
-                                metadata.linked_loan.amount ?? 0,
-                              ),
+                              currencyFormatter.format(outstandingLoanBalance),
                             )}
                           </p>
                         </div>
@@ -1030,6 +1186,66 @@ export function AssetDetailView({
                     />
                   </CardContent>
                 </Card>
+
+                {metadata.is_offplan && (
+                  <Card className="border-border bg-card">
+                    <CardHeader>
+                      <CardTitle className="text-foreground">
+                        {t("dld_project_status")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <DetailField
+                        label={t("completion_percentage")}
+                        value={
+                          metadata.completion_percentage != null
+                            ? `${metadata.completion_percentage}%`
+                            : null
+                        }
+                      />
+                      <DetailField
+                        label={t("escrow_balance_status")}
+                        value={metadata.escrow_balance_status}
+                      />
+                      <DetailField
+                        label={t("latest_inspection_date")}
+                        value={metadata.latest_inspection_date}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
+
+                {metadata.is_offplan && (
+                  <Card className="border-border bg-card">
+                    <CardHeader>
+                      <CardTitle className="text-foreground">
+                        {t("adrec_project_status")}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                      <DetailField
+                        label={t("completion_percentage")}
+                        value={
+                          metadata.adrec_completion_rate != null
+                            ? `${metadata.adrec_completion_rate}%`
+                            : null
+                        }
+                      />
+                      <DetailField
+                        label={t("escrow_balance_status")}
+                        value={metadata.adrec_escrow_status}
+                      />
+                      <DetailField
+                        label={t("adrec_construction_stage")}
+                        value={metadata.adrec_construction_stage}
+                      />
+                      <DetailField
+                        label={t("latest_inspection_date")}
+                        value={metadata.adrec_inspection_date}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
 
                 {metadata.is_offplan && (
                   <Card className="border-border bg-card">
@@ -1137,7 +1353,11 @@ export function AssetDetailView({
                     purchase_date: asset.purchase_date,
                   }}
                 />
-                <CsvImportDialog assetId={asset.id} />
+                <CsvImportDialog
+                  assetId={asset.id}
+                  currentValue={asset.current_value}
+                  currency={asset.currency}
+                />
                 <DeleteAssetButton
                   id={asset.id}
                   onSuccess={() => router.push("/dashboard")}
@@ -1188,6 +1408,81 @@ export function AssetDetailView({
                       label={t("epc_rating")}
                       value={metadata.epcRating}
                     />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      {t("dld_identifiers")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {metadata.is_offplan ? (
+                      <>
+                        <DetailField
+                          label={t("oqood_number")}
+                          value={metadata.oqood_number}
+                        />
+                        <DetailField
+                          label={t("project_number")}
+                          value={metadata.project_number}
+                        />
+                        <DetailField
+                          label={t("escrow_id")}
+                          value={metadata.escrow_id}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <DetailField
+                          label={t("title_deed_number")}
+                          value={metadata.title_deed_number}
+                        />
+                        <DetailField label={t("plot_id")} value={metadata.plot_id} />
+                      </>
+                    )}
+                    <DetailField
+                      label={t("community_id")}
+                      value={metadata.community_id}
+                    />
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      {t("adrec_identifiers")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {metadata.is_offplan ? (
+                      <>
+                        <DetailField
+                          label={t("adrec_project_id")}
+                          value={metadata.adrec_project_id}
+                        />
+                        <DetailField
+                          label={t("adrec_developer_id")}
+                          value={metadata.adrec_developer_id}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <DetailField
+                          label={t("adrec_plot_number")}
+                          value={metadata.adrec_plot_number}
+                        />
+                        <DetailField
+                          label={t("adrec_unit_id")}
+                          value={metadata.adrec_unit_id}
+                        />
+                        <DetailField
+                          label={t("adrec_title_deed")}
+                          value={metadata.adrec_title_deed}
+                        />
+                      </>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -1288,6 +1583,104 @@ export function AssetDetailView({
                       }
                     />
                     <DetailField
+                      label={t("transfer_trustee_fees")}
+                      value={
+                        metadata.transfer_trustee_fees != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.transfer_trustee_fees),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("agent_sales_progression_fees")}
+                      value={
+                        metadata.agent_sales_progression_fees != null
+                          ? maskValue(
+                              currencyFormatter.format(
+                                metadata.agent_sales_progression_fees,
+                              ),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("rera_title_deed_processing_fees")}
+                      value={
+                        metadata.rera_title_deed_processing_fees != null
+                          ? maskValue(
+                              currencyFormatter.format(
+                                metadata.rera_title_deed_processing_fees,
+                              ),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("rera_mortgage_registration_fees")}
+                      value={
+                        metadata.rera_mortgage_registration_fees != null
+                          ? maskValue(
+                              currencyFormatter.format(
+                                metadata.rera_mortgage_registration_fees,
+                              ),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("rera_knowledge_fee")}
+                      value={
+                        metadata.rera_knowledge_fee != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.rera_knowledge_fee),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("in_principle_bank_approval_fee")}
+                      value={
+                        metadata.in_principle_bank_approval_fee != null
+                          ? maskValue(
+                              currencyFormatter.format(
+                                metadata.in_principle_bank_approval_fee,
+                              ),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("property_valuation_fee")}
+                      value={
+                        metadata.property_valuation_fee != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.property_valuation_fee),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("bank_processing_fees")}
+                      value={
+                        metadata.bank_processing_fees != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.bank_processing_fees),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("yearly_insurance_fee")}
+                      value={
+                        metadata.yearly_insurance_fee != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.yearly_insurance_fee),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
                       label={t("total_property_cost")}
                       value={
                         totalCost != null
@@ -1306,37 +1699,69 @@ export function AssetDetailView({
                   </CardHeader>
                   <CardContent>
                     {hasLoan ? (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                        <DetailField
-                          label={t("principal")}
-                          value={maskValue(
-                            currencyFormatter.format(
-                              metadata.linked_loan.amount ?? 0,
-                            ),
+                      <div className="space-y-4">
+                        <div className="flex items-end justify-between gap-4 border-b border-border pb-4">
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">
+                              {t("outstanding_loan_balance")}
+                            </p>
+                            <p className="text-lg font-semibold text-destructive">
+                              {maskValue(
+                                currencyFormatter.format(outstandingLoanBalance),
+                              )}
+                            </p>
+                          </div>
+                          {metadata.linked_loan.lender_name && (
+                            <DetailField
+                              label={t("lender_name")}
+                              value={metadata.linked_loan.lender_name}
+                            />
                           )}
-                        />
-                        <DetailField
-                          label={t("interest_rate")}
-                          value={
-                            metadata.linked_loan.interest_rate != null
-                              ? `${metadata.linked_loan.interest_rate}%`
-                              : null
-                          }
-                        />
-                        <DetailField
-                          label={t("duration")}
-                          value={
-                            metadata.linked_loan.duration_months != null
-                              ? t("duration_months", {
-                                  n: metadata.linked_loan.duration_months,
-                                })
-                              : null
-                          }
-                        />
-                        <DetailField
-                          label={t("start_date")}
-                          value={metadata.linked_loan.start_date}
-                        />
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                          <DetailField
+                            label={t("principal")}
+                            value={maskValue(
+                              currencyFormatter.format(
+                                metadata.linked_loan.amount ?? 0,
+                              ),
+                            )}
+                          />
+                          <DetailField
+                            label={t("monthly_payment")}
+                            value={
+                              metadata.linked_loan.monthly_payment != null
+                                ? maskValue(
+                                    currencyFormatter.format(
+                                      metadata.linked_loan.monthly_payment,
+                                    ),
+                                  )
+                                : null
+                            }
+                          />
+                          <DetailField
+                            label={t("interest_rate")}
+                            value={
+                              metadata.linked_loan.interest_rate != null
+                                ? `${metadata.linked_loan.interest_rate}%`
+                                : null
+                            }
+                          />
+                          <DetailField
+                            label={t("duration")}
+                            value={
+                              metadata.linked_loan.duration_months != null
+                                ? t("duration_months", {
+                                    n: metadata.linked_loan.duration_months,
+                                  })
+                                : null
+                            }
+                          />
+                          <DetailField
+                            label={t("start_date")}
+                            value={metadata.linked_loan.start_date}
+                          />
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
@@ -1402,16 +1827,32 @@ export function AssetDetailView({
                     {t("equity_details")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
                   <DetailField label={t("exchange")} value={equityMetadata.exchange} />
                   <DetailField
-                    label={t("unit_price")}
+                    label={t("shares_owned")}
+                    value={maskValue(asset.quantity.toLocaleString())}
+                  />
+                  <DetailField
+                    label={t("average_cost_basis")}
+                    value={
+                      avgCostBasis != null
+                        ? maskValue(currencyFormatter.format(avgCostBasis))
+                        : null
+                    }
+                  />
+                  <DetailField
+                    label={t("current_price")}
                     value={
                       equityMetadata.last_unit_price != null
                         ? maskValue(currencyFormatter.format(equityMetadata.last_unit_price))
                         : null
                     }
+                  />
+                  <DetailField
+                    label={t("total_value")}
+                    value={maskValue(currencyFormatter.format(asset.current_value))}
                   />
                   <DetailField
                     label={t("last_updated")}

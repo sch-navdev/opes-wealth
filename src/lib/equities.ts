@@ -53,6 +53,34 @@ export const EMPTY_EQUITY_METADATA: EquityMetadata = {
 };
 
 /**
+ * Weighted average cost of the buy lots in `trades` — used both server-side
+ * (a fresh import's placeholder `current_value`, before "Refresh Market
+ * Price" ever runs, in `dashboard/actions.ts`'s `importBrokerTrades`) and
+ * client-side (the "Average Cost Basis" figure on the Equity Details card
+ * in `asset-detail-view.tsx`), so both stay in exact agreement rather than
+ * risking two copies of this math drifting apart. Deliberately never
+ * presented as a live quote — see `last_unit_price` for that. Falls back to
+ * the average price across every trade (including sells) only when there
+ * are no buy lots at all — an edge case (a sell-only import for an
+ * instrument this app has no prior record of), not the common path.
+ */
+export function estimateCostBasisUnitPrice(
+  trades: { side: "buy" | "sell"; quantity: number; price: number }[],
+): number | null {
+  const buys = trades.filter((t) => t.side === "buy");
+  const totalBuyQty = buys.reduce((sum, t) => sum + t.quantity, 0);
+  if (totalBuyQty > 0) {
+    const totalBuyCost = buys.reduce((sum, t) => sum + t.quantity * t.price, 0);
+    return totalBuyCost / totalBuyQty;
+  }
+
+  const totalQty = trades.reduce((sum, t) => sum + t.quantity, 0);
+  if (totalQty === 0) return null;
+  const totalCost = trades.reduce((sum, t) => sum + t.quantity * t.price, 0);
+  return totalCost / totalQty;
+}
+
+/**
  * Merges a raw `assets.metadata` value into a complete `EquityMetadata`,
  * same defensive pattern as `parseRealEstateMetadata`.
  */

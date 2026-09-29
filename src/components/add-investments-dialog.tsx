@@ -134,6 +134,7 @@ export function AddInvestmentsDialog() {
 
   const [trades, setTrades] = useState<ParsedTrade[]>([]);
   const [parseErrors, setParseErrors] = useState<ParsedTradeRowError[]>([]);
+  const [skippedNonTradeCount, setSkippedNonTradeCount] = useState(0);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<ImportBrokerTradesResult[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -217,6 +218,7 @@ export function AddInvestmentsDialog() {
     setDropError(null);
     setTrades([]);
     setParseErrors([]);
+    setSkippedNonTradeCount(0);
     setImportError(null);
     setImportResults([]);
     setSelectedIndices(new Set());
@@ -267,6 +269,7 @@ export function AddInvestmentsDialog() {
     setFileName(file.name);
     setTrades(result.trades.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(result.errors);
+    setSkippedNonTradeCount(result.skippedNonTradeCount ?? 0);
     setStage("preview");
   }
 
@@ -320,6 +323,7 @@ export function AddInvestmentsDialog() {
     });
     setTrades(parsed.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(errors);
+    setSkippedNonTradeCount(0);
     setStage("preview");
   }
 
@@ -357,6 +361,7 @@ export function AddInvestmentsDialog() {
 
     setTrades([trade]);
     setParseErrors([]);
+    setSkippedNonTradeCount(0);
     setStage("preview");
   }
 
@@ -390,7 +395,7 @@ export function AddInvestmentsDialog() {
         </DialogHeader>
 
         {stage === "select" && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             {(
               [
                 { key: "broker" as const, icon: Landmark, label: "method_upload_broker", desc: "method_upload_broker_desc" },
@@ -413,7 +418,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "broker-grid" && (
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStage("select")}>
               <ArrowLeft className="size-4" />
               {t("back")}
@@ -442,7 +447,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "broker-drop" && selectedBroker && (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStage("broker-grid")}>
               <ArrowLeft className="size-4" />
               {t("back")}
@@ -495,7 +500,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "generic-drop" && (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStage("select")}>
               <ArrowLeft className="size-4" />
               {t("back")}
@@ -546,7 +551,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "generic-map" && (
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStage("generic-drop")}>
               <ArrowLeft className="size-4" />
               {t("back")}
@@ -627,7 +632,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "manual-form" && (
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStage("select")}>
               <ArrowLeft className="size-4" />
               {t("back")}
@@ -723,7 +728,7 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "preview" && (
-          <div className="space-y-4">
+          <div className="min-w-0 space-y-4">
             <div className="space-y-1">
               <h3 className="text-sm font-medium text-foreground">{t("investments_review_heading")}</h3>
               <p className="text-xs text-muted-foreground">{t("investments_review_desc")}</p>
@@ -736,6 +741,11 @@ export function AddInvestmentsDialog() {
             {parseErrors.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 {t("csv_row_errors", { n: parseErrors.length })}
+              </p>
+            )}
+            {skippedNonTradeCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {t("investments_skipped_non_trade_rows", { n: skippedNonTradeCount })}
               </p>
             )}
             {trades.length === 0 ? (
@@ -910,8 +920,8 @@ export function AddInvestmentsDialog() {
         )}
 
         {stage === "result" && (
-          <div className="space-y-4">
-            <div className="border border-border">
+          <div className="min-w-0 space-y-4">
+            <div role="region" tabIndex={0} className="overflow-x-auto border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>

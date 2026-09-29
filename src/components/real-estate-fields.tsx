@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useLanguage } from "@/context/language-context";
 import { getCurrencySymbol } from "@/lib/currencies";
 import {
   CONDITION_RATINGS,
@@ -108,6 +109,27 @@ function NumberField({
   );
 }
 
+function TextField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <Label>{label}</Label>
+      <Input
+        className="w-full min-w-0"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
 function ToggleField({
   label,
   checked,
@@ -135,6 +157,7 @@ export function RealEstateFields({
   currency: string;
 }) {
   const currencySymbol = getCurrencySymbol(currency);
+  const { t } = useLanguage();
   function set<K extends keyof RealEstateMetadata>(
     key: K,
     next: RealEstateMetadata[K],
@@ -458,26 +481,133 @@ export function RealEstateFields({
       )}
 
       <div className="w-full min-w-0 space-y-4 border border-border p-4">
-        <h4 className="text-sm font-medium text-foreground">Linked Loan</h4>
+        <h4 className="text-sm font-medium text-foreground">
+          {t("dld_identifiers")}
+        </h4>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
+          {value.is_offplan ? (
+            <>
+              <TextField
+                label={t("oqood_number")}
+                value={value.oqood_number}
+                onChange={(next) => set("oqood_number", next)}
+              />
+              <TextField
+                label={t("project_number")}
+                value={value.project_number}
+                onChange={(next) => set("project_number", next)}
+              />
+              <TextField
+                label={t("escrow_id")}
+                value={value.escrow_id}
+                onChange={(next) => set("escrow_id", next)}
+              />
+            </>
+          ) : (
+            <>
+              <TextField
+                label={t("title_deed_number")}
+                value={value.title_deed_number}
+                onChange={(next) => set("title_deed_number", next)}
+              />
+              <TextField
+                label={t("plot_id")}
+                value={value.plot_id}
+                onChange={(next) => set("plot_id", next)}
+              />
+            </>
+          )}
+          <TextField
+            label={t("community_id")}
+            value={value.community_id}
+            onChange={(next) => set("community_id", next)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">{t("dld_identifiers_note")}</p>
+      </div>
+
+      <div className="w-full min-w-0 space-y-4 border border-border p-4">
+        <h4 className="text-sm font-medium text-foreground">
+          {t("adrec_identifiers")}
+        </h4>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
+          {value.is_offplan ? (
+            <>
+              <TextField
+                label={t("adrec_project_id")}
+                value={value.adrec_project_id}
+                onChange={(next) => set("adrec_project_id", next)}
+              />
+              <TextField
+                label={t("adrec_developer_id")}
+                value={value.adrec_developer_id}
+                onChange={(next) => set("adrec_developer_id", next)}
+              />
+            </>
+          ) : (
+            <>
+              <TextField
+                label={t("adrec_plot_number")}
+                value={value.adrec_plot_number}
+                onChange={(next) => set("adrec_plot_number", next)}
+              />
+              <TextField
+                label={t("adrec_unit_id")}
+                value={value.adrec_unit_id}
+                onChange={(next) => set("adrec_unit_id", next)}
+              />
+              <TextField
+                label={t("adrec_title_deed")}
+                value={value.adrec_title_deed}
+                onChange={(next) => set("adrec_title_deed", next)}
+              />
+            </>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{t("adrec_identifiers_note")}</p>
+      </div>
+
+      <div className="w-full min-w-0 space-y-4 border border-border p-4">
+        <h4 className="text-sm font-medium text-foreground">{t("financing")}</h4>
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
+          <div className="min-w-0 space-y-2 sm:col-span-2">
+            <Label>{t("lender_name")}</Label>
+            <Input
+              className="w-full min-w-0"
+              value={value.linked_loan.lender_name}
+              onChange={(e) => setLoan({ lender_name: e.target.value })}
+            />
+          </div>
           <NumberField
-            label="Total Loan Amount"
+            label={t("principal")}
             value={value.linked_loan.amount}
             onChange={(next) => setLoan({ amount: next })}
             currency={currency}
           />
           <NumberField
-            label="Interest Rate (%)"
+            label={t("outstanding_loan_balance")}
+            value={value.linked_loan.outstanding_principal}
+            onChange={(next) => setLoan({ outstanding_principal: next })}
+            currency={currency}
+          />
+          <NumberField
+            label={t("monthly_payment")}
+            value={value.linked_loan.monthly_payment}
+            onChange={(next) => setLoan({ monthly_payment: next })}
+            currency={currency}
+          />
+          <NumberField
+            label={t("interest_rate_percent_field_label")}
             value={value.linked_loan.interest_rate}
             onChange={(next) => setLoan({ interest_rate: next })}
           />
           <NumberField
-            label="Duration (months)"
+            label={t("duration_months_field_label")}
             value={value.linked_loan.duration_months}
             onChange={(next) => setLoan({ duration_months: next })}
           />
           <div className="min-w-0 space-y-2">
-            <Label>Start Date</Label>
+            <Label>{t("start_date")}</Label>
             <Input
               type="date"
               className="w-full min-w-0"
@@ -486,10 +616,9 @@ export function RealEstateFields({
             />
           </div>
         </div>
-        {value.linked_loan.amount ? (
+        {(value.linked_loan.amount || value.linked_loan.outstanding_principal) ? (
           <p className="text-xs text-muted-foreground">
-            The outstanding loan principal is subtracted from this
-            property&apos;s Net Equity.
+            {t("loan_equity_note")}
           </p>
         ) : null}
       </div>
@@ -557,6 +686,60 @@ export function RealEstateFields({
           label="Furnishing Fees"
           value={value.furnishingFees}
           onChange={(next) => set("furnishingFees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("transfer_trustee_fees")}
+          value={value.transfer_trustee_fees}
+          onChange={(next) => set("transfer_trustee_fees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("agent_sales_progression_fees")}
+          value={value.agent_sales_progression_fees}
+          onChange={(next) => set("agent_sales_progression_fees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("rera_title_deed_processing_fees")}
+          value={value.rera_title_deed_processing_fees}
+          onChange={(next) => set("rera_title_deed_processing_fees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("rera_mortgage_registration_fees")}
+          value={value.rera_mortgage_registration_fees}
+          onChange={(next) => set("rera_mortgage_registration_fees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("rera_knowledge_fee")}
+          value={value.rera_knowledge_fee}
+          onChange={(next) => set("rera_knowledge_fee", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("in_principle_bank_approval_fee")}
+          value={value.in_principle_bank_approval_fee}
+          onChange={(next) => set("in_principle_bank_approval_fee", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("property_valuation_fee")}
+          value={value.property_valuation_fee}
+          onChange={(next) => set("property_valuation_fee", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("bank_processing_fees")}
+          value={value.bank_processing_fees}
+          onChange={(next) => set("bank_processing_fees", next)}
+          currency={currency}
+        />
+        <NumberField
+          label={t("yearly_insurance_fee")}
+          value={value.yearly_insurance_fee}
+          onChange={(next) => set("yearly_insurance_fee", next)}
           currency={currency}
         />
       </div>

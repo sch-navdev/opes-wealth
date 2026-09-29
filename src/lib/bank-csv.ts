@@ -1,20 +1,20 @@
 /**
  * Backend for CSV Bank Uploads (tracker: `tracker/CSV-Bank-Uploads.md`,
  * Phase 1 Step 8). Scope, per that note: import a bank-exported CSV onto
- * the existing `assets`/`asset_history` schema — no new tables. This
- * supports the common "running balance" style bank export (one row per
- * date, with a Balance column already reflecting the account total that
- * day), which maps directly onto `asset_history(recorded_date, value)`.
+ * the existing `assets`/`asset_history` schema — no new tables. Supports
+ * two export shapes:
  *
- * Deliberately NOT supported yet: a transactions-only export (Date,
- * Description, Amount, no running Balance) would need a starting balance
- * and a cumulative sum to derive a balance per date — a real feature, not
- * a one-line addition, and left for a follow-up rather than guessed at
- * here.
- *
- * No UI consumes this yet — this is the backend half of the feature,
- * built ahead of the upload dropzone so the dropzone has something real to
- * call once it exists.
+ * - **Running-balance** (`parseBankCsvRows`): one row per date, with a
+ *   Balance column already reflecting the account total that day — maps
+ *   directly onto `asset_history(recorded_date, value)`.
+ * - **Transactions-only** (`parseTransactionRows` + `computeRunningBalance`,
+ *   added as a follow-up to the above): Date + either a signed Amount
+ *   column or separate Credit/Debit columns, no running balance at all.
+ *   `computeRunningBalance` derives one, anchored on a starting balance,
+ *   into the exact same `ParsedBankCsvRow[]` shape — so `csv-import-dialog.tsx`
+ *   and `importBankCsvHistory` need no changes at all for this mode; they
+ *   already only ever see `{ recorded_date, value }` rows regardless of
+ *   which export shape produced them.
  */
 
 export type BankCsvDateFormat = "YYYY-MM-DD" | "MM/DD/YYYY" | "DD/MM/YYYY";
@@ -168,4 +168,139 @@ export function parseBankCsvRows(
   });
 
   return { validRows, errors };
+}
+
+// --- Transactions-only mode (Date + Amount, or Date + Credit/Debit) -----
+
+/** A single dated transaction, signed: positive = credit/deposit, negative = debit/withdrawal — regardless of whether it came from one signed Amount column or a separate unsigned Credit/Debit pair. */
+export type ParsedTransactionRow = {
+  recorded_date: string;
+  amount: number;
+};
+
+export type BankCsvTransactionMapping =
+  | {
+      dateColumn: string;
+      dateFormat: BankCsvDateFormat;
+      amountMode: "single";
+      amountColumn: string;
+    }
+  | {
+      dateColumn: string;
+      dateFormat: BankCsvDateFormat;
+      amountMode: "creditDebit";
+      creditColumn: string;
+      debitColumn: string;
+    };
+
+export type BankCsvTransactionResult = {
+  validRows: ParsedTransactionRow[];
+  errors: BankCsvRowError[];
+};
+
+/**
+ * Validates and parses every row of a transactions-only export into dated,
+ * signed amounts. Unlike `parseBankCsvRows`'s running-balance mode, the
+ * same date appearing on multiple rows is normal here (several
+ * transactions posted the same day) and is not an error — `computeRunningBalance`
+ * below sums same-day transactions into that day's single balance point.
+ */
+export function parseTransactionRows(
+  rows: Record<string, string>[],
+  mapping: BankCsvTransactionMapping,
+): BankCsvTransactionResult {
+  const validRows: ParsedTransactionRow[] = [];
+  const errors: BankCsvRowError[] = [];
+
+  rows.forEach((row, rowIndex) => {
+    const rawDate = row[mapping.dateColumn];
+    if (rawDate === undefined) {
+      errors.push({ rowIndex, message: `Missing "${mapping.dateColumn}" column.` });
+      return;
+    }
+
+    const recorded_date = parseDate(rawDate, mapping.dateFormat);
+    if (!recorded_date) {
+      errors.push({ rowIndex, message: `Could not read "${rawDate}" as a ${mapping.dateFormat} date.` });
+      return;
+    }
+
+    let amount: number;
+
+    if (mapping.amountMode === "single") {
+      const raw = row[mapping.amountColumn];
+      if (raw === undefined) {
+        errors.push({ rowIndex, message: `Missing "${mapping.amountColumn}" column.` });
+        return;
+      }
+      const parsed = parseAmount(raw);
+      if (parsed === null) {
+        errors.push({ rowIndex, message: `Could not read "${raw}" as an amount.` });
+        return;
+      }
+      amount = parsed;
+    } else {
+      const rawCredit = row[mapping.creditColumn];
+      const rawDebit = row[mapping.debitColumn];
+      if (rawCredit === undefined || rawDebit === undefined) {
+        errors.push({
+          rowIndex,
+          message: `Missing "${mapping.creditColumn}" or "${mapping.debitColumn}" column.`,
+        });
+        return;
+      }
+      const credit = rawCredit.trim() === "" ? 0 : parseAmount(rawCredit);
+      const debit = rawDebit.trim() === "" ? 0 : parseAmount(rawDebit);
+      if (credit === null || debit === null) {
+        errors.push({
+          rowIndex,
+          message: `Could not read "${credit === null ? rawCredit : rawDebit}" as an amount.`,
+        });
+        return;
+      }
+      if (credit === 0 && debit === 0) {
+        errors.push({ rowIndex, message: "Row has no Credit or Debit amount." });
+        return;
+      }
+      amount = Math.abs(credit) - Math.abs(debit);
+    }
+
+    validRows.push({ recorded_date, amount });
+  });
+
+  return { validRows, errors };
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Turns dated transaction amounts into one running-balance point per
+ * distinct date, anchored on `startingBalance` — the account's balance
+ * immediately *before* the earliest transaction in the file. Produces the
+ * exact same `ParsedBankCsvRow[]` shape `parseBankCsvRows` does, so nothing
+ * downstream (the dialog's preview, `importBankCsvHistory`) needs to know
+ * which mode originally produced it. Multiple same-day transactions are
+ * summed into that date's single point (the day's actual closing balance).
+ */
+export function computeRunningBalance(
+  transactions: ParsedTransactionRow[],
+  startingBalance: number,
+): ParsedBankCsvRow[] {
+  const byDate = new Map<string, number>();
+  for (const t of transactions) {
+    byDate.set(t.recorded_date, (byDate.get(t.recorded_date) ?? 0) + t.amount);
+  }
+
+  const sortedDates = Array.from(byDate.keys()).sort();
+  let runningBalance = startingBalance;
+  const result: ParsedBankCsvRow[] = [];
+
+  for (const date of sortedDates) {
+    runningBalance += byDate.get(date)!;
+    result.push({ recorded_date: date, value: round2(runningBalance) });
+  }
+
+  return result;
 }

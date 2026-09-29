@@ -13,6 +13,31 @@ const dictionary = {
     en: "Every asset and liability you're tracking.",
     fr: "Chaque actif et passif que vous suivez.",
   },
+
+  // Portfolio grouping — category folder headers
+  category_real_estate: { en: "Real Estate", fr: "Immobilier" },
+  category_scpi: { en: "SCPI", fr: "SCPI" },
+  category_equities: { en: "Equities", fr: "Actions" },
+  category_crypto: { en: "Crypto", fr: "Cryptomonnaies" },
+  category_cash: { en: "Cash", fr: "Liquidités" },
+  category_liabilities: { en: "Liabilities", fr: "Passifs" },
+  category_vehicles: { en: "Vehicles", fr: "Véhicules" },
+  category_private_equity: { en: "Private Equity", fr: "Capital-investissement" },
+
+  // Portfolio — batch delete (multi-select checkboxes)
+  selected_count: { en: "{n} selected", fr: "{n} sélectionné(s)" },
+  batch_delete: { en: "Delete Selected", fr: "Supprimer la sélection" },
+  batch_delete_confirm_title: {
+    en: "Delete {n} assets?",
+    fr: "Supprimer {n} actifs ?",
+  },
+  batch_delete_confirm_desc: {
+    en: "Are you sure you want to delete {n} assets? This action cannot be undone.",
+    fr: "Voulez-vous vraiment supprimer {n} actifs ? Cette action est irréversible.",
+  },
+  batch_deleting: { en: "Deleting…", fr: "Suppression…" },
+  cancel: { en: "Cancel", fr: "Annuler" },
+  delete: { en: "Delete", fr: "Supprimer" },
   profile_settings: { en: "Profile Settings", fr: "Paramètres du profil" },
   sign_out: { en: "Sign Out", fr: "Déconnexion" },
   net_worth: { en: "Net Worth", fr: "Valeur nette" },
@@ -124,6 +149,36 @@ const dictionary = {
   agency_fees: { en: "Agency Fees", fr: "Frais d'agence" },
   renovation_fees: { en: "Renovation Fees", fr: "Frais de rénovation" },
   furnishing_fees: { en: "Furnishing Fees", fr: "Frais d'ameublement" },
+  transfer_trustee_fees: {
+    en: "Transfer Trustee Fees",
+    fr: "Frais de fiduciaire de transfert",
+  },
+  agent_sales_progression_fees: {
+    en: "Agent Sales Progression Fees",
+    fr: "Frais de suivi de vente de l'agent",
+  },
+  rera_title_deed_processing_fees: {
+    en: "RERA Title Deed Processing Fees",
+    fr: "Frais de traitement du titre de propriété RERA",
+  },
+  rera_mortgage_registration_fees: {
+    en: "RERA Mortgage Registration Fees",
+    fr: "Frais d'enregistrement hypothécaire RERA",
+  },
+  rera_knowledge_fee: { en: "RERA Knowledge Fee", fr: "Frais de connaissance RERA" },
+  in_principle_bank_approval_fee: {
+    en: "In-Principle Bank Approval Fee",
+    fr: "Frais d'accord de principe bancaire",
+  },
+  property_valuation_fee: {
+    en: "Property Valuation Fee",
+    fr: "Frais d'évaluation du bien",
+  },
+  bank_processing_fees: { en: "Bank Processing Fees", fr: "Frais de traitement bancaire" },
+  yearly_insurance_fee: {
+    en: "Yearly Insurance (recurring)",
+    fr: "Assurance annuelle (récurrente)",
+  },
   financing: { en: "Financing", fr: "Financement" },
   principal: { en: "Principal", fr: "Capital emprunté" },
   interest_rate: { en: "Interest Rate", fr: "Taux d'intérêt" },
@@ -131,6 +186,175 @@ const dictionary = {
   duration_months: { en: "{n} months", fr: "{n} mois" },
   start_date: { en: "Start Date", fr: "Date de début" },
   no_loan_attached: { en: "No loan attached.", fr: "Aucun prêt associé." },
+  loan_equity_note: {
+    en: "The outstanding loan balance is subtracted from this property's Net Equity.",
+    fr: "Le solde du prêt restant dû est déduit des capitaux propres nets de ce bien.",
+  },
+  dld_identifiers: {
+    en: "Dubai Land Department / RERA Identifiers",
+    fr: "Identifiants Dubai Land Department / RERA",
+  },
+  dld_project_status: { en: "Project Status", fr: "Statut du projet" },
+  dld_identifiers_note: {
+    en: "Used to look up this property with the Dubai Land Department for automatic valuations.",
+    fr: "Utilisés pour identifier ce bien auprès du Dubai Land Department afin d'obtenir des valorisations automatiques.",
+  },
+  title_deed_number: { en: "Title Deed Number", fr: "Numéro de titre de propriété" },
+  plot_id: { en: "Municipality Plot ID / Area ID", fr: "ID de parcelle / de zone" },
+  oqood_number: { en: "Oqood Contract Number", fr: "Numéro de contrat Oqood" },
+  project_number: { en: "Project Number", fr: "Numéro de projet" },
+  escrow_id: { en: "Escrow ID", fr: "ID du compte séquestre" },
+  community_id: { en: "Area / Community ID", fr: "ID de zone / communauté" },
+  refresh_from_dld: {
+    en: "Refresh from Dubai Land Department",
+    fr: "Actualiser via le Dubai Land Department",
+  },
+  refresh_from_dld_notice: {
+    en: "Fetches an automatic valuation (ready-built) or project status (off-plan) from the Dubai Land Department using the identifiers entered above.",
+    fr: "Récupère une valorisation automatique (bien livré) ou le statut du projet (sur plan) auprès du Dubai Land Department à partir des identifiants saisis ci-dessus.",
+  },
+  dld_fetching: { en: "Fetching…", fr: "Récupération…" },
+  dld_valuation_updated: {
+    en: "Valuation updated to {value} (certificate {ref}).",
+    fr: "Valorisation mise à jour à {value} (certificat {ref}).",
+  },
+  dld_project_status_updated: {
+    en: "Project status updated — {percent}% complete.",
+    fr: "Statut du projet mis à jour — {percent} % terminé.",
+  },
+  dld_error_invalid_request: {
+    en: "Enter the required identifiers above before refreshing.",
+    fr: "Saisissez les identifiants requis ci-dessus avant d'actualiser.",
+  },
+  dld_error_invalid_deed_number: {
+    en: "That Title Deed Number could not be found.",
+    fr: "Ce numéro de titre de propriété est introuvable.",
+  },
+  dld_error_invalid_project_number: {
+    en: "That Project Number could not be found.",
+    fr: "Ce numéro de projet est introuvable.",
+  },
+  dld_error_inactive_project: {
+    en: "This project is no longer active with the Dubai Land Department.",
+    fr: "Ce projet n'est plus actif auprès du Dubai Land Department.",
+  },
+  dld_error_not_found: {
+    en: "No matching property was found.",
+    fr: "Aucun bien correspondant n'a été trouvé.",
+  },
+  dld_error_rate_limited: {
+    en: "Too many requests — try again shortly.",
+    fr: "Trop de requêtes — réessayez dans un instant.",
+  },
+  dld_error_provider_not_configured: {
+    en: "The Dubai Land Department integration is not configured yet.",
+    fr: "L'intégration avec le Dubai Land Department n'est pas encore configurée.",
+  },
+  dld_error_invalid_response: {
+    en: "Received an unexpected response from the Dubai Land Department.",
+    fr: "Réponse inattendue reçue du Dubai Land Department.",
+  },
+  dld_error_timeout: {
+    en: "The request to the Dubai Land Department timed out.",
+    fr: "La requête vers le Dubai Land Department a expiré.",
+  },
+  dld_error_network_error: {
+    en: "Could not reach the Dubai Land Department.",
+    fr: "Impossible de contacter le Dubai Land Department.",
+  },
+  completion_percentage: { en: "Completion", fr: "Avancement" },
+  escrow_balance_status: { en: "Escrow Balance Status", fr: "Statut du compte séquestre" },
+  latest_inspection_date: { en: "Latest Inspection Date", fr: "Date de dernière inspection" },
+  adrec_identifiers: {
+    en: "ADREC / DARI Identifiers",
+    fr: "Identifiants ADREC / DARI",
+  },
+  adrec_identifiers_note: {
+    en: "Used to look up this property with the Abu Dhabi Real Estate Centre for automatic valuations.",
+    fr: "Utilisés pour identifier ce bien auprès de l'Abu Dhabi Real Estate Centre afin d'obtenir des valorisations automatiques.",
+  },
+  adrec_plot_number: { en: "Plot Number", fr: "Numéro de parcelle" },
+  adrec_unit_id: { en: "Unit ID", fr: "ID de l'unité" },
+  adrec_title_deed: { en: "Title Deed Number", fr: "Numéro de titre de propriété" },
+  adrec_project_id: { en: "Project ID", fr: "ID du projet" },
+  adrec_developer_id: { en: "Developer ID", fr: "ID du promoteur" },
+  refresh_from_adrec: {
+    en: "Refresh from ADREC / DARI",
+    fr: "Actualiser via ADREC / DARI",
+  },
+  refresh_from_adrec_notice: {
+    en: "Fetches an official valuation (ready-built) or project tracking status (off-plan) from the Abu Dhabi Real Estate Centre using the identifiers entered above.",
+    fr: "Récupère une valorisation officielle (bien livré) ou le statut de suivi du projet (sur plan) auprès de l'Abu Dhabi Real Estate Centre à partir des identifiants saisis ci-dessus.",
+  },
+  adrec_fetching: { en: "Fetching…", fr: "Récupération…" },
+  adrec_valuation_updated: {
+    en: "Valuation updated to {value} (certificate {ref}).",
+    fr: "Valorisation mise à jour à {value} (certificat {ref}).",
+  },
+  adrec_project_status_updated: {
+    en: "Project status updated — {percent}% complete.",
+    fr: "Statut du projet mis à jour — {percent} % terminé.",
+  },
+  adrec_project_status: { en: "Project Status", fr: "Statut du projet" },
+  adrec_construction_stage: { en: "Construction Stage", fr: "Étape de construction" },
+  adrec_error_invalid_request: {
+    en: "Enter the required identifiers above before refreshing.",
+    fr: "Saisissez les identifiants requis ci-dessus avant d'actualiser.",
+  },
+  adrec_error_invalid_plot_number: {
+    en: "That Plot Number could not be found.",
+    fr: "Ce numéro de parcelle est introuvable.",
+  },
+  adrec_error_invalid_title_deed: {
+    en: "That Title Deed Number could not be found.",
+    fr: "Ce numéro de titre de propriété est introuvable.",
+  },
+  adrec_error_project_not_found: {
+    en: "That Project ID could not be found.",
+    fr: "Cet ID de projet est introuvable.",
+  },
+  adrec_error_developer_blocked: {
+    en: "This developer is currently blocked by the Abu Dhabi Real Estate Centre.",
+    fr: "Ce promoteur est actuellement bloqué par l'Abu Dhabi Real Estate Centre.",
+  },
+  adrec_error_not_found: {
+    en: "No matching property was found.",
+    fr: "Aucun bien correspondant n'a été trouvé.",
+  },
+  adrec_error_rate_limited: {
+    en: "Too many requests — try again shortly.",
+    fr: "Trop de requêtes — réessayez dans un instant.",
+  },
+  adrec_error_provider_not_configured: {
+    en: "The ADREC/DARI integration is not configured yet.",
+    fr: "L'intégration avec ADREC/DARI n'est pas encore configurée.",
+  },
+  adrec_error_invalid_response: {
+    en: "Received an unexpected response from ADREC/DARI.",
+    fr: "Réponse inattendue reçue d'ADREC/DARI.",
+  },
+  adrec_error_timeout: {
+    en: "The request to ADREC/DARI timed out.",
+    fr: "La requête vers ADREC/DARI a expiré.",
+  },
+  adrec_error_network_error: {
+    en: "Could not reach ADREC/DARI.",
+    fr: "Impossible de contacter ADREC/DARI.",
+  },
+  lender_name: { en: "Lender / Bank Name", fr: "Prêteur / Nom de la banque" },
+  outstanding_loan_balance: {
+    en: "Outstanding Loan Balance",
+    fr: "Solde restant dû",
+  },
+  monthly_payment: { en: "Monthly Payment", fr: "Mensualité" },
+  duration_months_field_label: {
+    en: "Duration (months)",
+    fr: "Durée (mois)",
+  },
+  interest_rate_percent_field_label: {
+    en: "Interest Rate (%)",
+    fr: "Taux d'intérêt (%)",
+  },
 
   // Vehicles category (Settings tab)
   vehicle_details: { en: "Vehicle Details", fr: "Détails du véhicule" },
@@ -197,6 +421,31 @@ const dictionary = {
   },
   csv_date_column: { en: "Date Column", fr: "Colonne de date" },
   csv_balance_column: { en: "Balance Column", fr: "Colonne de solde" },
+  csv_mode_balance: {
+    en: "File includes a running balance column",
+    fr: "Le fichier contient une colonne de solde courant",
+  },
+  csv_mode_transactions: {
+    en: "Calculate balance from transaction amounts",
+    fr: "Calculer le solde à partir des montants des transactions",
+  },
+  csv_map_columns_desc_transactions: {
+    en: "Tell us which column holds the date and which holds the transaction amount(s).",
+    fr: "Indiquez quelle colonne contient la date et laquelle contient le(s) montant(s) des transactions.",
+  },
+  csv_amount_mode_single: { en: "Single Amount Column", fr: "Colonne de montant unique" },
+  csv_amount_mode_credit_debit: {
+    en: "Separate Credit/Debit Columns",
+    fr: "Colonnes crédit/débit séparées",
+  },
+  csv_amount_column: { en: "Amount Column", fr: "Colonne de montant" },
+  csv_credit_column: { en: "Credit Column", fr: "Colonne de crédit" },
+  csv_debit_column: { en: "Debit Column", fr: "Colonne de débit" },
+  csv_starting_balance: { en: "Starting Balance", fr: "Solde de départ" },
+  csv_starting_balance_hint: {
+    en: "The balance immediately before the earliest transaction in this file. Defaults to your current balance ({value}) minus these transactions, so the last computed balance matches today's value — adjust if this file isn't your most recent activity.",
+    fr: "Le solde juste avant la première transaction de ce fichier. Par défaut, votre solde actuel ({value}) moins ces transactions, afin que le dernier solde calculé corresponde à la valeur actuelle — ajustez si ce fichier ne représente pas votre activité la plus récente.",
+  },
   csv_date_format: { en: "Date Format", fr: "Format de date" },
   csv_select_column: { en: "Select a column…", fr: "Sélectionner une colonne…" },
   csv_preview_rows: { en: "{n} rows detected", fr: "{n} lignes détectées" },
@@ -210,18 +459,6 @@ const dictionary = {
   csv_import_success: { en: "Imported {n} rows successfully.", fr: "{n} lignes importées avec succès." },
   csv_cancel: { en: "Cancel", fr: "Annuler" },
   csv_done: { en: "Done", fr: "Terminé" },
-
-  // Live Pricing — Refresh from DARI (Overview tab, Real Estate only)
-  refresh_from_dari: { en: "Refresh from DARI", fr: "Actualiser depuis DARI" },
-  refresh_from_dari_notice: {
-    en: "Uses placeholder data until ADREC/DARI API access is confirmed with the provider.",
-    fr: "Utilise des données fictives jusqu'à confirmation de l'accès à l'API ADREC/DARI auprès du fournisseur.",
-  },
-  dari_fetching: { en: "Fetching…", fr: "Récupération…" },
-  dari_last_updated: {
-    en: "Updated just now (placeholder data, not a real valuation).",
-    fr: "Mis à jour à l'instant (données fictives, pas une valorisation réelle).",
-  },
 
   // Broker Trade Import (Phase 2) — Add Investments dialog
   add_investments: { en: "Add Investments", fr: "Ajouter des investissements" },
@@ -267,6 +504,10 @@ const dictionary = {
   investments_no_trades_found: {
     en: "No valid trades were found in this file.",
     fr: "Aucune transaction valide n'a été trouvée dans ce fichier.",
+  },
+  investments_skipped_non_trade_rows: {
+    en: "{n} watchlist/unconfirmed row(s) were skipped — only executed trades are imported.",
+    fr: "{n} ligne(s) de watchlist/non confirmée(s) ont été ignorées — seules les transactions exécutées sont importées.",
   },
   investments_import_button: { en: "Import {n} Holdings", fr: "Importer {n} positions" },
   investments_importing: { en: "Importing…", fr: "Importation…" },
@@ -323,6 +564,10 @@ const dictionary = {
   equity_details: { en: "Equity Details", fr: "Détails de l'action" },
   exchange: { en: "Exchange", fr: "Bourse" },
   equity_exchange_placeholder: { en: "e.g. NASDAQ", fr: "ex. NASDAQ" },
+  shares_owned: { en: "Shares Owned", fr: "Actions détenues" },
+  average_cost_basis: { en: "Average Cost Basis", fr: "Coût de revient moyen" },
+  current_price: { en: "Current Price", fr: "Prix actuel" },
+  total_value: { en: "Total Value", fr: "Valeur totale" },
 
   crypto_details: { en: "Crypto Details", fr: "Détails de la cryptomonnaie" },
   coingecko_id: { en: "CoinGecko ID", fr: "Identifiant CoinGecko" },
@@ -337,6 +582,8 @@ const dictionary = {
   },
 
   refresh_market_price: { en: "Refresh Market Price", fr: "Actualiser le prix du marché" },
+  refresh_from_finnhub: { en: "Refresh from Finnhub", fr: "Actualiser via Finnhub" },
+  refresh_from_coingecko: { en: "Refresh from CoinGecko", fr: "Actualiser via CoinGecko" },
   unit_price: { en: "Unit Price", fr: "Prix unitaire" },
   last_updated: { en: "Last Updated", fr: "Dernière mise à jour" },
   no_market_price_yet: {

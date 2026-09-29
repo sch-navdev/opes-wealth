@@ -34,6 +34,7 @@ import {
   EMPTY_REAL_ESTATE_METADATA,
   MAX_ASSET_IMAGES,
   parseRealEstateMetadata,
+  resolveOutstandingLoanBalance,
 } from "@/lib/real-estate";
 import {
   EMPTY_VEHICLE_METADATA,
@@ -182,7 +183,9 @@ export function AddAssetDialog({
       // The raw market valuation is preserved in metadata so it can be
       // re-edited later without double-subtracting.
       const marketValuation = Number(formData.get("current_value"));
-      const loanPrincipal = realEstateMetadata.linked_loan.amount ?? 0;
+      const loanPrincipal = resolveOutstandingLoanBalance(
+        realEstateMetadata.linked_loan,
+      );
       const outstandingOffplan = realEstateMetadata.is_offplan
         ? realEstateMetadata.outstanding_balance
         : 0;

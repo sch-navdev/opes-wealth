@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Briefcase, Building2, Car } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -46,11 +47,17 @@ export function PortfolioTable({
   categories,
   displayCurrency,
   rates,
+  selectedIds,
+  onToggleAsset,
+  onToggleAll,
 }: {
   assets: AssetRow[];
   categories: Category[];
   displayCurrency: string;
   rates: Record<string, number>;
+  selectedIds?: Set<string>;
+  onToggleAsset?: (id: string, checked: boolean) => void;
+  onToggleAll?: (ids: string[], checked: boolean) => void;
 }) {
   const { maskValue } = usePrivacy();
 
@@ -58,6 +65,15 @@ export function PortfolioTable({
     style: "currency",
     currency: displayCurrency,
   });
+
+  const visibleIds = assets.map((asset) => asset.id);
+  const selectedVisibleCount = selectedIds
+    ? visibleIds.filter((id) => selectedIds.has(id)).length
+    : 0;
+  const allVisibleSelected =
+    visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+  const someVisibleSelected =
+    selectedVisibleCount > 0 && !allVisibleSelected;
 
   return (
     <div
@@ -73,6 +89,24 @@ export function PortfolioTable({
         </TableCaption>
         <TableHeader>
           <TableRow>
+            {onToggleAll && (
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Select all"
+                  checked={
+                    allVisibleSelected
+                      ? true
+                      : someVisibleSelected
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(checked) =>
+                    onToggleAll(visibleIds, checked === true)
+                  }
+                  disabled={visibleIds.length === 0}
+                />
+              </TableHead>
+            )}
             <TableHead>Name</TableHead>
             <TableHead>Category</TableHead>
             <TableHead className="text-right">Quantity</TableHead>
@@ -87,7 +121,7 @@ export function PortfolioTable({
           {assets.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={onToggleAll ? 7 : 6}
                 className="text-center text-muted-foreground"
               >
                 No assets yet. Add your first one to get started.
@@ -181,6 +215,17 @@ export function PortfolioTable({
                     animationFillMode: "backwards",
                   }}
                 >
+                  {onToggleAsset && (
+                    <TableCell className="w-10">
+                      <Checkbox
+                        aria-label={`Select ${asset.name}`}
+                        checked={selectedIds?.has(asset.id) ?? false}
+                        onCheckedChange={(checked) =>
+                          onToggleAsset(asset.id, checked === true)
+                        }
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium text-foreground">
                     <Link
                       href={`/dashboard/assets/${asset.id}`}

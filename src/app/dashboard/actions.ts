@@ -3,10 +3,30 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseRealEstateMetadata, resolveRegistrationFee } from "@/lib/real-estate";
+import {
+  calculateTotalCost,
+  calculateUnrealizedGain,
+  parseRealEstateMetadata,
+  resolveOutstandingLoanBalance,
+  sumAcquisitionFees,
+} from "@/lib/real-estate";
+import {
+  getOqoodProjectStatus,
+  getSmartValuation,
+  type DldErrorCode,
+} from "@/lib/services/dld-client";
+import {
+  getOffPlanProjectTracking,
+  getReadyBuiltValuation,
+  type AdrecErrorCode,
+} from "@/lib/services/adrec-client";
 import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
-import { parseEquityMetadata, type EquityTrade } from "@/lib/equities";
+import {
+  estimateCostBasisUnitPrice,
+  parseEquityMetadata,
+  type EquityTrade,
+} from "@/lib/equities";
 import { tradeId } from "@/lib/parsers/broker-registry";
 import type { AggregatedHolding } from "@/lib/parsers/types";
 import type { Json } from "@/types/supabase";
@@ -69,11 +89,7 @@ async function syncAssetHistory(
 
   if (isRealEstate) {
     const re = parseRealEstateMetadata(metadata);
-    const totalFees =
-      resolveRegistrationFee(re) +
-      (re.agencyFees ?? 0) +
-      (re.renovationFees ?? 0) +
-      (re.furnishingFees ?? 0);
+    const totalFees = sumAcquisitionFees(re);
 
     const sortedMilestones = re.payment_schedule
       .filter((m) => m.due_date)
@@ -283,7 +299,7 @@ export async function updateAssetValuation(
 
   if (isRealEstate) {
     const reMetadata = parseRealEstateMetadata(asset.metadata);
-    const loanPrincipal = reMetadata.linked_loan.amount ?? 0;
+    const loanPrincipal = resolveOutstandingLoanBalance(reMetadata.linked_loan);
     const outstandingOffplan = reMetadata.is_offplan
       ? reMetadata.outstanding_balance
       : 0;
@@ -321,6 +337,294 @@ export async function updateAssetValuation(
 
   revalidatePath("/dashboard", "layout");
   revalidatePath(`/dashboard/assets/${id}`);
+}
+
+/**
+ * Dubai Land Department / RERA integration (`lib/services/dld-client.ts`,
+ * `tracker/Market-Data-Integration.md`) — dispatches to whichever DLD
+ * subsystem matches the asset's `is_offplan` flag:
+ *
+ * - **Ready-built**: the Smart Valuation API returns a monetary
+ *   `ai_valuation_amount`, so this reuses `updateAssetValuation` (same
+ *   persistence path as the DARI/manual flows: Net Equity recomputed via
+ *   `resolveOutstandingLoanBalance`, `assets.current_value`/
+ *   `metadata.market_valuation` updated, an `asset_history` row upserted).
+ *   `calculateTotalCost`/`calculateUnrealizedGain` are then used to hand
+ *   back an immediate cost-basis/gain figure for the UI, without waiting on
+ *   a full page reload.
+ * - **Off-plan**: the Oqood & TAS Project Status API returns no monetary
+ *   figure at all (only completion %, escrow status, latest inspection
+ *   date) — it would be dishonest to invent a valuation from those, so this
+ *   branch writes them into `metadata` instead and deliberately leaves
+ *   `current_value`/`asset_history` untouched.
+ */
+export type RefreshDldValuationResult =
+  | {
+      ok: true;
+      kind: "valuation";
+      isMock: boolean;
+      value: number;
+      certificateReference: string;
+      unrealizedGainAmount: number;
+    }
+  | {
+      ok: true;
+      kind: "project_status";
+      isMock: boolean;
+      completionPercentage: number;
+    }
+  | { ok: false; code?: DldErrorCode; error: string };
+
+export async function refreshDldValuation(id: string): Promise<RefreshDldValuationResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "You must be signed in to refresh a valuation." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset) {
+    return { ok: false, error: "Asset not found." };
+  }
+
+  if (asset.asset_categories?.name !== "Real Estate") {
+    return {
+      ok: false,
+      error: "Dubai Land Department refresh is only available for Real Estate assets.",
+    };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata);
+
+  if (metadata.is_offplan) {
+    const result = await getOqoodProjectStatus({
+      oqoodContractNumber: metadata.oqood_number || undefined,
+      projectNumber: metadata.project_number || undefined,
+      escrowId: metadata.escrow_id || undefined,
+    });
+
+    if (!result.ok) {
+      return { ok: false, code: result.code, error: result.error };
+    }
+
+    const nextMetadata = {
+      ...metadata,
+      completion_percentage: result.completion_percentage,
+      escrow_balance_status: result.escrow_balance_status,
+      latest_inspection_date: result.latest_inspection_date,
+    };
+
+    const { error: updateError } = await supabase
+      .from("assets")
+      .update({ metadata: nextMetadata })
+      .eq("id", id)
+      .eq("profile_id", user.id);
+
+    if (updateError) {
+      return { ok: false, error: updateError.message };
+    }
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath(`/dashboard/assets/${id}`);
+
+    return {
+      ok: true,
+      kind: "project_status",
+      isMock: result.isMock,
+      completionPercentage: result.completion_percentage,
+    };
+  }
+
+  const result = await getSmartValuation({
+    titleDeedNumber: metadata.title_deed_number,
+    plotId: metadata.plot_id,
+  });
+
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error };
+  }
+
+  const updateResult = await updateAssetValuation(
+    id,
+    result.ai_valuation_amount,
+    "dubailand",
+    result.valuation_date,
+  );
+
+  if (updateResult?.error) {
+    return { ok: false, error: updateResult.error };
+  }
+
+  const totalCost = calculateTotalCost(metadata, result.ai_valuation_amount);
+  const unrealizedGain = calculateUnrealizedGain(result.ai_valuation_amount, totalCost);
+
+  return {
+    ok: true,
+    kind: "valuation",
+    isMock: result.isMock,
+    value: result.ai_valuation_amount,
+    certificateReference: result.certificate_reference,
+    unrealizedGainAmount: unrealizedGain.amount,
+  };
+}
+
+export type RefreshAdrecValuationResult =
+  | {
+      ok: true;
+      kind: "valuation";
+      isMock: boolean;
+      value: number;
+      certificateId: string;
+      unrealizedGainAmount: number;
+    }
+  | {
+      ok: true;
+      kind: "project_status";
+      isMock: boolean;
+      completionRate: number;
+    }
+  | { ok: false; code?: AdrecErrorCode; error: string };
+
+/**
+ * Abu Dhabi Real Estate Centre (ADREC) / DARI integration
+ * (`lib/services/adrec-client.ts`, `tracker/Market-Data-Integration.md`) —
+ * follows the exact pattern established by `refreshDldValuation` above,
+ * dispatching on the asset's `is_offplan` flag:
+ *
+ * - **Ready-built**: the DARI Certificates API returns a monetary
+ *   `officialValuationAmount`, so this reuses `updateAssetValuation` (Net
+ *   Equity recomputed via `resolveOutstandingLoanBalance`,
+ *   `assets.current_value`/`metadata.market_valuation` updated, an
+ *   `asset_history` row upserted tagged `"dari"`), then uses
+ *   `calculateTotalCost`/`calculateUnrealizedGain` for an immediate
+ *   cost-basis/gain figure.
+ * - **Off-plan**: the ADREC Projects & Escrow API returns no monetary
+ *   figure (only completion rate, escrow status, construction stage,
+ *   inspection date) — same rationale as `refreshDldValuation`'s off-plan
+ *   branch, this writes those into `metadata` and deliberately leaves
+ *   `current_value`/`asset_history` untouched rather than fabricating a
+ *   valuation from a completion percentage.
+ */
+export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecValuationResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "You must be signed in to refresh a valuation." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset) {
+    return { ok: false, error: "Asset not found." };
+  }
+
+  if (asset.asset_categories?.name !== "Real Estate") {
+    return {
+      ok: false,
+      error: "ADREC/DARI refresh is only available for Real Estate assets.",
+    };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata);
+
+  if (metadata.is_offplan) {
+    const result = await getOffPlanProjectTracking({
+      projectId: metadata.adrec_project_id,
+      developerId: metadata.adrec_developer_id,
+    });
+
+    if (!result.ok) {
+      return { ok: false, code: result.code, error: result.error };
+    }
+
+    const nextMetadata = {
+      ...metadata,
+      adrec_completion_rate: result.projectCompletionRate,
+      adrec_escrow_status: result.escrowStatus,
+      adrec_construction_stage: result.constructionStage,
+      adrec_inspection_date: result.latestInspectionDate,
+    };
+
+    const { error: updateError } = await supabase
+      .from("assets")
+      .update({ metadata: nextMetadata })
+      .eq("id", id)
+      .eq("profile_id", user.id);
+
+    if (updateError) {
+      return { ok: false, error: updateError.message };
+    }
+
+    revalidatePath("/dashboard", "layout");
+    revalidatePath(`/dashboard/assets/${id}`);
+
+    return {
+      ok: true,
+      kind: "project_status",
+      isMock: result.isMock,
+      completionRate: result.projectCompletionRate,
+    };
+  }
+
+  const result = await getReadyBuiltValuation({
+    plotNumber: metadata.adrec_plot_number,
+    unitId: metadata.adrec_unit_id,
+    titleDeedNumber: metadata.adrec_title_deed,
+  });
+
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error };
+  }
+
+  const updateResult = await updateAssetValuation(
+    id,
+    result.officialValuationAmount,
+    "dari",
+    result.valuationDate,
+  );
+
+  if (updateResult?.error) {
+    return { ok: false, error: updateResult.error };
+  }
+
+  const totalCost = calculateTotalCost(metadata, result.officialValuationAmount);
+  const unrealizedGain = calculateUnrealizedGain(result.officialValuationAmount, totalCost);
+
+  return {
+    ok: true,
+    kind: "valuation",
+    isMock: result.isMock,
+    value: result.officialValuationAmount,
+    certificateId: result.certificateId,
+    unrealizedGainAmount: unrealizedGain.amount,
+  };
 }
 
 /**
@@ -430,6 +734,43 @@ export async function deleteAsset(id: string) {
 }
 
 /**
+ * Batch delete for the dashboard's multi-select checkboxes. A single
+ * `.delete().in("id", ids)` call is already one atomic SQL `DELETE`
+ * statement — every row is removed in a single all-or-nothing transaction
+ * at the Postgres level, same as `deleteAsset`'s single-row delete just
+ * extended to a list, so no separate RPC/transaction wrapper is needed.
+ * `asset_history` rows cascade automatically (`on delete cascade`,
+ * `0001_initial_schema.sql`).
+ */
+export async function batchDeleteAssets(ids: string[]) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to delete assets." };
+  }
+
+  if (ids.length === 0) {
+    return { error: "No assets selected." };
+  }
+
+  const { error } = await supabase
+    .from("assets")
+    .delete()
+    .in("id", ids)
+    .eq("profile_id", user.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+}
+
+/**
  * Live Pricing (`tracker/Live-Pricing.md`, Phase 1 Step 9) — persists a
  * freshly-fetched unit price for an Equities/Crypto asset. Unlike
  * `updateAssetValuation` (which takes a total value the user typed
@@ -515,32 +856,6 @@ export async function refreshMarketPrice(
   revalidatePath(`/dashboard/assets/${id}`);
 
   return { success: true as const, unitPrice, totalValue, asOf: now };
-}
-
-/**
- * Weighted average cost of the buy lots in `trades`, used as a placeholder
- * unit price for `current_value` right after an import — the asset's real
- * live price is only known once "Refresh Market Price" (`refreshMarketPrice`
- * above) runs, so this is deliberately just "what was actually paid,"
- * never presented as a live quote. Falls back to the average price across
- * every trade (including sells) only when there are no buy lots at all —
- * an edge case (a sell-only import for an instrument this app has no prior
- * record of), not the common path.
- */
-function estimateCostBasisUnitPrice(
-  trades: { side: "buy" | "sell"; quantity: number; price: number }[],
-): number | null {
-  const buys = trades.filter((t) => t.side === "buy");
-  const totalBuyQty = buys.reduce((sum, t) => sum + t.quantity, 0);
-  if (totalBuyQty > 0) {
-    const totalBuyCost = buys.reduce((sum, t) => sum + t.quantity * t.price, 0);
-    return totalBuyCost / totalBuyQty;
-  }
-
-  const totalQty = trades.reduce((sum, t) => sum + t.quantity, 0);
-  if (totalQty === 0) return null;
-  const totalCost = trades.reduce((sum, t) => sum + t.quantity * t.price, 0);
-  return totalCost / totalQty;
 }
 
 export type ImportBrokerTradesResult = {

@@ -46,6 +46,13 @@ export type ParsedTradeRowError = {
 export type BrokerParseResult = {
   trades: ParsedTrade[];
   errors: ParsedTradeRowError[];
+  /**
+   * Rows silently excluded because they weren't an executed trade at all —
+   * e.g. a Sharesight Watchlist entry, or a trade later cancelled/left
+   * unconfirmed. Not a row error (nothing is malformed about the row), so
+   * it's counted separately; `undefined` for parsers with no such concept.
+   */
+  skippedNonTradeCount?: number;
 };
 
 /** One instrument's net position across every trade an import contained. */
