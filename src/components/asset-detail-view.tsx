@@ -494,17 +494,24 @@ export function AssetDetailView({
   // engine (`lib/amortization.ts`) — rather than trusting each history row's
   // stored `net_equity`, which only ever reflected a manually-updated
   // balance snapshot frozen at whichever date it was recorded.
-  const chartData = displayHistory.map((h) => ({
-    date: h.recorded_date,
-    value: h.value,
-    netEquity: loanIsAmortizable
-      ? calculateEquity(h.value, getOutstandingPrincipalAt(loan, h.recorded_date))
-      : h.net_equity ?? h.value,
-    // Net Profit at each point = that point's Market Value minus the (fixed)
-    // all-in cost basis — so Day 1 immediately shows the negative hit of the
-    // acquisition fees, not zero.
-    netProfit: totalCost != null ? h.value - totalCost : null,
-  }));
+  const chartData = displayHistory.map((h) => {
+    const loanBalance = loanIsAmortizable
+      ? getOutstandingPrincipalAt(loan, h.recorded_date)
+      : null;
+    return {
+      date: h.recorded_date,
+      value: h.value,
+      netEquity: loanBalance != null ? calculateEquity(h.value, loanBalance) : h.net_equity ?? h.value,
+      // Net Profit at each point = that point's Market Value minus the (fixed)
+      // all-in cost basis — so Day 1 immediately shows the negative hit of the
+      // acquisition fees, not zero.
+      netProfit: totalCost != null ? h.value - totalCost : null,
+      // The loan's exact outstanding principal on this date — plotted
+      // alongside Equity so the two can be visually cross-checked
+      // (Equity = Market Value − Loan Balance at every point).
+      loanBalance,
+    };
+  });
 
   const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -1251,6 +1258,17 @@ export function AssetDetailView({
                             fill="transparent"
                             strokeWidth={2}
                             strokeDasharray="4 4"
+                          />
+                        )}
+                        {loanIsAmortizable && (
+                          <Area
+                            type="monotone"
+                            dataKey="loanBalance"
+                            name={t("outstanding_loan_balance")}
+                            stroke="var(--color-chart-4)"
+                            fill="transparent"
+                            strokeWidth={2}
+                            strokeDasharray="2 3"
                           />
                         )}
                       </AreaChart>

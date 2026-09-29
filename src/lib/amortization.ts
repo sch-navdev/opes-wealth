@@ -126,7 +126,12 @@ export function getOutstandingPrincipalAt(loan: LinkedLoan, isoDate: string): nu
   if (isoDate <= loan.start_date) return loan.amount as number;
 
   const schedule = generateAmortizationSchedule(loan);
-  let balance = 0;
+  // Before the first installment is due, the full principal is still
+  // outstanding — not `0`. Without this, any date between `start_date` and
+  // the first entry (e.g. the purchase date itself, if the loan started a
+  // few days earlier) fell through the loop below with no entry matching
+  // and wrongly returned a balance of 0 (as if the loan were paid off).
+  let balance = loan.amount as number;
   for (const entry of schedule) {
     if (entry.date > isoDate) break;
     balance = entry.remainingBalance;
