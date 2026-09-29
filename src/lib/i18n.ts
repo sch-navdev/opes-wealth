@@ -41,6 +41,10 @@ const dictionary = {
   profile_settings: { en: "Profile Settings", fr: "Paramètres du profil" },
   sign_out: { en: "Sign Out", fr: "Déconnexion" },
   net_worth: { en: "Net Worth", fr: "Valeur nette" },
+  base_currency_note: {
+    en: "All figures shown in {currency}",
+    fr: "Tous les montants sont affichés en {currency}",
+  },
   total_assets: { en: "Total Assets", fr: "Total des actifs" },
   total_liabilities: { en: "Total Liabilities", fr: "Total des passifs" },
   real_estate_unrealized_gain: {

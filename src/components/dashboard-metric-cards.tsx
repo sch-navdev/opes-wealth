@@ -51,6 +51,7 @@ export function DashboardMetricCards({
   hasLiabilities,
   unrealizedGainFormatted,
   unrealizedGainSign,
+  baseCurrency,
 }: {
   netWorthFormatted: string;
   assetsFormatted: string;
@@ -58,6 +59,7 @@ export function DashboardMetricCards({
   hasLiabilities: boolean;
   unrealizedGainFormatted: string;
   unrealizedGainSign: "+" | "-" | null;
+  baseCurrency: string;
 }) {
   const { maskValue } = usePrivacy();
   const { t } = useLanguage();
@@ -70,43 +72,48 @@ export function DashboardMetricCards({
         : undefined;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <MetricCard
-        label={t("net_worth")}
-        value={maskValue(netWorthFormatted)}
-        icon={<Wallet className="size-4" />}
-        animationDelayMs={0}
-      />
-      <MetricCard
-        label={t("total_assets")}
-        value={maskValue(assetsFormatted)}
-        icon={<TrendingUp className="size-4" />}
-        animationDelayMs={75}
-      />
-      <MetricCard
-        label={t("total_liabilities")}
-        value={maskValue(liabilitiesFormatted)}
-        icon={<TrendingDown className="size-4" />}
-        valueClassName={hasLiabilities ? "text-destructive" : undefined}
-        animationDelayMs={150}
-      />
-      <MetricCard
-        label={t("real_estate_unrealized_gain")}
-        value={
-          unrealizedGainSign
-            ? `${unrealizedGainSign}${maskValue(unrealizedGainFormatted)}`
-            : maskValue(unrealizedGainFormatted)
-        }
-        icon={
-          unrealizedGainSign === "-" ? (
-            <ArrowDownRight className="size-4" />
-          ) : (
-            <ArrowUpRight className="size-4" />
-          )
-        }
-        valueClassName={gainColorClass}
-        animationDelayMs={225}
-      />
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        {t("base_currency_note", { currency: baseCurrency })}
+      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <MetricCard
+          label={t("net_worth")}
+          value={maskValue(netWorthFormatted)}
+          icon={<Wallet className="size-4" />}
+          animationDelayMs={0}
+        />
+        <MetricCard
+          label={t("total_assets")}
+          value={maskValue(assetsFormatted)}
+          icon={<TrendingUp className="size-4" />}
+          animationDelayMs={75}
+        />
+        <MetricCard
+          label={t("total_liabilities")}
+          value={maskValue(liabilitiesFormatted)}
+          icon={<TrendingDown className="size-4" />}
+          valueClassName={hasLiabilities ? "text-destructive" : undefined}
+          animationDelayMs={150}
+        />
+        <MetricCard
+          label={t("real_estate_unrealized_gain")}
+          value={
+            unrealizedGainSign
+              ? `${unrealizedGainSign}${maskValue(unrealizedGainFormatted)}`
+              : maskValue(unrealizedGainFormatted)
+          }
+          icon={
+            unrealizedGainSign === "-" ? (
+              <ArrowDownRight className="size-4" />
+            ) : (
+              <ArrowUpRight className="size-4" />
+            )
+          }
+          valueClassName={gainColorClass}
+          animationDelayMs={225}
+        />
+      </div>
     </div>
   );
 }

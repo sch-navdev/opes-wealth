@@ -8,8 +8,10 @@ import { useLanguage } from "@/context/language-context";
 
 export function DashboardHeaderControls({
   totalNetWorthFormatted,
+  baseCurrency,
 }: {
   totalNetWorthFormatted: string;
+  baseCurrency: string;
 }) {
   const { maskValue } = usePrivacy();
   const { t } = useLanguage();
@@ -17,7 +19,9 @@ export function DashboardHeaderControls({
   return (
     <div className="flex items-center gap-3">
       <div className="text-right">
-        <p className="text-xs text-muted-foreground">{t("net_worth")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("net_worth")} · {baseCurrency}
+        </p>
         <p className="text-sm font-semibold text-foreground">
           {maskValue(totalNetWorthFormatted)}
         </p>

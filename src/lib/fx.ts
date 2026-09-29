@@ -1,10 +1,20 @@
 /**
- * Foreign-exchange helpers for displaying multi-currency portfolio values
- * in one selected currency.
+ * Foreign-exchange helpers for normalizing multi-currency portfolio values
+ * into one Base Currency (the dashboard's `displayCurrency` — user-selected,
+ * defaulting to `profiles.default_currency`, falling back to
+ * `DEFAULT_BASE_CURRENCY`).
  *
- * All rates are anchored to a single base currency (USD by default), so
- * converting between any two currencies only ever needs one fetch.
+ * Rate-fetching itself lives in `lib/services/fx-client.ts` (the
+ * MOCK_MODE-patterned service, in-memory cached); this module wraps that
+ * with the one guarantee page rendering needs that the client deliberately
+ * doesn't provide — a rate table no matter what, via a static fallback if
+ * the real provider is unreachable.
  */
+
+import { getFxRates } from "@/lib/services/fx-client";
+
+/** The app's default Base Currency when no user preference is set. */
+export const DEFAULT_BASE_CURRENCY = "USD";
 
 const FALLBACK_RATES_FROM_USD: Record<string, number> = {
   USD: 1,
@@ -18,43 +28,21 @@ const FALLBACK_RATES_FROM_USD: Record<string, number> = {
   SGD: 1.34,
 };
 
-type OpenErApiResponse = {
-  result: string;
-  rates: Record<string, number>;
-};
-
 /**
- * Fetches live rates from https://open.er-api.com, anchored to `base`
- * (USD by default). Frankfurter (the previous provider) doesn't support
- * AED, which this app needs, so this uses open.er-api.com instead. Checked
- * at most twice a day (`revalidate: 43200` seconds = 12h) since FX rates
- * don't need to be any fresher than that for portfolio display purposes.
- * Falls back to a static approximation — effectively a 1:1 ratio for any
- * currency it doesn't recognize — if the request fails, so the dashboard
- * never breaks over a network hiccup or an unsupported code.
+ * Fetches live rates anchored to `base` (`DEFAULT_BASE_CURRENCY` by
+ * default) from `lib/services/fx-client.ts`. Falls back to a static
+ * approximation — effectively a 1:1 ratio for any currency it doesn't
+ * recognize — if that fails, so the dashboard never breaks over a network
+ * hiccup or an unsupported code.
  */
 export async function getExchangeRatesFromUsd(
-  base = "USD",
+  base: string = DEFAULT_BASE_CURRENCY,
 ): Promise<Record<string, number>> {
-  try {
-    const res = await fetch(`https://open.er-api.com/v6/latest/${base}`, {
-      next: { revalidate: 43200 },
-    });
-
-    if (!res.ok) {
-      throw new Error(`open.er-api.com returned ${res.status}`);
-    }
-
-    const data: OpenErApiResponse = await res.json();
-
-    if (data.result !== "success" || !data.rates) {
-      throw new Error("open.er-api.com returned an unsuccessful result");
-    }
-
-    return { [base]: 1, ...data.rates };
-  } catch {
+  const result = await getFxRates(base);
+  if (!result.ok) {
     return FALLBACK_RATES_FROM_USD;
   }
+  return result.rates;
 }
 
 /**
@@ -76,4 +64,20 @@ export function convertAmount(
   const amountInBase = amount / fromRate;
 
   return amountInBase * toRate;
+}
+
+/**
+ * Converts `amount` from `fromCurrency` into the portfolio's Base Currency —
+ * the same operation as `convertAmount`, named for the specific "normalize
+ * onto one base before aggregating" use case (dashboard totals, the
+ * Portfolio Performance chart), so call sites read as what they're doing
+ * rather than a generic any-to-any conversion.
+ */
+export function convertToBaseCurrency(
+  amount: number,
+  fromCurrency: string,
+  baseCurrency: string,
+  rates: Record<string, number>,
+): number {
+  return convertAmount(amount, fromCurrency, baseCurrency, rates);
 }

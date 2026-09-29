@@ -19,7 +19,11 @@ import { DashboardMetricCards } from "@/components/dashboard-metric-cards";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
-import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
+import {
+  DEFAULT_BASE_CURRENCY,
+  convertToBaseCurrency,
+  getExchangeRatesFromUsd,
+} from "@/lib/fx";
 import { buildNetWorthSeries } from "@/lib/portfolio-performance";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
@@ -88,8 +92,12 @@ export default async function DashboardPage({
     ]);
 
   const { currency: currencyParam } = await searchParams;
+  // The dashboard's Base Currency: every asset's native `currency` is
+  // converted into this one before being aggregated into a total (Net
+  // Worth, Total Assets, Total Liabilities) or plotted on the Portfolio
+  // Performance chart — see `lib/fx.ts`.
   const displayCurrency =
-    currencyParam || profile?.default_currency || "USD";
+    currencyParam || profile?.default_currency || DEFAULT_BASE_CURRENCY;
 
   // Portfolio Performance chart — Total Net Worth over time across every
   // asset (any category), so it needs every asset's `asset_history` rows, not
@@ -124,10 +132,10 @@ export default async function DashboardPage({
         .filter((h) => h.asset_id === asset.id)
         .map((h) => ({
           recorded_date: h.recorded_date,
-          value: convertAmount(h.value, asset.currency, displayCurrency, rates),
+          value: convertToBaseCurrency(h.value, asset.currency, displayCurrency, rates),
           net_equity:
             h.net_equity != null
-              ? convertAmount(h.net_equity, asset.currency, displayCurrency, rates)
+              ? convertToBaseCurrency(h.net_equity, asset.currency, displayCurrency, rates)
               : null,
         })),
     })),
@@ -153,13 +161,14 @@ export default async function DashboardPage({
     .filter((asset) => !asset.is_liability)
     .reduce(
       (sum, asset) =>
-        sum + convertAmount(grossAssetValue(asset), asset.currency, displayCurrency, rates),
+        sum +
+        convertToBaseCurrency(grossAssetValue(asset), asset.currency, displayCurrency, rates),
       0,
     );
 
   const totalLiabilitiesValue = (assets ?? []).reduce(
     (sum, asset) =>
-      sum + convertAmount(assetLiability(asset), asset.currency, displayCurrency, rates),
+      sum + convertToBaseCurrency(assetLiability(asset), asset.currency, displayCurrency, rates),
     0,
   );
 
@@ -173,7 +182,7 @@ export default async function DashboardPage({
     const gain = calculateUnrealizedGain(marketValuation, totalCost);
     return (
       sum +
-      convertAmount(gain.amount, asset.currency, displayCurrency, rates)
+      convertToBaseCurrency(gain.amount, asset.currency, displayCurrency, rates)
     );
   }, 0);
 
@@ -198,6 +207,7 @@ export default async function DashboardPage({
         <div className="flex items-center gap-4">
           <DashboardHeaderControls
             totalNetWorthFormatted={currencyFormatter.format(totalNetWorth)}
+            baseCurrency={displayCurrency}
           />
           <Link
             href="/dashboard/settings"
@@ -225,6 +235,7 @@ export default async function DashboardPage({
           unrealizedGainSign={
             totalUnrealizedGain > 0 ? "+" : totalUnrealizedGain < 0 ? "-" : null
           }
+          baseCurrency={displayCurrency}
         />
 
         <PortfolioPerformanceChart series={performanceSeries} currency={displayCurrency} />
