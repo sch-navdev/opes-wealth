@@ -29,7 +29,7 @@ export default async function SettingsPage() {
     .single();
 
   return (
-    <div className="min-h-screen bg-background px-8 py-10">
+    <div className="w-full px-4 py-10 sm:px-6 lg:px-8">
       <Link
         href="/dashboard"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"

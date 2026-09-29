@@ -8,6 +8,7 @@ const dictionary = {
 
   // Dashboard chrome
   welcome_back: { en: "Welcome back", fr: "Bon retour" },
+  nav_dashboard: { en: "Dashboard", fr: "Tableau de bord" },
   portfolio_heading: { en: "Portfolio", fr: "Portefeuille" },
   portfolio_subtitle: {
     en: "Every asset and liability you're tracking.",

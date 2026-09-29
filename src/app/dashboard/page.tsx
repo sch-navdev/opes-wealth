@@ -1,5 +1,3 @@
-import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
@@ -8,9 +6,7 @@ import {
   getMockUserId,
   isMockAuthEnabled,
 } from "@/utils/supabase/mock-auth";
-import { logout } from "@/app/auth/actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
 import { CurrencySwitcher } from "@/components/currency-switcher";
@@ -187,10 +183,9 @@ export default async function DashboardPage({
   }, 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+    <>
+      <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <Image src="/logo.png" alt="Opes Wealth" width={40} height={40} className="size-10" priority />
           <Avatar size="lg">
             <AvatarImage src={profile?.avatar_base64 || undefined} alt="" />
             <AvatarFallback>{initials}</AvatarFallback>
@@ -209,21 +204,10 @@ export default async function DashboardPage({
             totalNetWorthFormatted={currencyFormatter.format(totalNetWorth)}
             baseCurrency={displayCurrency}
           />
-          <Link
-            href="/dashboard/settings"
-            className="text-sm text-primary underline-offset-4 hover:underline"
-          >
-            <T k="profile_settings" />
-          </Link>
-          <form action={logout}>
-            <Button type="submit" variant="outline">
-              <T k="sign_out" />
-            </Button>
-          </form>
         </div>
       </header>
 
-      <main className="space-y-6 px-4 py-10 sm:px-8">
+      <main className="w-full space-y-6 px-4 py-10 sm:px-6 lg:px-8">
         <DashboardMetricCards
           netWorthFormatted={currencyFormatter.format(totalNetWorth)}
           assetsFormatted={currencyFormatter.format(totalAssetsValue)}
@@ -263,6 +247,6 @@ export default async function DashboardPage({
           rates={rates}
         />
       </main>
-    </div>
+    </>
   );
 }

@@ -757,7 +757,7 @@ export function AssetDetailView({
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10 sm:px-8">
+    <div className="w-full px-4 py-10 sm:px-6 lg:px-8">
       <Link
         href="/dashboard"
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -766,7 +766,7 @@ export function AssetDetailView({
         {t("back_to_portfolio")}
       </Link>
 
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <Card className="border-border bg-card">
           <CardContent className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
@@ -2081,7 +2081,7 @@ export function AssetDetailView({
                       {t("core_property_details")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField label={t("address")} value={metadata.address} />
                     <DetailField label={t("type")} value={metadata.propertyType} />
                     <DetailField
@@ -2126,7 +2126,7 @@ export function AssetDetailView({
                       {t("dld_identifiers")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {metadata.is_offplan ? (
                       <>
                         <DetailField
@@ -2166,7 +2166,7 @@ export function AssetDetailView({
                       {t("adrec_identifiers")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {metadata.is_offplan ? (
                       <>
                         <DetailField
@@ -2204,7 +2204,7 @@ export function AssetDetailView({
                       {t("material_condition_ratings")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField
                       label={t("kitchen")}
                       value={metadata.condition.kitchen}
@@ -2234,7 +2234,7 @@ export function AssetDetailView({
                       {t("cost_fees_basis")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField
                       label={
                         metadata.contract_price != null
@@ -2477,7 +2477,7 @@ export function AssetDetailView({
 
                         {amortizationSummary && (
                           <div className="space-y-4 border-t border-border pt-4">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                               <div className="h-40 w-full min-w-0">
                                 <ResponsiveContainer width="100%" height="100%">
                                   <PieChart>
@@ -2624,7 +2624,7 @@ export function AssetDetailView({
                       {t("vehicle_details")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField label={t("make")} value={vehicleMetadata.make} />
                     <DetailField label={t("model")} value={vehicleMetadata.model} />
                     <DetailField
@@ -2665,7 +2665,7 @@ export function AssetDetailView({
                       {t("cost_fees_basis")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField
                       label={t("purchase_price")}
                       value={
@@ -2728,7 +2728,7 @@ export function AssetDetailView({
                     {t("private_equity_details")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailField
                     label={t("entity_name")}
                     value={privateEquityMetadata.entity_name}
@@ -2798,7 +2798,7 @@ export function AssetDetailView({
                     {t("crypto_details")}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
                   <DetailField label={t("coingecko_id")} value={cryptoMetadata.coingecko_id} />
                   <DetailField
