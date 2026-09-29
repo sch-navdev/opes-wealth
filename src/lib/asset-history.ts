@@ -13,4 +13,5 @@ export type AssetHistorySource =
   | "csv_import"
   | "coingecko"
   | "finnhub"
-  | "broker_import";
+  | "broker_import"
+  | "vehicle_valuation";

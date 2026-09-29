@@ -76,7 +76,7 @@ const dictionary = {
   // Tabs
   tab_overview: { en: "Overview", fr: "Aperçu" },
   tab_analysis: { en: "Analysis", fr: "Analyse" },
-  tab_settings: { en: "Settings", fr: "Paramètres" },
+  tab_settings: { en: "Specifications", fr: "Spécifications" },
 
   // Overview tab
   valuation_history: { en: "Valuation History", fr: "Historique de valorisation" },
@@ -187,9 +187,65 @@ const dictionary = {
   start_date: { en: "Start Date", fr: "Date de début" },
   no_loan_attached: { en: "No loan attached.", fr: "Aucun prêt associé." },
   loan_equity_note: {
-    en: "The outstanding loan balance is subtracted from this property's Net Equity.",
-    fr: "Le solde du prêt restant dû est déduit des capitaux propres nets de ce bien.",
+    en: "The outstanding loan balance is subtracted from this property's Equity.",
+    fr: "Le solde du prêt restant dû est déduit des capitaux propres de ce bien.",
   },
+  rate_type: { en: "Rate Type", fr: "Type de taux" },
+  rate_type_fixed: { en: "Fixed", fr: "Fixe" },
+  rate_type_hybrid: { en: "Hybrid (fixed then variable)", fr: "Hybride (fixe puis variable)" },
+  hybrid_rate_note: {
+    en: "Typical UAE \"salary transfer\" mortgage structure: a fixed teaser rate for an initial period, then a variable rate tied to a reference index. If the salary transfer lapses, a higher fallback rate applies instead.",
+    fr: "Structure de prêt « transfert de salaire » typique aux Émirats : un taux fixe initial, puis un taux variable indexé sur un taux de référence. Si le transfert de salaire cesse, un taux de repli plus élevé s'applique.",
+  },
+  fixed_period_months: { en: "Fixed Period (months)", fr: "Période fixe (mois)" },
+  reference_rate: { en: "Reference Rate (e.g. 3M EIBOR) %", fr: "Taux de référence (ex. EIBOR 3M) %" },
+  variable_margin: { en: "Variable Margin %", fr: "Marge variable %" },
+  floor_rate: { en: "Floor Rate %", fr: "Taux plancher %" },
+  fallback_rate: { en: "Fallback Rate %", fr: "Taux de repli %" },
+  salary_transfer_active: { en: "Salary Transfer Active", fr: "Transfert de salaire actif" },
+  principal_paid: { en: "Principal Paid", fr: "Capital remboursé" },
+  interest_paid: { en: "Interest Paid", fr: "Intérêts payés" },
+  loan_percent_paid: { en: "Loan Paid Off", fr: "Prêt remboursé" },
+  show_amortization_schedule: { en: "Show Amortization Schedule", fr: "Afficher l'échéancier" },
+  hide_amortization_schedule: { en: "Hide Amortization Schedule", fr: "Masquer l'échéancier" },
+  payment_number: { en: "#", fr: "N°" },
+  emirate: { en: "Emirate", fr: "Émirat" },
+  emirate_dubai: { en: "Dubai", fr: "Dubaï" },
+  emirate_abu_dhabi: { en: "Abu Dhabi", fr: "Abou Dabi" },
+  equity: { en: "Equity", fr: "Capitaux propres" },
+  tab_tenancy: { en: "Tenancy", fr: "Location" },
+  tenancy: { en: "Tenancy", fr: "Location" },
+  tenancy_note: {
+    en: "Manual fields, or auto-filled by uploading an Ejari (Dubai) / Tawtheeq (Abu Dhabi) contract PDF from the Tenancy tab.",
+    fr: "Champs manuels, ou remplis automatiquement en important un contrat Ejari (Dubaï) / Tawtheeq (Abou Dabi) au format PDF depuis l'onglet Location.",
+  },
+  tenant_name: { en: "Tenant Name", fr: "Nom du locataire" },
+  tenancy_start_date: { en: "Tenancy Start Date", fr: "Date de début de location" },
+  tenancy_end_date: { en: "Tenancy End Date", fr: "Date de fin de location" },
+  annual_rent: { en: "Annual Rent", fr: "Loyer annuel" },
+  tenancy_contract_value: { en: "Contract Value", fr: "Valeur du contrat" },
+  monthly_property_expenses: {
+    en: "Monthly Property Expenses",
+    fr: "Charges mensuelles du bien",
+  },
+  import_tenancy_contract: { en: "Import Tenancy Contract", fr: "Importer un contrat de location" },
+  import_tenancy_contract_desc: {
+    en: "Upload an Ejari or Tawtheeq contract PDF to auto-fill the tenancy fields above.",
+    fr: "Importez un contrat Ejari ou Tawtheeq au format PDF pour remplir automatiquement les champs de location ci-dessus.",
+  },
+  tenancy_dropzone_cta: { en: "Drop a contract PDF here, or click to browse", fr: "Déposez un contrat PDF ici, ou cliquez pour parcourir" },
+  tenancy_dropzone_subtext: { en: "Ejari (Dubai) or Tawtheeq (Abu Dhabi)", fr: "Ejari (Dubaï) ou Tawtheeq (Abou Dabi)" },
+  tenancy_dropzone_pending: { en: "Reading contract…", fr: "Lecture du contrat…" },
+  tenancy_dropzone_error_type: { en: "Please upload a PDF file.", fr: "Veuillez importer un fichier PDF." },
+  tenancy_import_success: {
+    en: "Found {n} field(s) and saved them to this property.",
+    fr: "{n} champ(s) trouvé(s) et enregistré(s) sur ce bien.",
+  },
+  rental_yield: { en: "Rental Yield", fr: "Rendement locatif" },
+  monthly_gross_rent: { en: "Monthly Gross Rent", fr: "Loyer brut mensuel" },
+  monthly_net_rent: { en: "Monthly Net Rent", fr: "Loyer net mensuel" },
+  net_profit_with_rent: { en: "Net Profit (incl. rental income)", fr: "Bénéfice net (loyers inclus)" },
+  property_irr: { en: "Property IRR", fr: "TRI du bien" },
   dld_identifiers: {
     en: "Dubai Land Department / RERA Identifiers",
     fr: "Identifiants Dubai Land Department / RERA",
@@ -376,6 +432,68 @@ const dictionary = {
   vehicle_year_required: { en: "Year is required.", fr: "L'année est requise." },
   vehicle_vin_required: { en: "VIN is required.", fr: "Le NIV est requis." },
 
+  // Vehicles — Total Cost of Ownership, mileage, French valuation client
+  license_plate: { en: "License Plate", fr: "Plaque d'immatriculation" },
+  license_plate_placeholder: { en: "e.g. AB-123-CD", fr: "ex. AB-123-CD" },
+  mileage: { en: "Mileage", fr: "Kilométrage" },
+  maintenance_costs: { en: "Maintenance Costs", fr: "Frais d'entretien" },
+  modifications: { en: "Modifications", fr: "Modifications" },
+  insurance_registration: {
+    en: "Insurance / Registration",
+    fr: "Assurance / Immatriculation",
+  },
+  total_cost_of_ownership: {
+    en: "Total Cost of Ownership",
+    fr: "Coût total de possession",
+  },
+  depreciation_vs_purchase: {
+    en: "Depreciation vs. Purchase Price",
+    fr: "Dépréciation vs. prix d'achat",
+  },
+  last_valuation: { en: "Last Valuation", fr: "Dernière valorisation" },
+  provider_la_centrale: { en: "La Centrale", fr: "La Centrale" },
+  provider_autobiz: { en: "Autobiz", fr: "Autobiz" },
+  refresh_vehicle_valuation: {
+    en: "Refresh Market Value",
+    fr: "Actualiser la valeur de marché",
+  },
+  refresh_vehicle_valuation_notice: {
+    en: "Fetches a market valuation from a French vehicle valuation provider using the License Plate/VIN and Mileage entered above.",
+    fr: "Récupère une valorisation de marché auprès d'un fournisseur français à partir de la plaque/du NIV et du kilométrage saisis ci-dessus.",
+  },
+  vehicle_valuation_updated: {
+    en: "Valuation updated to {value} ({provider}).",
+    fr: "Valorisation mise à jour à {value} ({provider}).",
+  },
+  vehicle_valuation_error_invalid_request: {
+    en: "Enter a License Plate or VIN, and a mileage, before refreshing.",
+    fr: "Saisissez une plaque d'immatriculation ou un NIV, ainsi qu'un kilométrage, avant d'actualiser.",
+  },
+  vehicle_valuation_error_not_found: {
+    en: "No matching vehicle was found.",
+    fr: "Aucun véhicule correspondant n'a été trouvé.",
+  },
+  vehicle_valuation_error_rate_limited: {
+    en: "Too many requests — try again shortly.",
+    fr: "Trop de requêtes — réessayez dans un instant.",
+  },
+  vehicle_valuation_error_provider_not_configured: {
+    en: "The vehicle valuation integration is not configured yet.",
+    fr: "L'intégration de valorisation de véhicules n'est pas encore configurée.",
+  },
+  vehicle_valuation_error_invalid_response: {
+    en: "Received an unexpected response from the valuation provider.",
+    fr: "Réponse inattendue reçue du fournisseur de valorisation.",
+  },
+  vehicle_valuation_error_timeout: {
+    en: "The valuation request timed out.",
+    fr: "La demande de valorisation a expiré.",
+  },
+  vehicle_valuation_error_network_error: {
+    en: "Could not reach the vehicle valuation provider.",
+    fr: "Impossible de contacter le fournisseur de valorisation.",
+  },
+
   // Private Equity category (Settings tab)
   private_equity_details: { en: "Private Equity Details", fr: "Détails de capital-investissement" },
   entity_name: { en: "Entity Name", fr: "Nom de l'entité" },
@@ -548,12 +666,13 @@ const dictionary = {
   investments_manual_quantity: { en: "Quantity", fr: "Quantité" },
   investments_manual_price: { en: "Price", fr: "Prix" },
 
-  // Portfolio Performance stacked area chart
+  // Portfolio Performance — total net worth chart with category filters
   portfolio_performance_title: { en: "Portfolio Performance", fr: "Performance du portefeuille" },
   portfolio_performance_empty: {
-    en: "No Equities price history yet — import trades and refresh a market price to see this chart fill in.",
-    fr: "Aucun historique de prix d'actions pour l'instant — importez des transactions et actualisez un prix de marché pour voir ce graphique se remplir.",
+    en: "No valuation history yet — refresh a valuation or import trades to see this chart fill in.",
+    fr: "Aucun historique de valorisation pour l'instant — actualisez une valorisation ou importez des transactions pour voir ce graphique se remplir.",
   },
+  portfolio_performance_filter_all: { en: "All", fr: "Tout" },
 
   // Live Pricing — Equities & Crypto (Phase 1 Step 9, second half)
   ticker_symbol: { en: "Ticker Symbol", fr: "Symbole boursier" },

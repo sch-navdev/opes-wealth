@@ -450,7 +450,11 @@ export function AddAssetDialog({
           )}
 
           {isVehicle && (
-            <VehicleFields value={vehicleMetadata} onChange={setVehicleMetadata} />
+            <VehicleFields
+              value={vehicleMetadata}
+              onChange={setVehicleMetadata}
+              currency={currency}
+            />
           )}
 
           {isPrivateEquity && (

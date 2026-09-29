@@ -1,10 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,27 +16,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
-import type { StackedPerformanceSeries } from "@/lib/portfolio-performance";
-
-const CHART_COLORS = [
-  "var(--color-chart-1)",
-  "var(--color-chart-2)",
-  "var(--color-chart-3)",
-  "var(--color-chart-4)",
-  "var(--color-chart-5)",
-];
+import {
+  PORTFOLIO_PERFORMANCE_TOTAL_KEY,
+  type PortfolioPerformanceSeries,
+} from "@/lib/portfolio-performance";
+import type { TranslationKey } from "@/lib/i18n";
 
 export function PortfolioPerformanceChart({
   series,
   currency,
 }: {
-  series: StackedPerformanceSeries;
+  series: PortfolioPerformanceSeries;
   currency: string;
 }) {
   const { t } = useLanguage();
   const { maskValue } = usePrivacy();
+  const [activeFilter, setActiveFilter] = useState<string>(PORTFOLIO_PERFORMANCE_TOTAL_KEY);
 
   const currencyFormatter = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -56,6 +55,17 @@ export function PortfolioPerformanceChart({
     return Number.isNaN(parsed.getTime()) ? isoDate : dateFormatter.format(parsed);
   }
 
+  function categoryLabel(category: string): string {
+    const key = CATEGORY_NAME_KEYS[category] as TranslationKey | undefined;
+    return key ? t(key) : category;
+  }
+
+  const activeKey = series.categories.includes(activeFilter)
+    ? activeFilter
+    : PORTFOLIO_PERFORMANCE_TOTAL_KEY;
+  const activeLabel =
+    activeKey === PORTFOLIO_PERFORMANCE_TOTAL_KEY ? t("net_worth") : categoryLabel(activeKey);
+
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -63,7 +73,31 @@ export function PortfolioPerformanceChart({
           {t("portfolio_performance_title")}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {series.categories.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={activeKey === PORTFOLIO_PERFORMANCE_TOTAL_KEY ? "default" : "outline"}
+              onClick={() => setActiveFilter(PORTFOLIO_PERFORMANCE_TOTAL_KEY)}
+            >
+              {t("portfolio_performance_filter_all")}
+            </Button>
+            {series.categories.map((category) => (
+              <Button
+                key={category}
+                type="button"
+                size="sm"
+                variant={activeKey === category ? "default" : "outline"}
+                onClick={() => setActiveFilter(category)}
+              >
+                {categoryLabel(category)}
+              </Button>
+            ))}
+          </div>
+        )}
+
         {series.points.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {t("portfolio_performance_empty")}
@@ -73,20 +107,10 @@ export function PortfolioPerformanceChart({
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={series.points}>
                 <defs>
-                  {series.seriesKeys.map((key, index) => (
-                    <linearGradient key={key} id={`portfolioSeries-${index}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor={CHART_COLORS[index % CHART_COLORS.length]}
-                        stopOpacity={0.5}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={CHART_COLORS[index % CHART_COLORS.length]}
-                        stopOpacity={0.05}
-                      />
-                    </linearGradient>
-                  ))}
+                  <linearGradient id="portfolioPerformanceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
@@ -110,19 +134,14 @@ export function PortfolioPerformanceChart({
                   labelFormatter={formatDate}
                   formatter={(value) => maskValue(currencyFormatter.format(Number(value)))}
                 />
-                <Legend wrapperStyle={{ fontSize: 12, color: "var(--color-muted-foreground)" }} />
-                {series.seriesKeys.map((key, index) => (
-                  <Area
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    name={key}
-                    stackId="1"
-                    stroke={CHART_COLORS[index % CHART_COLORS.length]}
-                    fill={`url(#portfolioSeries-${index})`}
-                    strokeWidth={2}
-                  />
-                ))}
+                <Area
+                  type="monotone"
+                  dataKey={activeKey}
+                  name={activeLabel}
+                  stroke="var(--color-primary)"
+                  fill="url(#portfolioPerformanceGradient)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>

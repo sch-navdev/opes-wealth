@@ -17,13 +17,16 @@ import { getCurrencySymbol } from "@/lib/currencies";
 import {
   CONDITION_RATINGS,
   CONSTRUCTION_YEARS,
+  EMIRATES,
   EPC_RATINGS,
   PROPERTY_TYPES,
   REGISTRATION_FEE_TYPES,
   calculateTotalArea,
   nextMilestoneId,
   type ConditionRatings,
+  type Emirate,
   type LinkedLoan,
+  type LoanRateType,
   type PaymentMilestone,
   type RealEstateMetadata,
   type RegistrationFeeType,
@@ -303,6 +306,24 @@ export function RealEstateFields({
             </SelectContent>
           </Select>
         </div>
+        <div className="min-w-0 space-y-2">
+          <Label>{t("emirate")}</Label>
+          <Select
+            value={value.emirate}
+            onValueChange={(next) => set("emirate", next as Emirate)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EMIRATES.map((emirate) => (
+                <SelectItem key={emirate} value={emirate}>
+                  {t(emirate === "dubai" ? "emirate_dubai" : "emirate_abu_dhabi")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -480,6 +501,7 @@ export function RealEstateFields({
         </div>
       )}
 
+      {value.emirate !== "abu_dhabi" && (
       <div className="w-full min-w-0 space-y-4 border border-border p-4">
         <h4 className="text-sm font-medium text-foreground">
           {t("dld_identifiers")}
@@ -525,7 +547,9 @@ export function RealEstateFields({
         </div>
         <p className="text-xs text-muted-foreground">{t("dld_identifiers_note")}</p>
       </div>
+      )}
 
+      {value.emirate === "abu_dhabi" && (
       <div className="w-full min-w-0 space-y-4 border border-border p-4">
         <h4 className="text-sm font-medium text-foreground">
           {t("adrec_identifiers")}
@@ -566,6 +590,7 @@ export function RealEstateFields({
         </div>
         <p className="text-xs text-muted-foreground">{t("adrec_identifiers_note")}</p>
       </div>
+      )}
 
       <div className="w-full min-w-0 space-y-4 border border-border p-4">
         <h4 className="text-sm font-medium text-foreground">{t("financing")}</h4>
@@ -615,12 +640,116 @@ export function RealEstateFields({
               onChange={(e) => setLoan({ start_date: e.target.value })}
             />
           </div>
+          <div className="min-w-0 space-y-2">
+            <Label>{t("rate_type")}</Label>
+            <Select
+              value={value.linked_loan.rate_type}
+              onValueChange={(next) => setLoan({ rate_type: next as LoanRateType })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fixed">{t("rate_type_fixed")}</SelectItem>
+                <SelectItem value="hybrid">{t("rate_type_hybrid")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {value.linked_loan.rate_type === "hybrid" && (
+          <div className="w-full min-w-0 space-y-4 border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground">{t("hybrid_rate_note")}</p>
+            <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
+              <NumberField
+                label={t("fixed_period_months")}
+                value={value.linked_loan.fixed_period_months}
+                onChange={(next) => setLoan({ fixed_period_months: next })}
+              />
+              <NumberField
+                label={t("reference_rate")}
+                value={value.linked_loan.reference_rate}
+                onChange={(next) => setLoan({ reference_rate: next })}
+              />
+              <NumberField
+                label={t("variable_margin")}
+                value={value.linked_loan.variable_margin}
+                onChange={(next) => setLoan({ variable_margin: next })}
+              />
+              <NumberField
+                label={t("floor_rate")}
+                value={value.linked_loan.floor_rate}
+                onChange={(next) => setLoan({ floor_rate: next })}
+              />
+              <NumberField
+                label={t("fallback_rate")}
+                value={value.linked_loan.fallback_rate}
+                onChange={(next) => setLoan({ fallback_rate: next })}
+              />
+              <div className="sm:col-span-2">
+                <ToggleField
+                  label={t("salary_transfer_active")}
+                  checked={value.linked_loan.salary_transfer_active}
+                  onChange={(next) => setLoan({ salary_transfer_active: next })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {(value.linked_loan.amount || value.linked_loan.outstanding_principal) ? (
           <p className="text-xs text-muted-foreground">
             {t("loan_equity_note")}
           </p>
         ) : null}
+      </div>
+
+      <div className="w-full min-w-0 space-y-4 border border-border p-4">
+        <h4 className="text-sm font-medium text-foreground">{t("tenancy")}</h4>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
+          <TextField
+            label={t("tenant_name")}
+            value={value.tenant_name}
+            onChange={(next) => set("tenant_name", next)}
+          />
+          <div className="min-w-0 space-y-2">
+            <Label>{t("tenancy_start_date")}</Label>
+            <Input
+              type="date"
+              className="w-full min-w-0"
+              value={value.tenancy_start_date}
+              onChange={(e) => set("tenancy_start_date", e.target.value)}
+            />
+          </div>
+          <div className="min-w-0 space-y-2">
+            <Label>{t("tenancy_end_date")}</Label>
+            <Input
+              type="date"
+              className="w-full min-w-0"
+              value={value.tenancy_end_date}
+              onChange={(e) => set("tenancy_end_date", e.target.value)}
+            />
+          </div>
+          <NumberField
+            label={t("annual_rent")}
+            value={value.annual_rent}
+            onChange={(next) => set("annual_rent", next)}
+            currency={currency}
+          />
+          <NumberField
+            label={t("tenancy_contract_value")}
+            value={value.tenancy_contract_value}
+            onChange={(next) => set("tenancy_contract_value", next)}
+            currency={currency}
+          />
+          <NumberField
+            label={t("monthly_property_expenses")}
+            value={value.monthly_property_expenses}
+            onChange={(next) => set("monthly_property_expenses", next)}
+            currency={currency}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">{t("tenancy_note")}</p>
       </div>
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">

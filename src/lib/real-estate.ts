@@ -20,18 +20,39 @@ export type PaymentMilestone = {
   status: "paid" | "pending";
 };
 
+/** "fixed" = `interest_rate` applies for the full `duration_months`. "hybrid" = a fixed teaser rate for `fixed_period_months`, then a variable rate for the remainder (the common UAE "salary transfer" mortgage structure). */
+export type LoanRateType = "fixed" | "hybrid";
+
 export type LinkedLoan = {
   lender_name: string;
   amount: number | null;
+  /** Rate used for the whole term when `rate_type === "fixed"`, and for the initial teaser period when `rate_type === "hybrid"`. Annual percentage, e.g. `3.99`. */
   interest_rate: number | null;
   duration_months: number | null;
   start_date: string;
   monthly_payment: number | null;
-  /** Current principal still owed — the actual liability, distinct from `amount` (the original loan). Falls back to `amount` (see `resolveOutstandingLoanBalance`) for loans entered before this field existed. */
+  /** Current principal still owed — the actual liability, distinct from `amount` (the original loan). Falls back to `amount` (see `resolveOutstandingLoanBalance`) for loans entered before this field existed, or when there isn't enough data to run the amortization engine (see `lib/amortization.ts`). */
   outstanding_principal: number | null;
+
+  rate_type: LoanRateType;
+  /** Hybrid only — how many months `interest_rate` (the fixed teaser rate) applies before switching to the variable rate. */
+  fixed_period_months: number | null;
+  /** Hybrid only — margin added on top of the reference rate (e.g. 3-month EIBOR) once the fixed period ends. Annual percentage points, e.g. `1.79`. */
+  variable_margin: number | null;
+  /** Hybrid only — the reference index rate (e.g. current 3-month EIBOR), entered manually since this app has no live rate feed. Annual percentage. */
+  reference_rate: number | null;
+  /** Hybrid only — the variable rate never goes below this floor, even if `reference_rate + variable_margin` would be lower. Annual percentage. */
+  floor_rate: number | null;
+  /** Hybrid only — whether the borrower's salary transfer to the lender is still active. Many UAE mortgages carry a materially higher rate if it lapses. */
+  salary_transfer_active: boolean;
+  /** Hybrid only — annual rate applied instead of `reference_rate + variable_margin` (still floored by `floor_rate`) once `salary_transfer_active` is false. */
+  fallback_rate: number | null;
 };
 
 export type RegistrationFeeType = "Notary" | "RERA" | "ADM";
+
+/** Which emirate's land authority this property is registered with — gates whether the DLD (Dubai) or ADREC/DARI (Abu Dhabi) identifier panels and refresh actions apply, since a property is registered with exactly one. */
+export type Emirate = "dubai" | "abu_dhabi";
 
 export type RealEstateMetadata = {
   address: string;
@@ -72,6 +93,9 @@ export type RealEstateMetadata = {
   epcRating: string;
   condition: ConditionRatings;
   ownership: OwnershipEntry[];
+
+  /** Which emirate's land authority this property is registered with — see `Emirate`. Defaults to `"dubai"`; assets saved before this field existed are treated as Dubai (the only emirate this app originally supported). */
+  emirate: Emirate;
 
   // Off-plan property tracking
   is_offplan: boolean;
@@ -135,8 +159,22 @@ export type RealEstateMetadata = {
   adrec_construction_stage: string;
   adrec_inspection_date: string;
 
-  // Financing linked to this property, subtracted from Net Equity.
+  // Financing linked to this property, subtracted from the market value to get Equity.
   linked_loan: LinkedLoan;
+
+  // Tenancy / rental tracking. `tenant_name`/date/amount fields are typically
+  // filled by parsing an uploaded Ejari (Dubai) or Tawtheeq (Abu Dhabi)
+  // contract PDF (see `lib/tenancy-parser.ts`), but remain plain editable
+  // fields so they also work for a property with no contract on file.
+  tenant_name: string;
+  tenancy_start_date: string;
+  tenancy_end_date: string;
+  /** Total contract value over the full tenancy term (Ejari "Contract Amount" / Tawtheeq "Contract Value") — may span multiple years and differ from `annual_rent * years`. */
+  tenancy_contract_value: number | null;
+  /** Annual rent (Ejari "Annual Amount" / Tawtheeq "Annual Rent"). */
+  annual_rent: number | null;
+  /** Recurring monthly property expenses (service charges, maintenance, etc.) not otherwise tracked — subtracted from gross rent to get net rent. */
+  monthly_property_expenses: number | null;
 };
 
 export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
@@ -181,6 +219,8 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
   },
   ownership: [{ name: "", percentage: 100 }],
 
+  emirate: "dubai",
+
   is_offplan: false,
   market_valuation: null,
   contract_price: null,
@@ -220,7 +260,21 @@ export const EMPTY_REAL_ESTATE_METADATA: RealEstateMetadata = {
     start_date: "",
     monthly_payment: null,
     outstanding_principal: null,
+    rate_type: "fixed",
+    fixed_period_months: null,
+    variable_margin: null,
+    reference_rate: null,
+    floor_rate: null,
+    salary_transfer_active: true,
+    fallback_rate: null,
   },
+
+  tenant_name: "",
+  tenancy_start_date: "",
+  tenancy_end_date: "",
+  tenancy_contract_value: null,
+  annual_rent: null,
+  monthly_property_expenses: null,
 };
 
 /**
@@ -330,7 +384,15 @@ export function calculateCashInvestedToDate(metadata: RealEstateMetadata): numbe
   return (metadata.paid_to_date ?? 0) + sumAcquisitionFees(metadata);
 }
 
-/** Net gain against the full cost basis (not just the raw purchase price), and that gain as a percentage of the cost basis. */
+/** Equity = current market value minus the outstanding loan balance still owed against it. */
+export function calculateEquity(
+  marketValuation: number,
+  outstandingLoanBalance: number,
+): number {
+  return marketValuation - outstandingLoanBalance;
+}
+
+/** Unrealized Gain / Net Profit against the full cost basis (not just the raw purchase price), and that gain as a percentage of the cost basis. */
 export function calculateUnrealizedGain(
   marketValuation: number,
   totalCost: number,
@@ -361,6 +423,8 @@ export const REGISTRATION_FEE_TYPES: RegistrationFeeType[] = [
   "RERA",
   "ADM",
 ];
+
+export const EMIRATES: Emirate[] = ["dubai", "abu_dhabi"];
 
 export const PROPERTY_TYPES = [
   "Apartment",

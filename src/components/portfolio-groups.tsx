@@ -45,7 +45,7 @@ type AssetRow = {
 };
 
 /** Maps the DB-seeded category names (`0001_initial_schema.sql`/`0009_vehicle_private_equity_categories.sql`) to a translated group heading. A category not in this map (e.g. one added later by hand) just falls back to its raw stored name. */
-const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
+export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   "Real Estate": "category_real_estate",
   SCPI: "category_scpi",
   Equities: "category_equities",

@@ -10,6 +10,17 @@ import {
   resolveOutstandingLoanBalance,
   sumAcquisitionFees,
 } from "@/lib/real-estate";
+import { canAmortize, getOutstandingPrincipalAt } from "@/lib/amortization";
+import {
+  hasAnyExtractedField,
+  parseTenancyContract,
+  type ParsedTenancyContract,
+} from "@/lib/tenancy-parser";
+import { parseVehicleMetadata } from "@/lib/vehicles";
+import {
+  getVehicleValuation,
+  type VehicleValuationErrorCode,
+} from "@/lib/services/vehicle-valuation-client";
 import {
   getOqoodProjectStatus,
   getSmartValuation,
@@ -299,7 +310,13 @@ export async function updateAssetValuation(
 
   if (isRealEstate) {
     const reMetadata = parseRealEstateMetadata(asset.metadata);
-    const loanPrincipal = resolveOutstandingLoanBalance(reMetadata.linked_loan);
+    // Equity = current market value − outstanding loan balance. The loan
+    // balance itself prefers the amortization engine's exact point-in-time
+    // figure (`lib/amortization.ts`) over the manually-entered
+    // `outstanding_principal`, whenever the loan has enough data to run it.
+    const loanPrincipal = canAmortize(reMetadata.linked_loan)
+      ? getOutstandingPrincipalAt(reMetadata.linked_loan, recordedDate)
+      : resolveOutstandingLoanBalance(reMetadata.linked_loan);
     const outstandingOffplan = reMetadata.is_offplan
       ? reMetadata.outstanding_balance
       : 0;
@@ -409,6 +426,13 @@ export async function refreshDldValuation(id: string): Promise<RefreshDldValuati
   }
 
   const metadata = parseRealEstateMetadata(asset.metadata);
+
+  if (metadata.emirate === "abu_dhabi") {
+    return {
+      ok: false,
+      error: "This property is registered in Abu Dhabi — use the ADREC/DARI refresh instead.",
+    };
+  }
 
   if (metadata.is_offplan) {
     const result = await getOqoodProjectStatus({
@@ -553,6 +577,13 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
   }
 
   const metadata = parseRealEstateMetadata(asset.metadata);
+
+  if (metadata.emirate !== "abu_dhabi") {
+    return {
+      ok: false,
+      error: "This property is registered in Dubai — use the DLD/RERA refresh instead.",
+    };
+  }
 
   if (metadata.is_offplan) {
     const result = await getOffPlanProjectTracking({
@@ -1050,4 +1081,213 @@ export async function importBrokerTrades(
   revalidatePath("/dashboard", "layout");
 
   return { results };
+}
+
+export type ImportTenancyContractResult =
+  | { ok: true; parsed: ParsedTenancyContract }
+  | { ok: false; error: string };
+
+/**
+ * Extracts tenancy details from an uploaded Ejari (Dubai) or Tawtheeq
+ * (Abu Dhabi) contract PDF — picked via the asset's `metadata.emirate` — and
+ * merges any recognized fields into the asset's Real Estate metadata (see
+ * `lib/tenancy-parser.ts` for the label-based extraction logic). Only
+ * overwrites the fields it actually found; anything the parser couldn't
+ * confidently extract is left as whatever was already saved.
+ */
+export async function importTenancyContract(
+  assetId: string,
+  formData: FormData,
+): Promise<ImportTenancyContractResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "You must be signed in to import a tenancy contract." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "No file was uploaded." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset) {
+    return { ok: false, error: "Asset not found." };
+  }
+
+  if (asset.asset_categories?.name !== "Real Estate") {
+    return {
+      ok: false,
+      error: "Tenancy contract import is only available for Real Estate assets.",
+    };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata);
+
+  let text: string;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const pdfParse = (await import("pdf-parse")).default;
+    const result = await pdfParse(buffer);
+    text = result.text;
+  } catch {
+    return { ok: false, error: "Could not read this PDF file." };
+  }
+
+  const extracted = parseTenancyContract(text, metadata.emirate);
+  if (!hasAnyExtractedField(extracted)) {
+    return {
+      ok: false,
+      error: "Couldn't find any recognizable tenancy details in this contract.",
+    };
+  }
+
+  const nextMetadata = {
+    ...metadata,
+    tenant_name: extracted.tenant_name ?? metadata.tenant_name,
+    tenancy_start_date: extracted.tenancy_start_date ?? metadata.tenancy_start_date,
+    tenancy_end_date: extracted.tenancy_end_date ?? metadata.tenancy_end_date,
+    tenancy_contract_value:
+      extracted.tenancy_contract_value ?? metadata.tenancy_contract_value,
+    annual_rent: extracted.annual_rent ?? metadata.annual_rent,
+  };
+
+  const { error: updateError } = await supabase
+    .from("assets")
+    .update({ metadata: nextMetadata })
+    .eq("id", assetId)
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+
+  return { ok: true, parsed: extracted };
+}
+
+export type RefreshVehicleValuationResult =
+  | {
+      ok: true;
+      isMock: boolean;
+      value: number;
+      depreciationTrend: "accelerating" | "stable" | "slowing";
+      provider: "la_centrale" | "autobiz";
+    }
+  | { ok: false; code?: VehicleValuationErrorCode; error: string };
+
+/**
+ * French vehicle valuation integration (`lib/services/vehicle-valuation-client.ts`)
+ * — follows the same persistence pattern as `refreshDldValuation`'s
+ * ready-built branch: the provider always returns a monetary valuation (no
+ * off-plan-style "no figure yet" case for vehicles), so this writes
+ * `assets.current_value` and an `asset_history` row directly rather than
+ * going through `updateAssetValuation` (which only merges Real Estate
+ * metadata shape).
+ */
+export async function refreshVehicleValuation(
+  id: string,
+): Promise<RefreshVehicleValuationResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "You must be signed in to refresh a valuation." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset) {
+    return { ok: false, error: "Asset not found." };
+  }
+
+  if (asset.asset_categories?.name !== "Vehicles") {
+    return {
+      ok: false,
+      error: "Vehicle valuation refresh is only available for Vehicles assets.",
+    };
+  }
+
+  const metadata = parseVehicleMetadata(asset.metadata);
+
+  const result = await getVehicleValuation({
+    licensePlate: metadata.license_plate || undefined,
+    vin: metadata.vin || undefined,
+    mileage: metadata.mileage ?? 0,
+  });
+
+  if (!result.ok) {
+    return { ok: false, code: result.code, error: result.error };
+  }
+
+  const nextMetadata = {
+    ...metadata,
+    market_valuation: result.market_valuation_amount,
+    last_valuation_source: result.provider,
+    last_valuation_date: result.valuation_date,
+  };
+
+  const { error: updateError } = await supabase
+    .from("assets")
+    .update({ current_value: result.market_valuation_amount, metadata: nextMetadata })
+    .eq("id", id)
+    .eq("profile_id", user.id);
+
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  const { error: historyError } = await supabase.from("asset_history").upsert(
+    {
+      asset_id: id,
+      recorded_date: result.valuation_date,
+      value: result.market_valuation_amount,
+      net_equity: result.market_valuation_amount,
+      source: "vehicle_valuation",
+    },
+    { onConflict: "asset_id,recorded_date" },
+  );
+
+  if (historyError) {
+    return { ok: false, error: historyError.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
+
+  return {
+    ok: true,
+    isMock: result.isMock,
+    value: result.market_valuation_amount,
+    depreciationTrend: result.depreciation_trend,
+    provider: result.provider,
+  };
 }

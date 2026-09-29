@@ -4,11 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, CloudDownload, Landmark, LineChart, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Car, CloudDownload, Landmark, LineChart, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -68,8 +71,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
+import { TenancyContractDialog } from "@/components/tenancy-contract-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
@@ -77,16 +86,28 @@ import { useLanguage } from "@/context/language-context";
 import {
   refreshAdrecValuation,
   refreshDldValuation,
+  refreshVehicleValuation,
   updateAssetValuation,
 } from "@/app/dashboard/actions";
 import {
   calculateCashInvestedToDate,
+  calculateEquity,
   calculateTotalCost,
   calculateUnrealizedGain,
   parseRealEstateMetadata,
   resolveOutstandingLoanBalance,
 } from "@/lib/real-estate";
-import { parseVehicleMetadata } from "@/lib/vehicles";
+import {
+  canAmortize,
+  getOutstandingPrincipalAt,
+  summarizeAmortization,
+} from "@/lib/amortization";
+import { calculateIrr, type DatedCashFlow } from "@/lib/irr";
+import {
+  calculateVehicleDepreciation,
+  calculateVehicleTotalCost,
+  parseVehicleMetadata,
+} from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import { estimateCostBasisUnitPrice, parseEquityMetadata } from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
@@ -163,6 +184,17 @@ const ADREC_ERROR_KEYS: Record<string, TranslationKey> = {
   NETWORK_ERROR: "adrec_error_network_error",
 };
 
+/** Maps `refreshVehicleValuation`'s `VehicleValuationErrorCode` to a localized message key, following the `DLD_ERROR_KEYS` lowercase-snake-case convention. */
+const VEHICLE_VALUATION_ERROR_KEYS: Record<string, TranslationKey> = {
+  invalid_request: "vehicle_valuation_error_invalid_request",
+  not_found: "vehicle_valuation_error_not_found",
+  rate_limited: "vehicle_valuation_error_rate_limited",
+  provider_not_configured: "vehicle_valuation_error_provider_not_configured",
+  invalid_response: "vehicle_valuation_error_invalid_response",
+  timeout: "vehicle_valuation_error_timeout",
+  network_error: "vehicle_valuation_error_network_error",
+};
+
 function DetailField({
   label,
   value,
@@ -230,6 +262,10 @@ export function AssetDetailView({
   const [dldError, setDldError] = useState<string | null>(null);
   const [dldMessage, setDldMessage] = useState<string | null>(null);
   const [isDldPending, startDldTransition] = useTransition();
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [vehicleValuationError, setVehicleValuationError] = useState<string | null>(null);
+  const [vehicleValuationMessage, setVehicleValuationMessage] = useState<string | null>(null);
+  const [isVehicleValuationPending, startVehicleValuationTransition] = useTransition();
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
@@ -239,6 +275,12 @@ export function AssetDetailView({
   const isCrypto = categoryName === "Crypto";
   const metadata = parseRealEstateMetadata(asset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
+  const vehicleTotalCost = vehicleMetadata
+    ? calculateVehicleTotalCost(vehicleMetadata, asset.current_value)
+    : null;
+  const vehicleDepreciation = vehicleMetadata
+    ? calculateVehicleDepreciation(asset.current_value, vehicleMetadata.purchase_price)
+    : null;
   const privateEquityMetadata = isPrivateEquity
     ? parsePrivateEquityMetadata(asset.metadata)
     : null;
@@ -254,10 +296,26 @@ export function AssetDetailView({
     currency: asset.currency,
   });
 
+  const today = new Date().toISOString().slice(0, 10);
+  const loan = metadata.linked_loan;
+  const loanIsAmortizable = isRealEstate && canAmortize(loan);
+
   const marketValuation = isRealEstate
     ? metadata.market_valuation ?? asset.current_value
     : asset.current_value;
-  const netEquity = asset.current_value;
+
+  // Equity = current market value − outstanding loan balance. The loan
+  // balance prefers the amortization engine's exact point-in-time figure
+  // (`lib/amortization.ts`) over a manually-entered snapshot, so Equity
+  // stays accurate without the user re-visiting this asset to update it.
+  const outstandingLoanBalance = isRealEstate
+    ? loanIsAmortizable
+      ? getOutstandingPrincipalAt(loan, today)
+      : resolveOutstandingLoanBalance(loan)
+    : 0;
+  const netEquity = isRealEstate
+    ? calculateEquity(marketValuation, outstandingLoanBalance)
+    : asset.current_value;
 
   const totalCost = isRealEstate
     ? calculateTotalCost(metadata, marketValuation)
@@ -288,8 +346,56 @@ export function AssetDetailView({
   const grossShare = (ownershipPercent / 100) * marketValuation;
   const netShare = (ownershipPercent / 100) * netEquity;
   const equityRatio = marketValuation !== 0 ? (netEquity / marketValuation) * 100 : 0;
-  const outstandingLoanBalance = resolveOutstandingLoanBalance(metadata.linked_loan);
-  const hasLoan = !!(metadata.linked_loan.amount || metadata.linked_loan.outstanding_principal);
+  const hasLoan = !!(loan.amount || loan.outstanding_principal);
+  const amortizationSummary = loanIsAmortizable ? summarizeAmortization(loan, today) : null;
+
+  // --- Tenancy / yield / IRR ---------------------------------------------
+
+  function monthsBetween(from: string, to: string): number {
+    const f = new Date(from + "T00:00:00Z");
+    const toDate = new Date(to + "T00:00:00Z");
+    return Math.max(
+      0,
+      (toDate.getUTCFullYear() - f.getUTCFullYear()) * 12 +
+        (toDate.getUTCMonth() - f.getUTCMonth()),
+    );
+  }
+
+  const rentStartDate = metadata.tenancy_start_date || asset.purchase_date;
+  // The monthly loan payment used for net rent prefers the amortization
+  // engine's current installment (accurate under a hybrid rate) over the
+  // manually-entered `monthly_payment`.
+  const currentInstallment = amortizationSummary
+    ? amortizationSummary.schedule.find((entry) => entry.date > today)
+    : null;
+  const monthlyLoanPayment = hasLoan
+    ? currentInstallment?.paymentAmount ?? loan.monthly_payment ?? 0
+    : 0;
+  const monthlyGrossRent = metadata.annual_rent ? metadata.annual_rent / 12 : 0;
+  const monthlyPropertyExpenses = metadata.monthly_property_expenses ?? 0;
+  const monthlyNetRent = monthlyGrossRent - monthlyLoanPayment - monthlyPropertyExpenses;
+  const monthsOfTenancy = rentStartDate ? monthsBetween(rentStartDate, today) : 0;
+  const cumulativeNetRent = monthlyNetRent * monthsOfTenancy;
+  const netProfitWithRent =
+    unrealizedGain != null ? unrealizedGain.amount + cumulativeNetRent : null;
+
+  // Property-level IRR: initial outlay is the full cost basis, cash flows in
+  // between are the monthly net rent (already net of loan payments), and the
+  // terminal cash flow is today's Equity — the appreciation and rental yield
+  // combined into a single annualized return.
+  const irrCashFlows: DatedCashFlow[] = [];
+  if (isRealEstate && totalCost != null && asset.purchase_date) {
+    irrCashFlows.push({ date: asset.purchase_date, amount: -totalCost });
+    if (rentStartDate && monthlyNetRent !== 0) {
+      for (let m = 1; m <= monthsOfTenancy; m++) {
+        const d = new Date(rentStartDate + "T00:00:00Z");
+        d.setUTCMonth(d.getUTCMonth() + m);
+        irrCashFlows.push({ date: d.toISOString().slice(0, 10), amount: monthlyNetRent });
+      }
+    }
+    irrCashFlows.push({ date: today, amount: netEquity });
+  }
+  const propertyIrr = irrCashFlows.length > 0 ? calculateIrr(irrCashFlows) : null;
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
@@ -299,9 +405,9 @@ export function AssetDetailView({
 
   // Real Estate: the curve should never show a valuation predating the
   // purchase — drop anything earlier, and pin whatever lands on the purchase
-  // date itself to the all-in cost basis (purchase/contract price +
-  // acquisition fees), synthesizing that point if none is stored there yet.
-  // Only done for standard (non-off-plan) purchases: an off-plan property's
+  // date itself to the actual market value at purchase (not the cost basis —
+  // see below), synthesizing that point if none is stored there yet. Only
+  // done for standard (non-off-plan) purchases: an off-plan property's
   // earliest point is its down-payment milestone, which is already a more
   // accurate anchor than the full contract price (not yet paid at signing).
   // Falls back to the earliest available history point when `purchase_date`
@@ -309,17 +415,24 @@ export function AssetDetailView({
   const purchaseAnchorDate =
     isRealEstate && asset.purchase_date ? asset.purchase_date : null;
 
+  // Day 1's Market Value is the actual purchase/contract price — NOT the
+  // all-in cost basis (price + fees). That gap is exactly what the
+  // Unrealized Gain / Net Profit card measures, so Day 1 must show that gain
+  // as an immediate negative hit (e.g. a 3,400,000 purchase with 226,620 of
+  // acquisition fees shows a Day 1 Net Profit of -226,620), not zero.
+  const purchaseAnchorValue = metadata.contract_price ?? metadata.purchasePrice ?? marketValuation;
+
   let displayHistory = sortedHistory;
   if (purchaseAnchorDate) {
     displayHistory = sortedHistory.filter(
       (h) => h.recorded_date >= purchaseAnchorDate,
     );
-    if (!metadata.is_offplan && totalCost != null) {
+    if (!metadata.is_offplan) {
       const anchorPoint: AssetHistoryPoint = {
         id: "purchase-anchor",
         recorded_date: purchaseAnchorDate,
-        value: totalCost,
-        net_equity: totalCost,
+        value: purchaseAnchorValue,
+        net_equity: null, // recomputed below via the amortization engine
         source: "manual",
       };
       const hasAnchorPoint = displayHistory.some(
@@ -327,16 +440,29 @@ export function AssetDetailView({
       );
       displayHistory = hasAnchorPoint
         ? displayHistory.map((h) =>
-            h.recorded_date === purchaseAnchorDate ? anchorPoint : h,
+            h.recorded_date === purchaseAnchorDate
+              ? { ...h, value: purchaseAnchorValue }
+              : h,
           )
         : [anchorPoint, ...displayHistory];
     }
   }
 
+  // Equity per point on the graph = that point's Market Value minus the
+  // loan's exact outstanding principal on that date, from the amortization
+  // engine (`lib/amortization.ts`) — rather than trusting each history row's
+  // stored `net_equity`, which only ever reflected a manually-updated
+  // balance snapshot frozen at whichever date it was recorded.
   const chartData = displayHistory.map((h) => ({
     date: h.recorded_date,
     value: h.value,
-    netEquity: h.net_equity ?? h.value,
+    netEquity: loanIsAmortizable
+      ? calculateEquity(h.value, getOutstandingPrincipalAt(loan, h.recorded_date))
+      : h.net_equity ?? h.value,
+    // Net Profit at each point = that point's Market Value minus the (fixed)
+    // all-in cost basis — so Day 1 immediately shows the negative hit of the
+    // acquisition fees, not zero.
+    netProfit: totalCost != null ? h.value - totalCost : null,
   }));
 
   const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -459,6 +585,30 @@ export function AssetDetailView({
         t("dld_valuation_updated", {
           value: currencyFormatter.format(result.value),
           ref: result.certificateReference,
+        }),
+      );
+    });
+  }
+
+  function handleRefreshVehicleValuation() {
+    setVehicleValuationError(null);
+    setVehicleValuationMessage(null);
+
+    startVehicleValuationTransition(async () => {
+      const result = await refreshVehicleValuation(asset.id);
+
+      if (!result.ok) {
+        const key =
+          VEHICLE_VALUATION_ERROR_KEYS[result.code ?? ""] ??
+          "vehicle_valuation_error_network_error";
+        setVehicleValuationError(t(key));
+        return;
+      }
+
+      setVehicleValuationMessage(
+        t("vehicle_valuation_updated", {
+          value: currencyFormatter.format(result.value),
+          provider: t(result.provider === "autobiz" ? "provider_autobiz" : "provider_la_centrale"),
         }),
       );
     });
@@ -603,7 +753,7 @@ export function AssetDetailView({
                 </p>
               </div>
               <PrivacyToggleButton />
-              {isRealEstate && (
+              {isRealEstate && metadata.emirate === "abu_dhabi" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -641,7 +791,7 @@ export function AssetDetailView({
                   </AlertDialogContent>
                 </AlertDialog>
               )}
-              {isRealEstate && (
+              {isRealEstate && metadata.emirate !== "abu_dhabi" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -674,6 +824,46 @@ export function AssetDetailView({
                         onClick={handleRefreshFromDld}
                       >
                         {isDldPending ? t("dld_fetching") : t("refresh_from_dld")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              {isVehicle && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label={t("refresh_vehicle_valuation")}
+                      disabled={isVehicleValuationPending}
+                    >
+                      <Car
+                        className={cn("size-4", isVehicleValuationPending && "animate-pulse")}
+                      />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border bg-card">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground">
+                        {t("refresh_vehicle_valuation")}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
+                        {t("refresh_vehicle_valuation_notice")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isVehicleValuationPending}>
+                        {t("csv_cancel")}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={isVehicleValuationPending}
+                        onClick={handleRefreshVehicleValuation}
+                      >
+                        {isVehicleValuationPending
+                          ? t("dld_fetching")
+                          : t("refresh_vehicle_valuation")}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -834,6 +1024,17 @@ export function AssetDetailView({
           </p>
         )}
 
+        {(vehicleValuationError || vehicleValuationMessage) && (
+          <p
+            className={
+              vehicleValuationError ? "text-sm text-destructive" : "text-sm text-success"
+            }
+            role={vehicleValuationError ? "alert" : undefined}
+          >
+            {vehicleValuationError ?? vehicleValuationMessage}
+          </p>
+        )}
+
         {(isEquity || isCrypto) && (
           <div className="space-y-1">
             {(() => {
@@ -872,6 +1073,9 @@ export function AssetDetailView({
           <TabsList>
             <TabsTrigger value="overview">{t("tab_overview")}</TabsTrigger>
             <TabsTrigger value="analysis">{t("tab_analysis")}</TabsTrigger>
+            {isRealEstate && (
+              <TabsTrigger value="tenancy">{t("tab_tenancy")}</TabsTrigger>
+            )}
             <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
           </TabsList>
 
@@ -951,11 +1155,22 @@ export function AssetDetailView({
                         <Area
                           type="monotone"
                           dataKey="netEquity"
-                          name="Net Equity"
+                          name={t("equity")}
                           stroke="var(--color-success)"
                           fill="transparent"
                           strokeWidth={2}
                         />
+                        {isRealEstate && (
+                          <Area
+                            type="monotone"
+                            dataKey="netProfit"
+                            name={t("unrealized_gain")}
+                            stroke="var(--color-destructive)"
+                            fill="transparent"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                          />
+                        )}
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -963,6 +1178,7 @@ export function AssetDetailView({
               </CardContent>
             </Card>
 
+            {isRealEstate && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card className="border-border bg-card">
                 <CardContent className="space-y-1 py-4">
@@ -1072,6 +1288,73 @@ export function AssetDetailView({
                 </CardContent>
               </Card>
             </div>
+            )}
+
+            {isVehicle && vehicleMetadata && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Card className="border-border bg-card">
+                  <CardContent className="space-y-1 py-4">
+                    <p className="text-xs text-muted-foreground">
+                      {t("total_cost_of_ownership")}
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {vehicleTotalCost != null
+                        ? maskValue(currencyFormatter.format(vehicleTotalCost))
+                        : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("all_in_cost_basis")}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardContent className="space-y-1 py-4">
+                    <p className="text-xs text-muted-foreground">{t("mileage")}</p>
+                    <p className="text-lg font-semibold text-foreground">
+                      {vehicleMetadata.mileage != null
+                        ? maskValue(`${vehicleMetadata.mileage.toLocaleString()} km`)
+                        : "—"}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardContent className="space-y-1 py-4">
+                    <p className="text-xs text-muted-foreground">
+                      {t("depreciation_vs_purchase")}
+                    </p>
+                    <div className="flex w-full flex-wrap items-center gap-2">
+                      <p
+                        className={
+                          vehicleDepreciation != null
+                            ? vehicleDepreciation.amount <= 0
+                              ? "text-lg font-semibold text-success"
+                              : "text-lg font-semibold text-destructive"
+                            : "text-lg font-semibold text-foreground"
+                        }
+                      >
+                        {vehicleDepreciation != null
+                          ? maskValue(currencyFormatter.format(vehicleDepreciation.amount))
+                          : "—"}
+                      </p>
+                      {vehicleDepreciation?.percent != null && (
+                        <Badge
+                          variant="secondary"
+                          className={
+                            vehicleDepreciation.amount <= 0
+                              ? "whitespace-nowrap bg-success px-2 py-0.5 text-success-foreground"
+                              : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"
+                          }
+                        >
+                          {vehicleDepreciation.percent.toFixed(1)}%
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">
@@ -1187,7 +1470,7 @@ export function AssetDetailView({
                   </CardContent>
                 </Card>
 
-                {metadata.is_offplan && (
+                {metadata.is_offplan && metadata.emirate !== "abu_dhabi" && (
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle className="text-foreground">
@@ -1215,7 +1498,7 @@ export function AssetDetailView({
                   </Card>
                 )}
 
-                {metadata.is_offplan && (
+                {metadata.is_offplan && metadata.emirate === "abu_dhabi" && (
                   <Card className="border-border bg-card">
                     <CardHeader>
                       <CardTitle className="text-foreground">
@@ -1330,6 +1613,86 @@ export function AssetDetailView({
             )}
           </TabsContent>
 
+          {isRealEstate && (
+            <TabsContent value="tenancy" className="space-y-6">
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("tenancy")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <DetailField label={t("tenant_name")} value={metadata.tenant_name} />
+                    <DetailField
+                      label={t("tenancy_start_date")}
+                      value={metadata.tenancy_start_date}
+                    />
+                    <DetailField
+                      label={t("tenancy_end_date")}
+                      value={metadata.tenancy_end_date}
+                    />
+                    <DetailField
+                      label={t("annual_rent")}
+                      value={
+                        metadata.annual_rent != null
+                          ? maskValue(currencyFormatter.format(metadata.annual_rent))
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("tenancy_contract_value")}
+                      value={
+                        metadata.tenancy_contract_value != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.tenancy_contract_value),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("monthly_property_expenses")}
+                      value={
+                        metadata.monthly_property_expenses != null
+                          ? maskValue(
+                              currencyFormatter.format(metadata.monthly_property_expenses),
+                            )
+                          : null
+                      }
+                    />
+                  </div>
+                  <TenancyContractDialog assetId={asset.id} />
+                </CardContent>
+              </Card>
+
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("rental_yield")}</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <DetailField
+                    label={t("monthly_gross_rent")}
+                    value={maskValue(currencyFormatter.format(monthlyGrossRent))}
+                  />
+                  <DetailField
+                    label={t("monthly_net_rent")}
+                    value={maskValue(currencyFormatter.format(monthlyNetRent))}
+                  />
+                  <DetailField
+                    label={t("net_profit_with_rent")}
+                    value={
+                      netProfitWithRent != null
+                        ? maskValue(currencyFormatter.format(netProfitWithRent))
+                        : "—"
+                    }
+                  />
+                  <DetailField
+                    label={t("property_irr")}
+                    value={propertyIrr != null ? `${(propertyIrr * 100).toFixed(2)}%` : "—"}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           <TabsContent value="settings" className="space-y-6">
             <Card className="border-border bg-card">
               <CardHeader>
@@ -1353,11 +1716,13 @@ export function AssetDetailView({
                     purchase_date: asset.purchase_date,
                   }}
                 />
-                <CsvImportDialog
-                  assetId={asset.id}
-                  currentValue={asset.current_value}
-                  currency={asset.currency}
-                />
+                {!isRealEstate && !isVehicle && (
+                  <CsvImportDialog
+                    assetId={asset.id}
+                    currentValue={asset.current_value}
+                    currency={asset.currency}
+                  />
+                )}
                 <DeleteAssetButton
                   id={asset.id}
                   onSuccess={() => router.push("/dashboard")}
@@ -1411,6 +1776,7 @@ export function AssetDetailView({
                   </CardContent>
                 </Card>
 
+                {metadata.emirate !== "abu_dhabi" && (
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
@@ -1448,7 +1814,9 @@ export function AssetDetailView({
                     />
                   </CardContent>
                 </Card>
+                )}
 
+                {metadata.emirate === "abu_dhabi" && (
                 <Card className="border-border bg-card">
                   <CardHeader>
                     <CardTitle className="text-foreground">
@@ -1485,6 +1853,7 @@ export function AssetDetailView({
                     )}
                   </CardContent>
                 </Card>
+                )}
 
                 <Card className="border-border bg-card">
                   <CardHeader>
@@ -1762,6 +2131,137 @@ export function AssetDetailView({
                             value={metadata.linked_loan.start_date}
                           />
                         </div>
+
+                        {amortizationSummary && (
+                          <div className="space-y-4 border-t border-border pt-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div className="h-40 w-full min-w-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={[
+                                        {
+                                          name: t("principal_paid"),
+                                          value: amortizationSummary.principalPaidToDate,
+                                        },
+                                        {
+                                          name: t("interest_paid"),
+                                          value: amortizationSummary.interestPaidToDate,
+                                        },
+                                      ]}
+                                      dataKey="value"
+                                      nameKey="name"
+                                      innerRadius={35}
+                                      outerRadius={60}
+                                    >
+                                      <Cell fill="var(--color-success)" />
+                                      <Cell fill="var(--color-destructive)" />
+                                    </Pie>
+                                    <Tooltip
+                                      contentStyle={{
+                                        background: "var(--color-card)",
+                                        border: "1px solid var(--color-border)",
+                                        color: "var(--color-foreground)",
+                                      }}
+                                      formatter={(value) =>
+                                        maskValue(currencyFormatter.format(Number(value)))
+                                      }
+                                    />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                              </div>
+                              <div className="flex flex-col justify-center gap-3">
+                                <DetailField
+                                  label={t("principal_paid")}
+                                  value={maskValue(
+                                    currencyFormatter.format(
+                                      amortizationSummary.principalPaidToDate,
+                                    ),
+                                  )}
+                                />
+                                <DetailField
+                                  label={t("interest_paid")}
+                                  value={maskValue(
+                                    currencyFormatter.format(
+                                      amortizationSummary.interestPaidToDate,
+                                    ),
+                                  )}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{t("loan_percent_paid")}</span>
+                                <span>{amortizationSummary.percentPaid.toFixed(1)}%</span>
+                              </div>
+                              <ProgressBar
+                                percent={amortizationSummary.percentPaid}
+                                colorClassName="bg-success"
+                              />
+                            </div>
+                            <Collapsible open={scheduleOpen} onOpenChange={setScheduleOpen}>
+                              <CollapsibleTrigger asChild>
+                                <Button type="button" variant="outline" size="sm">
+                                  {scheduleOpen
+                                    ? t("hide_amortization_schedule")
+                                    : t("show_amortization_schedule")}
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="mt-3 max-h-80 overflow-y-auto border border-border">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>{t("payment_number")}</TableHead>
+                                        <TableHead>{t("due_date")}</TableHead>
+                                        <TableHead className="text-right">
+                                          {t("interest_rate")}
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                          {t("principal")}
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                          {t("interest_paid")}
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                          {t("outstanding_loan_balance")}
+                                        </TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {amortizationSummary.schedule.map((entry) => (
+                                        <TableRow key={entry.paymentNumber}>
+                                          <TableCell>{entry.paymentNumber}</TableCell>
+                                          <TableCell className="text-muted-foreground">
+                                            {entry.date}
+                                          </TableCell>
+                                          <TableCell className="text-right text-muted-foreground">
+                                            {entry.rateUsed.toFixed(2)}%
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            {maskValue(
+                                              currencyFormatter.format(entry.principalAmount),
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            {maskValue(
+                                              currencyFormatter.format(entry.interestAmount),
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            {maskValue(
+                                              currencyFormatter.format(entry.remainingBalance),
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
@@ -1774,22 +2274,108 @@ export function AssetDetailView({
             )}
 
             {isVehicle && vehicleMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">
-                    {t("vehicle_details")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <DetailField label={t("make")} value={vehicleMetadata.make} />
-                  <DetailField label={t("model")} value={vehicleMetadata.model} />
-                  <DetailField
-                    label={t("vehicle_year")}
-                    value={vehicleMetadata.year}
-                  />
-                  <DetailField label={t("vin")} value={vehicleMetadata.vin} />
-                </CardContent>
-              </Card>
+              <>
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      {t("vehicle_details")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <DetailField label={t("make")} value={vehicleMetadata.make} />
+                    <DetailField label={t("model")} value={vehicleMetadata.model} />
+                    <DetailField
+                      label={t("vehicle_year")}
+                      value={vehicleMetadata.year}
+                    />
+                    <DetailField label={t("vin")} value={vehicleMetadata.vin} />
+                    <DetailField
+                      label={t("license_plate")}
+                      value={vehicleMetadata.license_plate}
+                    />
+                    <DetailField
+                      label={t("mileage")}
+                      value={
+                        vehicleMetadata.mileage != null
+                          ? `${vehicleMetadata.mileage.toLocaleString()} km`
+                          : null
+                      }
+                    />
+                    {vehicleMetadata.last_valuation_date && (
+                      <DetailField
+                        label={t("last_valuation")}
+                        value={`${maskValue(
+                          currencyFormatter.format(vehicleMetadata.market_valuation ?? 0),
+                        )} (${
+                          vehicleMetadata.last_valuation_source === "autobiz"
+                            ? t("provider_autobiz")
+                            : t("provider_la_centrale")
+                        }, ${vehicleMetadata.last_valuation_date})`}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">
+                      {t("cost_fees_basis")}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <DetailField
+                      label={t("purchase_price")}
+                      value={
+                        vehicleMetadata.purchase_price != null
+                          ? maskValue(
+                              currencyFormatter.format(vehicleMetadata.purchase_price),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("maintenance_costs")}
+                      value={
+                        vehicleMetadata.maintenance_costs != null
+                          ? maskValue(
+                              currencyFormatter.format(vehicleMetadata.maintenance_costs),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("modifications")}
+                      value={
+                        vehicleMetadata.modifications != null
+                          ? maskValue(
+                              currencyFormatter.format(vehicleMetadata.modifications),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("insurance_registration")}
+                      value={
+                        vehicleMetadata.insurance_registration != null
+                          ? maskValue(
+                              currencyFormatter.format(
+                                vehicleMetadata.insurance_registration,
+                              ),
+                            )
+                          : null
+                      }
+                    />
+                    <DetailField
+                      label={t("total_cost_of_ownership")}
+                      value={
+                        vehicleTotalCost != null
+                          ? maskValue(currencyFormatter.format(vehicleTotalCost))
+                          : null
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              </>
             )}
 
             {isPrivateEquity && privateEquityMetadata && (

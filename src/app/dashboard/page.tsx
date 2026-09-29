@@ -20,8 +20,8 @@ import { PortfolioPerformanceChart } from "@/components/portfolio-performance-ch
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
-import { parseEquityMetadata } from "@/lib/equities";
-import { buildStackedPerformanceSeries } from "@/lib/portfolio-performance";
+import { buildNetWorthSeries } from "@/lib/portfolio-performance";
+import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
@@ -91,34 +91,44 @@ export default async function DashboardPage({
   const displayCurrency =
     currencyParam || profile?.default_currency || "USD";
 
-  // Portfolio Performance chart (Phase 2, Broker Trade Import) — a second
-  // query rather than folding into the assets query above, since it needs
-  // the Equities asset ids first to fetch their `asset_history` rows.
-  const equityAssets = (assets ?? []).filter(
-    (asset) => asset.asset_categories?.name === "Equities",
-  );
-  const { data: equityHistory } =
-    equityAssets.length > 0
+  // Portfolio Performance chart — Total Net Worth over time across every
+  // asset (any category), so it needs every asset's `asset_history` rows, not
+  // just Equities (a second query rather than folding into the assets query
+  // above, since it needs the asset ids first).
+  const { data: allHistory } =
+    (assets ?? []).length > 0
       ? await supabase
           .from("asset_history")
-          .select("asset_id, recorded_date, value")
+          .select("asset_id, recorded_date, value, net_equity")
           .in(
             "asset_id",
-            equityAssets.map((a) => a.id),
+            (assets ?? []).map((a) => a.id),
           )
           .order("recorded_date", { ascending: true })
-          .returns<{ asset_id: string; recorded_date: string; value: number }[]>()
-      : { data: [] as { asset_id: string; recorded_date: string; value: number }[] };
+          .returns<
+            { asset_id: string; recorded_date: string; value: number; net_equity: number | null }[]
+          >()
+      : {
+          data: [] as {
+            asset_id: string;
+            recorded_date: string;
+            value: number;
+            net_equity: number | null;
+          }[],
+        };
 
-  const performanceSeries = buildStackedPerformanceSeries(
-    equityAssets.map((asset) => ({
-      ticker: asset.ticker_symbol ?? asset.name,
-      exchange: parseEquityMetadata(asset.metadata).exchange || null,
-      history: (equityHistory ?? [])
+  const performanceSeries = buildNetWorthSeries(
+    (assets ?? []).map((asset) => ({
+      category: asset.asset_categories?.name ?? "—",
+      history: (allHistory ?? [])
         .filter((h) => h.asset_id === asset.id)
         .map((h) => ({
           recorded_date: h.recorded_date,
           value: convertAmount(h.value, asset.currency, displayCurrency, rates),
+          net_equity:
+            h.net_equity != null
+              ? convertAmount(h.net_equity, asset.currency, displayCurrency, rates)
+              : null,
         })),
     })),
   );
@@ -133,33 +143,27 @@ export default async function DashboardPage({
     currency: displayCurrency,
   });
 
-  const totalNetWorth = (assets ?? []).reduce((sum, asset) => {
-    const converted = convertAmount(
-      asset.current_value,
-      asset.currency,
-      displayCurrency,
-      rates,
-    );
-    return sum + (asset.is_liability ? -converted : converted);
-  }, 0);
-
+  // "Total Assets" uses each asset's gross value and "Total Liabilities"
+  // aggregates every debt (standalone liability rows, plus Real Estate's
+  // linked-loan/off-plan balances via `lib/liabilities.ts`) — see that file's
+  // doc comment for why this split doesn't change Net Worth itself, only
+  // properly decomposes it instead of silently netting the mortgage debt out
+  // of both totals the way summing `current_value` directly used to.
   const totalAssetsValue = (assets ?? [])
     .filter((asset) => !asset.is_liability)
     .reduce(
       (sum, asset) =>
-        sum +
-        convertAmount(asset.current_value, asset.currency, displayCurrency, rates),
+        sum + convertAmount(grossAssetValue(asset), asset.currency, displayCurrency, rates),
       0,
     );
 
-  const totalLiabilitiesValue = (assets ?? [])
-    .filter((asset) => asset.is_liability)
-    .reduce(
-      (sum, asset) =>
-        sum +
-        convertAmount(asset.current_value, asset.currency, displayCurrency, rates),
-      0,
-    );
+  const totalLiabilitiesValue = (assets ?? []).reduce(
+    (sum, asset) =>
+      sum + convertAmount(assetLiability(asset), asset.currency, displayCurrency, rates),
+    0,
+  );
+
+  const totalNetWorth = totalAssetsValue - totalLiabilitiesValue;
 
   const totalUnrealizedGain = (assets ?? []).reduce((sum, asset) => {
     if (asset.asset_categories?.name !== "Real Estate") return sum;
