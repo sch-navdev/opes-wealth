@@ -117,8 +117,10 @@ import {
 import { calculateIrr, type DatedCashFlow } from "@/lib/irr";
 import {
   averageAnnualCosts,
+  addDays,
   buildProjection,
   cumulativeNetRentAt,
+  densifyHistory,
   estimateAnnualGrowth,
   estimateOffplanValueAt,
   type OffplanPlan,
@@ -708,9 +710,47 @@ export function AssetDetailView({
           },
         ]
       : [];
+  // Dense history for the tooltip: daily points between the recorded
+  // valuations (value interpolated; equity/loan/profit/total return recomputed
+  // per date; off-plan installment due dates injected so equity steps on the
+  // exact day) — see `densifyHistory`. The recorded points themselves are
+  // unchanged, and the projection bridge / growth estimate still use them.
+  const historySeries = isRealEstate
+    ? densifyHistory(chartData, {
+        extraDates: metadata.is_offplan
+          ? offplanSchedule.flatMap((m) => [m.due_date, addDays(m.due_date, -1)])
+          : [],
+        equityAt:
+          metadata.is_offplan && offplanSchedule.length > 0
+            ? (date) =>
+                offplanSchedule
+                  .filter((m) => m.status === "paid" && m.due_date <= date)
+                  .reduce((sum, m) => sum + m.amount, 0)
+            : loanIsAmortizable
+              ? (date, value) => calculateEquity(value, getOutstandingPrincipalAt(loan, date))
+              : undefined,
+        loanBalanceAt: loanIsAmortizable
+          ? (date) => getOutstandingPrincipalAt(loan, date)
+          : undefined,
+        netProfitAt: totalCost != null ? (value) => value - totalCost : undefined,
+        totalReturnAt:
+          totalCost != null
+            ? (date, value) =>
+                value -
+                totalCost +
+                cumulativeNetRentAt({
+                  contracts: metadata.tenancy_contracts,
+                  schedule: amortSchedule,
+                  expenses: metadata.property_expenses,
+                  date,
+                  flatMonthlyInterest: monthlyInterest,
+                }).net
+            : undefined,
+      })
+    : chartData;
   const combinedChartData = [
     ...(showHistory
-      ? chartData.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      ? historySeries.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
       : []),
     ...(showForward
       ? [...projectionBridge, ...projection].map((p) => ({

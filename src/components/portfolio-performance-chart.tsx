@@ -72,6 +72,14 @@ export function PortfolioPerformanceChart({
   const activeKey = series.categories.includes(activeFilter)
     ? activeFilter
     : PORTFOLIO_PERFORMANCE_TOTAL_KEY;
+  // A category's axis starts at ITS first history row (e.g. your first
+  // Real Estate purchase), not the portfolio's — otherwise selecting it leaves
+  // years of zeros from brokerage trades made before you owned any of it.
+  const categoryStart =
+    activeKey === PORTFOLIO_PERFORMANCE_TOTAL_KEY ? undefined : series.categoryStart[activeKey];
+  const visiblePoints = categoryStart
+    ? chartPoints.filter((p) => p.date >= categoryStart)
+    : chartPoints;
   const activeLabel =
     activeKey === PORTFOLIO_PERFORMANCE_TOTAL_KEY ? t("net_worth") : categoryLabel(activeKey);
 
@@ -114,7 +122,7 @@ export function PortfolioPerformanceChart({
         ) : (
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartPoints}>
+              <AreaChart data={visiblePoints}>
                 <defs>
                   <linearGradient id="portfolioPerformanceGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.4} />

@@ -317,6 +317,93 @@ export function buildProjection(input: {
   return points;
 }
 
+// --- Historical series density ----------------------------------------------
+
+/** One point of the Real Estate Valuation History chart (history, not projection). */
+export type HistoryChartPoint = {
+  date: string;
+  value: number;
+  netEquity: number;
+  netProfit: number | null;
+  loanBalance: number | null;
+  totalReturn: number | null;
+};
+
+/**
+ * Turns the sparse recorded valuation points (a handful of manual
+ * valuations/milestones, often months apart) into a dense series so the
+ * Valuation History tooltip is as precise as the forward projection's:
+ * **daily** points when the history spans ≤ 2 years, weekly beyond that.
+ *
+ * Recorded points are kept exactly as they are. Between them:
+ * - **market value** is interpolated linearly in time (a valuation drifts
+ *   between two appraisals; nothing is invented beyond the two endpoints);
+ * - **equity, loan balance, net profit and total return are recomputed at each
+ *   date from their actual definitions** via the callbacks, not interpolated —
+ *   an amortizing loan's balance and a rent-accruing total return follow their
+ *   own curves, and an off-plan unit's equity (cash paid in) is a *step* that
+ *   must jump on the day an installment falls due. `extraDates` injects those
+ *   due dates and the day before, so the step is sharp instead of a ramp.
+ *   A series with no callback falls back to linear interpolation.
+ */
+export function densifyHistory(
+  points: HistoryChartPoint[],
+  options: {
+    extraDates?: string[];
+    equityAt?: (date: string, value: number) => number | null;
+    loanBalanceAt?: (date: string) => number | null;
+    netProfitAt?: (value: number) => number | null;
+    totalReturnAt?: (date: string, value: number) => number | null;
+  } = {},
+): HistoryChartPoint[] {
+  if (points.length < 2) return points;
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const first = sorted[0].date;
+  const last = sorted[sorted.length - 1].date;
+  const step = daysBetween(first, last) <= 731 ? 1 : 7;
+
+  const recorded = new Map(sorted.map((p) => [p.date, p]));
+  const dates = new Set<string>(recorded.keys());
+  for (let d = addDays(first, step); d < last; d = addDays(d, step)) dates.add(d);
+  for (const d of options.extraDates ?? []) {
+    if (d > first && d < last) dates.add(d);
+  }
+
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const lerpNullable = (a: number | null, b: number | null, t: number) =>
+    a == null || b == null ? null : lerp(a, b, t);
+
+  const out: HistoryChartPoint[] = [];
+  let segment = 0;
+  for (const date of Array.from(dates).sort()) {
+    const exact = recorded.get(date);
+    if (exact) {
+      out.push(exact);
+      continue;
+    }
+    while (segment < sorted.length - 2 && sorted[segment + 1].date < date) segment++;
+    const a = sorted[segment];
+    const b = sorted[segment + 1];
+    const t = Math.min(1, Math.max(0, daysBetween(a.date, date) / daysBetween(a.date, b.date)));
+    const value = lerp(a.value, b.value, t);
+    out.push({
+      date,
+      value,
+      netEquity: options.equityAt?.(date, value) ?? lerp(a.netEquity, b.netEquity, t),
+      loanBalance: options.loanBalanceAt
+        ? options.loanBalanceAt(date)
+        : lerpNullable(a.loanBalance, b.loanBalance, t),
+      netProfit: options.netProfitAt
+        ? options.netProfitAt(value)
+        : lerpNullable(a.netProfit, b.netProfit, t),
+      totalReturn: options.totalReturnAt
+        ? options.totalReturnAt(date, value)
+        : lerpNullable(a.totalReturn, b.totalReturn, t),
+    });
+  }
+  return out;
+}
+
 // --- Off-plan valuation ---------------------------------------------------
 
 /**

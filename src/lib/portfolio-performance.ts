@@ -25,6 +25,8 @@ export type PortfolioPerformanceSeries = {
   points: PerformancePoint[];
   /** Distinct category names present across the portfolio's history, for the filter pills — "Total" is always available and isn't included here (it's implicit). */
   categories: string[];
+  /** Earliest `recorded_date` among the history rows of assets in each category. Lets the chart start a category's x-axis at its own first row instead of the portfolio-wide start (which would leave a long flat lead-in of zeros). */
+  categoryStart: Record<string, string>;
 };
 
 const TOTAL_KEY = "total";
@@ -52,10 +54,20 @@ export function buildNetWorthSeries(
   const sortedDates = Array.from(allDates).sort();
 
   if (sortedDates.length === 0) {
-    return { points: [], categories: [] };
+    return { points: [], categories: [], categoryStart: {} };
   }
 
   const categories = Array.from(new Set(assets.map((a) => a.category))).sort();
+
+  const categoryStart: Record<string, string> = {};
+  for (const asset of assets) {
+    for (const point of asset.history) {
+      const current = categoryStart[asset.category];
+      if (!current || point.recorded_date < current) {
+        categoryStart[asset.category] = point.recorded_date;
+      }
+    }
+  }
 
   const perAssetFilled = assets.map((asset) => {
     const byDate = new Map(
@@ -87,7 +99,7 @@ export function buildNetWorthSeries(
     points.push({ ...last, date: throughDate } as PerformancePoint);
   }
 
-  return { points, categories };
+  return { points, categories, categoryStart };
 }
 
 export { TOTAL_KEY as PORTFOLIO_PERFORMANCE_TOTAL_KEY };
