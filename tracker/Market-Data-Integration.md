@@ -80,6 +80,32 @@ Same honesty caveat as Steps 5/9 above, restated once more: **no confirmed publi
 - **UI**: new `getAdrecLiveValuation(id)` server action (ownership + Abu Dhabi + ready-built checks) feeding a "Live ADREC Valuation" block in `asset-detail-view.tsx` (semantic tokens only; value honours privacy mode; shows date, certificate and a "sample data" marker when mock). **Display-only** — it does not save; the existing "Refresh from ADREC / DARI" button remains the action that writes a valuation/history row. New EN/FR keys `adrec_live_valuation*`.
 - **Not verified**: the Edge Function is **not deployed and has never been run** (no Deno/Supabase CLI here; `supabase/functions` is excluded from `tsc`) — deploy with `supabase functions deploy adrec-pricing`. The UI path is also unexercised end-to-end (mock-auth wall). `tsc --noEmit`/`eslint`/`npm run build` clean for the app code.
 
+## Mock DLD/ADREC Data Is Read-Only (2026-09-30)
+
+- **Rule**: any DLD or ADREC result with `isMock: true` (sample mode — no credentials configured) is returned to the UI for display and certificate preview but **never written to the database**. `refreshDldValuation` and `refreshAdrecValuation` now skip `updateAssetValuation` (which overwrites `assets.current_value`, `metadata.market_valuation` and inserts an `asset_history` row) and the off-plan project-status `assets.metadata` update whenever the provider result is mock. Both results carry `persisted: false`, and the UI says "Sample data … shown for preview only and was NOT saved". Live (non-mock) results persist exactly as before. The display-only `getAdrecLiveValuation`, the `adrec-pricing` Edge Function and `getDldCertificate` never wrote anyway.
+- **Why**: a sample-mode DLD refresh on 2026-09-30 replaced Ellington House 1 - 713's valuation (3,300,000) with a fabricated 2,728,506, dropping Equity to ~75k and making Net Profit hugely negative.
+- **Note on naming**: the table is `asset_history` (there is no `valuation_log` table — "Valuation Log" is just the UI label for its rows).
+- **Existing bad data — one-off cleanup, NOT yet run**: the only affected row in the live DB is `asset_history.id = 30830335-aa64-47e0-824b-ff32e62fc7cd` (`dubailand`, 2,728,506, 2026-09-30). The automated attempt to delete it was blocked by the session's permission check, so it must be run manually (Supabase SQL editor). Deleting the row alone is not enough — the mock refresh also overwrote the asset itself, so the same statement restores `current_value` and `market_valuation` from the latest remaining history point (2026-09-29: value 3,300,000, equity 580,000):
+
+```sql
+with d as (
+  delete from asset_history where source = 'dubailand' and value = 2728506 returning id, asset_id
+), latest as (
+  select distinct on (h.asset_id) h.asset_id, h.value, h.net_equity
+  from asset_history h
+  where h.asset_id in (select asset_id from d) and h.id not in (select id from d)
+  order by h.asset_id, h.recorded_date desc
+)
+update assets a
+set current_value = l.net_equity,
+    metadata = jsonb_set(a.metadata, '{market_valuation}', to_jsonb(l.value))
+from latest l
+where a.id = l.asset_id
+returning a.id, a.name, a.current_value, a.metadata->>'market_valuation';
+```
+
+- `tsc --noEmit`/`eslint`/`npm run build` clean. Related: [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] (the Net Profit context).
+
 ## Related
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `resolveOutstandingLoanBalance`, `calculateTotalCost`, the Refresh Valuation flow both DLD and ADREC reuse
 - [[Authentication-Security|Authentication & Security]] — the server-only-secret pattern both `dld-client.ts`/`adrec-client.ts` follow for API credentials; also the mock-auth limitation that blocks live DB-write verification

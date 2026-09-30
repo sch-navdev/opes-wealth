@@ -740,13 +740,15 @@ export function AssetDetailView({
 
       if (result.kind === "project_status") {
         setAdrecMessage(
-          t("adrec_project_status_updated", { percent: result.completionRate }),
+          t(result.persisted ? "adrec_project_status_updated" : "sample_project_status_not_saved", {
+            percent: result.completionRate,
+          }),
         );
         return;
       }
 
       setAdrecMessage(
-        t("adrec_valuation_updated", {
+        t(result.persisted ? "adrec_valuation_updated" : "sample_valuation_not_saved", {
           value: currencyFormatter.format(result.value),
           ref: result.certificateId,
         }),
@@ -814,13 +816,15 @@ export function AssetDetailView({
 
       if (result.kind === "project_status") {
         setDldMessage(
-          t("dld_project_status_updated", { percent: result.completionPercentage }),
+          t(result.persisted ? "dld_project_status_updated" : "sample_project_status_not_saved", {
+            percent: result.completionPercentage,
+          }),
         );
         return;
       }
 
       setDldMessage(
-        t("dld_valuation_updated", {
+        t(result.persisted ? "dld_valuation_updated" : "sample_valuation_not_saved", {
           value: currencyFormatter.format(result.value),
           ref: result.certificateReference,
         }),

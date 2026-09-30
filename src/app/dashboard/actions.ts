@@ -418,6 +418,8 @@ export type RefreshDldValuationResult =
       ok: true;
       kind: "valuation";
       isMock: boolean;
+      /** False when the payload was sample data: returned for display only, nothing was written. */
+      persisted: boolean;
       value: number;
       certificateReference: string;
       unrealizedGainAmount: number;
@@ -426,6 +428,7 @@ export type RefreshDldValuationResult =
       ok: true;
       kind: "project_status";
       isMock: boolean;
+      persisted: boolean;
       completionPercentage: number;
     }
   | { ok: false; code?: DldErrorCode; error: string };
@@ -483,30 +486,34 @@ export async function refreshDldValuation(id: string): Promise<RefreshDldValuati
       return { ok: false, code: result.code, error: result.error };
     }
 
-    const nextMetadata = {
-      ...metadata,
-      completion_percentage: result.completion_percentage,
-      escrow_balance_status: result.escrow_balance_status,
-      latest_inspection_date: result.latest_inspection_date,
-    };
+    // Sample data is read-only: show it, never persist it.
+    if (!result.isMock) {
+      const nextMetadata = {
+        ...metadata,
+        completion_percentage: result.completion_percentage,
+        escrow_balance_status: result.escrow_balance_status,
+        latest_inspection_date: result.latest_inspection_date,
+      };
 
-    const { error: updateError } = await supabase
-      .from("assets")
-      .update({ metadata: nextMetadata })
-      .eq("id", id)
-      .eq("profile_id", user.id);
+      const { error: updateError } = await supabase
+        .from("assets")
+        .update({ metadata: nextMetadata })
+        .eq("id", id)
+        .eq("profile_id", user.id);
 
-    if (updateError) {
-      return { ok: false, error: updateError.message };
+      if (updateError) {
+        return { ok: false, error: updateError.message };
+      }
+
+      revalidatePath("/dashboard", "layout");
+      revalidatePath(`/dashboard/assets/${id}`);
     }
-
-    revalidatePath("/dashboard", "layout");
-    revalidatePath(`/dashboard/assets/${id}`);
 
     return {
       ok: true,
       kind: "project_status",
       isMock: result.isMock,
+      persisted: !result.isMock,
       completionPercentage: result.completion_percentage,
     };
   }
@@ -520,15 +527,21 @@ export async function refreshDldValuation(id: string): Promise<RefreshDldValuati
     return { ok: false, code: result.code, error: result.error };
   }
 
-  const updateResult = await updateAssetValuation(
-    id,
-    result.ai_valuation_amount,
-    "dubailand",
-    result.valuation_date,
-  );
+  // Sample (mock) valuations are read-only: returned for display/certificate
+  // preview but NEVER written — updateAssetValuation would overwrite the
+  // asset's current value/market valuation and insert an asset_history row
+  // (the bug that skewed Ellington House's Net Profit).
+  if (!result.isMock) {
+    const updateResult = await updateAssetValuation(
+      id,
+      result.ai_valuation_amount,
+      "dubailand",
+      result.valuation_date,
+    );
 
-  if (updateResult?.error) {
-    return { ok: false, error: updateResult.error };
+    if (updateResult?.error) {
+      return { ok: false, error: updateResult.error };
+    }
   }
 
   const totalCost = calculateTotalCost(metadata, result.ai_valuation_amount);
@@ -538,6 +551,7 @@ export async function refreshDldValuation(id: string): Promise<RefreshDldValuati
     ok: true,
     kind: "valuation",
     isMock: result.isMock,
+    persisted: !result.isMock,
     value: result.ai_valuation_amount,
     certificateReference: result.certificate_reference,
     unrealizedGainAmount: unrealizedGain.amount,
@@ -549,6 +563,8 @@ export type RefreshAdrecValuationResult =
       ok: true;
       kind: "valuation";
       isMock: boolean;
+      /** False when the payload was sample data: returned for display only, nothing was written. */
+      persisted: boolean;
       value: number;
       certificateId: string;
       unrealizedGainAmount: number;
@@ -557,6 +573,7 @@ export type RefreshAdrecValuationResult =
       ok: true;
       kind: "project_status";
       isMock: boolean;
+      persisted: boolean;
       completionRate: number;
     }
   | { ok: false; code?: AdrecErrorCode; error: string };
@@ -633,31 +650,35 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
       return { ok: false, code: result.code, error: result.error };
     }
 
-    const nextMetadata = {
-      ...metadata,
-      adrec_completion_rate: result.projectCompletionRate,
-      adrec_escrow_status: result.escrowStatus,
-      adrec_construction_stage: result.constructionStage,
-      adrec_inspection_date: result.latestInspectionDate,
-    };
+    // Sample data is read-only: show it, never persist it.
+    if (!result.isMock) {
+      const nextMetadata = {
+        ...metadata,
+        adrec_completion_rate: result.projectCompletionRate,
+        adrec_escrow_status: result.escrowStatus,
+        adrec_construction_stage: result.constructionStage,
+        adrec_inspection_date: result.latestInspectionDate,
+      };
 
-    const { error: updateError } = await supabase
-      .from("assets")
-      .update({ metadata: nextMetadata })
-      .eq("id", id)
-      .eq("profile_id", user.id);
+      const { error: updateError } = await supabase
+        .from("assets")
+        .update({ metadata: nextMetadata })
+        .eq("id", id)
+        .eq("profile_id", user.id);
 
-    if (updateError) {
-      return { ok: false, error: updateError.message };
+      if (updateError) {
+        return { ok: false, error: updateError.message };
+      }
+
+      revalidatePath("/dashboard", "layout");
+      revalidatePath(`/dashboard/assets/${id}`);
     }
-
-    revalidatePath("/dashboard", "layout");
-    revalidatePath(`/dashboard/assets/${id}`);
 
     return {
       ok: true,
       kind: "project_status",
       isMock: result.isMock,
+      persisted: !result.isMock,
       completionRate: result.projectCompletionRate,
     };
   }
@@ -672,15 +693,19 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
     return { ok: false, code: result.code, error: result.error };
   }
 
-  const updateResult = await updateAssetValuation(
-    id,
-    result.officialValuationAmount,
-    "dari",
-    result.valuationDate,
-  );
+  // Sample (mock) valuations are read-only — never written (see the DLD
+  // branch in refreshDldValuation for why).
+  if (!result.isMock) {
+    const updateResult = await updateAssetValuation(
+      id,
+      result.officialValuationAmount,
+      "dari",
+      result.valuationDate,
+    );
 
-  if (updateResult?.error) {
-    return { ok: false, error: updateResult.error };
+    if (updateResult?.error) {
+      return { ok: false, error: updateResult.error };
+    }
   }
 
   const totalCost = calculateTotalCost(metadata, result.officialValuationAmount);
@@ -690,6 +715,7 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
     ok: true,
     kind: "valuation",
     isMock: result.isMock,
+    persisted: !result.isMock,
     value: result.officialValuationAmount,
     certificateId: result.certificateId,
     unrealizedGainAmount: unrealizedGain.amount,

@@ -121,6 +121,14 @@ const dictionary = {
   property_document_type_dubai_form_f: { en: "Dubai Form F (MOU)", fr: "Form F (MOU) de Dubaï" },
   property_document_type_dubai_oqood: { en: "Dubai Oqood (initial contract)", fr: "Oqood (contrat initial) de Dubaï" },
   property_document_type_dubai_dld_receipt: { en: "Dubai DLD receipt", fr: "Reçu DLD de Dubaï" },
+  sample_valuation_not_saved: {
+    en: "Sample data: {value} (certificate {ref}) is shown for preview only and was NOT saved.",
+    fr: "Données d'exemple : {value} (certificat {ref}) affiché en aperçu uniquement et NON enregistré.",
+  },
+  sample_project_status_not_saved: {
+    en: "Sample data: project {percent}% complete — shown for preview only and NOT saved.",
+    fr: "Données d'exemple : projet terminé à {percent} % — aperçu uniquement, NON enregistré.",
+  },
   net_worth: { en: "Net Worth", fr: "Valeur nette" },
   base_currency_note: {
     en: "All figures shown in {currency}",
