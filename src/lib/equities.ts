@@ -144,6 +144,71 @@ export function accountDisplayName(metadata: Pick<EquityMetadata, "account_name"
   return name || null;
 }
 
+/**
+ * True daily market value of a holding over time: for every day it was held,
+ * `quantity held that day × that day's close` — the quantity comes from the
+ * trade ledger (net of sells), the close from the price history. Emits a row
+ * on each trading day from the first trade, plus each trade date (using the
+ * latest close on or before it, or — when no close exists yet, e.g. a listing
+ * whose price data starts later — the most recent trade price), and a single
+ * 0-value row on the day the position was fully sold. Returns `null` when
+ * there are no closes at all so the caller can fall back to
+ * `buildInvestedCapitalSeries` (cost basis). `closes` must be in the
+ * holding's currency, sorted by date.
+ */
+export function buildMarketValueSeries(
+  trades: EquityTrade[],
+  closes: { date: string; close: number }[],
+): { date: string; value: number }[] | null {
+  if (closes.length === 0 || trades.length === 0) return null;
+
+  const sorted = [...trades].sort(
+    (a, b) =>
+      a.tradeDate.localeCompare(b.tradeDate) ||
+      (a.side === b.side ? 0 : a.side === "buy" ? -1 : 1),
+  );
+  const firstDate = sorted[0].tradeDate;
+
+  const qtyAfter = new Map<string, number>();
+  const tradePrice = new Map<string, number>();
+  let running = 0;
+  for (const t of sorted) {
+    running = Math.max(0, running + (t.side === "buy" ? t.quantity : -t.quantity));
+    qtyAfter.set(t.tradeDate, running);
+    tradePrice.set(t.tradeDate, t.price);
+  }
+
+  const dates = Array.from(
+    new Set([
+      ...closes.map((c) => c.date).filter((d) => d >= firstDate),
+      ...qtyAfter.keys(),
+    ]),
+  ).sort();
+
+  const out: { date: string; value: number }[] = [];
+  let quantity = 0;
+  let wasOpen = false;
+  let closeIdx = -1;
+  let lastTradePrice: number | null = null;
+
+  for (const date of dates) {
+    if (qtyAfter.has(date)) {
+      quantity = qtyAfter.get(date)!;
+      lastTradePrice = tradePrice.get(date)!;
+    }
+    while (closeIdx + 1 < closes.length && closes[closeIdx + 1].date <= date) closeIdx++;
+    const price = closeIdx >= 0 ? closes[closeIdx].close : lastTradePrice;
+    if (quantity > 0 && price != null) {
+      out.push({ date, value: quantity * price });
+      wasOpen = true;
+    } else if (quantity <= 0 && wasOpen) {
+      out.push({ date, value: 0 });
+      wasOpen = false;
+    }
+  }
+  return out;
+}
+
 export type EquityMetadata = {
   /** Brokerage account this holding was imported from (e.g. Saxo Client ID) and its label, e.g. "Saxobank Acc. # 10164571". */
   account_id?: string;

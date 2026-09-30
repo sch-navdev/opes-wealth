@@ -968,6 +968,9 @@ export function AddInvestmentsDialog() {
                         {result.priced === false &&
                           result.status !== "error" &&
                           ` · ${t("investments_unpriced")}`}
+                        {result.history === "cost" &&
+                          result.status !== "error" &&
+                          ` · ${t("investments_history_cost")}`}
                       </TableCell>
                     </TableRow>
                   ))}

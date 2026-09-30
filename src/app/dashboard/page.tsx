@@ -33,6 +33,9 @@ import {
   parseRealEstateMetadata,
 } from "@/lib/real-estate";
 
+/** The broker import server action (called from this page) fetches daily price history for every holding; give it room on hosts that cap serverless time. */
+export const maxDuration = 60;
+
 type AssetRow = {
   id: string;
   name: string;

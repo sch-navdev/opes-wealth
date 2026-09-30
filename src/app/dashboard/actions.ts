@@ -39,6 +39,7 @@ import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import {
   buildInvestedCapitalSeries,
+  buildMarketValueSeries,
   estimateCostBasisUnitPrice,
   type EquityIncome,
   normalizeExchange,
@@ -1470,6 +1471,8 @@ export type ImportBrokerTradesResult = {
   priced?: boolean;
   /** Why pricing failed (Edge Function code), e.g. `invalid_api_key`. */
   code?: string;
+  /** `market` = history rebuilt from true daily prices; `cost` = prices unavailable, so the invested-capital (cost basis) series is what's charted. */
+  history?: "market" | "cost";
 };
 
 type HistoryUpsertRow = {
@@ -1495,11 +1498,109 @@ async function upsertHistoryRows(supabase: SupabaseClient, rows: HistoryUpsertRo
   const write = (batch: HistoryUpsertRow[]) =>
     supabase.from("asset_history").upsert(batch, { onConflict: "asset_id,recorded_date" });
 
-  let { error } = await write(rows);
-  if (error?.code === "23514") {
-    ({ error } = await write(rows.map((r) => ({ ...r, source: "manual" as AssetHistorySource }))));
+  // Daily market-value history can be thousands of rows: write in chunks.
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    let { error } = await write(chunk);
+    if (error?.code === "23514") {
+      ({ error } = await write(
+        chunk.map((r) => ({ ...r, source: "manual" as AssetHistorySource })),
+      ));
+    }
+    if (error) return error;
   }
-  return error;
+  return null;
+}
+
+type HistoryJob = {
+  assetId: string;
+  ticker: string;
+  currency: string;
+  trades: EquityTrade[];
+  exchange?: string;
+  isin?: string;
+};
+
+/** Daily closes for a holding from the `refresh-market-price` Edge Function's history mode (Yahoo), or `null` if unavailable (not deployed yet, delisted, rate-limited…). */
+async function fetchHistoricalCloses(
+  supabase: SupabaseClient,
+  job: HistoryJob,
+  from: string,
+): Promise<{ currency: string; closes: { date: string; close: number }[] } | null> {
+  const { data, error } = await supabase.functions.invoke("refresh-market-price", {
+    body: {
+      assetId: job.assetId,
+      category: "equities",
+      mode: "history",
+      symbol: job.ticker,
+      currency: job.currency,
+      exchange: job.exchange,
+      isin: job.isin,
+      from,
+    },
+  });
+  if (error || data?.error || !Array.isArray(data?.prices)) return null;
+  return {
+    currency: String(data.currency ?? job.currency).toUpperCase(),
+    closes: (data.prices as [string, number][]).map(([date, close]) => ({ date, close })),
+  };
+}
+
+/**
+ * Upgrades imported holdings' history from invested capital (cost basis) to
+ * TRUE daily market value (`quantity held × that day's close`,
+ * `buildMarketValueSeries`), converting each close into the asset's currency
+ * at today's FX rate (historical FX isn't available — a known approximation).
+ * Runs a few holdings in parallel under a time budget so a big import can't
+ * outlive the request; anything that can't be priced (delisted, no data,
+ * function not redeployed, out of time) keeps the cost-basis series already
+ * written and is reported as `"cost"`.
+ */
+async function upgradeHistoryToMarketValue(
+  supabase: SupabaseClient,
+  jobs: HistoryJob[],
+  rates: Record<string, number>,
+  source: AssetHistorySource,
+): Promise<Map<string, "market" | "cost">> {
+  const outcome = new Map<string, "market" | "cost">();
+  const deadline = Date.now() + 40_000;
+  let next = 0;
+
+  async function worker() {
+    while (next < jobs.length) {
+      const job = jobs[next++];
+      if (Date.now() > deadline || job.trades.length === 0) {
+        outcome.set(job.assetId, "cost");
+        continue;
+      }
+      const from = [...job.trades].map((t) => t.tradeDate).sort()[0];
+      const prices = await fetchHistoricalCloses(supabase, job, from);
+      const closes = prices?.closes.map((c) => ({
+        date: c.date,
+        close: convertAmount(c.close, prices.currency, job.currency, rates),
+      }));
+      const series = closes ? buildMarketValueSeries(job.trades, closes) : null;
+      if (!series || series.length === 0) {
+        outcome.set(job.assetId, "cost");
+        continue;
+      }
+      const error = await upsertHistoryRows(
+        supabase,
+        series.map((p) => ({
+          asset_id: job.assetId,
+          recorded_date: p.date,
+          value: p.value,
+          net_equity: p.value,
+          source,
+        })),
+      );
+      outcome.set(job.assetId, error ? "cost" : "market");
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(4, jobs.length) }, worker));
+  return outcome;
 }
 
 /**
@@ -1605,6 +1706,7 @@ export async function importBrokerTrades(
     ? `${options?.brokerName ?? "Broker"} Acc. # ${accountId}`
     : null;
   const touched: { id: string; ticker: string; currency: string; quantity: number; metadata: Json }[] = [];
+  const historyJobs: HistoryJob[] = [];
 
   for (const holding of holdings) {
     if (holding.trades.length === 0) {
@@ -1681,6 +1783,14 @@ export async function importBrokerTrades(
           });
           continue;
         }
+        historyJobs.push({
+          assetId: existing.id,
+          ticker: holding.ticker,
+          currency: holding.currency,
+          trades: existingMetadata.trades,
+          exchange: holding.exchange ?? (existingMetadata.exchange_mic || existingMetadata.exchange),
+          isin: holding.isin ?? existingMetadata.isin,
+        });
         if (!identityNeeded) {
           results.push({
             ticker: holding.ticker,
@@ -1753,6 +1863,15 @@ export async function importBrokerTrades(
         });
         continue;
       }
+
+      historyJobs.push({
+        assetId: existing.id,
+        ticker: holding.ticker,
+        currency: holding.currency,
+        trades: allTrades,
+        exchange: holding.exchange ?? (existingMetadata.exchange_mic || existingMetadata.exchange),
+        isin: holding.isin ?? existingMetadata.isin,
+      });
 
       if (updatePayload.current_value != null) {
         await upsertHistoryRows(supabase, [
@@ -1862,6 +1981,15 @@ export async function importBrokerTrades(
         continue;
       }
 
+      historyJobs.push({
+        assetId: inserted.id,
+        ticker: holding.ticker,
+        currency: holding.currency,
+        trades,
+        exchange: holding.exchange ?? undefined,
+        isin: holding.isin,
+      });
+
       await upsertHistoryRows(supabase, [
         {
           asset_id: inserted.id,
@@ -1888,6 +2016,22 @@ export async function importBrokerTrades(
           ? { message: "Closed position — history and dividends only." }
           : { priced: false }),
       });
+    }
+  }
+
+  // Upgrade the cost-basis history written above to true daily market value
+  // wherever price history is available (runs before live pricing, which then
+  // sets today's row).
+  if (historyJobs.length > 0) {
+    const outcome = await upgradeHistoryToMarketValue(
+      supabase,
+      historyJobs,
+      await getExchangeRatesFromUsd(),
+      source,
+    );
+    for (const job of historyJobs) {
+      const row = results.find((r) => r.ticker === job.ticker && r.status !== "error");
+      if (row) row.history = outcome.get(job.assetId) ?? "cost";
     }
   }
 

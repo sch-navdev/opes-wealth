@@ -936,6 +936,11 @@ const dictionary = {
     en: "{n} not covered by the free price feed (last price kept).",
     fr: "{n} non couverte(s) par le flux gratuit (dernier cours conservé).",
   },
+  investments_history_cost: {
+    en: "history at cost basis — price history unavailable",
+    fr: "historique au prix de revient — historique des cours indisponible",
+  },
+  invested_cost_basis: { en: "Invested (cost basis)", fr: "Investi (prix de revient)" },
   brokerage_income_yield_hint: {
     en: "Cumulative income received ÷ current cost basis",
     fr: "Revenus cumulés perçus ÷ prix de revient actuel",

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
+import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -210,8 +211,19 @@ export function PortfolioGroups({
         const label = translationKey ? t(translationKey) : group.name;
 
         const subtotal = group.assets.reduce((sum, asset) => {
+          // Real Estate: net equity from today's amortized loan (market value −
+          // liability), matching the rows and the dashboard cards, rather than the
+          // stored `current_value` snapshot.
+          const mortgageOwed =
+            asset.asset_categories?.name === "Real Estate" &&
+            !asset.is_liability &&
+            asset.metadata?.is_offplan !== true
+              ? assetLiability(asset)
+              : 0;
+          const nativeValue =
+            mortgageOwed > 0 ? grossAssetValue(asset) - mortgageOwed : asset.current_value;
           const converted = convertAmount(
-            asset.current_value,
+            nativeValue,
             asset.currency,
             displayCurrency,
             rates,

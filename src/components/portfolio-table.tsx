@@ -18,6 +18,7 @@ import { AddAssetDialog, type AssetForEdit } from "@/components/add-asset-dialog
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { convertAmount } from "@/lib/fx";
+import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import { cn } from "@/lib/utils";
 import {
   calculateTotalCost,
@@ -154,6 +155,31 @@ export function PortfolioTable({
                   ? asset.metadata.outstanding_balance
                   : null;
 
+              // Ready-built property with a mortgage: the row's headline figure is
+              // Net Equity (value − loan), so show what the bank is still owed
+              // beside the full market value — same "Total | Owed" format as
+              // off-plan. `assetLiability` is the same figure the dashboard's
+              // Total Liabilities card uses (amortized balance), so they agree.
+              const mortgageOwed =
+                asset.asset_categories?.name === "Real Estate" && !isOffplan
+                  ? assetLiability(asset)
+                  : 0;
+              const mortgageTotal = mortgageOwed > 0 ? grossAssetValue(asset) : 0;
+              // Headline figure for a mortgaged property is Net Equity = Total −
+              // Owed, computed from today's amortized balance — the same figure
+              // the Net Worth / Total Liabilities cards use. The stored
+              // `current_value` is only a snapshot from the last valuation
+              // update, which drifts from it as the loan amortizes.
+              const displayedValue =
+                mortgageOwed > 0
+                  ? convertAmount(
+                      mortgageTotal - mortgageOwed,
+                      asset.currency,
+                      displayCurrency,
+                      rates,
+                    )
+                  : convertedValue;
+
               // Performance column — Real Estate: total cost basis
               // (contract/purchase price + fees) vs. market valuation.
               // Vehicles: latest valuation vs. purchase price (or the
@@ -270,7 +296,7 @@ export function PortfolioTable({
                     )}
                   >
                     {asset.is_liability ? "-" : ""}
-                    {maskValue(currencyFormatter.format(convertedValue))}
+                    {maskValue(currencyFormatter.format(displayedValue))}
                     {isOffplan &&
                       contractPrice != null &&
                       outstandingBalance != null && (
@@ -299,6 +325,22 @@ export function PortfolioTable({
                           )}
                         </p>
                       )}
+                    {mortgageOwed > 0 && (
+                      <p className="text-xs font-normal text-muted-foreground">
+                        Total:{" "}
+                        {maskValue(
+                          currencyFormatter.format(
+                            convertAmount(mortgageTotal, asset.currency, displayCurrency, rates),
+                          ),
+                        )}{" "}
+                        | Owed:{" "}
+                        {maskValue(
+                          currencyFormatter.format(
+                            convertAmount(mortgageOwed, asset.currency, displayCurrency, rates),
+                          ),
+                        )}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {convertedGain == null || gainPercent == null ? (

@@ -26,6 +26,10 @@ interface PriceRequest {
   exchange?: string;
   /** Equities: ISIN, used to resolve the Yahoo Finance symbol for non-US listings. */
   isin?: string;
+  /** `history` returns daily closes since `from` instead of a live quote (equities only, always via Yahoo). */
+  mode?: "quote" | "history";
+  /** History mode: first date wanted, `YYYY-MM-DD`. */
+  from?: string;
 }
 
 interface PriceSuccess {
@@ -371,7 +375,12 @@ async function yahooSymbolFromIsin(
   return (preferred ?? tradable[0])?.symbol ?? null;
 }
 
-async function fetchYahooPrice(req: PriceRequest): Promise<PriceSuccess | Response> {
+/**
+ * Ordered Yahoo symbols to try for an equity: the ISIN-resolved symbol first
+ * (Saxo `UBIP` is Yahoo `UBI.PA`), then `<ticker><suffix>` guesses. Returns a
+ * rate-limit Response if the ISIN lookup itself was throttled.
+ */
+async function yahooCandidateSymbols(req: PriceRequest): Promise<string[] | Response> {
   const ticker = (req.symbol ?? "").trim().toUpperCase();
   const exchange = (req.exchange ?? "").trim().toUpperCase();
   const isin = (req.isin ?? "").trim().toUpperCase();
@@ -395,6 +404,14 @@ async function fetchYahooPrice(req: PriceRequest): Promise<PriceSuccess | Respon
     // Some Saxo Euronext tickers carry a trailing exchange letter (UBIP -> UBI).
     if (ticker.length > 3 && /[A-Z]$/.test(ticker)) add(ticker.slice(0, -1) + suffix);
   }
+  return candidates;
+}
+
+async function fetchYahooPrice(req: PriceRequest): Promise<PriceSuccess | Response> {
+  const ticker = (req.symbol ?? "").trim().toUpperCase();
+  const found = await yahooCandidateSymbols(req);
+  if (found instanceof Response) return found;
+  const candidates = found;
 
   for (const symbol of candidates) {
     const r = await yahooGet(
@@ -448,6 +465,64 @@ async function fetchYahooPrice(req: PriceRequest): Promise<PriceSuccess | Respon
   );
 }
 
+/**
+ * Daily closes since `req.from` for a holding (history mode). Yahoo's chart
+ * closes are split-ADJUSTED, but the trade ledger's quantities are as-traded,
+ * so each close is multiplied back by every split that happened after it —
+ * otherwise quantity × price would be off by the split ratio before a split
+ * (e.g. Tesla's 2020 5:1 and 2022 3:1). Dates use the exchange's local day.
+ */
+async function fetchYahooHistory(req: PriceRequest): Promise<Record<string, unknown> | Response> {
+  const found = await yahooCandidateSymbols(req);
+  if (found instanceof Response) return found;
+
+  const fromMs = Date.parse((req.from ?? "") + "T00:00:00Z");
+  if (!Number.isFinite(fromMs)) return errorResponse("invalid_request", "from must be YYYY-MM-DD.", 400);
+  const period1 = Math.floor(fromMs / 1000) - 7 * 86400;
+  const period2 = Math.floor(Date.now() / 1000) + 86400;
+
+  for (const symbol of found) {
+    const r = await yahooGet(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${period1}&period2=${period2}&interval=1d&events=split`,
+    );
+    if (!r.ok) {
+      if (r.kind === "rate_limited") {
+        return errorResponse("rate_limited", "Yahoo Finance's rate limit was hit. Try again shortly.", 429);
+      }
+      if (r.kind === "timeout") return errorResponse("timeout", "Yahoo Finance took too long to respond.", 504);
+      if (r.kind === "network") return errorResponse("network_error", "Could not reach Yahoo Finance.", 502);
+      continue;
+    }
+
+    const result = r.json?.chart?.result?.[0];
+    const timestamps: number[] = result?.timestamp ?? [];
+    const closes: (number | null)[] = result?.indicators?.quote?.[0]?.close ?? [];
+    if (timestamps.length === 0) continue;
+
+    const offset: number = result.meta?.gmtoffset ?? 0;
+    const pence = result.meta?.currency === "GBp" || result.meta?.currency === "GBX";
+    const currency = pence ? "GBP" : String(result.meta?.currency ?? req.currency).toUpperCase();
+    const splits: { ts: number; ratio: number }[] = Object.values(result.events?.splits ?? {}).map(
+      (sp: any) => ({ ts: Number(sp.date), ratio: Number(sp.numerator) / Number(sp.denominator) }),
+    );
+
+    const prices: [string, number][] = [];
+    timestamps.forEach((ts, i) => {
+      const close = closes[i];
+      if (typeof close !== "number" || !(close > 0)) return;
+      let factor = 1;
+      for (const sp of splits) if (sp.ts > ts && Number.isFinite(sp.ratio) && sp.ratio > 0) factor *= sp.ratio;
+      const date = new Date((ts + offset) * 1000).toISOString().slice(0, 10);
+      prices.push([date, close * factor * (pence ? 0.01 : 1)]);
+    });
+    if (prices.length === 0) continue;
+
+    return { symbol, currency, source: "yahoo", prices };
+  }
+
+  return errorResponse("no_data", `Yahoo Finance has no price history for "${req.symbol}".`, 404);
+}
+
 /** The error code of one of this function's own error Responses. */
 async function errorCodeOf(res: Response): Promise<string | undefined> {
   try {
@@ -496,6 +571,14 @@ Deno.serve(async (req: Request) => {
   }
   if (!body.currency || typeof body.currency !== "string") {
     return errorResponse("invalid_request", "currency is required.", 400);
+  }
+
+  if (body.mode === "history") {
+    if (body.category !== "equities" || !body.symbol || !body.from) {
+      return errorResponse("invalid_request", "history needs category=equities, symbol and from.", 400);
+    }
+    const history = await fetchYahooHistory(body);
+    return history instanceof Response ? history : jsonResponse(history, 200);
   }
 
   let result: PriceSuccess | Response;

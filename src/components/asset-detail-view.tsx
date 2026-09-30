@@ -132,7 +132,11 @@ import {
   resolveVehicleValuation,
 } from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
-import { estimateCostBasisUnitPrice, parseEquityMetadata } from "@/lib/equities";
+import {
+  buildInvestedCapitalSeries,
+  estimateCostBasisUnitPrice,
+  parseEquityMetadata,
+} from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
@@ -592,6 +596,20 @@ export function AssetDetailView({
   // stored `net_equity`, which only ever reflected a manually-updated
   // balance snapshot frozen at whichever date it was recorded.
   const offplanSchedule = metadata.payment_schedule.filter((m) => m.due_date);
+  // Equities: what was actually invested (cost basis of the open position),
+  // as a step function of date — plotted beside the true daily market value so
+  // the gap between them is the unrealized gain/loss.
+  const equityCostSeries =
+    isEquity && equityMetadata ? buildInvestedCapitalSeries(equityMetadata.trades) : [];
+  const equityCostAt = (date: string): number | null => {
+    if (equityCostSeries.length === 0) return null;
+    let cost = 0;
+    for (const p of equityCostSeries) {
+      if (p.date <= date) cost = p.value;
+      else break;
+    }
+    return cost;
+  };
   const chartData = displayHistory.map((h) => {
     const loanBalance = loanIsAmortizable
       ? getOutstandingPrincipalAt(loan, h.recorded_date)
@@ -624,6 +642,7 @@ export function AssetDetailView({
           : loanBalance != null
             ? calculateEquity(h.value, loanBalance)
             : h.net_equity ?? h.value,
+      costBasis: equityCostAt(h.recorded_date),
       // Net Profit at each point = that point's Market Value minus the (fixed)
       // all-in cost basis — so Day 1 immediately shows the negative hit of the
       // acquisition fees, not zero.
@@ -1704,7 +1723,7 @@ export function AssetDetailView({
                             maskValue(currencyFormatter.format(Number(value)))
                           }
                         />
-                        {isRealEstate && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                        {(isRealEstate || isEquity) && <Legend wrapperStyle={{ fontSize: 12 }} />}
                         {showHistory && (
                           <>
                             <Area
@@ -1743,6 +1762,17 @@ export function AssetDetailView({
                                 fill="transparent"
                                 strokeWidth={2}
                                 strokeDasharray="2 3"
+                              />
+                            )}
+                            {isEquity && (
+                              <Area
+                                type="stepAfter"
+                                dataKey="costBasis"
+                                name={t("invested_cost_basis")}
+                                stroke="var(--color-muted-foreground)"
+                                fill="transparent"
+                                strokeWidth={2}
+                                strokeDasharray="6 4"
                               />
                             )}
                             {isRealEstate && (
