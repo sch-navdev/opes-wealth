@@ -135,6 +135,9 @@ export function AddInvestmentsDialog() {
   const [trades, setTrades] = useState<ParsedTrade[]>([]);
   const [parseErrors, setParseErrors] = useState<ParsedTradeRowError[]>([]);
   const [skippedNonTradeCount, setSkippedNonTradeCount] = useState(0);
+  const [accountInfo, setAccountInfo] = useState<{ brokerName: string; accountId: string } | null>(
+    null,
+  );
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<ImportBrokerTradesResult[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -219,6 +222,7 @@ export function AddInvestmentsDialog() {
     setTrades([]);
     setParseErrors([]);
     setSkippedNonTradeCount(0);
+    setAccountInfo(null);
     setImportError(null);
     setImportResults([]);
     setSelectedIndices(new Set());
@@ -270,6 +274,11 @@ export function AddInvestmentsDialog() {
     setTrades(result.trades.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(result.errors);
     setSkippedNonTradeCount(result.skippedNonTradeCount ?? 0);
+    setAccountInfo(
+      result.accountId
+        ? { brokerName: broker.id === "saxo" ? "Saxobank" : broker.name, accountId: result.accountId }
+        : null,
+    );
     setStage("preview");
   }
 
@@ -324,6 +333,7 @@ export function AddInvestmentsDialog() {
     setTrades(parsed.map((t) => ({ ...t, exchangeRate: t.exchangeRate ?? 1, brokerage: t.brokerage ?? 0 })));
     setParseErrors(errors);
     setSkippedNonTradeCount(0);
+    setAccountInfo(null);
     setStage("preview");
   }
 
@@ -362,13 +372,14 @@ export function AddInvestmentsDialog() {
     setTrades([trade]);
     setParseErrors([]);
     setSkippedNonTradeCount(0);
+    setAccountInfo(null);
     setStage("preview");
   }
 
   function handleConfirmImport() {
     setImportError(null);
     startImportTransition(async () => {
-      const result = await importBrokerTrades(aggregatedHoldings);
+      const result = await importBrokerTrades(aggregatedHoldings, accountInfo ?? undefined);
       if ("error" in result) {
         setImportError(result.error);
         return;
@@ -950,6 +961,13 @@ export function AddInvestmentsDialog() {
                 </TableBody>
               </Table>
             </div>
+            {importResults.some(
+              (r) => r.code === "invalid_api_key" || r.code === "provider_not_configured",
+            ) && (
+              <p className="text-sm text-destructive" role="alert">
+                {t("brokerage_api_key_warning")}
+              </p>
+            )}
             <DialogFooter>
               <Button type="button" onClick={() => handleOpenChange(false)}>
                 {t("csv_done")}

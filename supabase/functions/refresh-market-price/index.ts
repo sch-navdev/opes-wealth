@@ -42,6 +42,7 @@ type PriceErrorCode =
   | "invalid_symbol"
   | "unsupported_currency"
   | "provider_not_configured"
+  | "invalid_api_key"
   | "timeout"
   | "rate_limited"
   | "invalid_response"
@@ -167,6 +168,17 @@ async function fetchEquityPrice(
     return errorResponse("network_error", "Could not reach Finnhub.", 502);
   }
 
+  // Finnhub answers 401 for a missing/invalid/revoked token. Surface it as
+  // its own code (not a generic network error) so the UI can tell the user
+  // to fix the key instead of retrying. Returned as 502 — this function's own
+  // caller auth succeeded, it's the upstream provider that rejected us.
+  if (res.status === 401) {
+    return errorResponse(
+      "invalid_api_key",
+      "Finnhub rejected the API key (HTTP 401) — the FINNHUB_API_KEY secret is invalid, revoked or missing.",
+      502,
+    );
+  }
   if (res.status === 429) {
     return errorResponse("rate_limited", "Finnhub's rate limit was hit. Try again shortly.", 429);
   }

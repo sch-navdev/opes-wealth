@@ -907,6 +907,14 @@ const dictionary = {
     en: "Live equity pricing isn't configured yet — an API key still needs to be set up.",
     fr: "La tarification en direct des actions n'est pas encore configurée — une clé API doit encore être ajoutée.",
   },
+  market_price_error_invalid_api_key: {
+    en: "Invalid or Missing API Key — Finnhub rejected the key. Check the FINNHUB_API_KEY secret.",
+    fr: "Clé API invalide ou manquante — Finnhub a rejeté la clé. Vérifiez le secret FINNHUB_API_KEY.",
+  },
+  brokerage_api_key_warning: {
+    en: "Invalid or Missing API Key — live prices could not be refreshed. Holdings keep their last price or cost basis.",
+    fr: "Clé API invalide ou manquante — les cours n'ont pas pu être actualisés. Les positions conservent leur dernier cours ou leur prix de revient.",
+  },
   market_price_error_timeout: {
     en: "The pricing provider took too long to respond. Try again.",
     fr: "Le fournisseur de prix a mis trop de temps à répondre. Réessayez.",

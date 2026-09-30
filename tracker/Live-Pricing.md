@@ -62,6 +62,12 @@ No new tables — same `assets.metadata` jsonb-per-category pattern as every oth
 - `actions.ts`: shared `persistQuote()` (convert → `current_value = qty × price` → metadata `last_unit_price`/open/previous close/exchange → today's `asset_history` upsert) now backs both the single-asset `refreshMarketPrice` and the new `refreshBrokerageQuotes(assetIds?)` (sequential, per-ticker errors never zero a holding). `lib/equities.ts` gained `normalizeExchange`/`computeHoldingMetrics`. **Free-tier reality**: only US listings are covered, so EURONEXT holdings will report "not covered" and stay valued at cost until a paid plan or another provider.
 - See [[Broker-Trade-Import|Broker Trade Import]] for the import-side fix and [[Portfolio-Dashboard|Portfolio Dashboard]] for the table.
 
+## Finnhub 401 / Invalid-Key Handling (2026-09-30)
+
+- `refresh-market-price`: a Finnhub **HTTP 401** now returns its own code `invalid_api_key` (HTTP 502 from our function — our caller auth succeeded, the upstream rejected the key) instead of falling into a generic network error. **Needs redeploying** (`supabase functions deploy refresh-market-price`).
+- Client: `fetchMarketPrice` (and the server `fetchLiveEquityQuote`) read the real `{error:{code,message}}` body off a non-2xx function response (`error.context`) — previously any non-2xx collapsed to "network error". The single-asset Refresh button shows "Invalid or Missing API Key…" (`market_price_error_invalid_api_key`).
+- Batches: `priceEquityAssets` stops calling Finnhub after the first `invalid_api_key`/`provider_not_configured` and reports every remaining ticker with that code (no crash, no N identical failures). Nothing is written on failure, so each holding **keeps its last price / cost basis**; `computeHoldingMetrics` price falls back `last_unit_price → previous_close → value ÷ quantity`. The brokerage table's "Refresh prices" and the import result both show a single red "Invalid or Missing API Key" warning. Logic-only verification (no holdings exist to refresh live).
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — Step 9's other half (Real Estate/ADREC-DARI, stubbed)
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — existing `fx.ts` pattern for external rate data; also the closest precedent for a category-specific metadata module

@@ -169,6 +169,7 @@ const MARKET_PRICE_ERROR_KEYS: Record<string, TranslationKey> = {
   invalid_symbol: "market_price_error_invalid_symbol",
   unsupported_currency: "market_price_error_unsupported_currency",
   provider_not_configured: "market_price_error_provider_not_configured",
+  invalid_api_key: "market_price_error_invalid_api_key",
   timeout: "market_price_error_timeout",
   rate_limited: "market_price_error_rate_limited",
   invalid_response: "market_price_error_invalid_response",
@@ -640,12 +641,36 @@ export function AssetDetailView({
       : [];
   const showHistory = !isRealEstate || chartView !== "forward";
   const showForward = isRealEstate && chartView !== "history";
+  // Bridge: start the forward series at the last KNOWN historical point so
+  // the dashed projection leaves exactly where the solid history ends — even
+  // if the newest manual valuation was deleted, or history stops before today
+  // (the projection itself starts from today's market valuation).
+  const lastHistoryPoint = chartData[chartData.length - 1];
+  const projectionBridge: ProjectionPoint[] =
+    projection.length > 0 &&
+    lastHistoryPoint &&
+    lastHistoryPoint.netProfit != null &&
+    lastHistoryPoint.totalReturn != null
+      ? [
+          {
+            date: lastHistoryPoint.date,
+            pValue: lastHistoryPoint.value,
+            pNetEquity: lastHistoryPoint.netEquity,
+            pNetProfit: lastHistoryPoint.netProfit,
+            pLoanBalance: lastHistoryPoint.loanBalance,
+            pTotalReturn: lastHistoryPoint.totalReturn,
+          },
+        ]
+      : [];
   const combinedChartData = [
     ...(showHistory
       ? chartData.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
       : []),
     ...(showForward
-      ? projection.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      ? [...projectionBridge, ...projection].map((p) => ({
+          ...p,
+          ts: new Date(p.date).getTime(),
+        }))
       : []),
   ];
 

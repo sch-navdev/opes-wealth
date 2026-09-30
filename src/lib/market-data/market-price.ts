@@ -40,6 +40,18 @@ export async function fetchMarketPrice(
   });
 
   if (error) {
+    // A non-2xx Edge Function response arrives as a generic transport error;
+    // the real { error: { code, message } } (e.g. invalid_api_key on a
+    // Finnhub 401) is on `error.context` — read it so the UI can show the
+    // specific problem instead of a vague "network error".
+    try {
+      const body = await (error as { context?: Response }).context?.json();
+      if (body?.error?.code) {
+        return { ok: false, code: body.error.code, error: body.error.message ?? error.message };
+      }
+    } catch {
+      // fall through to the generic error
+    }
     return { ok: false, code: "network_error", error: error.message };
   }
 

@@ -32,12 +32,70 @@ export type EquityTrade = {
   /** See `ParsedTrade` (`lib/parsers/types.ts`) — captured but not yet factored into cost-basis math. */
   exchangeRate?: number;
   brokerage?: number;
+  /** Broker-reported total cost/proceeds (Saxo `Total cost`/`Booked Amount`), when present. */
+  bookedAmount?: number;
 };
 
 /** One dividend/income receipt against this holding (asset currency). No automatic source yet — filled manually — so the table's Income column is honestly `—` until entries exist. */
 export type EquityIncome = { date: string; amount: number };
 
+/**
+ * Cost of a buy (or proceeds of a sell): the broker's booked amount when it's
+ * present and plausible, otherwise `quantity × price`. A booked amount more
+ * than 2× off (or under half of) quantity × price is ignored — it is almost
+ * certainly in a different currency/unit, and would corrupt the series.
+ */
+export function tradeCost(t: {
+  quantity: number;
+  price: number;
+  bookedAmount?: number;
+}): number {
+  const gross = t.quantity * t.price;
+  if (t.bookedAmount && t.bookedAmount > 0 && gross > 0) {
+    const ratio = t.bookedAmount / gross;
+    if (ratio >= 0.5 && ratio <= 2) return t.bookedAmount;
+  }
+  return gross;
+}
+
+/**
+ * Invested capital over time from a trade ledger: for every trade date, the
+ * cost basis of the position still held after that day's trades (average-cost
+ * method — a sell removes cost at the running average, not at its proceeds).
+ * Feeds the `asset_history` backfill so the portfolio chart starts at the
+ * earliest trade rather than flatlining at zero until the import date.
+ */
+export function buildInvestedCapitalSeries(
+  trades: EquityTrade[],
+): { date: string; value: number }[] {
+  const sorted = [...trades].sort(
+    (a, b) =>
+      a.tradeDate.localeCompare(b.tradeDate) ||
+      (a.side === b.side ? 0 : a.side === "buy" ? -1 : 1),
+  );
+  let quantity = 0;
+  let cost = 0;
+  const byDate = new Map<string, number>();
+
+  for (const trade of sorted) {
+    if (trade.side === "buy") {
+      quantity += trade.quantity;
+      cost += tradeCost(trade);
+    } else if (quantity > 0) {
+      const sold = Math.min(trade.quantity, quantity);
+      cost -= (cost / quantity) * sold;
+      quantity -= sold;
+    }
+    byDate.set(trade.tradeDate, Math.max(0, cost));
+  }
+
+  return Array.from(byDate, ([date, value]) => ({ date, value }));
+}
+
 export type EquityMetadata = {
+  /** Brokerage account this holding was imported from (e.g. Saxo Client ID) and the label used in the asset's name. */
+  account_id?: string;
+  account_name?: string;
   /** Display exchange, normalized by `normalizeExchange` (e.g. "NASDAQ", "EURONEXT"). Drives the brokerage table's exchange grouping. */
   exchange: string;
   last_unit_price: number | null;
@@ -104,8 +162,13 @@ export function computeHoldingMetrics(input: {
   const { quantity, currentValue, metadata } = input;
   const avgCost = estimateCostBasisUnitPrice(metadata.trades);
   const cost = avgCost != null ? Math.max(0, quantity) * avgCost : null;
+  // Last live quote, else the stored previous close, else value ÷ quantity
+  // (cost basis for a never-priced holding) — so a failed refresh never
+  // blanks or zeroes a holding's price.
   const price =
-    metadata.last_unit_price ?? (quantity > 0 ? currentValue / quantity : null);
+    metadata.last_unit_price ??
+    metadata.previous_close ??
+    (quantity > 0 ? currentValue / quantity : null);
   const income = (metadata.income ?? []).reduce((sum, i) => sum + i.amount, 0);
   const capitalGain = cost != null ? currentValue - cost : null;
   const returnPct =

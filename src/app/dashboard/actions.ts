@@ -38,6 +38,7 @@ import {
 import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import {
+  buildInvestedCapitalSeries,
   estimateCostBasisUnitPrice,
   normalizeExchange,
   parseEquityMetadata,
@@ -1339,7 +1340,12 @@ export type RefreshBrokerageQuotesResult = {
   ticker: string;
   status: "updated" | "error";
   message?: string;
+  /** Edge Function error code on failure, e.g. `invalid_api_key` — lets the UI flag a bad/missing Finnhub key distinctly. */
+  code?: string;
 };
+
+/** Codes meaning the Finnhub key itself is unusable — every further call in the batch would fail the same way. */
+const API_KEY_ERROR_CODES = new Set(["invalid_api_key", "provider_not_configured"]);
 
 /**
  * Re-prices every Brokerage Account holding (or just `assetIds`) from
@@ -1406,13 +1412,25 @@ async function priceEquityAssets(
   rates: Record<string, number>,
 ): Promise<RefreshBrokerageQuotesResult[]> {
   const results: RefreshBrokerageQuotesResult[] = [];
+  let keyProblem: { code: string; message: string } | null = null;
   for (const asset of assets) {
     const ticker = asset.ticker_symbol?.trim();
     if (!ticker || !(asset.quantity > 0)) continue;
 
+    // A rejected/missing API key fails every ticker the same way, so stop
+    // calling Finnhub and report the rest with the same code. Nothing is
+    // written on failure, so each holding keeps its last price / cost basis.
+    if (keyProblem) {
+      results.push({ ticker, status: "error", ...keyProblem });
+      continue;
+    }
+
     const quote = await fetchLiveEquityQuote(supabase, asset.id, ticker, asset.currency);
     if (!quote.ok) {
-      results.push({ ticker, status: "error", message: quote.error });
+      if (API_KEY_ERROR_CODES.has(quote.code)) {
+        keyProblem = { code: quote.code, message: quote.error };
+      }
+      results.push({ ticker, status: "error", code: quote.code, message: quote.error });
       continue;
     }
     const persisted = await persistQuote(supabase, userId, asset, quote.quote, rates);
@@ -1433,7 +1451,36 @@ export type ImportBrokerTradesResult = {
   message?: string;
   /** True once a live Finnhub quote priced this holding; false means it is valued at cost basis until a refresh succeeds. */
   priced?: boolean;
+  /** Why pricing failed (Edge Function code), e.g. `invalid_api_key`. */
+  code?: string;
 };
+
+/**
+ * Writes the invested-capital history for an imported holding: one
+ * `asset_history` row per trade date (cost basis of the open position after
+ * that day, `buildInvestedCapitalSeries`), so the portfolio chart starts at
+ * the earliest trade instead of flatlining until the import date. Idempotent
+ * (upsert on asset/date), so re-importing rebuilds it in place.
+ */
+async function backfillInvestedCapital(
+  supabase: SupabaseClient,
+  assetId: string,
+  trades: EquityTrade[],
+  source: AssetHistorySource,
+) {
+  const series = buildInvestedCapitalSeries(trades);
+  if (series.length === 0) return;
+  await supabase.from("asset_history").upsert(
+    series.map((p) => ({
+      asset_id: assetId,
+      recorded_date: p.date,
+      value: p.value,
+      net_equity: p.value,
+      source,
+    })),
+    { onConflict: "asset_id,recorded_date" },
+  );
+}
 
 /**
  * Broker Trade Import (Phase 2, `tracker/Broker-Trade-Import.md`) — persists
@@ -1450,6 +1497,12 @@ export type ImportBrokerTradesResult = {
  */
 export async function importBrokerTrades(
   holdings: AggregatedHolding[],
+  options?: {
+    /** e.g. "Saxobank" — used with `accountId` to name the generated assets. */
+    brokerName?: string;
+    /** Brokerage account/client number found in the file. */
+    accountId?: string | null;
+  },
 ): Promise<{ error: string } | { results: ImportBrokerTradesResult[] }> {
   const supabase = await createClient();
 
@@ -1474,6 +1527,12 @@ export async function importBrokerTrades(
   const source: AssetHistorySource = "broker_import";
   const today = new Date().toISOString().slice(0, 10);
   const results: ImportBrokerTradesResult[] = [];
+  // "Brokerage Account / Saxobank Acc. # 10164571" — each holding becomes its
+  // own asset (they're priced individually), named `<label> / <ticker>`.
+  const accountId = options?.accountId?.trim() || null;
+  const accountLabel = accountId
+    ? `Brokerage Account / ${options?.brokerName ?? "Broker"} Acc. # ${accountId}`
+    : null;
   const touched: { id: string; ticker: string; currency: string; quantity: number; metadata: Json }[] = [];
 
   for (const holding of holdings) {
@@ -1506,6 +1565,7 @@ export async function importBrokerTrades(
           source,
           exchangeRate: t.exchangeRate,
           brokerage: t.brokerage,
+          bookedAmount: t.bookedAmount,
         }));
 
       if (newTrades.length === 0) {
@@ -1524,6 +1584,9 @@ export async function importBrokerTrades(
       const nextMetadata: Json = {
         ...existingMetadata,
         exchange: normalizeExchange(existingMetadata.exchange || holding.exchange),
+        ...(accountId && !existingMetadata.account_id
+          ? { account_id: accountId, account_name: accountLabel as string }
+          : {}),
         trades: allTrades,
       };
 
@@ -1545,6 +1608,8 @@ export async function importBrokerTrades(
         results.push({ ticker: holding.ticker, status: "error", message: updateError.message });
         continue;
       }
+
+      await backfillInvestedCapital(supabase, existing.id, allTrades, source);
 
       if (updatePayload.current_value != null) {
         await supabase.from("asset_history").upsert(
@@ -1589,6 +1654,7 @@ export async function importBrokerTrades(
         source,
         exchangeRate: t.exchangeRate,
         brokerage: t.brokerage,
+        bookedAmount: t.bookedAmount,
       }));
 
       // Never seed a zero value: fall back from cost basis to the latest
@@ -1605,6 +1671,7 @@ export async function importBrokerTrades(
           .sort()[0] ?? trades.map((t) => t.tradeDate).sort()[0] ?? today;
 
       const metadata: Json = {
+        ...(accountId ? { account_id: accountId, account_name: accountLabel } : {}),
         exchange: normalizeExchange(holding.exchange),
         last_unit_price: null,
         last_priced_at: null,
@@ -1617,7 +1684,7 @@ export async function importBrokerTrades(
         .insert({
           profile_id: user.id,
           category_id: equitiesCategory.id,
-          name: holding.instrumentName,
+          name: accountLabel ? `${accountLabel} / ${holding.ticker}` : holding.instrumentName,
           quantity: holding.netQuantity,
           current_value: currentValue,
           currency: holding.currency,
@@ -1636,6 +1703,8 @@ export async function importBrokerTrades(
         });
         continue;
       }
+
+      await backfillInvestedCapital(supabase, inserted.id, trades, source);
 
       await supabase.from("asset_history").upsert(
         {
@@ -1680,7 +1749,10 @@ export async function importBrokerTrades(
       const row = results.find((r) => r.ticker === p.ticker);
       if (!row) continue;
       row.priced = p.status === "updated";
-      if (p.status === "error") row.message = p.message;
+      if (p.status === "error") {
+        row.message = p.message;
+        row.code = p.code;
+      }
     }
   }
 

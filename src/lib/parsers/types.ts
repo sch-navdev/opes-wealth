@@ -35,6 +35,10 @@ export type ParsedTrade = {
    */
   exchangeRate?: number;
   brokerage?: number;
+  /** Absolute cash cost (buy) / proceeds (sell) including commission, from the broker's `Booked Amount` column when the export has one. Preferred over `quantity × price` for invested-capital history (see `tradeCost` in `lib/equities.ts`). */
+  bookedAmount?: number;
+  /** The broker's own trade id, used to join a trade to its Transactions-sheet row. */
+  brokerTradeId?: string;
 };
 
 export type ParsedTradeRowError = {
@@ -53,6 +57,8 @@ export type BrokerParseResult = {
    * it's counted separately; `undefined` for parsers with no such concept.
    */
   skippedNonTradeCount?: number;
+  /** The brokerage account/client number found in the file (Saxo `Client ID`/`Account ID`), used to name the generated asset. */
+  accountId?: string;
 };
 
 /** One instrument's net position across every trade an import contained. */

@@ -32,6 +32,9 @@ const COLUMN_ALIASES = {
   symbol: ["instrument symbol"],
   name: ["instrument"],
   currency: ["instrument currency", "currency"],
+  /** Optional: Saxo's own trade id (joins a trade to its Transactions-sheet row) and, if a trades table carries it, the booked cash amount. */
+  tradeId: ["trade id"],
+  bookedAmount: ["booked amount"],
 } as const;
 
 type ColumnKey = keyof typeof COLUMN_ALIASES;
@@ -130,7 +133,11 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
   const columns = buildColumnIndex(headerRow);
 
   const missing = (Object.keys(COLUMN_ALIASES) as ColumnKey[]).filter(
-    (key) => columns[key] === undefined && key !== "currency",
+    (key) =>
+      columns[key] === undefined &&
+      key !== "currency" &&
+      key !== "tradeId" &&
+      key !== "bookedAmount",
   );
   if (missing.length > 0) {
     return {
@@ -192,6 +199,11 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
     const currency =
       columns.currency !== undefined ? String(row[columns.currency] ?? "").trim().toUpperCase() : "";
 
+    const bookedAmount =
+      columns.bookedAmount !== undefined ? parseAmountCell(row[columns.bookedAmount]) : null;
+    const brokerTradeId =
+      columns.tradeId !== undefined ? String(row[columns.tradeId] ?? "").trim() : "";
+
     trades.push({
       instrumentSymbol: rawSymbol,
       ticker,
@@ -202,10 +214,67 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
       side,
       quantity,
       price,
+      ...(bookedAmount != null && bookedAmount > 0 ? { bookedAmount } : {}),
+      ...(brokerTradeId ? { brokerTradeId } : {}),
     });
   }
 
   return { trades, errors };
+}
+
+/** Absolute magnitude of an amount cell (numbers, or strings with thousands separators/parenthesised negatives); `null` if it isn't one. */
+function parseAmountCell(raw: RawCell): number | null {
+  if (typeof raw === "number") return Number.isFinite(raw) ? Math.abs(raw) : null;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const n = Number(raw.replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? Math.abs(n) : null;
+}
+
+/** Checked in priority order: the Transactions sheet's `Client ID` (e.g. 10164571) is the number Saxo shows the client; `Account ID` (e.g. 373048INET) is a per-sub-account id and only a fallback. */
+const CLIENT_ID_LABELS = ["client id", "clientid", "client id:"];
+const ACCOUNT_ID_LABELS = ["account id", "accountid", "account id:"];
+const ACCOUNT_LABELS = [...CLIENT_ID_LABELS, ...ACCOUNT_ID_LABELS];
+
+function cellText(cell: RawCell): string {
+  return cell === undefined || cell === null ? "" : String(cell).trim();
+}
+
+const looksLikeAccountId = (text: string) =>
+  /^[A-Za-z0-9-]{4,20}$/.test(text) && /\d/.test(text) && !ACCOUNT_LABELS.includes(normalizeHeader(text));
+
+/**
+ * Finds the brokerage account number. Saxo puts it in a `Client ID` /
+ * `Account ID` column or a "label | value" pair; both are handled by
+ * scanning every row for that label and taking either the next cell in the
+ * same row or the first populated cell beneath it in the same column. Falls
+ * back to a 6–10 digit run in the file name (Saxo names exports like
+ * `Portfolio_10164571_2021-01-01_….pdf`/xlsx) that isn't a YYYYMMDD date.
+ * Verified against a real export (`Transactions_10164571_….xlsx`): the
+ * Transactions sheet's `Client ID` column holds `10164571`.
+ */
+export function extractSaxoAccountId(rows: RawRow[], fileName: string): string | undefined {
+  const limit = Math.min(rows.length, 500);
+  for (const labels of [CLIENT_ID_LABELS, ACCOUNT_ID_LABELS]) {
+    for (let r = 0; r < limit; r++) {
+      const row = rows[r] ?? [];
+      for (let c = 0; c < row.length; c++) {
+        if (!labels.includes(normalizeHeader(row[c]))) continue;
+        const pair = cellText(row[c + 1]);
+        if (looksLikeAccountId(pair)) return pair;
+        for (let k = r + 1; k < Math.min(rows.length, r + 6); k++) {
+          const value = cellText(rows[k]?.[c]);
+          if (looksLikeAccountId(value)) return value;
+        }
+      }
+    }
+  }
+
+  for (const match of fileName.matchAll(/(?<!\d)(\d{6,10})(?!\d)/g)) {
+    const digits = match[1];
+    const isDate = digits.length === 8 && /^(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/.test(digits);
+    if (!isDate) return digits;
+  }
+  return undefined;
 }
 
 function findTradesSheet(workbook: XLSX.WorkBook): { sheet: XLSX.WorkSheet; rows: RawRow[]; headerRow: number } | null {
@@ -222,6 +291,54 @@ function findTradesSheet(workbook: XLSX.WorkBook): { sheet: XLSX.WorkSheet; rows
   }
 
   return null;
+}
+
+/**
+ * Joins trades to the Transactions sheet by `Trade ID` (every trade has one
+ * row there). In that sheet `Booked Amount` is the full signed cash effect
+ * including commission (e.g. -530.99 for 14 @ 37.86) and `Total cost` is
+ * just the commission (-1), so `Booked Amount` becomes the trade's cost and
+ * `Total cost` its brokerage fee.
+ */
+function enrichFromTransactions(trades: ParsedTrade[], sheets: RawRow[][]): void {
+  const byTradeId = new Map<string, { booked: number | null; commission: number | null }>();
+
+  for (const rows of sheets) {
+    const headerIdx = rows.findIndex((row) => {
+      const n = row.map(normalizeHeader);
+      // "Transaction Type" distinguishes the Transactions sheet from Bookings,
+      // which also has Trade ID + Booked Amount but splits each trade into
+      // separate value and commission rows.
+      return (
+        n.includes("trade id") && n.includes("booked amount") && n.includes("transaction type")
+      );
+    });
+    if (headerIdx === -1) continue;
+    const header = rows[headerIdx].map(normalizeHeader);
+    const idCol = header.indexOf("trade id");
+    const bookedCol = header.indexOf("booked amount");
+    const costCol = header.indexOf("total cost");
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const id = cellText(rows[i]?.[idCol]);
+      if (!id) continue;
+      byTradeId.set(id, {
+        booked: parseAmountCell(rows[i][bookedCol]),
+        commission: costCol >= 0 ? parseAmountCell(rows[i][costCol]) : null,
+      });
+    }
+  }
+
+  for (const trade of trades) {
+    const match = trade.brokerTradeId ? byTradeId.get(trade.brokerTradeId) : undefined;
+    if (!match) continue;
+    if (match.booked && match.booked > 0 && trade.bookedAmount === undefined) {
+      trade.bookedAmount = match.booked;
+    }
+    if (match.commission && match.commission > 0 && trade.brokerage === undefined) {
+      trade.brokerage = match.commission;
+    }
+  }
 }
 
 export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): BrokerParseResult {
@@ -241,7 +358,7 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
         errors: [{ rowIndex: 0, message: 'Could not find a "Trade Event Type"/"Traded Quantity" header row — this may not be a Saxo Bank trade export.' }],
       };
     }
-    return mapRows(rows, headerRow);
+    return { ...mapRows(rows, headerRow), accountId: extractSaxoAccountId(rows, fileName) };
   }
 
   let workbook: XLSX.WorkBook;
@@ -259,5 +376,14 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
     };
   }
 
-  return mapRows(found.rows, found.headerRow);
+  const sheetRows = workbook.SheetNames.map(
+    (name) =>
+      XLSX.utils.sheet_to_json<RawRow>(workbook.Sheets[name], {
+        header: 1,
+        raw: true,
+      }) as unknown as RawRow[],
+  );
+  const result = mapRows(found.rows, found.headerRow);
+  enrichFromTransactions(result.trades, sheetRows);
+  return { ...result, accountId: extractSaxoAccountId(sheetRows.flat(), fileName) };
 }

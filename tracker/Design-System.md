@@ -52,6 +52,10 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 - i18n: nav labels were already routed through `useLanguage().t`; the hardcoded "Menu" aria-label and new close button now use new `menu`/`close` keys in `lib/i18n.ts` (EN/FR).
 - **21st.dev still not fetched** (2 `get_component`/day quota) — drawer pattern hand-built on existing primitives again. `tsc --noEmit`/`eslint`/`npm run build` clean; **not verified visually** this pass (dashboard is behind the mock-auth wall). Related: [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]].
 
+## Forward Projection Bridged to History (2026-09-30)
+
+- Real Estate valuation chart (off-plan and ready-built share it): the Forward Looking series now **starts with the last known historical point** (`projectionBridge` in `asset-detail-view.tsx`, mapped onto the `p*` keys), so the dashed projection leaves exactly where the solid history ends — even if the newest manual valuation is deleted or history stops before today (the projection itself still starts from today's market valuation, so there may be a short straight segment between the two). Verified in the browser on Ellington House 1 - 713 in "Both": history curves end at x=101px and the projection curves begin at exactly x=101px. See [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] for the projection model.
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components

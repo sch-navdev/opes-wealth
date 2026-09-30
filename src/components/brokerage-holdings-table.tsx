@@ -141,11 +141,18 @@ export function BrokerageHoldingsTable({
       }
       const failed = result.results.filter((r) => r.status === "error");
       setRefreshError(failed.length > 0);
+      // A rejected/missing Finnhub key is reported as one clear warning (every
+      // ticker fails identically); holdings keep their last price/cost basis.
+      const keyProblem = failed.some(
+        (r) => r.code === "invalid_api_key" || r.code === "provider_not_configured",
+      );
       setRefreshMessage(
-        t("brokerage_refresh_done", {
-          updated: result.results.length - failed.length,
-          failed: failed.length,
-        }) + (failed[0]?.message ? ` — ${failed[0].ticker}: ${failed[0].message}` : ""),
+        keyProblem
+          ? t("brokerage_api_key_warning")
+          : t("brokerage_refresh_done", {
+              updated: result.results.length - failed.length,
+              failed: failed.length,
+            }) + (failed[0]?.message ? ` — ${failed[0].ticker}: ${failed[0].message}` : ""),
       );
     });
   }
