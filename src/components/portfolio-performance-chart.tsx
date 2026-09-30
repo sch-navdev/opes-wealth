@@ -55,6 +55,15 @@ export function PortfolioPerformanceChart({
     return Number.isNaN(parsed.getTime()) ? isoDate : dateFormatter.format(parsed);
   }
 
+  // Numeric time axis: points are spaced by real elapsed time, so an import
+  // with trades from 2020 doesn't get squeezed into evenly-spaced categories
+  // next to a handful of recent rows.
+  function formatTimestamp(ts: unknown): string {
+    const n = Number(ts);
+    return Number.isFinite(n) ? formatDate(new Date(n).toISOString().slice(0, 10)) : "";
+  }
+  const chartPoints = series.points.map((p) => ({ ...p, ts: new Date(p.date).getTime() }));
+
   function categoryLabel(category: string): string {
     const key = CATEGORY_NAME_KEYS[category] as TranslationKey | undefined;
     return key ? t(key) : category;
@@ -105,7 +114,7 @@ export function PortfolioPerformanceChart({
         ) : (
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series.points}>
+              <AreaChart data={chartPoints}>
                 <defs>
                   <linearGradient id="portfolioPerformanceGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.4} />
@@ -114,10 +123,13 @@ export function PortfolioPerformanceChart({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
-                  dataKey="date"
+                  dataKey="ts"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
                   stroke="var(--color-muted-foreground)"
                   fontSize={12}
-                  tickFormatter={formatDate}
+                  tickFormatter={formatTimestamp}
                 />
                 <YAxis
                   stroke="var(--color-muted-foreground)"
@@ -131,7 +143,7 @@ export function PortfolioPerformanceChart({
                     border: "1px solid var(--color-border)",
                     color: "var(--color-foreground)",
                   }}
-                  labelFormatter={formatDate}
+                  labelFormatter={formatTimestamp}
                   formatter={(value) => maskValue(currencyFormatter.format(Number(value)))}
                 />
                 <Area

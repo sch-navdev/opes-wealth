@@ -38,7 +38,11 @@ const TOTAL_KEY = "total";
  * portfolio's net worth yet) rather than dropping out and understating the
  * total. Standard practice for merging independently-sampled time series.
  */
-export function buildNetWorthSeries(assets: AssetHistoryInput[]): PortfolioPerformanceSeries {
+export function buildNetWorthSeries(
+  assets: AssetHistoryInput[],
+  /** ISO date to extend the series to (normally today): each asset keeps its last known value up to it, so the chart runs to the present rather than stopping at the last recorded row. */
+  throughDate?: string,
+): PortfolioPerformanceSeries {
   const allDates = new Set<string>();
   for (const asset of assets) {
     for (const point of asset.history) {
@@ -77,6 +81,11 @@ export function buildNetWorthSeries(assets: AssetHistoryInput[]): PortfolioPerfo
     }
     return point;
   });
+
+  const last = points[points.length - 1];
+  if (throughDate && last && last.date < throughDate) {
+    points.push({ ...last, date: throughDate } as PerformancePoint);
+  }
 
   return { points, categories };
 }

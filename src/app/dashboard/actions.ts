@@ -377,7 +377,7 @@ export async function updateAssetValuation(
     }
   }
 
-  const { error: historyError } = await supabase.from("asset_history").upsert(
+  const historyError = await upsertHistoryRows(supabase, [
     {
       asset_id: id,
       recorded_date: recordedDate,
@@ -385,8 +385,7 @@ export async function updateAssetValuation(
       net_equity: netEquity,
       source,
     },
-    { onConflict: "asset_id,recorded_date" },
-  );
+  ]);
 
   if (historyError) {
     return { error: historyError.message };
@@ -1044,7 +1043,8 @@ export async function importBankCsvHistory(
 
   const source: AssetHistorySource = "csv_import";
 
-  const { error: historyError } = await supabase.from("asset_history").upsert(
+  const historyError = await upsertHistoryRows(
+    supabase,
     rows.map((row) => ({
       asset_id: assetId,
       recorded_date: row.recorded_date,
@@ -1052,7 +1052,6 @@ export async function importBankCsvHistory(
       net_equity: row.value,
       source,
     })),
-    { onConflict: "asset_id,recorded_date" },
   );
 
   if (historyError) {
@@ -1331,24 +1330,15 @@ async function persistQuote(
     .eq("profile_id", userId);
   if (updateError) return { error: updateError.message };
 
-  const historyRow = {
-    asset_id: asset.id,
-    recorded_date: quote.asOf.slice(0, 10),
-    value: totalValue,
-    net_equity: totalValue,
-  };
-  let { error: historyError } = await supabase
-    .from("asset_history")
-    .upsert({ ...historyRow, source: quote.source }, { onConflict: "asset_id,recorded_date" });
-  // `yahoo` needs migration 0014 (DB CHECK on asset_history.source). Until it
-  // is applied, record the row as `manual` rather than failing the refresh
-  // after the asset itself was already updated; `metadata.last_price_source`
-  // still carries the true provider.
-  if (historyError?.code === "23514" && quote.source === "yahoo") {
-    ({ error: historyError } = await supabase
-      .from("asset_history")
-      .upsert({ ...historyRow, source: "manual" }, { onConflict: "asset_id,recorded_date" }));
-  }
+  const historyError = await upsertHistoryRows(supabase, [
+    {
+      asset_id: asset.id,
+      recorded_date: quote.asOf.slice(0, 10),
+      value: totalValue,
+      net_equity: totalValue,
+      source: quote.source,
+    },
+  ]);
   if (historyError) return { error: historyError.message };
 
   return { unitPrice, totalValue, asOf: quote.asOf };
@@ -1482,6 +1472,36 @@ export type ImportBrokerTradesResult = {
   code?: string;
 };
 
+type HistoryUpsertRow = {
+  asset_id: string;
+  recorded_date: string;
+  value: number;
+  net_equity: number | null;
+  source: AssetHistorySource;
+};
+
+/**
+ * The one place `asset_history` rows are upserted (on asset + date).
+ * Returns the error instead of dropping it — the importer used to ignore it,
+ * which is how a rejected `source` silently left every imported holding with
+ * no history at all. If Postgres rejects the `source` with a CHECK violation
+ * (`23514` — the live `asset_history_source_check` can lag behind this
+ * app's `AssetHistorySource` union; see migration 0015), the same rows are
+ * retried as `manual` — the one value every version of the constraint has
+ * allowed — so the data still lands; provenance stays on the asset's metadata.
+ */
+async function upsertHistoryRows(supabase: SupabaseClient, rows: HistoryUpsertRow[]) {
+  if (rows.length === 0) return null;
+  const write = (batch: HistoryUpsertRow[]) =>
+    supabase.from("asset_history").upsert(batch, { onConflict: "asset_id,recorded_date" });
+
+  let { error } = await write(rows);
+  if (error?.code === "23514") {
+    ({ error } = await write(rows.map((r) => ({ ...r, source: "manual" as AssetHistorySource }))));
+  }
+  return error;
+}
+
 /**
  * Writes the invested-capital history for an imported holding: one
  * `asset_history` row per trade date (cost basis of the open position after
@@ -1495,17 +1515,15 @@ async function backfillInvestedCapital(
   trades: EquityTrade[],
   source: AssetHistorySource,
 ) {
-  const series = buildInvestedCapitalSeries(trades);
-  if (series.length === 0) return;
-  await supabase.from("asset_history").upsert(
-    series.map((p) => ({
+  return upsertHistoryRows(
+    supabase,
+    buildInvestedCapitalSeries(trades).map((p) => ({
       asset_id: assetId,
       recorded_date: p.date,
       value: p.value,
       net_equity: p.value,
       source,
     })),
-    { onConflict: "asset_id,recorded_date" },
   );
 }
 
@@ -1646,8 +1664,29 @@ export async function importBrokerTrades(
         : existing.name;
 
       if (newTrades.length === 0) {
+        // Rebuild the invested-capital history even when the file has no new
+        // trades (idempotent): an earlier import may have lost it (see
+        // `upsertHistoryRows`), and re-uploading the same file should heal it.
+        const rebuildError = await backfillInvestedCapital(
+          supabase,
+          existing.id,
+          existingMetadata.trades,
+          source,
+        );
+        if (rebuildError) {
+          results.push({
+            ticker: holding.ticker,
+            status: "error",
+            message: `History could not be saved: ${rebuildError.message}`,
+          });
+          continue;
+        }
         if (!identityNeeded) {
-          results.push({ ticker: holding.ticker, status: "unchanged" });
+          results.push({
+            ticker: holding.ticker,
+            status: "updated",
+            message: "Invested-capital history rebuilt.",
+          });
           continue;
         }
         const { error: identityError } = await supabase
@@ -1705,10 +1744,18 @@ export async function importBrokerTrades(
         continue;
       }
 
-      await backfillInvestedCapital(supabase, existing.id, allTrades, source);
+      const backfillError = await backfillInvestedCapital(supabase, existing.id, allTrades, source);
+      if (backfillError) {
+        results.push({
+          ticker: holding.ticker,
+          status: "error",
+          message: `History could not be saved: ${backfillError.message}`,
+        });
+        continue;
+      }
 
       if (updatePayload.current_value != null) {
-        await supabase.from("asset_history").upsert(
+        await upsertHistoryRows(supabase, [
           {
             asset_id: existing.id,
             recorded_date: today,
@@ -1716,8 +1763,7 @@ export async function importBrokerTrades(
             net_equity: updatePayload.current_value,
             source,
           },
-          { onConflict: "asset_id,recorded_date" },
-        );
+        ]);
       }
 
       // Only open positions need a live price; a closed one has no value to price.
@@ -1806,9 +1852,17 @@ export async function importBrokerTrades(
         continue;
       }
 
-      await backfillInvestedCapital(supabase, inserted.id, trades, source);
+      const newBackfillError = await backfillInvestedCapital(supabase, inserted.id, trades, source);
+      if (newBackfillError) {
+        results.push({
+          ticker: holding.ticker,
+          status: "error",
+          message: `History could not be saved: ${newBackfillError.message}`,
+        });
+        continue;
+      }
 
-      await supabase.from("asset_history").upsert(
+      await upsertHistoryRows(supabase, [
         {
           asset_id: inserted.id,
           recorded_date: today,
@@ -1816,8 +1870,7 @@ export async function importBrokerTrades(
           net_equity: currentValue,
           source,
         },
-        { onConflict: "asset_id,recorded_date" },
-      );
+      ]);
 
       if (!isClosed) {
         touched.push({

@@ -24,6 +24,7 @@ import {
   getExchangeRatesFromUsd,
 } from "@/lib/fx";
 import { buildNetWorthSeries } from "@/lib/portfolio-performance";
+import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
   calculateTotalCost,
@@ -102,27 +103,12 @@ export default async function DashboardPage({
   // asset (any category), so it needs every asset's `asset_history` rows, not
   // just Equities (a second query rather than folding into the assets query
   // above, since it needs the asset ids first).
-  const { data: allHistory } =
-    (assets ?? []).length > 0
-      ? await supabase
-          .from("asset_history")
-          .select("asset_id, recorded_date, value, net_equity")
-          .in(
-            "asset_id",
-            (assets ?? []).map((a) => a.id),
-          )
-          .order("recorded_date", { ascending: true })
-          .returns<
-            { asset_id: string; recorded_date: string; value: number; net_equity: number | null }[]
-          >()
-      : {
-          data: [] as {
-            asset_id: string;
-            recorded_date: string;
-            value: number;
-            net_equity: number | null;
-          }[],
-        };
+  // Paged + unwindowed (`fetchAllAssetHistory`): the chart starts at the
+  // earliest row in the database, not at whatever one response could hold.
+  const allHistory = await fetchAllAssetHistory(
+    supabase,
+    (assets ?? []).map((a) => a.id),
+  );
 
   const performanceSeries = buildNetWorthSeries(
     (assets ?? []).map((asset) => ({
@@ -138,6 +124,8 @@ export default async function DashboardPage({
               : null,
         })),
     })),
+    // Run the series to today so it doesn't stop at the last recorded row.
+    new Date().toISOString().slice(0, 10),
   );
 
   const initials =

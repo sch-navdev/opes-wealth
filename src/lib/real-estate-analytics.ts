@@ -181,14 +181,72 @@ export type ProjectionPoint = {
   pTotalReturn: number;
 };
 
+export function addDays(isoDate: string, days: number): string {
+  const d = new Date(isoDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function addMonthsIso(isoDate: string, months: number): string {
+  const d = new Date(isoDate + "T00:00:00Z");
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d.toISOString().slice(0, 10);
+}
+
+const DAY_MS = 86_400_000;
+const YEAR_DAYS = 365.25;
+const daysBetween = (a: string, b: string) =>
+  (new Date(b + "T00:00:00Z").getTime() - new Date(a + "T00:00:00Z").getTime()) / DAY_MS;
+
 /**
- * 20-year (by default) yearly projection starting from today's figures:
- * market value compounds at `growthRate`; the loan follows its amortization
- * schedule (or stays at its manual balance when it can't amortize); each
- * year adds `annualRent − that year's loan interest − averageAnnualCosts` to
- * cumulative net rent (carried forward from `baseCumulativeNetRent`), and
- * Total Return = Unrealized Gain + cumulative net rent. Year 0 is today, so
- * the projection joins the history curve.
+ * The dates the projection is sampled on, oldest first: monthly for the whole
+ * horizon; **every 14 days until handover** for an off-plan unit (the
+ * construction/payment timeline, where equity moves); and — so a step lands on
+ * the exact day — each scheduled installment's due date and the day before it,
+ * plus the handover date and the day before it.
+ */
+export function projectionDates(input: {
+  today: string;
+  years: number;
+  offplan?: OffplanPlan;
+}): string[] {
+  const { today, years, offplan } = input;
+  const end = addYears(today, years);
+  const dates = new Set<string>([today, end]);
+  const add = (d: string) => d >= today && d <= end && dates.add(d);
+
+  for (let m = 1; m <= years * 12; m++) add(addMonthsIso(today, m));
+
+  if (offplan) {
+    const handover = offplan.handoverDate;
+    if (handover && handover > today) {
+      for (let d = addDays(today, 14); d < handover; d = addDays(d, 14)) add(d);
+      add(handover);
+      add(addDays(handover, -1));
+    }
+    for (const m of offplan.futureInstallments) {
+      add(m.due_date);
+      add(addDays(m.due_date, -1));
+    }
+  }
+  return Array.from(dates).sort();
+}
+
+/**
+ * 20-year (by default) projection starting from today's figures: market value
+ * compounds at `growthRate`; the loan follows its amortization schedule (or
+ * stays at its manual balance when it can't amortize); between consecutive
+ * sample dates the cumulative net rent grows by `annualRent − the loan
+ * interest charged in that window − averageAnnualCosts` (rent and costs
+ * pro-rated by days; carried forward from `baseCumulativeNetRent`), and Total
+ * Return = Unrealized Gain + cumulative net rent. The first point is today, so
+ * the projection joins the history curve. See `projectionDates` for the
+ * sampling (monthly, bi-weekly during off-plan construction, exact
+ * installment/handover days).
  */
 export function buildProjection(input: {
   today: string;
@@ -204,9 +262,10 @@ export function buildProjection(input: {
   hasLoan: boolean;
   /**
    * Off-plan only. Until handover, Equity is the cash actually paid in
-   * (stepping up as scheduled installments fall due) — NOT market value minus
-   * a loan, which would read 100% equity on day one because an off-plan unit
-   * has no mortgage yet. From handover on it is market value minus the loan.
+   * (stepping up on the exact day each scheduled installment falls due) — NOT
+   * market value minus a loan, which would read 100% equity on day one because
+   * an off-plan unit has no mortgage yet. From handover on it is market value
+   * minus the loan.
    */
   offplan?: OffplanPlan;
 }): ProjectionPoint[] {
@@ -215,20 +274,25 @@ export function buildProjection(input: {
   const manualBalance = input.hasLoan
     ? (input.loan.outstanding_principal ?? input.loan.amount ?? 0)
     : 0;
+  const dates = projectionDates({ today: input.today, years, offplan: input.offplan });
   const points: ProjectionPoint[] = [];
   let cumulativeNet = input.baseCumulativeNetRent;
+  let previous = input.today;
 
-  for (let y = 0; y <= years; y++) {
-    const date = addYears(input.today, y);
-    if (y > 0) {
-      const prev = addYears(input.today, y - 1);
+  for (const date of dates) {
+    if (date > previous) {
+      const fraction = daysBetween(previous, date) / YEAR_DAYS;
       const interest = input.schedule.reduce(
-        (s, e) => (e.date > prev && e.date <= date ? s + e.interestAmount : s),
+        (sum, e) => (e.date > previous && e.date <= date ? sum + e.interestAmount : sum),
         0,
       );
-      cumulativeNet += input.annualRent - interest - input.annualCosts;
+      cumulativeNet += (input.annualRent - input.annualCosts) * fraction - interest;
     }
-    const value = input.marketValue * Math.pow(1 + input.growthRate, y);
+    previous = date;
+
+    const value =
+      input.marketValue *
+      Math.pow(1 + input.growthRate, daysBetween(input.today, date) / YEAR_DAYS);
     const loanBalance = input.hasLoan
       ? amortizable
         ? getOutstandingPrincipalAt(input.loan, date)
