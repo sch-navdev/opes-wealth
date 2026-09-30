@@ -53,7 +53,12 @@ import { cn } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv-parser";
 import { currencies } from "@/lib/currencies";
 import { BROKERS, aggregateTrades, type BrokerDefinition } from "@/lib/parsers/broker-registry";
-import type { ParsedTrade, ParsedTradeRowError, TradeSide } from "@/lib/parsers/types";
+import type {
+  ParsedIncome,
+  ParsedTrade,
+  ParsedTradeRowError,
+  TradeSide,
+} from "@/lib/parsers/types";
 import {
   parseGenericCsvTrades,
   parseGenericWorkbook,
@@ -138,6 +143,7 @@ export function AddInvestmentsDialog() {
   const [accountInfo, setAccountInfo] = useState<{ brokerName: string; accountId: string } | null>(
     null,
   );
+  const [dividends, setDividends] = useState<ParsedIncome[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<ImportBrokerTradesResult[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
@@ -223,6 +229,7 @@ export function AddInvestmentsDialog() {
     setParseErrors([]);
     setSkippedNonTradeCount(0);
     setAccountInfo(null);
+    setDividends([]);
     setImportError(null);
     setImportResults([]);
     setSelectedIndices(new Set());
@@ -279,6 +286,7 @@ export function AddInvestmentsDialog() {
         ? { brokerName: broker.id === "saxo" ? "Saxobank" : broker.name, accountId: result.accountId }
         : null,
     );
+    setDividends(result.dividends ?? []);
     setStage("preview");
   }
 
@@ -334,6 +342,7 @@ export function AddInvestmentsDialog() {
     setParseErrors(errors);
     setSkippedNonTradeCount(0);
     setAccountInfo(null);
+    setDividends([]);
     setStage("preview");
   }
 
@@ -373,13 +382,17 @@ export function AddInvestmentsDialog() {
     setParseErrors([]);
     setSkippedNonTradeCount(0);
     setAccountInfo(null);
+    setDividends([]);
     setStage("preview");
   }
 
   function handleConfirmImport() {
     setImportError(null);
     startImportTransition(async () => {
-      const result = await importBrokerTrades(aggregatedHoldings, accountInfo ?? undefined);
+      const result = await importBrokerTrades(aggregatedHoldings, {
+        ...(accountInfo ?? {}),
+        dividends,
+      });
       if ("error" in result) {
         setImportError(result.error);
         return;

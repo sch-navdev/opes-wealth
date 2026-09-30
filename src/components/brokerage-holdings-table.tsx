@@ -363,6 +363,11 @@ export function BrokerageHoldingsTable({
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {metrics.income ? maskValue(formatMoney(metrics.income, asset.currency)) : "—"}
+                        {metrics.income > 0 && metrics.cost != null && metrics.cost > 0 && (
+                          <p className="text-xs" title={t("brokerage_income_yield_hint")}>
+                            {((metrics.income / metrics.cost) * 100).toFixed(1)}%
+                          </p>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{asset.currency}</TableCell>
                       <TableCell className={cn("text-right tabular-nums", signedClass(metrics.returnPct))}>

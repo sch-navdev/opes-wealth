@@ -22,13 +22,17 @@ interface PriceRequest {
   coingeckoId?: string;
   /** The asset's stored currency, e.g. "USD". */
   currency: string;
+  /** Equities: where it trades — a MIC ("XPAR") or the app's display name ("EURONEXT", "NASDAQ"). Picks Finnhub (US) vs Yahoo Finance (elsewhere). */
+  exchange?: string;
+  /** Equities: ISIN, used to resolve the Yahoo Finance symbol for non-US listings. */
+  isin?: string;
 }
 
 interface PriceSuccess {
   unitPrice: number;
   currency: string;
   asOf: string;
-  source: "coingecko" | "finnhub";
+  source: "coingecko" | "finnhub" | "yahoo";
   /** Equities only (Finnhub /quote + /stock/profile2). */
   openPrice?: number;
   previousClose?: number;
@@ -259,6 +263,218 @@ async function fetchEquityPrice(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Yahoo Finance fallback (non-US listings)
+//
+// Finnhub's free tier only covers US stocks. Listings on Euronext, DFM, ADX,
+// LSE, ... are priced from Yahoo Finance's public endpoints instead:
+//   - `/v8/finance/chart/<symbol>`  -> regularMarketPrice, chartPreviousClose,
+//     currency, exchange name (and the day's open)
+//   - `/v1/finance/search?q=<ISIN>` -> resolves the Yahoo symbol from an ISIN
+//
+// Deliberately NOT the `yahoo-finance2` npm library: its `quote()` goes
+// through Yahoo's cookie/crumb flow, which returned HTTP 429 "Too Many
+// Requests" for every symbol (even AAPL) when tried, and v2 is flagged
+// unmaintained; the two plain endpoints above returned data immediately and
+// need no crumb, dependency or Deno npm shim.
+//
+// Routing (`fetchEquityWithRouting`): a US exchange goes to Finnhub; a known
+// non-US exchange goes straight to Yahoo (no wasted Finnhub call); an unknown
+// exchange tries Finnhub first and falls back to Yahoo when Finnhub reports
+// `no_data`. Saxo tickers aren't always Yahoo tickers (Saxo `UBIP` = Yahoo
+// `UBI.PA`), so the ISIN is searched first and `<ticker><suffix>` guesses
+// are the fallback.
+// ---------------------------------------------------------------------------
+
+const US_EXCHANGES = new Set([
+  "NASDAQ", "NYSE", "XNAS", "XNYS", "ARCX", "XASE", "AMEX", "NMS", "NYQ", "NGM", "NCM", "PCX",
+]);
+
+/** ISO-10383 MIC -> Yahoo suffix. */
+const MIC_SUFFIX: Record<string, string> = {
+  XPAR: ".PA", XAMS: ".AS", XBRU: ".BR", XLIS: ".LS", XMIL: ".MI", XETR: ".DE", XFRA: ".F",
+  XLON: ".L", XSWX: ".SW", XDFM: ".AE", XADS: ".AD", XTSE: ".TO", XASX: ".AX",
+};
+
+/** Normalised display exchange (as the app stores it) -> Yahoo suffix. */
+const NAME_SUFFIX: Record<string, string> = {
+  EURONEXT: ".PA", DFM: ".AE", ADX: ".AD", LSE: ".L", XETRA: ".DE",
+  "BORSA ITALIANA": ".MI", SIX: ".SW", TSX: ".TO", ASX: ".AX",
+};
+
+/** ISIN country prefix -> Yahoo suffix (tells Paris from Amsterdam/Brussels/Lisbon on Euronext). */
+const ISIN_SUFFIX: Record<string, string> = {
+  FR: ".PA", NL: ".AS", BE: ".BR", PT: ".LS", IT: ".MI", DE: ".DE", GB: ".L", CH: ".SW", AE: ".AE",
+};
+
+const YAHOO_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (compatible; OpesWealth/1.0)",
+  Accept: "application/json",
+};
+
+function yahooSuffixes(exchange: string, isin: string): string[] {
+  const out: string[] = [];
+  const push = (s?: string) => s && !out.includes(s) && out.push(s);
+  push(MIC_SUFFIX[exchange]);
+  const country = isin.slice(0, 2);
+  if (exchange === "EURONEXT" || exchange === "") push(ISIN_SUFFIX[country]);
+  push(NAME_SUFFIX[exchange]);
+  // UAE: DFM is ".AE", ADX is ".AD" — when only the ISIN says "AE", try both.
+  if (country === "AE") {
+    push(".AE");
+    push(".AD");
+  }
+  return out;
+}
+
+type YahooGet =
+  | { ok: true; json: any }
+  | { ok: false; kind: "rate_limited" | "not_found" | "timeout" | "network" | "invalid" };
+
+async function yahooGet(url: string): Promise<YahooGet> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { headers: YAHOO_HEADERS, signal: controller.signal });
+    if (res.status === 429) return { ok: false, kind: "rate_limited" };
+    if (res.status === 404) return { ok: false, kind: "not_found" };
+    if (!res.ok) return { ok: false, kind: "network" };
+    try {
+      return { ok: true, json: await res.json() };
+    } catch {
+      return { ok: false, kind: "invalid" };
+    }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") return { ok: false, kind: "timeout" };
+    return { ok: false, kind: "network" };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Resolves a Yahoo symbol from an ISIN, preferring a listing on the expected exchange suffix. */
+async function yahooSymbolFromIsin(
+  isin: string,
+  suffixes: string[],
+): Promise<string | null | "rate_limited"> {
+  const r = await yahooGet(
+    `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(isin)}&quotesCount=6&newsCount=0`,
+  );
+  if (!r.ok) return r.kind === "rate_limited" ? "rate_limited" : null;
+  const quotes: { symbol?: string; quoteType?: string }[] = Array.isArray(r.json?.quotes)
+    ? r.json.quotes
+    : [];
+  const tradable = quotes.filter(
+    (q) => q.symbol && (q.quoteType === "EQUITY" || q.quoteType === "ETF"),
+  );
+  const preferred = tradable.find((q) => suffixes.some((s) => q.symbol!.endsWith(s)));
+  return (preferred ?? tradable[0])?.symbol ?? null;
+}
+
+async function fetchYahooPrice(req: PriceRequest): Promise<PriceSuccess | Response> {
+  const ticker = (req.symbol ?? "").trim().toUpperCase();
+  const exchange = (req.exchange ?? "").trim().toUpperCase();
+  const isin = (req.isin ?? "").trim().toUpperCase();
+  const suffixes = yahooSuffixes(exchange, isin);
+
+  const candidates: string[] = [];
+  const add = (s: string) => s && !candidates.includes(s) && candidates.push(s);
+
+  if (isin) {
+    const resolved = await yahooSymbolFromIsin(isin, suffixes);
+    if (resolved === "rate_limited") {
+      return errorResponse("rate_limited", "Yahoo Finance's rate limit was hit. Try again shortly.", 429);
+    }
+    if (resolved) add(resolved);
+  }
+  // No exchange/ISIN hints at all (e.g. an unknown-exchange import): the bare
+  // ticker is the only guess left (US-style symbols resolve as-is on Yahoo).
+  if (suffixes.length === 0) add(ticker);
+  for (const suffix of suffixes) {
+    add(ticker + suffix);
+    // Some Saxo Euronext tickers carry a trailing exchange letter (UBIP -> UBI).
+    if (ticker.length > 3 && /[A-Z]$/.test(ticker)) add(ticker.slice(0, -1) + suffix);
+  }
+
+  for (const symbol of candidates) {
+    const r = await yahooGet(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`,
+    );
+    if (!r.ok) {
+      if (r.kind === "rate_limited") {
+        return errorResponse("rate_limited", "Yahoo Finance's rate limit was hit. Try again shortly.", 429);
+      }
+      if (r.kind === "timeout") return errorResponse("timeout", "Yahoo Finance took too long to respond.", 504);
+      if (r.kind === "network") return errorResponse("network_error", "Could not reach Yahoo Finance.", 502);
+      continue; // not_found / invalid: try the next candidate
+    }
+
+    const result = r.json?.chart?.result?.[0];
+    const meta = result?.meta;
+    const price = meta?.regularMarketPrice;
+    if (typeof price !== "number" || !(price > 0)) continue;
+
+    // London quotes are in pence (GBp/GBX): convert to pounds.
+    const pence = meta.currency === "GBp" || meta.currency === "GBX";
+    const scale = pence ? 0.01 : 1;
+    const currency = pence ? "GBP" : String(meta.currency ?? req.currency).toUpperCase();
+    const previousClose = meta.chartPreviousClose ?? meta.previousClose;
+    const opens = (result?.indicators?.quote?.[0]?.open ?? []).filter(
+      (n: unknown): n is number => typeof n === "number" && n > 0,
+    );
+
+    return {
+      unitPrice: price * scale,
+      currency,
+      asOf: new Date().toISOString(),
+      source: "yahoo",
+      openPrice: opens.length ? opens[opens.length - 1] * scale : undefined,
+      previousClose:
+        typeof previousClose === "number" && previousClose > 0 ? previousClose * scale : undefined,
+      dayChangePct:
+        typeof meta.regularMarketChangePercent === "number"
+          ? meta.regularMarketChangePercent
+          : typeof previousClose === "number" && previousClose > 0
+            ? (price / previousClose - 1) * 100
+            : undefined,
+      exchange: meta.fullExchangeName || meta.exchangeName || undefined,
+    };
+  }
+
+  return errorResponse(
+    "no_data",
+    `Yahoo Finance has no quote for "${ticker}" (tried ${candidates.join(", ") || "no candidate symbols"}).`,
+    404,
+  );
+}
+
+/** The error code of one of this function's own error Responses. */
+async function errorCodeOf(res: Response): Promise<string | undefined> {
+  try {
+    return (await res.clone().json())?.error?.code;
+  } catch {
+    return undefined;
+  }
+}
+
+async function fetchEquityWithRouting(req: PriceRequest): Promise<PriceSuccess | Response> {
+  const exchange = (req.exchange ?? "").trim().toUpperCase();
+  const knownNonUs = exchange !== "" && exchange !== "OTHER" && !US_EXCHANGES.has(exchange);
+
+  // Finnhub's free tier can't quote non-US listings: skip it entirely.
+  if (knownNonUs) return await fetchYahooPrice(req);
+
+  const finnhub = await fetchEquityPrice(req.symbol!, req.currency);
+  if (!(finnhub instanceof Response)) return finnhub;
+  if ((await errorCodeOf(finnhub)) !== "no_data") return finnhub;
+
+  // Finnhub has nothing for this ticker (unknown exchange, or not covered):
+  // Yahoo may. If it doesn't either, report Finnhub's original `no_data`.
+  const yahoo = await fetchYahooPrice(req);
+  if (!(yahoo instanceof Response)) return yahoo;
+  return (await errorCodeOf(yahoo)) === "no_data" ? finnhub : yahoo;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: CORS_HEADERS });
@@ -293,7 +509,7 @@ Deno.serve(async (req: Request) => {
     if (!body.symbol || typeof body.symbol !== "string") {
       return errorResponse("invalid_request", "symbol is required for equities.", 400);
     }
-    result = await fetchEquityPrice(body.symbol, body.currency);
+    result = await fetchEquityWithRouting(body);
   } else {
     return errorResponse("invalid_request", 'category must be "equities" or "crypto".', 400);
   }

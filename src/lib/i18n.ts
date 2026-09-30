@@ -923,6 +923,10 @@ const dictionary = {
     en: "{n} not covered by the free price feed (last price kept).",
     fr: "{n} non couverte(s) par le flux gratuit (dernier cours conservé).",
   },
+  brokerage_income_yield_hint: {
+    en: "Cumulative income received ÷ current cost basis",
+    fr: "Revenus cumulés perçus ÷ prix de revient actuel",
+  },
   brokerage_other_holdings: { en: "Other holdings", fr: "Autres positions" },
   market_price_error_timeout: {
     en: "The pricing provider took too long to respond. Try again.",

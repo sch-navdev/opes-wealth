@@ -40,12 +40,13 @@ import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import {
   buildInvestedCapitalSeries,
   estimateCostBasisUnitPrice,
+  type EquityIncome,
   normalizeExchange,
   parseEquityMetadata,
   type EquityTrade,
 } from "@/lib/equities";
 import { tradeId } from "@/lib/parsers/broker-registry";
-import type { AggregatedHolding } from "@/lib/parsers/types";
+import type { AggregatedHolding, ParsedIncome } from "@/lib/parsers/types";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { estimateOffplanValueAt } from "@/lib/real-estate-analytics";
 import {
@@ -1235,9 +1236,18 @@ async function fetchLiveEquityQuote(
   assetId: string,
   symbol: string,
   currency: string,
+  hints?: { exchange?: string; isin?: string },
 ): Promise<{ ok: true; quote: LiveQuote } | { ok: false; code: string; error: string }> {
   const { data, error } = await supabase.functions.invoke("refresh-market-price", {
-    body: { assetId, category: "equities", symbol, currency },
+    body: {
+      assetId,
+      category: "equities",
+      symbol,
+      currency,
+      // Lets the Edge Function send non-US listings to Yahoo Finance.
+      exchange: hints?.exchange,
+      isin: hints?.isin,
+    },
   });
 
   if (error) {
@@ -1321,16 +1331,24 @@ async function persistQuote(
     .eq("profile_id", userId);
   if (updateError) return { error: updateError.message };
 
-  const { error: historyError } = await supabase.from("asset_history").upsert(
-    {
-      asset_id: asset.id,
-      recorded_date: quote.asOf.slice(0, 10),
-      value: totalValue,
-      net_equity: totalValue,
-      source: quote.source,
-    },
-    { onConflict: "asset_id,recorded_date" },
-  );
+  const historyRow = {
+    asset_id: asset.id,
+    recorded_date: quote.asOf.slice(0, 10),
+    value: totalValue,
+    net_equity: totalValue,
+  };
+  let { error: historyError } = await supabase
+    .from("asset_history")
+    .upsert({ ...historyRow, source: quote.source }, { onConflict: "asset_id,recorded_date" });
+  // `yahoo` needs migration 0014 (DB CHECK on asset_history.source). Until it
+  // is applied, record the row as `manual` rather than failing the refresh
+  // after the asset itself was already updated; `metadata.last_price_source`
+  // still carries the true provider.
+  if (historyError?.code === "23514" && quote.source === "yahoo") {
+    ({ error: historyError } = await supabase
+      .from("asset_history")
+      .upsert({ ...historyRow, source: "manual" }, { onConflict: "asset_id,recorded_date" }));
+  }
   if (historyError) return { error: historyError.message };
 
   return { unitPrice, totalValue, asOf: quote.asOf };
@@ -1345,8 +1363,8 @@ export type RefreshBrokerageQuotesResult = {
   code?: string;
 };
 
-/** Codes meaning the Finnhub key itself is unusable — every further call in the batch would fail the same way. */
-const API_KEY_ERROR_CODES = new Set(["invalid_api_key", "provider_not_configured"]);
+/** Codes after which every further call in the batch would fail the same way — an unusable Finnhub key, or a provider rate limit (Finnhub or Yahoo): stop calling and report the rest with the same code. */
+const API_KEY_ERROR_CODES = new Set(["invalid_api_key", "provider_not_configured", "rate_limited"]);
 
 /**
  * Re-prices every Brokerage Account holding (or just `assetIds`) from
@@ -1426,7 +1444,11 @@ async function priceEquityAssets(
       continue;
     }
 
-    const quote = await fetchLiveEquityQuote(supabase, asset.id, ticker, asset.currency);
+    const eqMeta = parseEquityMetadata(asset.metadata);
+    const quote = await fetchLiveEquityQuote(supabase, asset.id, ticker, asset.currency, {
+      exchange: eqMeta.exchange_mic || eqMeta.exchange || undefined,
+      isin: eqMeta.isin,
+    });
     if (!quote.ok) {
       if (quote.code === "no_data") {
         results.push({ ticker, status: "skipped", code: "no_data" });
@@ -1507,6 +1529,8 @@ export async function importBrokerTrades(
     brokerName?: string;
     /** Brokerage account/client number found in the file. */
     accountId?: string | null;
+    /** Cash dividends from the file, attached to holdings by `TICKER:EXCHANGE` and stored as `metadata.income`/`total_income`. */
+    dividends?: ParsedIncome[];
   },
 ): Promise<{ error: string } | { results: ImportBrokerTradesResult[] }> {
   const supabase = await createClient();
@@ -1536,6 +1560,29 @@ export async function importBrokerTrades(
   // holding is its own asset (priced individually) named after the company;
   // the account lives in metadata and is shown as the table's middle level.
   const accountId = options?.accountId?.trim() || null;
+  const fxRates = options?.dividends?.length ? await getExchangeRatesFromUsd() : {};
+  // Dividends for a holding, converted into its currency (Saxo books them in
+  // the account currency, which can differ from the instrument's).
+  const incomeFor = (holding: AggregatedHolding): EquityIncome[] => {
+    const key = holding.exchange ? `${holding.ticker}:${holding.exchange}` : holding.ticker;
+    return (options?.dividends ?? [])
+      .filter((d) => d.key === key)
+      .map((d) => ({
+        ...(d.id ? { id: d.id } : {}),
+        date: d.date,
+        amount:
+          Math.round(convertAmount(d.amount, d.currency, holding.currency, fxRates) * 100) / 100,
+      }));
+  };
+  const mergeIncome = (existing: EquityIncome[] | undefined, incoming: EquityIncome[]) => {
+    const seen = new Set((existing ?? []).map((i) => i.id ?? `${i.date}|${i.amount}`));
+    const fresh = incoming.filter((i) => !seen.has(i.id ?? `${i.date}|${i.amount}`));
+    return [...(existing ?? []), ...fresh];
+  };
+  const incomeMeta = (list: EquityIncome[]) => ({
+    income: list,
+    total_income: Math.round(list.reduce((s, i) => s + i.amount, 0) * 100) / 100,
+  });
   const accountLabel = accountId
     ? `${options?.brokerName ?? "Broker"} Acc. # ${accountId}`
     : null;
@@ -1578,12 +1625,18 @@ export async function importBrokerTrades(
       // internal path ("Brokerage Account / … / UBIP") and have no company
       // name/ISIN/account label stored. Re-importing the same file repairs
       // them even when it contains no new trades.
+      const mergedIncome = mergeIncome(existingMetadata.income, incomeFor(holding));
+      const incomeChanged = mergedIncome.length !== (existingMetadata.income?.length ?? 0);
       const identityNeeded =
+        incomeChanged ||
+        (Boolean(holding.exchange) && !existingMetadata.exchange_mic) ||
         existing.name.startsWith("Brokerage Account /") ||
         !existingMetadata.instrument_name ||
         (Boolean(holding.isin) && !existingMetadata.isin) ||
         (accountLabel !== null && existingMetadata.account_name !== accountLabel);
       const identityMetadata = {
+        ...(mergedIncome.length > 0 ? incomeMeta(mergedIncome) : {}),
+        ...(holding.exchange ? { exchange_mic: holding.exchange } : {}),
         instrument_name: holding.instrumentName,
         ...(holding.isin ? { isin: holding.isin } : {}),
         ...(accountId && accountLabel ? { account_id: accountId, account_name: accountLabel } : {}),
@@ -1715,6 +1768,8 @@ export async function importBrokerTrades(
         ...(accountId ? { account_id: accountId, account_name: accountLabel } : {}),
         instrument_name: holding.instrumentName,
         ...(holding.isin ? { isin: holding.isin } : {}),
+        ...(holding.exchange ? { exchange_mic: holding.exchange } : {}),
+        ...(incomeFor(holding).length > 0 ? incomeMeta(incomeFor(holding)) : {}),
         exchange: normalizeExchange(holding.exchange),
         last_unit_price: null,
         last_priced_at: null,

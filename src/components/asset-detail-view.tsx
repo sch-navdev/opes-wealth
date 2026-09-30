@@ -839,6 +839,8 @@ export function AssetDetailView({
               category: "equities",
               symbol: asset.ticker_symbol ?? undefined,
               currency: asset.currency,
+              exchange: equityMetadata?.exchange_mic || equityMetadata?.exchange || undefined,
+              isin: equityMetadata?.isin,
             },
       );
 

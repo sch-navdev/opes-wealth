@@ -43,6 +43,20 @@ export type ParsedTrade = {
   isin?: string;
 };
 
+/** One cash dividend/income receipt from a broker export, in the currency it was booked in. */
+export type ParsedIncome = {
+  /** `TICKER:EXCHANGE` (upper-case), matching `aggregateTrades`' holding key, so it can be attached to a holding. */
+  key: string;
+  ticker: string;
+  /** ISO `YYYY-MM-DD`. */
+  date: string;
+  /** Signed booked amount (net of withholding tax for Saxo). */
+  amount: number;
+  currency: string;
+  /** Broker's stable record id, for de-duplicating re-imports. */
+  id?: string;
+};
+
 export type ParsedTradeRowError = {
   /** 0-based, matches the row's position in the source sheet/file (excluding header rows). */
   rowIndex: number;
@@ -61,6 +75,8 @@ export type BrokerParseResult = {
   skippedNonTradeCount?: number;
   /** The brokerage account/client number found in the file (Saxo `Client ID`/`Account ID`), used to name the generated asset. */
   accountId?: string;
+  /** Cash dividends found in the file (Saxo Transactions sheet, `Event` = "Cash dividend"), summed per holding into the Income column. */
+  dividends?: ParsedIncome[];
 };
 
 /** One instrument's net position across every trade an import contained. */

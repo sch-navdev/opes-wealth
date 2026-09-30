@@ -37,7 +37,7 @@ export type EquityTrade = {
 };
 
 /** One dividend/income receipt against this holding (asset currency). No automatic source yet — filled manually — so the table's Income column is honestly `—` until entries exist. */
-export type EquityIncome = { date: string; amount: number };
+export type EquityIncome = { id?: string; date: string; amount: number };
 
 /**
  * Cost of a buy (or proceeds of a sell): the broker's booked amount when it's
@@ -130,8 +130,12 @@ export type EquityMetadata = {
   open_price?: number | null;
   previous_close?: number | null;
   day_change_pct?: number | null;
-  /** Dividend/income receipts, if any. */
+  /** Dividend/income receipts (asset currency), de-duplicated on re-import by `id`. */
   income?: EquityIncome[];
+  /** Cumulative income received — the sum of `income` — stored alongside so the table can show it without re-summing. */
+  total_income?: number;
+  /** Raw exchange MIC from the broker (e.g. "XPAR"), so the price Edge Function can pick the right Yahoo suffix (.PA/.AS/.BR…). */
+  exchange_mic?: string;
   /** Every lot on record for this asset, newest import appended — see `EquityTrade`. */
   trades: EquityTrade[];
 };
@@ -194,7 +198,8 @@ export function computeHoldingMetrics(input: {
     metadata.last_unit_price ??
     metadata.previous_close ??
     (quantity > 0 ? currentValue / quantity : null);
-  const income = (metadata.income ?? []).reduce((sum, i) => sum + i.amount, 0);
+  const itemised = (metadata.income ?? []).reduce((sum, i) => sum + i.amount, 0);
+  const income = itemised || metadata.total_income || 0;
   const capitalGain = cost != null ? currentValue - cost : null;
   const returnPct =
     cost != null && cost > 0 && capitalGain != null

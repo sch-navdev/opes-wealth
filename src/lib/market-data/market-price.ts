@@ -6,6 +6,9 @@ export type MarketPriceRequest = {
   symbol?: string;
   coingeckoId?: string;
   currency: string;
+  /** Equities: where it trades (display name or MIC) and its ISIN — lets the Edge Function route non-US listings to Yahoo Finance. */
+  exchange?: string;
+  isin?: string;
 };
 
 export type MarketPriceResult =
@@ -14,7 +17,7 @@ export type MarketPriceResult =
       unitPrice: number;
       currency: string;
       asOf: string;
-      source: "coingecko" | "finnhub";
+      source: "coingecko" | "finnhub" | "yahoo";
       openPrice?: number;
       previousClose?: number;
       dayChangePct?: number;

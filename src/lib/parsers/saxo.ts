@@ -19,7 +19,13 @@
  */
 import * as XLSX from "xlsx";
 import { parseCsv } from "@/lib/csv-parser";
-import type { BrokerParseResult, ParsedTrade, ParsedTradeRowError, TradeSide } from "./types";
+import type {
+  BrokerParseResult,
+  ParsedIncome,
+  ParsedTrade,
+  ParsedTradeRowError,
+  TradeSide,
+} from "./types";
 
 type RawCell = string | number | Date | undefined | null;
 type RawRow = RawCell[];
@@ -346,6 +352,83 @@ function enrichFromTransactions(trades: ParsedTrade[], sheets: RawRow[][]): void
   }
 }
 
+/** Signed numeric value of a cell (keeps the sign, unlike `parseAmountCell`). */
+function parseSignedCell(raw: RawCell): number | null {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const n = Number(raw.replace(/[^0-9.\-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Saxo's Transactions dates are local midnight stored as a UTC timestamp at
+ * 20:00 the previous day (e.g. `2026-09-17T20:00:00Z` is 18 Sep), so a plain
+ * `.toISOString().slice(0, 10)` lands a day early; add the offset back.
+ */
+function shiftedMidnightDate(raw: RawCell): string | null {
+  const d = raw instanceof Date ? raw : typeof raw === "string" ? new Date(raw) : null;
+  if (!d || Number.isNaN(d.getTime())) return null;
+  const adjusted = d.getUTCHours() >= 20 ? new Date(d.getTime() + 4 * 3_600_000) : d;
+  return adjusted.toISOString().slice(0, 10);
+}
+
+/**
+ * Cash dividends from the Transactions sheet: rows whose `Event` is "Cash
+ * dividend" (Transaction Type "Corporate action"). `Booked Amount` is what
+ * actually landed in the account — net of withholding tax (verified on a real
+ * export: Bookings shows 35.24 gross − 10.57 tax = the 24.67 booked here) —
+ * in the account currency (`_Currency`), which can differ from the
+ * instrument's (a USD dividend on a EUR-account holding books in EUR), so the
+ * currency travels with the amount. 32 rows across 8 tickers in the sample.
+ */
+function parseDividends(sheets: RawRow[][]): ParsedIncome[] {
+  const out: ParsedIncome[] = [];
+  for (const rows of sheets) {
+    const headerIdx = rows.findIndex((row) => {
+      const n = row.map(normalizeHeader);
+      return (
+        n.includes("event") &&
+        n.includes("booked amount") &&
+        n.includes("instrument symbol") &&
+        n.includes("transaction type")
+      );
+    });
+    if (headerIdx === -1) continue;
+    const h = rows[headerIdx].map(normalizeHeader);
+    const col = (name: string) => h.indexOf(name);
+    const eventCol = col("event");
+    const bookedCol = col("booked amount");
+    const symbolCol = col("instrument symbol");
+    const dateCol = col("trade date");
+    const bkCol = col("bk record id");
+    const caCol = col("corporate action id");
+    const currencyCol = col("_currency") >= 0 ? col("_currency") : col("currency");
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || !/cash dividend/i.test(cellText(row[eventCol]))) continue;
+      const amount = parseSignedCell(row[bookedCol]);
+      const date = shiftedMidnightDate(row[dateCol]);
+      const rawSymbol = cellText(row[symbolCol]);
+      if (amount == null || !date || !rawSymbol) continue;
+      const { ticker, exchange } = parseSymbol(rawSymbol);
+      // Bk Record Id alone isn't unique (two different IVV dividends, 19.35 and
+      // 0.41, share one on 2025-03-21), so the id also carries the corporate
+      // action id, date and amount — de-duping on it must never merge real rows.
+      const recordId = [cellText(row[bkCol]), cellText(row[caCol]), date, amount].join("-");
+      out.push({
+        key: exchange ? `${ticker}:${exchange}` : ticker,
+        ticker,
+        date,
+        amount,
+        currency: cellText(row[currencyCol]).toUpperCase() || "USD",
+        id: `div-${recordId}`,
+      });
+    }
+  }
+  return out;
+}
+
 export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): BrokerParseResult {
   const isCsv = fileName.toLowerCase().endsWith(".csv");
 
@@ -390,5 +473,9 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
   );
   const result = mapRows(found.rows, found.headerRow);
   enrichFromTransactions(result.trades, sheetRows);
-  return { ...result, accountId: extractSaxoAccountId(sheetRows.flat(), fileName) };
+  return {
+    ...result,
+    accountId: extractSaxoAccountId(sheetRows.flat(), fileName),
+    dividends: parseDividends(sheetRows),
+  };
 }
