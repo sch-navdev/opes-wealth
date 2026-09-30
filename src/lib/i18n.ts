@@ -625,6 +625,14 @@ const dictionary = {
   csv_import_success: { en: "Imported {n} rows successfully.", fr: "{n} lignes importées avec succès." },
   csv_cancel: { en: "Cancel", fr: "Annuler" },
   csv_done: { en: "Done", fr: "Terminé" },
+  csv_dropzone_error_read: {
+    en: "Could not read this file.",
+    fr: "Impossible de lire ce fichier.",
+  },
+  csv_parsing: { en: "Reading file…", fr: "Lecture du fichier…" },
+  csv_description_column: { en: "Description Column", fr: "Colonne de description" },
+  csv_column_none: { en: "None", fr: "Aucune" },
+  csv_preview_title: { en: "Data Preview", fr: "Aperçu des données" },
 
   // Broker Trade Import (Phase 2) — Add Investments dialog
   add_investments: { en: "Add Investments", fr: "Ajouter des investissements" },
