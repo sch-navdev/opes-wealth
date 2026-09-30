@@ -24,6 +24,13 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 - **`FINNHUB_API_KEY`** Supabase secret, for live Equities pricing to return real data (Crypto already works without it) — see [[Live-Pricing|Live Pricing]].
 - Production Supabase credentials/env vars in Vercel, and confirming every migration under `supabase/migrations/` (through `0010`) is applied to whichever Supabase project the production deployment points at.
 
+## Environment Hardening: `NEXT_PUBLIC_SITE_URL` (2026-09-30)
+
+- **Must be set manually in the Vercel dashboard** (Project Settings → Environment Variables, Production) to the canonical domain — `https://www.opeswealth.app`. It is **critical for Supabase Auth redirects**: `getSiteURL()` in `src/app/auth/actions.ts` builds the sign-up confirmation and password-reset links from it. It should also match the domain the app's passkeys are registered under (WebAuthn credentials are bound to the domain; a mismatched site URL/domain breaks validation) — note the app code itself only reads this variable for the auth redirects; passkey domain binding was not verified against it in this pass.
+- Fallback if unset on Vercel: `getSiteURL()` pins to the hardcoded production domain (never the per-deployment `VERCEL_URL`), so it degrades safely, but it should still be set explicitly.
+- **New `.env.example`** documents every variable (Supabase keys, `NEXT_PUBLIC_SITE_URL`, the local-only mock-auth vars). `.gitignore` previously ignored `.env*` entirely, so an `!.env.example` exception was added.
+- **Validation**: there is no central env schema, so `next.config.ts` now `console.warn`s at build/server start when `NODE_ENV === "production"` and `NEXT_PUBLIC_SITE_URL` is unset (a warning, not a build failure). `tsc --noEmit`/`eslint`/`npm run build` clean with the variable unset locally.
+
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — the `FINNHUB_API_KEY` secret still needed
