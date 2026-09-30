@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Briefcase, Building2, Car, ChevronDown, Trash2 } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
+import { CategoryIcon } from "@/components/category-icon";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,13 +57,6 @@ export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   Vehicles: "category_vehicles",
   "Private Equity": "category_private_equity",
 };
-
-function CategoryIcon({ name }: { name: string }) {
-  if (name === "Real Estate") return <Building2 className="size-4" />;
-  if (name === "Vehicles") return <Car className="size-4" />;
-  if (name === "Private Equity") return <Briefcase className="size-4" />;
-  return null;
-}
 
 export function PortfolioGroups({
   assets,

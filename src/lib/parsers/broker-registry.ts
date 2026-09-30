@@ -61,12 +61,14 @@ export function aggregateTrades(trades: ParsedTrade[]): AggregatedHolding[] {
     if (existing) {
       existing.netQuantity += signedQuantity;
       existing.trades.push(trade);
+      if (!existing.isin && trade.isin) existing.isin = trade.isin;
     } else {
       holdings.set(key, {
         ticker: trade.ticker,
         exchange: trade.exchange,
         instrumentName: trade.instrumentName,
         currency: trade.currency,
+        isin: trade.isin,
         netQuantity: signedQuantity,
         trades: [trade],
       });

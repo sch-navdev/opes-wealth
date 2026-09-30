@@ -43,6 +43,7 @@ type PriceErrorCode =
   | "unsupported_currency"
   | "provider_not_configured"
   | "invalid_api_key"
+  | "no_data"
   | "timeout"
   | "rate_limited"
   | "invalid_response"
@@ -182,10 +183,14 @@ async function fetchEquityPrice(
   if (res.status === 429) {
     return errorResponse("rate_limited", "Finnhub's rate limit was hit. Try again shortly.", 429);
   }
+  // 403 = the free tier doesn't cover this listing (non-US exchanges such as
+  // EURONEXT). That is a coverage limit, not a failure: report `no_data` so
+  // callers can keep the last known price quietly instead of raising a red
+  // "failed" banner.
   if (res.status === 403) {
     return errorResponse(
-      "invalid_symbol",
-      `Finnhub's free tier doesn't cover "${symbol}" (non-US listings need a paid plan).`,
+      "no_data",
+      `Finnhub's free tier has no quote for "${symbol}" (non-US listings need a paid plan).`,
       404,
     );
   }
@@ -210,9 +215,11 @@ async function fetchEquityPrice(
 
   const allZero =
     !body.c && !body.h && !body.l && !body.o && !body.pc && !body.t;
+  // An all-zero quote means "no data" (unknown ticker or not covered by the
+  // free tier) — same quiet `no_data` outcome as the 403 above.
   if (allZero || typeof body.c !== "number") {
     return errorResponse(
-      "invalid_symbol",
+      "no_data",
       `Finnhub has no quote for ticker "${symbol}" -- it may not exist or isn't covered by the free tier.`,
       404,
     );

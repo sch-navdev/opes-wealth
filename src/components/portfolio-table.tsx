@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Briefcase, Building2, Car } from "lucide-react";
+import { CategoryIcon, categoryIconFor } from "@/components/category-icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -237,12 +237,11 @@ export function PortfolioTable({
                           alt=""
                         />
                         <AvatarFallback className="rounded-md">
-                          {asset.asset_categories?.name === "Real Estate" ? (
-                            <Building2 className="size-3.5" />
-                          ) : asset.asset_categories?.name === "Vehicles" ? (
-                            <Car className="size-3.5" />
-                          ) : asset.asset_categories?.name === "Private Equity" ? (
-                            <Briefcase className="size-3.5" />
+                          {categoryIconFor(asset.asset_categories?.name) ? (
+                            <CategoryIcon
+                              name={asset.asset_categories?.name}
+                              className="size-3.5"
+                            />
                           ) : (
                             asset.asset_categories?.name?.[0]?.toUpperCase() ??
                             "?"

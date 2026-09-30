@@ -35,6 +35,7 @@ const COLUMN_ALIASES = {
   /** Optional: Saxo's own trade id (joins a trade to its Transactions-sheet row) and, if a trades table carries it, the booked cash amount. */
   tradeId: ["trade id"],
   bookedAmount: ["booked amount"],
+  isin: ["instrument isin"],
 } as const;
 
 type ColumnKey = keyof typeof COLUMN_ALIASES;
@@ -137,7 +138,8 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
       columns[key] === undefined &&
       key !== "currency" &&
       key !== "tradeId" &&
-      key !== "bookedAmount",
+      key !== "bookedAmount" &&
+      key !== "isin",
   );
   if (missing.length > 0) {
     return {
@@ -203,6 +205,8 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
       columns.bookedAmount !== undefined ? parseAmountCell(row[columns.bookedAmount]) : null;
     const brokerTradeId =
       columns.tradeId !== undefined ? String(row[columns.tradeId] ?? "").trim() : "";
+    const isin =
+      columns.isin !== undefined ? String(row[columns.isin] ?? "").trim().toUpperCase() : "";
 
     trades.push({
       instrumentSymbol: rawSymbol,
@@ -216,6 +220,7 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
       price,
       ...(bookedAmount != null && bookedAmount > 0 ? { bookedAmount } : {}),
       ...(brokerTradeId ? { brokerTradeId } : {}),
+      ...(isin ? { isin } : {}),
     });
   }
 

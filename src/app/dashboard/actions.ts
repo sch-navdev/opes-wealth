@@ -1338,7 +1338,8 @@ async function persistQuote(
 
 export type RefreshBrokerageQuotesResult = {
   ticker: string;
-  status: "updated" | "error";
+  /** `skipped` = Finnhub has no data for this ticker (free tier doesn't cover non-US listings): not a failure, the holding keeps its last price / cost basis. */
+  status: "updated" | "error" | "skipped";
   message?: string;
   /** Edge Function error code on failure, e.g. `invalid_api_key` — lets the UI flag a bad/missing Finnhub key distinctly. */
   code?: string;
@@ -1427,6 +1428,10 @@ async function priceEquityAssets(
 
     const quote = await fetchLiveEquityQuote(supabase, asset.id, ticker, asset.currency);
     if (!quote.ok) {
+      if (quote.code === "no_data") {
+        results.push({ ticker, status: "skipped", code: "no_data" });
+        continue;
+      }
       if (API_KEY_ERROR_CODES.has(quote.code)) {
         keyProblem = { code: quote.code, message: quote.error };
       }
@@ -1527,11 +1532,12 @@ export async function importBrokerTrades(
   const source: AssetHistorySource = "broker_import";
   const today = new Date().toISOString().slice(0, 10);
   const results: ImportBrokerTradesResult[] = [];
-  // "Brokerage Account / Saxobank Acc. # 10164571" — each holding becomes its
-  // own asset (they're priced individually), named `<label> / <ticker>`.
+  // Hierarchy: Brokerage Account → "Saxobank Acc. # 10164571" → holding. Each
+  // holding is its own asset (priced individually) named after the company;
+  // the account lives in metadata and is shown as the table's middle level.
   const accountId = options?.accountId?.trim() || null;
   const accountLabel = accountId
-    ? `Brokerage Account / ${options?.brokerName ?? "Broker"} Acc. # ${accountId}`
+    ? `${options?.brokerName ?? "Broker"} Acc. # ${accountId}`
     : null;
   const touched: { id: string; ticker: string; currency: string; quantity: number; metadata: Json }[] = [];
 
@@ -1543,11 +1549,11 @@ export async function importBrokerTrades(
 
     const { data: existing } = await supabase
       .from("assets")
-      .select("id, quantity, metadata")
+      .select("id, name, quantity, metadata")
       .eq("profile_id", user.id)
       .eq("category_id", equitiesCategory.id)
       .ilike("ticker_symbol", holding.ticker)
-      .maybeSingle<{ id: string; quantity: number; metadata: Json | null }>();
+      .maybeSingle<{ id: string; name: string; quantity: number; metadata: Json | null }>();
 
     if (existing) {
       const existingMetadata = parseEquityMetadata(existing.metadata);
@@ -1568,8 +1574,39 @@ export async function importBrokerTrades(
           bookedAmount: t.bookedAmount,
         }));
 
+      // Identity backfill: assets from earlier imports were named with an
+      // internal path ("Brokerage Account / … / UBIP") and have no company
+      // name/ISIN/account label stored. Re-importing the same file repairs
+      // them even when it contains no new trades.
+      const identityNeeded =
+        existing.name.startsWith("Brokerage Account /") ||
+        !existingMetadata.instrument_name ||
+        (Boolean(holding.isin) && !existingMetadata.isin) ||
+        (accountLabel !== null && existingMetadata.account_name !== accountLabel);
+      const identityMetadata = {
+        instrument_name: holding.instrumentName,
+        ...(holding.isin ? { isin: holding.isin } : {}),
+        ...(accountId && accountLabel ? { account_id: accountId, account_name: accountLabel } : {}),
+      };
+      const identityName = existing.name.startsWith("Brokerage Account /")
+        ? holding.instrumentName
+        : existing.name;
+
       if (newTrades.length === 0) {
-        results.push({ ticker: holding.ticker, status: "unchanged" });
+        if (!identityNeeded) {
+          results.push({ ticker: holding.ticker, status: "unchanged" });
+          continue;
+        }
+        const { error: identityError } = await supabase
+          .from("assets")
+          .update({ name: identityName, metadata: { ...existingMetadata, ...identityMetadata } as Json })
+          .eq("id", existing.id)
+          .eq("profile_id", user.id);
+        results.push(
+          identityError
+            ? { ticker: holding.ticker, status: "error", message: identityError.message }
+            : { ticker: holding.ticker, status: "updated", message: "Name/ISIN/account updated." },
+        );
         continue;
       }
 
@@ -1584,15 +1621,19 @@ export async function importBrokerTrades(
       const nextMetadata: Json = {
         ...existingMetadata,
         exchange: normalizeExchange(existingMetadata.exchange || holding.exchange),
-        ...(accountId && !existingMetadata.account_id
-          ? { account_id: accountId, account_name: accountLabel as string }
-          : {}),
+        ...identityMetadata,
         trades: allTrades,
       };
 
-      const updatePayload: { metadata: Json; quantity: number; current_value?: number } = {
+      const updatePayload: {
+        metadata: Json;
+        quantity: number;
+        name: string;
+        current_value?: number;
+      } = {
         metadata: nextMetadata,
         quantity: newQuantity,
+        name: identityName,
       };
       if (unitPrice != null) {
         updatePayload.current_value = Math.max(0, newQuantity) * unitPrice;
@@ -1672,6 +1713,8 @@ export async function importBrokerTrades(
 
       const metadata: Json = {
         ...(accountId ? { account_id: accountId, account_name: accountLabel } : {}),
+        instrument_name: holding.instrumentName,
+        ...(holding.isin ? { isin: holding.isin } : {}),
         exchange: normalizeExchange(holding.exchange),
         last_unit_price: null,
         last_priced_at: null,
@@ -1684,7 +1727,7 @@ export async function importBrokerTrades(
         .insert({
           profile_id: user.id,
           category_id: equitiesCategory.id,
-          name: accountLabel ? `${accountLabel} / ${holding.ticker}` : holding.instrumentName,
+          name: holding.instrumentName,
           quantity: holding.netQuantity,
           current_value: currentValue,
           currency: holding.currency,

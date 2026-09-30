@@ -17,7 +17,14 @@ import {
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import { refreshBrokerageQuotes } from "@/app/dashboard/actions";
-import { computeHoldingMetrics, parseEquityMetadata } from "@/lib/equities";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CategoryIcon } from "@/components/category-icon";
+import {
+  accountDisplayName,
+  computeHoldingMetrics,
+  holdingDisplayName,
+  parseEquityMetadata,
+} from "@/lib/equities";
 import { convertAmount } from "@/lib/fx";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +95,7 @@ export function BrokerageHoldingsTable({
           metadata,
           metrics,
           exchange: metadata.exchange || "OTHER",
+          account: accountDisplayName(metadata),
           baseValue: toBase(asset.current_value),
           baseGain: metrics.capitalGain != null ? toBase(metrics.capitalGain) : null,
           baseCost: metrics.cost != null ? toBase(metrics.cost) : null,
@@ -97,19 +105,35 @@ export function BrokerageHoldingsTable({
     [assets, displayCurrency, rates],
   );
 
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof rows>();
+  // Hierarchy: Brokerage Account (the category header above) → account
+  // ("Saxobank Acc. # 10164571") → exchange → holding.
+  const accountGroups = useMemo(() => {
+    const byAccount = new Map<string | null, typeof rows>();
     for (const row of rows) {
-      if (!map.has(row.exchange)) map.set(row.exchange, []);
-      map.get(row.exchange)!.push(row);
+      if (!byAccount.has(row.account)) byAccount.set(row.account, []);
+      byAccount.get(row.account)!.push(row);
     }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([exchange, list]) => ({
-        exchange,
-        rows: [...list].sort((a, b) => b.baseValue - a.baseValue),
-      }));
+    return Array.from(byAccount.entries())
+      .sort(([a], [b]) => (a ?? "\uffff").localeCompare(b ?? "\uffff"))
+      .map(([account, accountRows]) => {
+        const byExchange = new Map<string, typeof rows>();
+        for (const row of accountRows) {
+          if (!byExchange.has(row.exchange)) byExchange.set(row.exchange, []);
+          byExchange.get(row.exchange)!.push(row);
+        }
+        return {
+          account,
+          rows: accountRows,
+          exchanges: Array.from(byExchange.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([exchange, list]) => ({
+              exchange,
+              rows: [...list].sort((a, b) => b.baseValue - a.baseValue),
+            })),
+        };
+      });
   }, [rows]);
+  const showAccountHeaders = accountGroups.some((g) => g.account !== null);
 
   const summarize = (list: typeof rows) => {
     const value = list.reduce((s, r) => s + r.baseValue, 0);
@@ -139,7 +163,10 @@ export function BrokerageHoldingsTable({
         setRefreshMessage(result.error);
         return;
       }
+      // `skipped` = Finnhub has no data for that ticker (free tier, non-US
+      // listing): neutral, never counted as a failure.
       const failed = result.results.filter((r) => r.status === "error");
+      const skipped = result.results.filter((r) => r.status === "skipped");
       setRefreshError(failed.length > 0);
       // A rejected/missing Finnhub key is reported as one clear warning (every
       // ticker fails identically); holdings keep their last price/cost basis.
@@ -150,9 +177,11 @@ export function BrokerageHoldingsTable({
         keyProblem
           ? t("brokerage_api_key_warning")
           : t("brokerage_refresh_done", {
-              updated: result.results.length - failed.length,
+              updated: result.results.length - failed.length - skipped.length,
               failed: failed.length,
-            }) + (failed[0]?.message ? ` — ${failed[0].ticker}: ${failed[0].message}` : ""),
+            }) +
+              (failed[0]?.message ? ` — ${failed[0].ticker}: ${failed[0].message}` : "") +
+              (skipped.length > 0 ? ` ${t("brokerage_refresh_skipped", { n: skipped.length })}` : ""),
       );
     });
   }
@@ -215,12 +244,50 @@ export function BrokerageHoldingsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {groups.map((group) => {
+            {accountGroups.map((acct) => {
+              const acctSub = summarize(acct.rows);
+              return (
+                <Fragment key={acct.account ?? "no-account"}>
+                  {showAccountHeaders && (
+                    <TableRow className="bg-muted hover:bg-muted">
+                      <TableCell
+                        colSpan={columnCount - 5}
+                        className="font-semibold text-foreground"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <CategoryIcon name="Equities" className="size-4" />
+                          {acct.account ?? t("brokerage_other_holdings")}
+                        </span>
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          ({acct.rows.length})
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                        {money(acctSub.value)}
+                      </TableCell>
+                      <TableCell className={cn("text-right tabular-nums", signedClass(acctSub.gain))}>
+                        {money(acctSub.gain)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {acctSub.income ? money(acctSub.income) : "—"}
+                      </TableCell>
+                      <TableCell />
+                      <TableCell
+                        className={cn("text-right tabular-nums", signedClass(acctSub.returnPct))}
+                      >
+                        {pct(acctSub.returnPct)}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {acct.exchanges.map((group) => {
               const sub = summarize(group.rows);
               return (
                 <Fragment key={group.exchange}>
-                  <TableRow className="bg-muted hover:bg-muted">
-                    <TableCell colSpan={columnCount - 5} className="font-medium text-foreground">
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableCell
+                      colSpan={columnCount - 5}
+                      className={cn("font-medium text-foreground", showAccountHeaders && "pl-6")}
+                    >
                       {group.exchange}
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         ({group.rows.length})
@@ -251,17 +318,27 @@ export function BrokerageHoldingsTable({
                           />
                         </TableCell>
                       )}
-                      <TableCell>
-                        <Link
-                          href={`/dashboard/assets/${asset.id}`}
-                          className="font-medium text-foreground hover:underline"
-                        >
-                          {asset.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {asset.ticker_symbol ?? "—"}
-                          {asset.purchase_date && ` · ${t("brokerage_opened")} ${asset.purchase_date}`}
-                        </p>
+                      <TableCell className={cn(showAccountHeaders && "pl-6")}>
+                        <div className="flex items-center gap-2">
+                          <Avatar size="sm" className="rounded-md">
+                            <AvatarFallback className="rounded-md">
+                              <CategoryIcon name="Equities" className="size-3.5" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <Link
+                              href={`/dashboard/assets/${asset.id}`}
+                              className="font-medium text-foreground hover:underline"
+                            >
+                              {holdingDisplayName(asset.name, metadata, asset.ticker_symbol)}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">
+                              {[asset.ticker_symbol, metadata.isin].filter(Boolean).join(" · ") || "—"}
+                              {asset.purchase_date &&
+                                ` · ${t("brokerage_opened")} ${asset.purchase_date}`}
+                            </p>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-foreground">
                         {metrics.price != null ? maskValue(formatMoney(metrics.price, asset.currency)) : "—"}
@@ -293,6 +370,9 @@ export function BrokerageHoldingsTable({
                       </TableCell>
                     </TableRow>
                   ))}
+                </Fragment>
+              );
+                  })}
                 </Fragment>
               );
             })}

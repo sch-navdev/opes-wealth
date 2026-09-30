@@ -121,6 +121,7 @@ import {
   cumulativeNetRentAt,
   estimateAnnualGrowth,
   estimateOffplanValueAt,
+  type OffplanPlan,
   type ProjectionPoint,
 } from "@/lib/real-estate-analytics";
 import {
@@ -170,6 +171,7 @@ const MARKET_PRICE_ERROR_KEYS: Record<string, TranslationKey> = {
   unsupported_currency: "market_price_error_unsupported_currency",
   provider_not_configured: "market_price_error_provider_not_configured",
   invalid_api_key: "market_price_error_invalid_api_key",
+  no_data: "market_price_error_no_data",
   timeout: "market_price_error_timeout",
   rate_limited: "market_price_error_rate_limited",
   invalid_response: "market_price_error_invalid_response",
@@ -581,6 +583,7 @@ export function AssetDetailView({
   // engine (`lib/amortization.ts`) — rather than trusting each history row's
   // stored `net_equity`, which only ever reflected a manually-updated
   // balance snapshot frozen at whichever date it was recorded.
+  const offplanSchedule = metadata.payment_schedule.filter((m) => m.due_date);
   const chartData = displayHistory.map((h) => {
     const loanBalance = loanIsAmortizable
       ? getOutstandingPrincipalAt(loan, h.recorded_date)
@@ -594,10 +597,25 @@ export function AssetDetailView({
           flatMonthlyInterest: monthlyInterest,
         })
       : null;
+    // Off-plan: until handover, Equity on the chart is the cash paid in by that
+    // date (same rule the projection uses), so history and projection share
+    // one definition and meet without a jump. Falls back to the stored
+    // figure when no payment schedule is on file.
+    const offplanPaidAtPoint =
+      isRealEstate && metadata.is_offplan && offplanSchedule.length > 0
+        ? offplanSchedule
+            .filter((m) => m.status === "paid" && m.due_date <= h.recorded_date)
+            .reduce((sum, m) => sum + m.amount, 0)
+        : null;
     return {
       date: h.recorded_date,
       value: h.value,
-      netEquity: loanBalance != null ? calculateEquity(h.value, loanBalance) : h.net_equity ?? h.value,
+      netEquity:
+        offplanPaidAtPoint != null
+          ? offplanPaidAtPoint
+          : loanBalance != null
+            ? calculateEquity(h.value, loanBalance)
+            : h.net_equity ?? h.value,
       // Net Profit at each point = that point's Market Value minus the (fixed)
       // all-in cost basis — so Day 1 immediately shows the negative hit of the
       // acquisition fees, not zero.
@@ -624,9 +642,31 @@ export function AssetDetailView({
   const annualCosts = isRealEstate
     ? averageAnnualCosts(metadata, asset.purchase_date, today)
     : 0;
+  // Anchored on the real current date (`today`, from `new Date()` at render),
+  // never a stored/static date — so the forward series always starts at
+  // "now", and the bridge below joins it to the last recorded point.
+  const offplanPlan: OffplanPlan | undefined =
+    isRealEstate && metadata.is_offplan
+      ? {
+          paidNow:
+            offplanSchedule.length > 0
+              ? offplanSchedule
+                  .filter((m) => m.status === "paid")
+                  .reduce((sum, m) => sum + m.amount, 0)
+              : metadata.paid_to_date,
+          futureInstallments: offplanSchedule.filter(
+            (m) => m.status !== "paid" && m.due_date > today,
+          ),
+          handoverDate:
+            offplanSchedule.length > 0
+              ? offplanSchedule.map((m) => m.due_date).sort().at(-1) ?? null
+              : null,
+        }
+      : undefined;
   const projection: ProjectionPoint[] =
     isRealEstate && totalCost != null
       ? buildProjection({
+          offplan: offplanPlan,
           today,
           marketValue: marketValuation,
           growthRate,

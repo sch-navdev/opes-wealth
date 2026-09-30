@@ -915,6 +915,15 @@ const dictionary = {
     en: "Invalid or Missing API Key — live prices could not be refreshed. Holdings keep their last price or cost basis.",
     fr: "Clé API invalide ou manquante — les cours n'ont pas pu être actualisés. Les positions conservent leur dernier cours ou leur prix de revient.",
   },
+  market_price_error_no_data: {
+    en: "No live quote available for this ticker on Finnhub's free tier (non-US listings aren't covered). Its last price is kept.",
+    fr: "Aucun cours en direct pour ce titre avec l'offre gratuite de Finnhub (les places hors États-Unis ne sont pas couvertes). Le dernier cours est conservé.",
+  },
+  brokerage_refresh_skipped: {
+    en: "{n} not covered by the free price feed (last price kept).",
+    fr: "{n} non couverte(s) par le flux gratuit (dernier cours conservé).",
+  },
+  brokerage_other_holdings: { en: "Other holdings", fr: "Autres positions" },
   market_price_error_timeout: {
     en: "The pricing provider took too long to respond. Try again.",
     fr: "Le fournisseur de prix a mis trop de temps à répondre. Réessayez.",

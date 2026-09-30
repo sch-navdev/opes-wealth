@@ -149,6 +149,29 @@ export function averageAnnualCosts(
   return total / yearsHeld + (metadata.yearly_insurance_fee ?? 0);
 }
 
+/**
+ * Off-plan payment plan as the projection needs it. There is no handover
+ * date field on `RealEstateMetadata`, so `handoverDate` defaults to the last
+ * scheduled installment (developers typically collect the final payment at
+ * handover); `null` (no schedule at all) means equity simply stays at the
+ * amount paid for the whole projection rather than guessing a handover.
+ */
+export type OffplanPlan = {
+  /** Installments already paid today. */
+  paidNow: number;
+  /** Scheduled installments not yet paid and due after today; assumed paid on their due date. */
+  futureInstallments: { due_date: string; amount: number }[];
+  handoverDate: string | null;
+};
+
+/** Cash paid into an off-plan unit by `date`: what's paid now plus every scheduled installment due by then. */
+export function offplanPaidAt(plan: OffplanPlan, date: string): number {
+  return (
+    plan.paidNow +
+    plan.futureInstallments.reduce((sum, m) => (m.due_date <= date ? sum + m.amount : sum), 0)
+  );
+}
+
 export type ProjectionPoint = {
   date: string;
   pValue: number;
@@ -179,6 +202,13 @@ export function buildProjection(input: {
   annualCosts: number;
   baseCumulativeNetRent: number;
   hasLoan: boolean;
+  /**
+   * Off-plan only. Until handover, Equity is the cash actually paid in
+   * (stepping up as scheduled installments fall due) — NOT market value minus
+   * a loan, which would read 100% equity on day one because an off-plan unit
+   * has no mortgage yet. From handover on it is market value minus the loan.
+   */
+  offplan?: OffplanPlan;
 }): ProjectionPoint[] {
   const years = input.years ?? 20;
   const amortizable = canAmortize(input.loan);
@@ -204,10 +234,17 @@ export function buildProjection(input: {
         ? getOutstandingPrincipalAt(input.loan, date)
         : manualBalance
       : null;
+    const handedOver =
+      input.offplan?.handoverDate != null && date >= input.offplan.handoverDate;
+    const netEquity = input.offplan
+      ? handedOver
+        ? value - (loanBalance ?? 0)
+        : offplanPaidAt(input.offplan, date)
+      : value - (loanBalance ?? 0);
     points.push({
       date,
       pValue: value,
-      pNetEquity: value - (loanBalance ?? 0),
+      pNetEquity: netEquity,
       pNetProfit: value - input.totalCost,
       pLoanBalance: loanBalance,
       pTotalReturn: value - input.totalCost + cumulativeNet,

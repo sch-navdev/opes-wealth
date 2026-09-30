@@ -92,10 +92,35 @@ export function buildInvestedCapitalSeries(
   return Array.from(byDate, ([date, value]) => ({ date, value }));
 }
 
+/**
+ * What to show as a holding's name. Assets imported before names were
+ * cleaned up are called "Brokerage Account / Saxobank Acc. # 123 / UBIP" (an
+ * internal path, not a name): for those, fall back to the stored company name
+ * (`instrument_name`), then the ticker.
+ */
+export function holdingDisplayName(
+  assetName: string,
+  metadata: Pick<EquityMetadata, "instrument_name">,
+  ticker: string | null,
+): string {
+  if (metadata.instrument_name) return metadata.instrument_name;
+  if (/^Brokerage Account \//.test(assetName)) return ticker || assetName.split("/").pop()!.trim();
+  return assetName;
+}
+
+/** "Saxobank Acc. # 10164571" — the account level of the Brokerage Account → account → holding hierarchy. Strips the legacy "Brokerage Account / " prefix older imports stored. */
+export function accountDisplayName(metadata: Pick<EquityMetadata, "account_name">): string | null {
+  const name = metadata.account_name?.replace(/^Brokerage Account \/\s*/, "").trim();
+  return name || null;
+}
+
 export type EquityMetadata = {
-  /** Brokerage account this holding was imported from (e.g. Saxo Client ID) and the label used in the asset's name. */
+  /** Brokerage account this holding was imported from (e.g. Saxo Client ID) and its label, e.g. "Saxobank Acc. # 10164571". */
   account_id?: string;
   account_name?: string;
+  /** Company/fund name and ISIN from the broker export. */
+  instrument_name?: string;
+  isin?: string;
   /** Display exchange, normalized by `normalizeExchange` (e.g. "NASDAQ", "EURONEXT"). Drives the brokerage table's exchange grouping. */
   exchange: string;
   last_unit_price: number | null;

@@ -39,6 +39,8 @@ export type ParsedTrade = {
   bookedAmount?: number;
   /** The broker's own trade id, used to join a trade to its Transactions-sheet row. */
   brokerTradeId?: string;
+  /** ISIN of the instrument (Saxo `Instrument ISIN`), e.g. `FR0000054470`. */
+  isin?: string;
 };
 
 export type ParsedTradeRowError = {
@@ -67,6 +69,8 @@ export type AggregatedHolding = {
   exchange: string | null;
   instrumentName: string;
   currency: string;
+  /** ISIN, when the broker export carries one. */
+  isin?: string;
   /** Sum of buy quantities minus sell quantities across `trades`. */
   netQuantity: number;
   trades: ParsedTrade[];
