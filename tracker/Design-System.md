@@ -45,6 +45,13 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 - **21st.dev integration explicitly skipped this pass**: the 21st.dev MCP's free tier is metered at 2 `get_component` calls/day, so no live fetch was spent on an unreviewed autonomous overhaul — the sidebar/shell above was hand-built from existing shadcn primitives + semantic tokens instead, which already satisfies the "no hardcoded colors, theme-aware" requirement. Worth spending an actual 21st.dev lookup later, with Steve reviewing the result, if a more polished sidebar/dashboard-shell primitive is wanted.
 - Verified live in the browser at three breakpoints (1600px, 900px, 375px mobile) against a real seeded asset (Ellington House) and the dashboard: full sidebar with active-route highlight at desktop width, icon-only collapse at tablet width, top bar + working hamburger slide-down at mobile width; the asset details page's Specifications tab now visibly fills the wide viewport instead of sitting in a centered 768px column. `tsc --noEmit`, `eslint`, and `npm run build` all clean.
 
+## Sidebar Polish: Mobile Drawer & Strict Semantic Tokens (2026-09-30)
+
+- `src/components/app-sidebar.tsx` reworked: nav list + Sign Out extracted into one shared `NavList` used by both the desktop/tablet rail and the mobile drawer. Breakpoints unchanged (full at `lg+`, icon-only rail at `md`–`lg`, CSS-driven). Below `md` the old slide-down panel became a left-side **drawer** (`role="dialog"`, dimmed backdrop, close button, Escape/backdrop/link-tap to close, body scroll lock).
+- Colors are now only `bg-background`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border` (dropped `bg-card` and `bg-primary/10`/`text-primary`; active item is `bg-muted text-foreground`; backdrop is `bg-foreground/40`) — no hardcoded palette colors, so it follows `next-themes`.
+- i18n: nav labels were already routed through `useLanguage().t`; the hardcoded "Menu" aria-label and new close button now use new `menu`/`close` keys in `lib/i18n.ts` (EN/FR).
+- **21st.dev still not fetched** (2 `get_component`/day quota) — drawer pattern hand-built on existing primitives again. `tsc --noEmit`/`eslint`/`npm run build` clean; **not verified visually** this pass (dashboard is behind the mock-auth wall). Related: [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]].
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components

@@ -38,6 +38,8 @@ const dictionary = {
   },
   batch_deleting: { en: "Deleting…", fr: "Suppression…" },
   cancel: { en: "Cancel", fr: "Annuler" },
+  close: { en: "Close", fr: "Fermer" },
+  menu: { en: "Menu", fr: "Menu" },
   delete: { en: "Delete", fr: "Supprimer" },
   profile_settings: { en: "Profile Settings", fr: "Paramètres du profil" },
   sign_out: { en: "Sign Out", fr: "Déconnexion" },

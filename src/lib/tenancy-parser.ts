@@ -126,39 +126,59 @@ export function parseEjariContract(text: string): ParsedTenancyContract {
   };
 }
 
+/** First capture group of `pattern` against the raw text, or `null`. */
+function firstMatch(text: string, pattern: RegExp): string | null {
+  return text.match(pattern)?.[1] ?? null;
+}
+
 /**
- * Tawtheeq (Abu Dhabi) tenancy contract. No real export has been available
- * to verify this against (unlike Ejari above) — this mirrors the same
- * row-pairing structure as a best-effort match for what's presumed to be a
- * similarly-generated government export, isolating "Full Name" to the
- * SECOND PARTY / TENANT DETAILS section since the landlord's FIRST PARTY
- * section uses the identical label.
+ * Tawtheeq (Abu Dhabi) tenancy contract — verified against a real export
+ * (dari.ae). Unlike Ejari, the CONTRACT DETAILS table extracts as one line
+ * per row with the English label, value and mirrored Arabic label run
+ * together with no delimiter:
+ *
+ * ```
+ * Start Date2026-04-28<Arabic label>
+ * Annual Rent157,500.00 <Arabic label>
+ * ```
+ *
+ * so dates and amounts are anchored on the line-start label and read straight
+ * off its value (dates are already ISO). The tenant's English name is the
+ * last `Full Name` value inside TENANT DETAILS (the landlord section uses the
+ * same label). It follows the Arabic name and can wrap across lines
+ * (`MICHAEL WILLIAM ` / `MCGROARTY`), so it's the trailing run of pure
+ * Latin-uppercase lines in that section. Falls back to the signature line
+ * (`NAME<Emirates ID><Arabic name>`).
  */
 export function parseTawtheeqContract(text: string): ParsedTenancyContract {
-  const tenantSectionMatch = text.match(/(SECOND\s+PARTY|TENANT\s+DETAILS)([\s\S]*)/i);
-  const tenantLines = toLines(tenantSectionMatch ? tenantSectionMatch[2] : text);
-  const allLines = toLines(text);
-
-  const tenantLine = lineAfterLabel(tenantLines, "Full Name");
-  const tenant_name = tenantLine ? extractEnglishName(tenantLine) : null;
-
-  const dateLine = lineAfterLabel(allLines, "Start Date");
-  const dates = dateLine ? (dateLine.match(DATE_TOKEN) ?? []) : [];
-  const tenancy_start_date = dates[0] ? normalizeDate(dates[0]) : null;
-  const tenancy_end_date = dates[1] ? normalizeDate(dates[1]) : null;
-
-  const amountLine = lineAfterLabel(allLines, "Contract Value");
-  const amounts = amountLine ? (amountLine.match(AMOUNT_TOKEN) ?? []) : [];
-  const tenancy_contract_value = amounts[0] ? parseAmount(amounts[0]) : null;
-  const annual_rent = amounts[1] ? parseAmount(amounts[1]) : null;
+  const start = firstMatch(text, /^Start Date\s*(\d{4}-\d{2}-\d{2})/m);
+  const end = firstMatch(text, /^End Date\s*(\d{4}-\d{2}-\d{2})/m);
+  const annual = firstMatch(text, /^Annual Rent\s*([\d,]+\.\d{2})/m);
+  const value = firstMatch(text, /^Contract Value\s*([\d,]+\.\d{2})/m);
 
   return {
-    tenant_name,
-    tenancy_start_date,
-    tenancy_end_date,
-    tenancy_contract_value,
-    annual_rent,
+    tenant_name: extractTawtheeqTenantName(text),
+    tenancy_start_date: start,
+    tenancy_end_date: end,
+    tenancy_contract_value: value ? parseAmount(value) : null,
+    annual_rent: annual ? parseAmount(annual) : null,
   };
+}
+
+function extractTawtheeqTenantName(text: string): string | null {
+  const section = text.match(/TENANT\s+DETAILS([\s\S]*?)(?:PROPERTY\s+DETAILS|$)/i)?.[1];
+  if (section) {
+    const lines = toLines(section);
+    const labelIdx = lines.map((l) => l === "Full Name").lastIndexOf(true);
+    const nameLines: string[] = [];
+    for (let i = lines.length - 1; labelIdx >= 0 && i > labelIdx; i--) {
+      if (!/^[A-Z][A-Z .'-]*$/.test(lines[i])) break;
+      nameLines.unshift(lines[i]);
+    }
+    if (nameLines.length > 0) return nameLines.join(" ").replace(/\s+/g, " ");
+  }
+  const signed = firstMatch(text, /^([A-Z][A-Z .'-]+?)\s*\d{15}/m);
+  return signed ? signed.replace(/\s+/g, " ") : null;
 }
 
 /** Picks the parser based on the property's registered emirate — Ejari for Dubai, Tawtheeq for Abu Dhabi. */
