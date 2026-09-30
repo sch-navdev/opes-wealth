@@ -47,6 +47,7 @@ export function PortfolioTable({
   categories,
   displayCurrency,
   rates,
+  performanceByAsset,
   selectedIds,
   onToggleAsset,
   onToggleAll,
@@ -55,6 +56,8 @@ export function PortfolioTable({
   categories: Category[];
   displayCurrency: string;
   rates: Record<string, number>;
+  /** Gain/loss (asset currency) for categories without a cost basis in their metadata — Vehicles, computed server-side from the valuation log. */
+  performanceByAsset?: Record<string, { amount: number; percent: number | null }>;
   selectedIds?: Set<string>;
   onToggleAsset?: (id: string, checked: boolean) => void;
   onToggleAll?: (ids: string[], checked: boolean) => void;
@@ -151,11 +154,11 @@ export function PortfolioTable({
                   ? asset.metadata.outstanding_balance
                   : null;
 
-              // Performance column — total cost basis (contract/purchase
-              // price + registration fee + agency/renovation/furnishing
-              // fees) vs. market valuation. Only meaningful for Real
-              // Estate assets, which are the only category with a cost
-              // basis on file; other categories show "—".
+              // Performance column — Real Estate: total cost basis
+              // (contract/purchase price + fees) vs. market valuation.
+              // Vehicles: latest valuation vs. purchase price (or the
+              // earliest valuation), precomputed in `performanceByAsset`.
+              // Categories with no cost basis on file show "—".
               const isRealEstate = asset.asset_categories?.name === "Real Estate";
               const reMetadata = isRealEstate
                 ? parseRealEstateMetadata(asset.metadata)
@@ -169,7 +172,7 @@ export function PortfolioTable({
               const unrealizedGain =
                 totalCost != null
                   ? calculateUnrealizedGain(marketValuation, totalCost)
-                  : null;
+                  : (performanceByAsset?.[asset.id] ?? null);
               const convertedGain =
                 unrealizedGain != null
                   ? convertAmount(

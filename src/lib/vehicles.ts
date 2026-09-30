@@ -87,24 +87,76 @@ export function sumVehicleOwnershipCosts(metadata: VehicleMetadata): number {
 }
 
 /**
- * Total Cost of Ownership: purchase price (falling back to the asset's
- * current value when no purchase price was entered) plus every ownership
- * cost since — the vehicle equivalent of `calculateTotalCost` for Real Estate.
+ * Total Cost of Ownership: the cost baseline (see `resolveVehicleValuation`:
+ * the purchase price, else the earliest valuation) plus every ownership cost
+ * since — the vehicle equivalent of `calculateTotalCost` for Real Estate.
+ * `baseCost` falls back to whatever the caller passes (typically the current
+ * value) when there is no baseline at all.
  */
 export function calculateVehicleTotalCost(
   metadata: VehicleMetadata,
-  fallbackValue: number,
+  baseCost: number,
 ): number {
-  return (metadata.purchase_price ?? fallbackValue) + sumVehicleOwnershipCosts(metadata);
+  return baseCost + sumVehicleOwnershipCosts(metadata);
 }
 
-/** Depreciation vs. purchase price: positive means the vehicle has lost value. `null` when no purchase price was entered (nothing to compare against). */
-export function calculateVehicleDepreciation(
-  currentValue: number,
-  purchasePrice: number | null,
-): { amount: number; percent: number | null } | null {
-  if (purchasePrice == null) return null;
-  const amount = purchasePrice - currentValue;
-  const percent = purchasePrice !== 0 ? (amount / purchasePrice) * 100 : null;
-  return { amount, percent };
+export type VehicleValuePoint = { recorded_date: string; value: number };
+
+export type VehicleValuation = {
+  /** The cost baseline: the purchase price if one was entered, else the EARLIEST valuation entry; `null` if there's nothing to compare against. */
+  baselineCost: number | null;
+  baselineSource: "purchase_price" | "first_valuation" | null;
+  /** Date of the earliest valuation entry when it is the baseline. */
+  baselineDate: string | null;
+  /** The LATEST valuation entry (or `fallbackValue` when the log is empty). */
+  currentMarketValue: number;
+  /** Signed change from baseline to current: **positive = appreciation, negative = depreciation**. `null` when there's no baseline. */
+  change: { amount: number; percent: number | null } | null;
+};
+
+/**
+ * Resolves a vehicle's cost baseline and current market value from its
+ * valuation log. The old calculation confused the two: with no purchase price
+ * it fell back to the CURRENT value as the "cost" (so a 90,000 → 75,000 slide
+ * showed no loss at all), and it reported depreciation with an inverted sign
+ * (value gain shown as a negative number). Now:
+ *
+ * - baseline cost = `purchase_price` if set, otherwise the earliest entry in
+ *   the valuation log (needs at least two entries — with a single one there is
+ *   nothing to compare to, so no change is reported);
+ * - current market value = the latest log entry;
+ * - change = current − baseline, so a vehicle worth more than it cost is a
+ *   positive number and one that lost value is negative.
+ */
+export function resolveVehicleValuation(
+  metadata: VehicleMetadata,
+  history: VehicleValuePoint[],
+  fallbackValue: number,
+): VehicleValuation {
+  const sorted = [...history].sort((a, b) => a.recorded_date.localeCompare(b.recorded_date));
+  const first = sorted[0];
+  const latest = sorted[sorted.length - 1];
+  const currentMarketValue = latest?.value ?? fallbackValue;
+
+  let baselineCost: number | null = null;
+  let baselineSource: VehicleValuation["baselineSource"] = null;
+  let baselineDate: string | null = null;
+  if (metadata.purchase_price != null && metadata.purchase_price > 0) {
+    baselineCost = metadata.purchase_price;
+    baselineSource = "purchase_price";
+  } else if (sorted.length >= 2 && first.value > 0) {
+    baselineCost = first.value;
+    baselineSource = "first_valuation";
+    baselineDate = first.recorded_date;
+  }
+
+  const change =
+    baselineCost != null
+      ? (() => {
+          const amount = currentMarketValue - baselineCost;
+          return { amount, percent: (amount / baselineCost) * 100 };
+        })()
+      : null;
+
+  return { baselineCost, baselineSource, baselineDate, currentMarketValue, change };
 }

@@ -587,6 +587,19 @@ const dictionary = {
     en: "Total Cost of Ownership",
     fr: "Coût total de possession",
   },
+  vehicle_value_change: {
+    en: "Value Change vs. Cost Basis",
+    fr: "Variation de valeur vs. prix de revient",
+  },
+  vehicle_basis_purchase: { en: "vs. purchase price", fr: "vs. prix d'achat" },
+  vehicle_basis_first_valuation: {
+    en: "vs. first valuation ({date})",
+    fr: "vs. première valorisation ({date})",
+  },
+  vehicle_basis_none: {
+    en: "Add a purchase price (or a second valuation) to compare",
+    fr: "Ajoutez un prix d'achat (ou une seconde valorisation) pour comparer",
+  },
   depreciation_vs_purchase: {
     en: "Depreciation vs. Purchase Price",
     fr: "Dépréciation vs. prix d'achat",

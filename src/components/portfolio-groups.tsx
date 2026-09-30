@@ -63,11 +63,14 @@ export function PortfolioGroups({
   categories,
   displayCurrency,
   rates,
+  performanceByAsset,
 }: {
   assets: AssetRow[];
   categories: Category[];
   displayCurrency: string;
   rates: Record<string, number>;
+  /** Gain/loss per asset (in the asset's own currency) for categories that have no cost basis in their metadata — currently Vehicles. */
+  performanceByAsset?: Record<string, { amount: number; percent: number | null }>;
 }) {
   const { maskValue } = usePrivacy();
   const { t } = useLanguage();
@@ -273,6 +276,7 @@ export function PortfolioGroups({
                   categories={categories}
                   displayCurrency={displayCurrency}
                   rates={rates}
+                  performanceByAsset={performanceByAsset}
                   selectedIds={selectedIds}
                   onToggleAsset={toggleAsset}
                   onToggleAll={toggleAll}

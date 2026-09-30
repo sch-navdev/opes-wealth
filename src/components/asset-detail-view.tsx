@@ -125,9 +125,9 @@ import {
   type ProjectionPoint,
 } from "@/lib/real-estate-analytics";
 import {
-  calculateVehicleDepreciation,
   calculateVehicleTotalCost,
   parseVehicleMetadata,
+  resolveVehicleValuation,
 } from "@/lib/vehicles";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import { estimateCostBasisUnitPrice, parseEquityMetadata } from "@/lib/equities";
@@ -314,12 +314,18 @@ export function AssetDetailView({
   const isCrypto = categoryName === "Crypto";
   const metadata = parseRealEstateMetadata(asset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
+  // Baseline = purchase price, else the earliest valuation entry; current =
+  // the latest valuation entry (see `resolveVehicleValuation`).
+  const vehicleValuation = vehicleMetadata
+    ? resolveVehicleValuation(vehicleMetadata, history, asset.current_value)
+    : null;
   const vehicleTotalCost = vehicleMetadata
-    ? calculateVehicleTotalCost(vehicleMetadata, asset.current_value)
+    ? calculateVehicleTotalCost(
+        vehicleMetadata,
+        vehicleValuation?.baselineCost ?? asset.current_value,
+      )
     : null;
-  const vehicleDepreciation = vehicleMetadata
-    ? calculateVehicleDepreciation(asset.current_value, vehicleMetadata.purchase_price)
-    : null;
+  const vehicleChange = vehicleValuation?.change ?? null;
   const privateEquityMetadata = isPrivateEquity
     ? parsePrivateEquityMetadata(asset.metadata)
     : null;
@@ -2013,35 +2019,45 @@ export function AssetDetailView({
                 <Card className="border-border bg-card">
                   <CardContent className="space-y-1 py-4">
                     <p className="text-xs text-muted-foreground">
-                      {t("depreciation_vs_purchase")}
+                      {t("vehicle_value_change")}
                     </p>
                     <div className="flex w-full flex-wrap items-center gap-2">
                       <p
                         className={
-                          vehicleDepreciation != null
-                            ? vehicleDepreciation.amount <= 0
+                          vehicleChange != null
+                            ? vehicleChange.amount >= 0
                               ? "text-lg font-semibold text-success"
                               : "text-lg font-semibold text-destructive"
                             : "text-lg font-semibold text-foreground"
                         }
                       >
-                        {vehicleDepreciation != null
-                          ? maskValue(currencyFormatter.format(vehicleDepreciation.amount))
+                        {vehicleChange != null
+                          ? `${vehicleChange.amount >= 0 ? "+" : "-"}${maskValue(currencyFormatter.format(Math.abs(vehicleChange.amount)))}`
                           : "—"}
                       </p>
-                      {vehicleDepreciation?.percent != null && (
+                      {vehicleChange?.percent != null && (
                         <Badge
                           variant="secondary"
                           className={
-                            vehicleDepreciation.amount <= 0
+                            vehicleChange.amount >= 0
                               ? "whitespace-nowrap bg-success px-2 py-0.5 text-success-foreground"
                               : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"
                           }
                         >
-                          {vehicleDepreciation.percent.toFixed(1)}%
+                          {vehicleChange.percent >= 0 ? "+" : "-"}
+                          {Math.abs(vehicleChange.percent).toFixed(1)}%
                         </Badge>
                       )}
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      {vehicleValuation?.baselineSource === "purchase_price"
+                        ? t("vehicle_basis_purchase")
+                        : vehicleValuation?.baselineSource === "first_valuation"
+                          ? t("vehicle_basis_first_valuation", {
+                              date: vehicleValuation.baselineDate ?? "",
+                            })
+                          : t("vehicle_basis_none")}
+                    </p>
                   </CardContent>
                 </Card>
               </div>

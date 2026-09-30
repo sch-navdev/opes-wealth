@@ -25,6 +25,7 @@ import {
 } from "@/lib/fx";
 import { buildNetWorthSeries } from "@/lib/portfolio-performance";
 import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
+import { parseVehicleMetadata, resolveVehicleValuation } from "@/lib/vehicles";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
   calculateTotalCost,
@@ -127,6 +128,21 @@ export default async function DashboardPage({
     // Run the series to today so it doesn't stop at the last recorded row.
     new Date().toISOString().slice(0, 10),
   );
+
+  // Performance column for categories with no cost basis of their own:
+  // vehicles compare the latest valuation with the purchase price (or, if none
+  // was entered, the earliest valuation) — see `resolveVehicleValuation`.
+  // Real Estate is still computed in the table from its all-in cost basis.
+  const performanceByAsset: Record<string, { amount: number; percent: number | null }> = {};
+  for (const asset of assets ?? []) {
+    if (asset.asset_categories?.name !== "Vehicles") continue;
+    const { change } = resolveVehicleValuation(
+      parseVehicleMetadata(asset.metadata),
+      (allHistory ?? []).filter((h) => h.asset_id === asset.id),
+      asset.current_value,
+    );
+    if (change) performanceByAsset[asset.id] = change;
+  }
 
   const initials =
     profile?.first_name?.[0]?.toUpperCase() ??
@@ -272,6 +288,7 @@ export default async function DashboardPage({
           categories={categories ?? []}
           displayCurrency={displayCurrency}
           rates={rates}
+          performanceByAsset={performanceByAsset}
         />
       </main>
     </>
