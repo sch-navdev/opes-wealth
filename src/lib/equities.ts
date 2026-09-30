@@ -34,12 +34,21 @@ export type EquityTrade = {
   brokerage?: number;
 };
 
+/** One dividend/income receipt against this holding (asset currency). No automatic source yet — filled manually — so the table's Income column is honestly `—` until entries exist. */
+export type EquityIncome = { date: string; amount: number };
+
 export type EquityMetadata = {
-  /** Free-text, e.g. "NASDAQ" — for display only; Finnhub's `/quote` doesn't need it for a US ticker. */
+  /** Display exchange, normalized by `normalizeExchange` (e.g. "NASDAQ", "EURONEXT"). Drives the brokerage table's exchange grouping. */
   exchange: string;
   last_unit_price: number | null;
   last_priced_at: string | null;
   last_price_source: string | null;
+  /** Finnhub `/quote` extras from the last refresh, in the asset's currency. */
+  open_price?: number | null;
+  previous_close?: number | null;
+  day_change_pct?: number | null;
+  /** Dividend/income receipts, if any. */
+  income?: EquityIncome[];
   /** Every lot on record for this asset, newest import appended — see `EquityTrade`. */
   trades: EquityTrade[];
 };
@@ -51,6 +60,60 @@ export const EMPTY_EQUITY_METADATA: EquityMetadata = {
   last_price_source: null,
   trades: [],
 };
+
+/** Broker/MIC codes and Finnhub profile strings -> the exchange names the brokerage table groups by. Anything unrecognized falls back to the trimmed upper-cased raw value, and an empty value to "OTHER". */
+const EXCHANGE_ALIASES: [RegExp, string][] = [
+  [/^(XNAS|NASDAQ|XNMS|XNCM|XNGS)/i, "NASDAQ"],
+  [/^(XNYS|NYSE|ARCX|XASE|AMEX|NEW YORK STOCK)/i, "NYSE"],
+  [/^(XPAR|XAMS|XBRU|XLIS|XMLI|EURONEXT|PARIS|AMSTERDAM|BRUSSELS|LISBON)/i, "EURONEXT"],
+  [/^(XLON|LSE|LONDON)/i, "LSE"],
+  [/^(XETR|XFRA|XETRA|FRANKFURT|DEUTSCHE)/i, "XETRA"],
+  [/^(XMIL|MILAN|BORSA ITALIANA)/i, "BORSA ITALIANA"],
+  [/^(XSWX|SIX)/i, "SIX"],
+  [/^(XTSE|TSX|TORONTO)/i, "TSX"],
+  [/^(XASX|ASX)/i, "ASX"],
+  [/^(XTKS|TSE|TOKYO)/i, "TSE"],
+  [/^(XHKG|HKEX|HONG KONG)/i, "HKEX"],
+  [/^(XADS|ADX|ABU DHABI)/i, "ADX"],
+  [/^(XDFM|DFM|DUBAI)/i, "DFM"],
+];
+
+export function normalizeExchange(raw: string | null | undefined): string {
+  const value = (raw ?? "").trim();
+  if (!value) return "OTHER";
+  for (const [pattern, name] of EXCHANGE_ALIASES) {
+    if (pattern.test(value)) return name;
+  }
+  return value.toUpperCase();
+}
+
+/**
+ * The per-holding figures shown in the brokerage table, all in the asset's
+ * own currency. Cost uses the average buy cost of the open position
+ * (`estimateCostBasisUnitPrice` × shares still held); Capital Gain is value
+ * minus that cost; Return is (gain + income) / cost, or `null` when there is
+ * no cost basis to divide by. `price` is the last live quote, falling back to
+ * value/quantity so a holding never shows a blank or zero price just because
+ * it hasn't been refreshed yet.
+ */
+export function computeHoldingMetrics(input: {
+  quantity: number;
+  currentValue: number;
+  metadata: EquityMetadata;
+}) {
+  const { quantity, currentValue, metadata } = input;
+  const avgCost = estimateCostBasisUnitPrice(metadata.trades);
+  const cost = avgCost != null ? Math.max(0, quantity) * avgCost : null;
+  const price =
+    metadata.last_unit_price ?? (quantity > 0 ? currentValue / quantity : null);
+  const income = (metadata.income ?? []).reduce((sum, i) => sum + i.amount, 0);
+  const capitalGain = cost != null ? currentValue - cost : null;
+  const returnPct =
+    cost != null && cost > 0 && capitalGain != null
+      ? ((capitalGain + income) / cost) * 100
+      : null;
+  return { price, cost, capitalGain, income, returnPct };
+}
 
 /**
  * Weighted average cost of the buy lots in `trades` — used both server-side

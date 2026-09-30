@@ -19,6 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { BrokerageHoldingsTable } from "@/components/brokerage-holdings-table";
 import { PortfolioTable } from "@/components/portfolio-table";
 import { batchDeleteAssets } from "@/app/dashboard/actions";
 import { usePrivacy } from "@/context/privacy-context";
@@ -261,15 +262,26 @@ export function PortfolioGroups({
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <PortfolioTable
-                assets={group.assets}
-                categories={categories}
-                displayCurrency={displayCurrency}
-                rates={rates}
-                selectedIds={selectedIds}
-                onToggleAsset={toggleAsset}
-                onToggleAll={toggleAll}
-              />
+              {group.name === "Equities" ? (
+                <BrokerageHoldingsTable
+                  assets={group.assets}
+                  displayCurrency={displayCurrency}
+                  rates={rates}
+                  selectedIds={selectedIds}
+                  onToggleAsset={toggleAsset}
+                  onToggleAll={toggleAll}
+                />
+              ) : (
+                <PortfolioTable
+                  assets={group.assets}
+                  categories={categories}
+                  displayCurrency={displayCurrency}
+                  rates={rates}
+                  selectedIds={selectedIds}
+                  onToggleAsset={toggleAsset}
+                  onToggleAll={toggleAll}
+                />
+              )}
             </CollapsibleContent>
           </Collapsible>
         );

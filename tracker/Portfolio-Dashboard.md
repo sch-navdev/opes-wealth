@@ -129,6 +129,13 @@ Verified visually in the browser (via a disposable local-only preview route, rem
 - Verified live in the browser (dev server, mock auth): default load shows "Tous les montants sont affichés en USD" above the metric cards and "Valeur nette · USD" in the header; switching to `?currency=EUR` correctly re-converts every total (verified the €/$ ratio against the known ~0.92 EUR/USD rate) and updates both new labels to EUR, with no console errors beyond the dev server's own unrelated HMR websocket noise.
 - `npx tsc --noEmit`, `eslint`, and `npm run build` all clean.
 
+## Clickable Metric Cards, Brokerage Holdings Table, Landing Logo (2026-09-30)
+
+- The four dashboard cards (Net Worth, Total Assets, Total Liabilities, Real Estate Unrealized Gain) are now buttons opening a **per-asset breakdown dialog** (`dashboard-metric-cards.tsx`, data built in `dashboard/page.tsx` with the same helpers/FX as the headline, so each list sums exactly to its card — verified: liabilities 758,785.70 + 722,475.58 = 1,481,261.29). Rows link to the asset. Unrealized Gain shows market value / cost / gain.
+- "Equities" is now labelled **Brokerage Account** / **Comptes d'investissement** (`category_equities`; the DB category name stays "Equities"). Landing page header shows only the "Opes Wealth" text (hero mark untouched).
+- **Brokerage table** (`brokerage-holdings-table.tsx`, mounted by `portfolio-groups.tsx` for the Equities group): Sharesight-style, grouped by exchange (EURONEXT/NASDAQ/NYSE/… via `normalizeExchange`), columns Price, Quantity, Value, Capital Gain, Income, Currency, Return, per-exchange + overall subtotals in the base currency, batch-select preserved, "Refresh prices" button. Capital Gain/Return from `computeHoldingMetrics` (average cost of the open position). **Income is `—` until dividends are entered**: no automatic dividend source exists (`EquityMetadata.income` is supported but nothing populates it yet). No equities exist in the live DB, so the table was verified by logic check only, not visually.
+- 21st.dev components were not fetched (2/day quota); tables/cards are built on the existing shadcn primitives with semantic tokens. Related: [[Live-Pricing|Live Pricing]], [[Broker-Trade-Import|Broker Trade Import]].
+
 ## Related
 - [[Database-Schema|Database Schema]] — `assets` table, `profiles` trigger, migration `0012`'s `purchase_date` column, `asset_history`'s cascade delete, migration `0013`'s new `vehicle_valuation` source
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — Real Estate sub-form rendered inside the Add/Edit dialog, FX conversion of the Value column, the cost-basis/Equity/amortization helpers `lib/liabilities.ts` reuses

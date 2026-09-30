@@ -60,6 +60,10 @@ New i18n keys (`src/lib/i18n.ts`): the full Add Investments dialog (`add_investm
 ## What Steve needs to do
 Nothing — migration `0011` is applied and the feature is ready to use.
 
+## Import No Longer Creates Zero-Value Holdings (2026-09-30)
+
+- `importBrokerTrades`: (1) a fully-closed position (net quantity ≤ 0) with no existing asset is **skipped** ("Closed position — not imported") instead of creating a 0-value row; (2) seed value falls back cost basis → latest trade price, never 0; (3) `purchase_date` is set to the earliest buy (the position's **open date**) and `metadata.exchange` is normalized (XNAS→NASDAQ, XPAR/XAMS→EURONEXT, …); (4) after saving, every touched holding is re-priced from Finnhub (`priceEquityAssets`) — the result row carries `priced`, and the import dialog marks holdings that stayed at cost with "valued at cost — live price unavailable". Not exercised against a real broker file this pass. See [[Live-Pricing|Live Pricing]].
+
 ## Related
 - [[Live-Pricing|Live Pricing]] — `refreshMarketPrice`, ticker-symbol handling, the migration-blocking precedent this follows
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — the column-mapping UI pattern and re-import-dedupe principle this reuses

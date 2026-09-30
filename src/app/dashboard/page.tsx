@@ -11,7 +11,10 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
-import { DashboardMetricCards } from "@/components/dashboard-metric-cards";
+import {
+  DashboardMetricCards,
+  type DashboardBreakdowns,
+} from "@/components/dashboard-metric-cards";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
@@ -182,6 +185,41 @@ export default async function DashboardPage({
     );
   }, 0);
 
+  // Per-asset decomposition behind each metric card (the card-click modal).
+  // Every row is already in the Base Currency, and each list sums exactly to
+  // its card's headline figure (same helpers, same conversion).
+  const breakdowns: DashboardBreakdowns = {
+    netWorth: [],
+    assets: [],
+    liabilities: [],
+    gain: [],
+  };
+  for (const asset of assets ?? []) {
+    const category = asset.asset_categories?.name ?? "—";
+    const toBase = (n: number) =>
+      convertToBaseCurrency(n, asset.currency, displayCurrency, rates);
+    const gross = asset.is_liability ? 0 : toBase(grossAssetValue(asset));
+    const liability = toBase(assetLiability(asset));
+    const base = { id: asset.id, name: asset.name, category };
+    if (gross !== 0) breakdowns.assets.push({ ...base, amount: gross });
+    if (liability !== 0) breakdowns.liabilities.push({ ...base, amount: liability });
+    if (gross - liability !== 0) {
+      breakdowns.netWorth.push({ ...base, amount: gross - liability });
+    }
+    if (category === "Real Estate") {
+      const metadata = parseRealEstateMetadata(asset.metadata);
+      const marketValuation = metadata.market_valuation ?? asset.current_value;
+      const totalCost = calculateTotalCost(metadata, marketValuation);
+      const gain = calculateUnrealizedGain(marketValuation, totalCost);
+      breakdowns.gain.push({
+        ...base,
+        amount: toBase(gain.amount),
+        marketValue: toBase(marketValuation),
+        costBasis: toBase(totalCost),
+      });
+    }
+  }
+
   return (
     <>
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -220,6 +258,7 @@ export default async function DashboardPage({
             totalUnrealizedGain > 0 ? "+" : totalUnrealizedGain < 0 ? "-" : null
           }
           baseCurrency={displayCurrency}
+          breakdowns={breakdowns}
         />
 
         <PortfolioPerformanceChart series={performanceSeries} currency={displayCurrency} />

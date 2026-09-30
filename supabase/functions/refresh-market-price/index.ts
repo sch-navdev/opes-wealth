@@ -29,6 +29,12 @@ interface PriceSuccess {
   currency: string;
   asOf: string;
   source: "coingecko" | "finnhub";
+  /** Equities only (Finnhub /quote + /stock/profile2). */
+  openPrice?: number;
+  previousClose?: number;
+  dayChangePct?: number;
+  /** Raw exchange string from Finnhub's company profile, e.g. "NASDAQ NMS - GLOBAL MARKET". */
+  exchange?: string;
 }
 
 type PriceErrorCode =
@@ -140,14 +146,6 @@ async function fetchEquityPrice(
   symbol: string,
   currency: string,
 ): Promise<PriceSuccess | Response> {
-  if (currency.toUpperCase() !== "USD") {
-    return errorResponse(
-      "unsupported_currency",
-      "Finnhub's free tier only quotes equities in USD. Set this asset's currency to USD to use live pricing.",
-      400,
-    );
-  }
-
   const apiKey = Deno.env.get("FINNHUB_API_KEY");
   if (!apiKey) {
     return errorResponse(
@@ -172,11 +170,26 @@ async function fetchEquityPrice(
   if (res.status === 429) {
     return errorResponse("rate_limited", "Finnhub's rate limit was hit. Try again shortly.", 429);
   }
+  if (res.status === 403) {
+    return errorResponse(
+      "invalid_symbol",
+      `Finnhub's free tier doesn't cover "${symbol}" (non-US listings need a paid plan).`,
+      404,
+    );
+  }
   if (!res.ok) {
     return errorResponse("network_error", `Finnhub returned HTTP ${res.status}.`, 502);
   }
 
-  let body: { c?: number; h?: number; l?: number; o?: number; pc?: number; t?: number };
+  let body: {
+    c?: number;
+    h?: number;
+    l?: number;
+    o?: number;
+    pc?: number;
+    dp?: number;
+    t?: number;
+  };
   try {
     body = await res.json();
   } catch {
@@ -193,11 +206,37 @@ async function fetchEquityPrice(
     );
   }
 
+  // Company profile (best effort) supplies the listing's exchange and
+  // trading currency; if it's unavailable we can only vouch for USD, since
+  // /quote itself carries no currency.
+  let profile: { exchange?: string; currency?: string } = {};
+  try {
+    const profileRes = await fetchWithTimeout(
+      `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`,
+    );
+    if (profileRes.ok) profile = await profileRes.json();
+  } catch {
+    // ignore — handled below
+  }
+
+  const quoteCurrency = (profile.currency || (currency.toUpperCase() === "USD" ? "USD" : "")).toUpperCase();
+  if (!quoteCurrency) {
+    return errorResponse(
+      "unsupported_currency",
+      "Could not determine the trading currency for this ticker; set the asset's currency to USD or try again.",
+      400,
+    );
+  }
+
   return {
     unitPrice: body.c,
-    currency: "USD",
+    currency: quoteCurrency,
     asOf: new Date().toISOString(),
     source: "finnhub",
+    openPrice: typeof body.o === "number" && body.o > 0 ? body.o : undefined,
+    previousClose: typeof body.pc === "number" && body.pc > 0 ? body.pc : undefined,
+    dayChangePct: typeof body.dp === "number" ? body.dp : undefined,
+    exchange: profile.exchange || undefined,
   };
 }
 

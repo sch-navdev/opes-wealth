@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
+  EMPTY_REAL_ESTATE_METADATA,
   nextPropertyExpenseId,
   nextTenancyContractId,
   parseRealEstateMetadata,
@@ -38,11 +39,20 @@ import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import {
   estimateCostBasisUnitPrice,
+  normalizeExchange,
   parseEquityMetadata,
   type EquityTrade,
 } from "@/lib/equities";
 import { tradeId } from "@/lib/parsers/broker-registry";
 import type { AggregatedHolding } from "@/lib/parsers/types";
+import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
+import { estimateOffplanValueAt } from "@/lib/real-estate-analytics";
+import {
+  hasAnyExtractedField as hasAnyPropertyDocumentField,
+  parsePropertyDocument,
+  toRealEstateMetadataPatch,
+  type PropertyDocumentType,
+} from "@/lib/property-document-parser";
 import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
@@ -109,7 +119,33 @@ async function syncAssetHistory(
       .filter((m) => m.due_date)
       .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
-    if (sortedMilestones.length > 0) {
+    const marketValuation = re.market_valuation ?? currentValue;
+
+    if (sortedMilestones.length > 0 && re.is_offplan) {
+      // Off-plan: the log must reflect the unit's estimated MARKET value on
+      // each milestone date (contract price drifting toward today's
+      // valuation), not the installments paid. Equity is that value minus
+      // what is still owed to the developer at that point.
+      const contractPrice = re.contract_price ?? re.purchasePrice ?? marketValuation;
+      const startDate = sortedMilestones[0].due_date;
+      const valueAt = (date: string) =>
+        estimateOffplanValueAt({
+          contractPrice,
+          startDate,
+          currentMarketValue: marketValuation,
+          snapshotDate,
+          date,
+        });
+
+      let cumulativePaid = sortedMilestones[0].status === "paid" ? 0 : sortedMilestones[0].amount;
+      for (const milestone of sortedMilestones) {
+        if (milestone.status === "paid") cumulativePaid += milestone.amount;
+        if (milestone.status === "paid" || milestone === sortedMilestones[0]) {
+          const value = valueAt(milestone.due_date);
+          addPoint(milestone.due_date, value, value - Math.max(0, contractPrice - cumulativePaid));
+        }
+      }
+    } else if (sortedMilestones.length > 0) {
       const first = sortedMilestones[0];
       addPoint(first.due_date, first.amount + totalFees, first.amount + totalFees);
 
@@ -123,7 +159,6 @@ async function syncAssetHistory(
       }
     }
 
-    const marketValuation = re.market_valuation ?? currentValue;
     addPoint(snapshotDate, marketValuation, currentValue);
   } else {
     addPoint(snapshotDate, currentValue, currentValue);
@@ -661,6 +696,226 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
   };
 }
 
+export type ParsePropertyDocumentResult =
+  | {
+      ok: true;
+      documentType: PropertyDocumentType;
+      patch: Partial<RealEstateMetadata>;
+      /** Patch entries flattened for the confirmation preview. */
+      fields: { key: string; value: string }[];
+    }
+  | { ok: false; error: string };
+
+/**
+ * Step 1 of the UAE property-document import: reads an uploaded PDF (Abu
+ * Dhabi off-plan SPA / title deed, Dubai title deed / Form F / Oqood / DLD
+ * receipt — `lib/property-document-parser.ts`), auto-detects which it is,
+ * and returns the fields it would write into the asset's existing
+ * `RealEstateMetadata` jsonb. Writes nothing — the user confirms the preview
+ * first, then `applyPropertyDocumentPatch` persists.
+ */
+export async function parsePropertyDocumentFile(
+  formData: FormData,
+): Promise<ParsePropertyDocumentResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "You must be signed in to import a document." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "No file was uploaded." };
+  }
+
+  let text: string;
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const pdfParse = (await import("pdf-parse")).default;
+    text = (await pdfParse(buffer)).text;
+  } catch {
+    return { ok: false, error: "Could not read this PDF file." };
+  }
+
+  const parsed = parsePropertyDocument(text);
+  if (!parsed || !hasAnyPropertyDocumentField(parsed)) {
+    return {
+      ok: false,
+      error: "This doesn't look like a supported property document, or no details could be read from it.",
+    };
+  }
+
+  const patch = toRealEstateMetadataPatch(parsed);
+  const fields = Object.entries(patch).map(([key, value]) => ({
+    key,
+    value:
+      typeof value === "object" && value !== null
+        ? JSON.stringify(value)
+        : String(value),
+  }));
+
+  return { ok: true, documentType: parsed.type, patch, fields };
+}
+
+const isEmptyMetadataValue = (value: unknown): boolean =>
+  value === null ||
+  value === undefined ||
+  value === "" ||
+  value === 0 ||
+  (Array.isArray(value) &&
+    value.every(
+      (v) => v === null || (typeof v === "object" && !Object.values(v as object).some(Boolean)),
+    ));
+
+/**
+ * Step 2: merges a confirmed document patch into the asset's metadata. Only
+ * keys that exist on `RealEstateMetadata` are accepted, and by default only
+ * fields that are currently empty are filled — `overwrite` replaces values
+ * that are already set. No schema change: it's the same jsonb object the
+ * rest of the app reads via `parseRealEstateMetadata`.
+ */
+export async function applyPropertyDocumentPatch(
+  assetId: string,
+  patch: Partial<RealEstateMetadata>,
+  overwrite: boolean,
+): Promise<{ ok: true; applied: number } | { ok: false; error: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in to import a document." };
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{ id: string; metadata: Json | null; asset_categories: { name: string } | null }>();
+
+  if (!asset) return { ok: false, error: "Asset not found." };
+  if (asset.asset_categories?.name !== "Real Estate") {
+    return { ok: false, error: "Document import is only available for Real Estate assets." };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata) as Record<string, unknown>;
+  const allowedKeys = new Set(Object.keys(EMPTY_REAL_ESTATE_METADATA));
+  const next: Record<string, unknown> = { ...metadata };
+  let applied = 0;
+
+  for (const [key, value] of Object.entries(patch)) {
+    if (!allowedKeys.has(key)) continue;
+    if (!overwrite && !isEmptyMetadataValue(metadata[key])) continue;
+    next[key] = value;
+    applied++;
+  }
+
+  if (applied === 0) return { ok: true, applied: 0 };
+
+  const { error } = await supabase
+    .from("assets")
+    .update({ metadata: next as Json })
+    .eq("id", assetId)
+    .eq("profile_id", user.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+  return { ok: true, applied };
+}
+
+export type DldCertificate = {
+  reference: string;
+  isMock: boolean;
+  valuationAmount: number;
+  valuationDate: string;
+  currency: string;
+  propertyName: string;
+  titleDeedNumber: string;
+  plotId: string;
+};
+
+/**
+ * Builds the Dubai Land Department Smart Valuation certificate for a
+ * ready-built Dubai property so the user can view/download it and verify
+ * the figure. The reference (e.g. `MOCK-SV-BE22723A`) and amount come from
+ * `getSmartValuation`, which in mock mode is a deterministic function of the
+ * property's Title Deed Number + Plot ID, so it reproduces the exact
+ * certificate a previous refresh issued; the date/amount prefer the latest
+ * `dubailand` `asset_history` row (what was actually recorded) when one
+ * exists. Read-only.
+ */
+export async function getDldCertificate(
+  id: string,
+): Promise<{ ok: true; certificate: DldCertificate } | { ok: false; code: string; error: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, code: "unauthorized", error: "You must be signed in to view a certificate." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, name, currency, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      name: string;
+      currency: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset || asset.asset_categories?.name !== "Real Estate") {
+    return { ok: false, code: "not_found", error: "Real Estate asset not found." };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata);
+  if (metadata.emirate === "abu_dhabi" || metadata.is_offplan) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      error: "Smart Valuation certificates exist only for ready-built Dubai properties.",
+    };
+  }
+
+  const result = await getSmartValuation({
+    titleDeedNumber: metadata.title_deed_number,
+    plotId: metadata.plot_id,
+  });
+  if (!result.ok) return { ok: false, code: result.code, error: result.error };
+
+  const { data: recorded } = await supabase
+    .from("asset_history")
+    .select("recorded_date, value")
+    .eq("asset_id", id)
+    .eq("source", "dubailand")
+    .order("recorded_date", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ recorded_date: string; value: number }>();
+
+  return {
+    ok: true,
+    certificate: {
+      reference: result.certificate_reference,
+      isMock: result.isMock,
+      valuationAmount: recorded?.value ?? result.ai_valuation_amount,
+      valuationDate: recorded?.recorded_date ?? result.valuation_date,
+      currency: asset.currency,
+      propertyName: asset.name,
+      titleDeedNumber: metadata.title_deed_number,
+      plotId: metadata.plot_id,
+    },
+  };
+}
+
 export type AdrecLiveValuationResult =
   | { ok: true; isMock: boolean; data: AdrecValuationData }
   | { ok: false; code: string; error: string };
@@ -876,6 +1131,14 @@ export async function refreshMarketPrice(
   id: string,
   unitPrice: number,
   source: AssetHistorySource,
+  extra?: {
+    /** The listing's trading currency, if it may differ from the asset's. */
+    currency?: string;
+    openPrice?: number;
+    previousClose?: number;
+    dayChangePct?: number;
+    exchange?: string;
+  },
 ) {
   const supabase = await createClient();
 
@@ -889,66 +1152,261 @@ export async function refreshMarketPrice(
 
   const { data: asset } = await supabase
     .from("assets")
-    .select("id, quantity, metadata")
+    .select("id, quantity, currency, metadata")
     .eq("id", id)
     .eq("profile_id", user.id)
-    .single<{ id: string; quantity: number; metadata: Json | null }>();
+    .single<{ id: string; quantity: number; currency: string; metadata: Json | null }>();
 
   if (!asset) {
     return { error: "Asset not found." };
   }
 
+  const rates = extra?.currency && extra.currency !== asset.currency
+    ? await getExchangeRatesFromUsd()
+    : {};
+  const persisted = await persistQuote(
+    supabase,
+    user.id,
+    asset,
+    {
+      unitPrice,
+      currency: extra?.currency ?? asset.currency,
+      asOf: new Date().toISOString(),
+      source,
+      openPrice: extra?.openPrice,
+      previousClose: extra?.previousClose,
+      dayChangePct: extra?.dayChangePct,
+      exchange: extra?.exchange,
+    },
+    rates,
+  );
+
+  if ("error" in persisted) {
+    return { error: persisted.error };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
+
+  return { success: true as const, ...persisted };
+}
+
+/** A live Finnhub quote (via the `refresh-market-price` Edge Function), in the listing's trading currency. */
+type LiveQuote = {
+  unitPrice: number;
+  currency: string;
+  asOf: string;
+  source: AssetHistorySource;
+  openPrice?: number;
+  previousClose?: number;
+  dayChangePct?: number;
+  exchange?: string;
+};
+
+async function fetchLiveEquityQuote(
+  supabase: SupabaseClient,
+  assetId: string,
+  symbol: string,
+  currency: string,
+): Promise<{ ok: true; quote: LiveQuote } | { ok: false; code: string; error: string }> {
+  const { data, error } = await supabase.functions.invoke("refresh-market-price", {
+    body: { assetId, category: "equities", symbol, currency },
+  });
+
+  if (error) {
+    // A non-2xx Edge Function response surfaces as a generic transport error;
+    // the real { error: { code, message } } body is on `error.context`.
+    try {
+      const body = await (error as { context?: Response }).context?.json();
+      if (body?.error) {
+        return { ok: false, code: body.error.code ?? "network_error", error: body.error.message };
+      }
+    } catch {
+      // fall through
+    }
+    return { ok: false, code: "network_error", error: error.message };
+  }
+
+  if (data?.error) {
+    return { ok: false, code: data.error.code ?? "network_error", error: data.error.message };
+  }
+  if (typeof data?.unitPrice !== "number" || !(data.unitPrice > 0)) {
+    return { ok: false, code: "invalid_response", error: "Received an unexpected quote response." };
+  }
+
+  return {
+    ok: true,
+    quote: {
+      unitPrice: data.unitPrice,
+      currency: String(data.currency ?? currency).toUpperCase(),
+      asOf: data.asOf ?? new Date().toISOString(),
+      source: (data.source ?? "finnhub") as AssetHistorySource,
+      openPrice: data.openPrice,
+      previousClose: data.previousClose,
+      dayChangePct: data.dayChangePct,
+      exchange: data.exchange,
+    },
+  };
+}
+
+/**
+ * Writes a live quote onto an Equities/Crypto asset: converts it into the
+ * asset's own currency if the listing trades in another (Finnhub quotes in
+ * the listing currency, which need not match what the user stored), sets
+ * `current_value = quantity × price`, records `last_unit_price` / open /
+ * previous close / normalized exchange into `metadata`, and upserts today's
+ * `asset_history` row.
+ */
+async function persistQuote(
+  supabase: SupabaseClient,
+  userId: string,
+  asset: { id: string; quantity: number; currency: string; metadata: Json | null },
+  quote: LiveQuote,
+  rates: Record<string, number>,
+): Promise<{ error: string } | { unitPrice: number; totalValue: number; asOf: string }> {
+  const toAssetCurrency = (n: number) => convertAmount(n, quote.currency, asset.currency, rates);
+  const unitPrice = toAssetCurrency(quote.unitPrice);
   const quantity = asset.quantity ?? 1;
   const totalValue = quantity * unitPrice;
-  const now = new Date().toISOString();
 
   const existingMetadata =
     asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
       ? (asset.metadata as Record<string, Json>)
       : {};
 
-  const nextMetadata: Json = {
+  const nextMetadata: Record<string, Json> = {
     ...existingMetadata,
     last_unit_price: unitPrice,
-    last_priced_at: now,
-    last_price_source: source,
+    last_priced_at: quote.asOf,
+    last_price_source: quote.source,
   };
+  if (quote.openPrice != null) nextMetadata.open_price = toAssetCurrency(quote.openPrice);
+  if (quote.previousClose != null) {
+    nextMetadata.previous_close = toAssetCurrency(quote.previousClose);
+  }
+  if (quote.dayChangePct != null) nextMetadata.day_change_pct = quote.dayChangePct;
+  if (quote.exchange) nextMetadata.exchange = normalizeExchange(quote.exchange);
 
   const { error: updateError } = await supabase
     .from("assets")
     .update({ current_value: totalValue, metadata: nextMetadata })
-    .eq("id", id)
-    .eq("profile_id", user.id);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
+    .eq("id", asset.id)
+    .eq("profile_id", userId);
+  if (updateError) return { error: updateError.message };
 
   const { error: historyError } = await supabase.from("asset_history").upsert(
     {
-      asset_id: id,
-      recorded_date: now.slice(0, 10),
+      asset_id: asset.id,
+      recorded_date: quote.asOf.slice(0, 10),
       value: totalValue,
       net_equity: totalValue,
-      source,
+      source: quote.source,
     },
     { onConflict: "asset_id,recorded_date" },
   );
+  if (historyError) return { error: historyError.message };
 
-  if (historyError) {
-    return { error: historyError.message };
+  return { unitPrice, totalValue, asOf: quote.asOf };
+}
+
+export type RefreshBrokerageQuotesResult = {
+  ticker: string;
+  status: "updated" | "error";
+  message?: string;
+};
+
+/**
+ * Re-prices every Brokerage Account holding (or just `assetIds`) from
+ * Finnhub via the existing `refresh-market-price` Edge Function — the same
+ * connection the single-asset "Refresh Market Price" button uses. Sequential
+ * (Finnhub's free tier is rate limited) and independent per ticker: one
+ * uncovered/failed symbol is reported and skipped, never aborting the batch
+ * or zeroing that holding's existing value.
+ */
+export async function refreshBrokerageQuotes(
+  assetIds?: string[],
+): Promise<{ error: string } | { results: RefreshBrokerageQuotesResult[] }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in to refresh prices." };
   }
 
-  revalidatePath("/dashboard", "layout");
-  revalidatePath(`/dashboard/assets/${id}`);
+  const { data: category } = await supabase
+    .from("asset_categories")
+    .select("id")
+    .eq("name", "Equities")
+    .single<{ id: string }>();
+  if (!category) return { error: 'The "Equities" category is missing from this project.' };
 
-  return { success: true as const, unitPrice, totalValue, asOf: now };
+  let query = supabase
+    .from("assets")
+    .select("id, quantity, currency, ticker_symbol, metadata")
+    .eq("profile_id", user.id)
+    .eq("category_id", category.id);
+  if (assetIds && assetIds.length > 0) query = query.in("id", assetIds);
+
+  const { data: assets } = await query.returns<
+    {
+      id: string;
+      quantity: number;
+      currency: string;
+      ticker_symbol: string | null;
+      metadata: Json | null;
+    }[]
+  >();
+
+  const rates = await getExchangeRatesFromUsd();
+  const results = await priceEquityAssets(supabase, user.id, assets ?? [], rates);
+
+  revalidatePath("/dashboard", "layout");
+  return { results };
 }
+
+async function priceEquityAssets(
+  supabase: SupabaseClient,
+  userId: string,
+  assets: {
+    id: string;
+    quantity: number;
+    currency: string;
+    ticker_symbol: string | null;
+    metadata: Json | null;
+  }[],
+  rates: Record<string, number>,
+): Promise<RefreshBrokerageQuotesResult[]> {
+  const results: RefreshBrokerageQuotesResult[] = [];
+  for (const asset of assets) {
+    const ticker = asset.ticker_symbol?.trim();
+    if (!ticker || !(asset.quantity > 0)) continue;
+
+    const quote = await fetchLiveEquityQuote(supabase, asset.id, ticker, asset.currency);
+    if (!quote.ok) {
+      results.push({ ticker, status: "error", message: quote.error });
+      continue;
+    }
+    const persisted = await persistQuote(supabase, userId, asset, quote.quote, rates);
+    results.push(
+      "error" in persisted
+        ? { ticker, status: "error", message: persisted.error }
+        : { ticker, status: "updated" },
+    );
+  }
+  return results;
+}
+
+
 
 export type ImportBrokerTradesResult = {
   ticker: string;
   status: "created" | "updated" | "unchanged" | "error";
   message?: string;
+  /** True once a live Finnhub quote priced this holding; false means it is valued at cost basis until a refresh succeeds. */
+  priced?: boolean;
 };
 
 /**
@@ -990,6 +1448,7 @@ export async function importBrokerTrades(
   const source: AssetHistorySource = "broker_import";
   const today = new Date().toISOString().slice(0, 10);
   const results: ImportBrokerTradesResult[] = [];
+  const touched: { id: string; ticker: string; currency: string; quantity: number; metadata: Json }[] = [];
 
   for (const holding of holdings) {
     if (holding.trades.length === 0) {
@@ -1036,7 +1495,11 @@ export async function importBrokerTrades(
 
       const allTrades = [...existingMetadata.trades, ...newTrades];
       const unitPrice = existingMetadata.last_unit_price ?? estimateCostBasisUnitPrice(allTrades);
-      const nextMetadata: Json = { ...existingMetadata, trades: allTrades };
+      const nextMetadata: Json = {
+        ...existingMetadata,
+        exchange: normalizeExchange(existingMetadata.exchange || holding.exchange),
+        trades: allTrades,
+      };
 
       const updatePayload: { metadata: Json; quantity: number; current_value?: number } = {
         metadata: nextMetadata,
@@ -1070,8 +1533,26 @@ export async function importBrokerTrades(
         );
       }
 
-      results.push({ ticker: holding.ticker, status: "updated" });
+      touched.push({
+        id: existing.id,
+        ticker: holding.ticker,
+        currency: holding.currency,
+        quantity: newQuantity,
+        metadata: nextMetadata,
+      });
+      results.push({ ticker: holding.ticker, status: "updated", priced: false });
     } else {
+      // A fully-closed position (net quantity 0) has nothing to hold or
+      // value — creating it would just add a zero-value row.
+      if (!(holding.netQuantity > 0)) {
+        results.push({
+          ticker: holding.ticker,
+          status: "unchanged",
+          message: "Closed position — not imported.",
+        });
+        continue;
+      }
+
       const trades: EquityTrade[] = holding.trades.map((t) => ({
         id: tradeId(t),
         tradeDate: t.tradeDate,
@@ -1084,11 +1565,21 @@ export async function importBrokerTrades(
         brokerage: t.brokerage,
       }));
 
-      const unitPrice = estimateCostBasisUnitPrice(trades);
-      const currentValue = unitPrice != null ? Math.max(0, holding.netQuantity) * unitPrice : 0;
+      // Never seed a zero value: fall back from cost basis to the latest
+      // trade price; the live Finnhub quote below then replaces either.
+      const latestTradePrice = [...trades].sort((a, b) =>
+        b.tradeDate.localeCompare(a.tradeDate),
+      )[0]?.price;
+      const unitPrice = estimateCostBasisUnitPrice(trades) || latestTradePrice || 0;
+      const currentValue = Math.max(0, holding.netQuantity) * unitPrice;
+      const openDate =
+        trades
+          .filter((t) => t.side === "buy")
+          .map((t) => t.tradeDate)
+          .sort()[0] ?? trades.map((t) => t.tradeDate).sort()[0] ?? today;
 
       const metadata: Json = {
-        exchange: holding.exchange ?? "",
+        exchange: normalizeExchange(holding.exchange),
         last_unit_price: null,
         last_priced_at: null,
         last_price_source: null,
@@ -1105,6 +1596,7 @@ export async function importBrokerTrades(
           current_value: currentValue,
           currency: holding.currency,
           ticker_symbol: holding.ticker,
+          purchase_date: openDate,
           metadata,
         })
         .select("id")
@@ -1130,7 +1622,39 @@ export async function importBrokerTrades(
         { onConflict: "asset_id,recorded_date" },
       );
 
-      results.push({ ticker: holding.ticker, status: "created" });
+      touched.push({
+        id: inserted.id,
+        ticker: holding.ticker,
+        currency: holding.currency,
+        quantity: holding.netQuantity,
+        metadata,
+      });
+      results.push({ ticker: holding.ticker, status: "created", priced: false });
+    }
+  }
+
+  // Replace cost-basis placeholders with live Finnhub quotes (same
+  // connection as the single-asset Refresh Market Price). A holding whose
+  // quote fails keeps its cost-basis value and is flagged `priced: false`.
+  if (touched.length > 0) {
+    const rates = await getExchangeRatesFromUsd();
+    const priced = await priceEquityAssets(
+      supabase,
+      user.id,
+      touched.map((a) => ({
+        id: a.id,
+        quantity: a.quantity,
+        currency: a.currency,
+        ticker_symbol: a.ticker,
+        metadata: a.metadata,
+      })),
+      rates,
+    );
+    for (const p of priced) {
+      const row = results.find((r) => r.ticker === p.ticker);
+      if (!row) continue;
+      row.priced = p.status === "updated";
+      if (p.status === "error") row.message = p.message;
     }
   }
 

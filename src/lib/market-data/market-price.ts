@@ -15,6 +15,10 @@ export type MarketPriceResult =
       currency: string;
       asOf: string;
       source: "coingecko" | "finnhub";
+      openPrice?: number;
+      previousClose?: number;
+      dayChangePct?: number;
+      exchange?: string;
     }
   | { ok: false; code: string; error: string };
 
@@ -61,5 +65,9 @@ export async function fetchMarketPrice(
     currency: data.currency,
     asOf: data.asOf,
     source: data.source,
+    openPrice: data.openPrice,
+    previousClose: data.previousClose,
+    dayChangePct: data.dayChangePct,
+    exchange: data.exchange,
   };
 }

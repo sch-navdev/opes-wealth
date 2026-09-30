@@ -4,12 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, Car, CloudDownload, Landmark, LineChart, Minus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Car, CloudDownload, Download, FileText, Landmark, LineChart, Minus, RefreshCw } from "lucide-react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Cell,
+  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -79,13 +80,16 @@ import {
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { TenancyContractDialog } from "@/components/tenancy-contract-dialog";
+import { PropertyDocumentDialog } from "@/components/property-document-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import {
   getAdrecLiveValuation,
+  getDldCertificate,
   type AdrecLiveValuationResult,
+  type DldCertificate,
   refreshAdrecValuation,
   refreshDldValuation,
   refreshVehicleValuation,
@@ -111,6 +115,14 @@ import {
   summarizeAmortization,
 } from "@/lib/amortization";
 import { calculateIrr, type DatedCashFlow } from "@/lib/irr";
+import {
+  averageAnnualCosts,
+  buildProjection,
+  cumulativeNetRentAt,
+  estimateAnnualGrowth,
+  estimateOffplanValueAt,
+  type ProjectionPoint,
+} from "@/lib/real-estate-analytics";
 import {
   calculateVehicleDepreciation,
   calculateVehicleTotalCost,
@@ -284,6 +296,12 @@ export function AssetDetailView({
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [chartView, setChartView] = useState<"history" | "forward" | "both">("history");
+  const [growthInput, setGrowthInput] = useState("");
+  const [certOpen, setCertOpen] = useState(false);
+  const [certificate, setCertificate] = useState<DldCertificate | null>(null);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [isCertPending, startCertTransition] = useTransition();
 
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
@@ -398,18 +416,36 @@ export function AssetDetailView({
   const monthlyGrossRent = activeTenancyContract?.annual_rent
     ? activeTenancyContract.annual_rent / 12
     : 0;
-  const monthlyNetRent = monthlyGrossRent - monthlyLoanPayment;
+  // Net rent counts only the loan's INTEREST as a cost, never principal
+  // repayments (those build equity, already captured by Unrealized Gain /
+  // Equity) — subtracting the whole installment double-counted it and made
+  // Net Profit hugely negative. `monthlyCashFlow` (rent minus the full
+  // installment) is what actually leaves the bank each month and is what the
+  // IRR below needs, since its terminal value is Equity.
+  const amortSchedule = amortizationSummary?.schedule ?? [];
+  const monthlyInterest = hasLoan
+    ? (currentInstallment?.interestAmount ??
+      (loan.interest_rate != null
+        ? (outstandingLoanBalance * loan.interest_rate) / 100 / 12
+        : 0))
+    : 0;
+  const monthlyNetRent = monthlyGrossRent - monthlyInterest;
+  const monthlyCashFlow = monthlyGrossRent - monthlyLoanPayment;
   const monthsOfTenancy = rentStartDate ? monthsBetween(rentStartDate, today) : 0;
-  const cumulativeNetRent = monthlyNetRent * monthsOfTenancy;
   // Logged property expenses (`metadata.property_expenses`) accumulate as a
-  // dated ledger rather than one flat "monthly" figure, so they're summed
-  // and subtracted as a lump total here instead of folded into the
-  // per-month rent rate above.
+  // dated ledger rather than one flat "monthly" figure.
   const totalPropertyExpenses = sumPropertyExpenses(metadata.property_expenses);
+  // Rent received across EVERY tenancy contract (not just the active one),
+  // less loan interest during tenancy months and all logged expenses.
+  const rentalToDate = cumulativeNetRentAt({
+    contracts: metadata.tenancy_contracts,
+    schedule: amortSchedule,
+    expenses: metadata.property_expenses,
+    date: today,
+    flatMonthlyInterest: monthlyInterest,
+  });
   const netProfitWithRent =
-    unrealizedGain != null
-      ? unrealizedGain.amount + cumulativeNetRent - totalPropertyExpenses
-      : null;
+    unrealizedGain != null ? unrealizedGain.amount + rentalToDate.net : null;
 
   // Property-level IRR: initial outlay is the full cost basis, cash flows in
   // between are the monthly net rent (already net of loan payments) plus
@@ -419,11 +455,11 @@ export function AssetDetailView({
   const irrCashFlows: DatedCashFlow[] = [];
   if (isRealEstate && totalCost != null && asset.purchase_date) {
     irrCashFlows.push({ date: asset.purchase_date, amount: -totalCost });
-    if (rentStartDate && monthlyNetRent !== 0) {
+    if (rentStartDate && monthlyCashFlow !== 0) {
       for (let m = 1; m <= monthsOfTenancy; m++) {
         const d = new Date(rentStartDate + "T00:00:00Z");
         d.setUTCMonth(d.getUTCMonth() + m);
-        irrCashFlows.push({ date: d.toISOString().slice(0, 10), amount: monthlyNetRent });
+        irrCashFlows.push({ date: d.toISOString().slice(0, 10), amount: monthlyCashFlow });
       }
     }
     for (const expense of metadata.property_expenses) {
@@ -448,9 +484,46 @@ export function AssetDetailView({
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
-  const sortedHistory = [...history].sort((a, b) =>
+  const sortedHistoryRaw = [...history].sort((a, b) =>
     a.recorded_date.localeCompare(b.recorded_date),
   );
+
+  // Off-plan: the auto-generated milestone points were stored as cash paid
+  // (installments + fees), which made the log/graph just mirror payments.
+  // Present them as the unit's estimated market value instead (contract
+  // price drifting toward today's valuation — see `estimateOffplanValueAt`),
+  // with Equity = that value minus what is still owed to the developer.
+  // Only auto-generated (`manual`) points on a milestone date are touched;
+  // anything else (DLD/ADREC/user valuations) is shown as recorded.
+  const offplanMilestoneDates = new Set(
+    metadata.payment_schedule.filter((m) => m.due_date).map((m) => m.due_date),
+  );
+  const offplanStartDate = [...offplanMilestoneDates].sort()[0];
+  const sortedHistory =
+    isRealEstate && metadata.is_offplan && offplanStartDate
+      ? sortedHistoryRaw.map((h) => {
+          if (
+            h.source !== "manual" ||
+            !offplanMilestoneDates.has(h.recorded_date) ||
+            h.recorded_date >= today
+          ) {
+            return h;
+          }
+          const contractPrice =
+            metadata.contract_price ?? metadata.purchasePrice ?? marketValuation;
+          const value = estimateOffplanValueAt({
+            contractPrice,
+            startDate: offplanStartDate,
+            currentMarketValue: marketValuation,
+            snapshotDate: today,
+            date: h.recorded_date,
+          });
+          const paid = metadata.payment_schedule
+            .filter((m) => m.status === "paid" && m.due_date <= h.recorded_date)
+            .reduce((sum, m) => sum + m.amount, 0);
+          return { ...h, value, net_equity: value - Math.max(0, contractPrice - paid) };
+        })
+      : sortedHistoryRaw;
 
   // Newest-first for the deletable "Valuation Log" table below the chart —
   // the point someone wants to erase (a bad refresh) is almost always the
@@ -511,6 +584,15 @@ export function AssetDetailView({
     const loanBalance = loanIsAmortizable
       ? getOutstandingPrincipalAt(loan, h.recorded_date)
       : null;
+    const rentalAtPoint = isRealEstate
+      ? cumulativeNetRentAt({
+          contracts: metadata.tenancy_contracts,
+          schedule: amortSchedule,
+          expenses: metadata.property_expenses,
+          date: h.recorded_date,
+          flatMonthlyInterest: monthlyInterest,
+        })
+      : null;
     return {
       date: h.recorded_date,
       value: h.value,
@@ -523,8 +605,49 @@ export function AssetDetailView({
       // alongside Equity so the two can be visually cross-checked
       // (Equity = Market Value − Loan Balance at every point).
       loanBalance,
+      // Total Return = Unrealized Gain + cumulative net rent up to this
+      // point (rent received − loan interest − logged expenses).
+      totalReturn:
+        totalCost != null && rentalAtPoint
+          ? h.value - totalCost + rentalAtPoint.net
+          : null,
     };
   });
+
+  // 20-year forward projection (Real Estate) — see `buildProjection`.
+  const growthEstimate = estimateAnnualGrowth(
+    chartData.map((p) => ({ date: p.date, value: p.value })),
+  );
+  const growthParsed = growthInput.trim() !== "" ? Number(growthInput) : Number.NaN;
+  const growthRate = Number.isFinite(growthParsed) ? growthParsed / 100 : growthEstimate.rate;
+  const annualCosts = isRealEstate
+    ? averageAnnualCosts(metadata, asset.purchase_date, today)
+    : 0;
+  const projection: ProjectionPoint[] =
+    isRealEstate && totalCost != null
+      ? buildProjection({
+          today,
+          marketValue: marketValuation,
+          growthRate,
+          totalCost,
+          loan,
+          schedule: amortSchedule,
+          annualRent: activeTenancyContract?.annual_rent ?? 0,
+          annualCosts,
+          baseCumulativeNetRent: rentalToDate.net,
+          hasLoan,
+        })
+      : [];
+  const showHistory = !isRealEstate || chartView !== "forward";
+  const showForward = isRealEstate && chartView !== "history";
+  const combinedChartData = [
+    ...(showHistory
+      ? chartData.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      : []),
+    ...(showForward
+      ? projection.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      : []),
+  ];
 
   const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -544,6 +667,48 @@ export function AssetDetailView({
     if (!iso) return null;
     const parsed = new Date(iso);
     return Number.isNaN(parsed.getTime()) ? null : lastPricedAtFormatter.format(parsed);
+  }
+
+  function formatChartTimestamp(ts: unknown): string {
+    const n = Number(ts);
+    return Number.isFinite(n) ? formatChartDate(new Date(n).toISOString().slice(0, 10)) : "";
+  }
+
+  function handleViewCertificate() {
+    setCertError(null);
+    if (!metadata.title_deed_number || !metadata.plot_id) {
+      setCertError(t("dld_certificate_missing_ids"));
+      return;
+    }
+    startCertTransition(async () => {
+      const result = await getDldCertificate(asset.id);
+      if (!result.ok) {
+        setCertError(result.error);
+        return;
+      }
+      setCertificate(result.certificate);
+      setCertOpen(true);
+    });
+  }
+
+  function downloadCertificate(c: DldCertificate) {
+    const lines = [
+      "DUBAI LAND DEPARTMENT — SMART VALUATION CERTIFICATE",
+      c.isMock ? "*** SAMPLE DATA — NOT AN OFFICIAL DOCUMENT ***" : "",
+      "",
+      `Reference:         ${c.reference}`,
+      `Property:          ${c.propertyName}`,
+      `Title Deed Number: ${c.titleDeedNumber}`,
+      `Plot ID:           ${c.plotId}`,
+      `Valuation:         ${c.currency} ${c.valuationAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `Valuation date:    ${c.valuationDate}`,
+    ];
+    const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${c.reference}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function formatChartDate(isoDate: unknown): string {
@@ -616,7 +781,13 @@ export function AssetDetailView({
         return;
       }
 
-      const persistResult = await refreshMarketPrice(asset.id, result.unitPrice, result.source);
+      const persistResult = await refreshMarketPrice(asset.id, result.unitPrice, result.source, {
+        currency: result.currency,
+        openPrice: result.openPrice,
+        previousClose: result.previousClose,
+        dayChangePct: result.dayChangePct,
+        exchange: result.exchange,
+      });
       if (persistResult?.error) {
         setMarketPriceError(persistResult.error);
         return;
@@ -1159,6 +1330,86 @@ export function AssetDetailView({
           </div>
         )}
 
+        {isRealEstate && metadata.emirate !== "abu_dhabi" && !metadata.is_offplan && (
+          <div className="space-y-2 rounded-md border border-border bg-muted p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <FileText className="size-4 text-muted-foreground" />
+                {t("dld_certificate")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleViewCertificate}
+                disabled={isCertPending}
+              >
+                {isCertPending ? t("dld_fetching") : t("dld_certificate_view")}
+              </Button>
+            </div>
+            <p className="text-xs font-medium text-foreground">
+              {t("dld_certificate_how_title")}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t("dld_certificate_how_live")} {t("dld_certificate_how_mock")}
+            </p>
+            {certError && (
+              <p className="text-sm text-destructive" role="alert">
+                {certError}
+              </p>
+            )}
+          </div>
+        )}
+
+        <Dialog open={certOpen} onOpenChange={setCertOpen}>
+          <DialogContent className="border-border bg-background sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">{t("dld_certificate")}</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                {certificate?.isMock
+                  ? t("dld_certificate_sample_badge")
+                  : t("dld_certificate_how_live")}
+              </DialogDescription>
+            </DialogHeader>
+            {certificate && (
+              <div className="space-y-3">
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                  <dt className="text-muted-foreground">{t("dld_certificate_reference")}</dt>
+                  <dd className="font-mono text-foreground">{certificate.reference}</dd>
+                  <dt className="text-muted-foreground">{t("dld_certificate_property")}</dt>
+                  <dd className="text-foreground">{certificate.propertyName}</dd>
+                  <dt className="text-muted-foreground">{t("dld_certificate_deed")}</dt>
+                  <dd className="text-foreground">{certificate.titleDeedNumber}</dd>
+                  <dt className="text-muted-foreground">{t("dld_certificate_plot")}</dt>
+                  <dd className="text-foreground">{certificate.plotId}</dd>
+                  <dt className="text-muted-foreground">{t("dld_certificate_amount")}</dt>
+                  <dd className="font-semibold text-foreground">
+                    {maskValue(currencyFormatter.format(certificate.valuationAmount))}
+                  </dd>
+                  <dt className="text-muted-foreground">{t("dld_certificate_date")}</dt>
+                  <dd className="text-foreground">{certificate.valuationDate}</dd>
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                  {certificate.isMock
+                    ? t("dld_certificate_how_mock")
+                    : t("dld_certificate_how_live")}
+                </p>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => certificate && downloadCertificate(certificate)}
+                disabled={!certificate}
+              >
+                <Download className="size-4" />
+                {t("dld_certificate_download")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {(adrecError || adrecMessage) && (
           <p
             className={
@@ -1240,20 +1491,50 @@ export function AssetDetailView({
 
           <TabsContent value="overview" className="space-y-6">
             <Card className="border-border bg-card">
-              <CardHeader>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="text-foreground">
                   {t("valuation_history")}
                 </CardTitle>
+                {isRealEstate && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {showForward && (
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="growth-rate" className="text-xs text-muted-foreground">
+                          {t("growth_assumption")}
+                        </Label>
+                        <Input
+                          id="growth-rate"
+                          type="number"
+                          step="0.1"
+                          className="h-8 w-20"
+                          placeholder={(growthEstimate.rate * 100).toFixed(1)}
+                          value={growthInput}
+                          onChange={(e) => setGrowthInput(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    <Tabs
+                      value={chartView}
+                      onValueChange={(next) => setChartView(next as typeof chartView)}
+                    >
+                      <TabsList>
+                        <TabsTrigger value="history">{t("chart_view_history")}</TabsTrigger>
+                        <TabsTrigger value="forward">{t("chart_view_forward")}</TabsTrigger>
+                        <TabsTrigger value="both">{t("chart_view_both")}</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                )}
               </CardHeader>
-              <CardContent>
-                {chartData.length === 0 ? (
+              <CardContent className="space-y-3">
+                {combinedChartData.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     {t("no_valuation_history")}
                   </p>
                 ) : (
-                  <div className="h-64 w-full">
+                  <div className={cn("w-full", isRealEstate ? "h-80" : "h-64")}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
+                      <AreaChart data={combinedChartData}>
                         <defs>
                           <linearGradient
                             id="valueGradient"
@@ -1279,10 +1560,13 @@ export function AssetDetailView({
                           stroke="var(--color-border)"
                         />
                         <XAxis
-                          dataKey="date"
+                          dataKey="ts"
+                          type="number"
+                          scale="time"
+                          domain={["dataMin", "dataMax"]}
                           stroke="var(--color-muted-foreground)"
                           fontSize={12}
-                          tickFormatter={formatChartDate}
+                          tickFormatter={formatChartTimestamp}
                         />
                         <YAxis
                           stroke="var(--color-muted-foreground)"
@@ -1298,52 +1582,138 @@ export function AssetDetailView({
                             border: "1px solid var(--color-border)",
                             color: "var(--color-foreground)",
                           }}
-                          labelFormatter={formatChartDate}
+                          labelFormatter={formatChartTimestamp}
                           formatter={(value) =>
                             maskValue(currencyFormatter.format(Number(value)))
                           }
                         />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          name="Market Value"
-                          stroke="var(--color-primary)"
-                          fill="url(#valueGradient)"
-                          strokeWidth={2}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="netEquity"
-                          name={t("equity")}
-                          stroke="var(--color-success)"
-                          fill="transparent"
-                          strokeWidth={2}
-                        />
-                        {isRealEstate && (
-                          <Area
-                            type="monotone"
-                            dataKey="netProfit"
-                            name={t("unrealized_gain")}
-                            stroke="var(--color-destructive)"
-                            fill="transparent"
-                            strokeWidth={2}
-                            strokeDasharray="4 4"
-                          />
+                        {isRealEstate && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                        {showHistory && (
+                          <>
+                            <Area
+                              type="monotone"
+                              dataKey="value"
+                              name="Market Value"
+                              stroke="var(--color-primary)"
+                              fill="url(#valueGradient)"
+                              strokeWidth={2}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="netEquity"
+                              name={t("equity")}
+                              stroke="var(--color-success)"
+                              fill="transparent"
+                              strokeWidth={2}
+                            />
+                            {isRealEstate && (
+                              <Area
+                                type="monotone"
+                                dataKey="netProfit"
+                                name={t("unrealized_gain")}
+                                stroke="var(--color-destructive)"
+                                fill="transparent"
+                                strokeWidth={2}
+                                strokeDasharray="4 4"
+                              />
+                            )}
+                            {loanIsAmortizable && (
+                              <Area
+                                type="monotone"
+                                dataKey="loanBalance"
+                                name={t("outstanding_loan_balance")}
+                                stroke="var(--color-chart-4)"
+                                fill="transparent"
+                                strokeWidth={2}
+                                strokeDasharray="2 3"
+                              />
+                            )}
+                            {isRealEstate && (
+                              <Area
+                                type="monotone"
+                                dataKey="totalReturn"
+                                name={t("total_return")}
+                                stroke="var(--color-chart-5)"
+                                fill="transparent"
+                                strokeWidth={2}
+                                strokeDasharray="8 2 2 2"
+                              />
+                            )}
+                          </>
                         )}
-                        {loanIsAmortizable && (
-                          <Area
-                            type="monotone"
-                            dataKey="loanBalance"
-                            name={t("outstanding_loan_balance")}
-                            stroke="var(--color-chart-4)"
-                            fill="transparent"
-                            strokeWidth={2}
-                            strokeDasharray="2 3"
-                          />
+                        {showForward && (
+                          <>
+                            <Area
+                              type="monotone"
+                              dataKey="pValue"
+                              name={`Market Value ${t("projected_suffix")}`}
+                              stroke="var(--color-primary)"
+                              strokeOpacity={0.7}
+                              fill="transparent"
+                              strokeWidth={2}
+                              strokeDasharray="10 6"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="pNetEquity"
+                              name={`${t("equity")} ${t("projected_suffix")}`}
+                              stroke="var(--color-success)"
+                              strokeOpacity={0.7}
+                              fill="transparent"
+                              strokeWidth={2}
+                              strokeDasharray="10 6"
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="pNetProfit"
+                              name={`${t("unrealized_gain")} ${t("projected_suffix")}`}
+                              stroke="var(--color-destructive)"
+                              strokeOpacity={0.7}
+                              fill="transparent"
+                              strokeWidth={2}
+                              strokeDasharray="10 6"
+                            />
+                            {hasLoan && (
+                              <Area
+                                type="monotone"
+                                dataKey="pLoanBalance"
+                                name={`${t("outstanding_loan_balance")} ${t("projected_suffix")}`}
+                                stroke="var(--color-chart-4)"
+                                strokeOpacity={0.7}
+                                fill="transparent"
+                                strokeWidth={2}
+                                strokeDasharray="10 6"
+                              />
+                            )}
+                            <Area
+                              type="monotone"
+                              dataKey="pTotalReturn"
+                              name={`${t("total_return")} ${t("projected_suffix")}`}
+                              stroke="var(--color-chart-5)"
+                              strokeOpacity={0.7}
+                              fill="transparent"
+                              strokeWidth={2}
+                              strokeDasharray="10 6"
+                            />
+                          </>
                         )}
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
+                )}
+                {showForward && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("projection_note", {
+                      rate: (growthRate * 100).toFixed(1),
+                      source:
+                        Number.isFinite(growthParsed)
+                          ? t("growth_assumption")
+                          : growthEstimate.source === "history"
+                            ? t("growth_source_history")
+                            : t("growth_source_assumed"),
+                      costs: currencyFormatter.format(annualCosts),
+                    })}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -2084,6 +2454,9 @@ export function AssetDetailView({
                     label={t("property_irr")}
                     value={propertyIrr != null ? `${(propertyIrr * 100).toFixed(2)}%` : "—"}
                   />
+                  <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
+                    {t("net_rent_hint")}
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -2112,6 +2485,7 @@ export function AssetDetailView({
                     purchase_date: asset.purchase_date,
                   }}
                 />
+                {isRealEstate && <PropertyDocumentDialog assetId={asset.id} />}
                 {!isRealEstate && !isVehicle && (
                   <CsvImportDialog
                     assetId={asset.id}

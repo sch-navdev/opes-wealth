@@ -941,6 +941,9 @@ export function AddInvestmentsDialog() {
                         title={result.message}
                       >
                         {t(`investments_result_${result.status}` as TranslationKey)}
+                        {result.priced === false &&
+                          result.status !== "error" &&
+                          ` · ${t("investments_unpriced")}`}
                       </TableCell>
                     </TableRow>
                   ))}

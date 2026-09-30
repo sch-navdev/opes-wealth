@@ -7,12 +7,9 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="flex items-center justify-between px-8 py-6">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Opes Wealth" width={32} height={32} priority />
-          <span className="text-lg font-semibold tracking-tight text-foreground">
-            Opes Wealth
-          </span>
-        </div>
+        <span className="text-lg font-semibold tracking-tight text-foreground">
+          Opes Wealth
+        </span>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <Button asChild variant="outline">

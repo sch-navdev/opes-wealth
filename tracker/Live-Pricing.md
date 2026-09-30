@@ -56,6 +56,12 @@ No new tables — same `assets.metadata` jsonb-per-category pattern as every oth
 1. ~~Apply migration `0010_market_pricing_sources.sql` to the live project~~ — done (see above).
 2. Get a free Finnhub API key (finnhub.io) and run `supabase secrets set FINNHUB_API_KEY=<key>` against the `lpaollycwokxejrihrap` project. Until then, adding a live price for an Equities asset returns a clear "not configured" error — Crypto works immediately, no key needed.
 
+## Finnhub Quotes for Brokerage Accounts (2026-09-30)
+
+- `refresh-market-price` Edge Function (equities path) now also returns **open price, previous close, day change %** and the listing's **exchange + trading currency** (Finnhub `/quote` + best-effort `/stock/profile2`); the old hard "USD only" block is gone (a non-USD quote is converted into the asset's currency server-side). A 403 (free tier doesn't cover the listing — e.g. Euronext tickers) is reported as `invalid_symbol`. **Needs redeploying** (`supabase functions deploy refresh-market-price`) and the `FINNHUB_API_KEY` secret; not deployed/run from here.
+- `actions.ts`: shared `persistQuote()` (convert → `current_value = qty × price` → metadata `last_unit_price`/open/previous close/exchange → today's `asset_history` upsert) now backs both the single-asset `refreshMarketPrice` and the new `refreshBrokerageQuotes(assetIds?)` (sequential, per-ticker errors never zero a holding). `lib/equities.ts` gained `normalizeExchange`/`computeHoldingMetrics`. **Free-tier reality**: only US listings are covered, so EURONEXT holdings will report "not covered" and stay valued at cost until a paid plan or another provider.
+- See [[Broker-Trade-Import|Broker Trade Import]] for the import-side fix and [[Portfolio-Dashboard|Portfolio Dashboard]] for the table.
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — Step 9's other half (Real Estate/ADREC-DARI, stubbed)
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — existing `fx.ts` pattern for external rate data; also the closest precedent for a category-specific metadata module
