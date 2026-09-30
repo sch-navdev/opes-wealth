@@ -1667,7 +1667,9 @@ export async function importBrokerTrades(
         (sum, t) => sum + (t.side === "buy" ? t.quantity : -t.quantity),
         0,
       );
-      const newQuantity = existing.quantity + quantityDelta;
+      // A position that's now fully sold is kept (quantity 0, value 0) so its
+      // history and dividends stay in the charts; never let it go negative.
+      const newQuantity = Math.max(0, existing.quantity + quantityDelta);
 
       const allTrades = [...existingMetadata.trades, ...newTrades];
       const unitPrice = existingMetadata.last_unit_price ?? estimateCostBasisUnitPrice(allTrades);
@@ -1718,25 +1720,27 @@ export async function importBrokerTrades(
         );
       }
 
-      touched.push({
-        id: existing.id,
-        ticker: holding.ticker,
-        currency: holding.currency,
-        quantity: newQuantity,
-        metadata: nextMetadata,
-      });
-      results.push({ ticker: holding.ticker, status: "updated", priced: false });
-    } else {
-      // A fully-closed position (net quantity 0) has nothing to hold or
-      // value — creating it would just add a zero-value row.
-      if (!(holding.netQuantity > 0)) {
-        results.push({
+      // Only open positions need a live price; a closed one has no value to price.
+      if (newQuantity > 0) {
+        touched.push({
+          id: existing.id,
           ticker: holding.ticker,
-          status: "unchanged",
-          message: "Closed position — not imported.",
+          currency: holding.currency,
+          quantity: newQuantity,
+          metadata: nextMetadata,
         });
-        continue;
       }
+      results.push({
+        ticker: holding.ticker,
+        status: "updated",
+        ...(newQuantity > 0 ? { priced: false } : { message: "Closed position." }),
+      });
+    } else {
+      // A fully-closed position (net quantity ≤ 0) is imported too: quantity 0
+      // and value 0 today, but its trade ledger, invested-capital history
+      // (first buy → final sell) and lifetime dividends are kept so the
+      // portfolio charts and income totals stay historically accurate.
+      const isClosed = !(holding.netQuantity > 0);
 
       const trades: EquityTrade[] = holding.trades.map((t) => ({
         id: tradeId(t),
@@ -1757,7 +1761,7 @@ export async function importBrokerTrades(
         b.tradeDate.localeCompare(a.tradeDate),
       )[0]?.price;
       const unitPrice = estimateCostBasisUnitPrice(trades) || latestTradePrice || 0;
-      const currentValue = Math.max(0, holding.netQuantity) * unitPrice;
+      const currentValue = isClosed ? 0 : Math.max(0, holding.netQuantity) * unitPrice;
       const openDate =
         trades
           .filter((t) => t.side === "buy")
@@ -1783,7 +1787,7 @@ export async function importBrokerTrades(
           profile_id: user.id,
           category_id: equitiesCategory.id,
           name: holding.instrumentName,
-          quantity: holding.netQuantity,
+          quantity: Math.max(0, holding.netQuantity),
           current_value: currentValue,
           currency: holding.currency,
           ticker_symbol: holding.ticker,
@@ -1815,14 +1819,22 @@ export async function importBrokerTrades(
         { onConflict: "asset_id,recorded_date" },
       );
 
-      touched.push({
-        id: inserted.id,
+      if (!isClosed) {
+        touched.push({
+          id: inserted.id,
+          ticker: holding.ticker,
+          currency: holding.currency,
+          quantity: holding.netQuantity,
+          metadata,
+        });
+      }
+      results.push({
         ticker: holding.ticker,
-        currency: holding.currency,
-        quantity: holding.netQuantity,
-        metadata,
+        status: "created",
+        ...(isClosed
+          ? { message: "Closed position — history and dividends only." }
+          : { priced: false }),
       });
-      results.push({ ticker: holding.ticker, status: "created", priced: false });
     }
   }
 

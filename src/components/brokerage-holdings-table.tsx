@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -23,7 +23,9 @@ import {
   accountDisplayName,
   computeHoldingMetrics,
   holdingDisplayName,
+  isClosedPosition,
   parseEquityMetadata,
+  summarizeClosedPosition,
 } from "@/lib/equities";
 import { convertAmount } from "@/lib/fx";
 import { cn } from "@/lib/utils";
@@ -78,6 +80,7 @@ export function BrokerageHoldingsTable({
   const [isRefreshing, startRefresh] = useTransition();
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
   const rows = useMemo(
     () =>
@@ -100,16 +103,53 @@ export function BrokerageHoldingsTable({
           baseGain: metrics.capitalGain != null ? toBase(metrics.capitalGain) : null,
           baseCost: metrics.cost != null ? toBase(metrics.cost) : null,
           baseIncome: toBase(metrics.income),
+          closed: isClosedPosition(asset.quantity),
+          // Closed positions: lifetime figures from the trade ledger + dividends.
+          closedSummary: isClosedPosition(asset.quantity)
+            ? summarizeClosedPosition(metadata.trades, metrics.income)
+            : null,
         };
       }),
     [assets, displayCurrency, rates],
   );
 
+  // Open positions drive the main table and its totals; fully-sold ones are
+  // kept (quantity 0, value 0) for history and dividends and listed below.
+  const activeRows = useMemo(() => rows.filter((r) => !r.closed), [rows]);
+  const closedRows = useMemo(
+    () =>
+      rows
+        .filter((r) => r.closed)
+        .sort((a, b) => (b.closedSummary?.closed ?? "").localeCompare(a.closedSummary?.closed ?? "")),
+    [rows],
+  );
+  const closedIds = closedRows.map((r) => r.asset.id);
+  const closedTotals = useMemo(() => {
+    const toBase = (n: number, cur: string) => convertAmount(n, cur, displayCurrency, rates);
+    let invested = 0;
+    let proceeds = 0;
+    let income = 0;
+    for (const r of closedRows) {
+      const s = r.closedSummary!;
+      invested += toBase(s.invested, r.asset.currency);
+      proceeds += toBase(s.proceeds, r.asset.currency);
+      income += toBase(s.income, r.asset.currency);
+    }
+    const realized = proceeds - invested;
+    return {
+      invested,
+      proceeds,
+      realized,
+      income,
+      returnPct: invested > 0 ? ((realized + income) / invested) * 100 : null,
+    };
+  }, [closedRows, displayCurrency, rates]);
+
   // Hierarchy: Brokerage Account (the category header above) → account
   // ("Saxobank Acc. # 10164571") → exchange → holding.
   const accountGroups = useMemo(() => {
     const byAccount = new Map<string | null, typeof rows>();
-    for (const row of rows) {
+    for (const row of activeRows) {
       if (!byAccount.has(row.account)) byAccount.set(row.account, []);
       byAccount.get(row.account)!.push(row);
     }
@@ -132,7 +172,7 @@ export function BrokerageHoldingsTable({
             })),
         };
       });
-  }, [rows]);
+  }, [activeRows]);
   const showAccountHeaders = accountGroups.some((g) => g.account !== null);
 
   const summarize = (list: typeof rows) => {
@@ -148,7 +188,7 @@ export function BrokerageHoldingsTable({
     };
   };
 
-  const allIds = assets.map((a) => a.id);
+  const allIds = activeRows.map((r) => r.asset.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds?.has(id));
   const selectable = Boolean(selectedIds && onToggleAsset && onToggleAll);
   const columnCount = selectable ? 9 : 8;
@@ -186,7 +226,7 @@ export function BrokerageHoldingsTable({
     });
   }
 
-  const total = summarize(rows);
+  const total = summarize(activeRows);
   const money = (n: number) => maskValue(formatMoney(n, displayCurrency));
   const pct = (n: number | null) =>
     n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
@@ -220,6 +260,9 @@ export function BrokerageHoldingsTable({
         </p>
       )}
 
+      {activeRows.length === 0 ? (
+        <p className="px-4 text-sm text-muted-foreground">{t("brokerage_no_open")}</p>
+      ) : (
       <div role="region" tabIndex={0} className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -404,6 +447,146 @@ export function BrokerageHoldingsTable({
           </TableFooter>
         </Table>
       </div>
+      )}
+
+      {closedRows.length > 0 && (
+        <div className="border-t border-border">
+          <button
+            type="button"
+            onClick={() => setShowClosed((v) => !v)}
+            aria-expanded={showClosed}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              {t("brokerage_closed_positions")}
+              <span className="text-xs font-normal text-muted-foreground">
+                ({closedRows.length})
+              </span>
+            </span>
+            <span className="flex items-center gap-3">
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                {t("brokerage_closed_note")}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "size-4 text-muted-foreground transition-transform",
+                  showClosed && "rotate-180",
+                )}
+              />
+            </span>
+          </button>
+          {showClosed && (
+            <div role="region" tabIndex={0} className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {selectable && (
+                      <TableHead className="w-8">
+                        <Checkbox
+                          checked={closedIds.length > 0 && closedIds.every((id) => selectedIds?.has(id))}
+                          onCheckedChange={(c) => onToggleAll!(closedIds, c === true)}
+                          aria-label={t("select_all")}
+                        />
+                      </TableHead>
+                    )}
+                    <TableHead className="text-muted-foreground">{t("brokerage_holding")}</TableHead>
+                    <TableHead className="text-muted-foreground">{t("brokerage_opened_col")}</TableHead>
+                    <TableHead className="text-muted-foreground">{t("brokerage_closed_col")}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t("brokerage_invested")}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t("brokerage_proceeds")}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t("brokerage_realized")}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t("brokerage_income")}</TableHead>
+                    <TableHead className="text-muted-foreground">{t("brokerage_currency")}</TableHead>
+                    <TableHead className="text-right text-muted-foreground">{t("brokerage_return")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {closedRows.map(({ asset, metadata, closedSummary }) => {
+                    const s = closedSummary!;
+                    const cur = (n: number) => maskValue(formatMoney(n, asset.currency));
+                    return (
+                      <TableRow key={asset.id}>
+                        {selectable && (
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds!.has(asset.id)}
+                              onCheckedChange={(c) => onToggleAsset!(asset.id, c === true)}
+                              aria-label={asset.name}
+                            />
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Avatar size="sm" className="rounded-md">
+                              <AvatarFallback className="rounded-md">
+                                <CategoryIcon name="Equities" className="size-3.5" />
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <Link
+                                href={`/dashboard/assets/${asset.id}`}
+                                className="font-medium text-foreground hover:underline"
+                              >
+                                {holdingDisplayName(asset.name, metadata, asset.ticker_symbol)}
+                              </Link>
+                              <p className="text-xs text-muted-foreground">
+                                {[asset.ticker_symbol, metadata.isin].filter(Boolean).join(" · ") || "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{s.opened ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.closed ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums text-foreground">
+                          {cur(s.invested)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-foreground">
+                          {cur(s.proceeds)}
+                        </TableCell>
+                        <TableCell className={cn("text-right tabular-nums", signedClass(s.realized))}>
+                          {cur(s.realized)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {s.income ? cur(s.income) : "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{asset.currency}</TableCell>
+                        <TableCell className={cn("text-right tabular-nums", signedClass(s.returnPct))}>
+                          {pct(s.returnPct)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={selectable ? 4 : 3} className="font-medium text-foreground">
+                      {t("breakdown_total")}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground">
+                      {money(closedTotals.invested)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground">
+                      {money(closedTotals.proceeds)}
+                    </TableCell>
+                    <TableCell className={cn("text-right tabular-nums", signedClass(closedTotals.realized))}>
+                      {money(closedTotals.realized)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {closedTotals.income ? money(closedTotals.income) : "—"}
+                    </TableCell>
+                    <TableCell />
+                    <TableCell
+                      className={cn("text-right tabular-nums", signedClass(closedTotals.returnPct))}
+                    >
+                      {pct(closedTotals.returnPct)}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

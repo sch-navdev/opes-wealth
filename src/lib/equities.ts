@@ -92,6 +92,36 @@ export function buildInvestedCapitalSeries(
   return Array.from(byDate, ([date, value]) => ({ date, value }));
 }
 
+/** True once a holding has been fully sold (kept only for history and dividends). */
+export function isClosedPosition(quantity: number): boolean {
+  return !(quantity > 0);
+}
+
+/**
+ * Lifetime summary of a fully-closed position, from its trade ledger and
+ * dividends: when it was opened/closed, what was put in and taken out, the
+ * realized result (proceeds − invested — exact for a fully closed position,
+ * since every share bought has been sold) and the total return including
+ * dividends. All in the holding's own currency.
+ */
+export function summarizeClosedPosition(trades: EquityTrade[], income: number) {
+  const buys = trades.filter((t) => t.side === "buy");
+  const sells = trades.filter((t) => t.side === "sell");
+  const invested = buys.reduce((s, t) => s + tradeCost(t), 0);
+  const proceeds = sells.reduce((s, t) => s + tradeCost(t), 0);
+  const dates = (list: EquityTrade[]) => list.map((t) => t.tradeDate).sort();
+  const realized = proceeds - invested;
+  return {
+    opened: dates(buys)[0] ?? dates(trades)[0] ?? null,
+    closed: dates(sells).at(-1) ?? dates(trades).at(-1) ?? null,
+    invested,
+    proceeds,
+    realized,
+    income,
+    returnPct: invested > 0 ? ((realized + income) / invested) * 100 : null,
+  };
+}
+
 /**
  * What to show as a holding's name. Assets imported before names were
  * cleaned up are called "Brokerage Account / Saxobank Acc. # 123 / UBIP" (an

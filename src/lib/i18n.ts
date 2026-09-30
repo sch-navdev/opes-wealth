@@ -927,6 +927,18 @@ const dictionary = {
     en: "Cumulative income received ÷ current cost basis",
     fr: "Revenus cumulés perçus ÷ prix de revient actuel",
   },
+  brokerage_closed_positions: { en: "Closed positions", fr: "Positions clôturées" },
+  brokerage_closed_note: {
+    en: "Fully sold — kept for history and dividends",
+    fr: "Entièrement vendues — conservées pour l'historique et les dividendes",
+  },
+  brokerage_closed_count: { en: "{n} closed", fr: "{n} clôturées" },
+  brokerage_no_open: { en: "No open positions.", fr: "Aucune position ouverte." },
+  brokerage_opened_col: { en: "Opened", fr: "Ouverture" },
+  brokerage_closed_col: { en: "Closed", fr: "Clôture" },
+  brokerage_invested: { en: "Invested", fr: "Investi" },
+  brokerage_proceeds: { en: "Proceeds", fr: "Produit de vente" },
+  brokerage_realized: { en: "Realized", fr: "Réalisé" },
   brokerage_other_holdings: { en: "Other holdings", fr: "Autres positions" },
   market_price_error_timeout: {
     en: "The pricing provider took too long to respond. Try again.",

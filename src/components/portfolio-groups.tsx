@@ -234,7 +234,9 @@ export function PortfolioGroups({
                   {label}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  ({group.assets.length})
+                  {group.name === "Equities" && group.assets.some((a) => !(a.quantity > 0))
+                    ? `(${group.assets.filter((a) => a.quantity > 0).length} · ${t("brokerage_closed_count", { n: group.assets.filter((a) => !(a.quantity > 0)).length })})`
+                    : `(${group.assets.length})`}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-3">
