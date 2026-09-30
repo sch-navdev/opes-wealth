@@ -21,7 +21,7 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 ## What's still actually needed before/at deployment (not done this session)
 - **The Vercel deployment itself.** Nothing was pushed or deployed to Vercel this session — no deploy credentials/access were used, and doing so is a shared-infrastructure action that needs Steve's explicit go-ahead regardless of tooling.
 - **`NEXT_PUBLIC_SITE_URL`** must be set manually in the Vercel dashboard before the first production deploy — flagged repeatedly since the auth-email-links work (see [[Authentication-Security|Authentication & Security]]); `src/app/auth/actions.ts`'s `getSiteURL()` falls back to the real production domain when this is unset and `VERCEL_URL` is present, but setting it explicitly is still the intended final state.
-- **`FINNHUB_API_KEY`** Supabase secret, for live Equities pricing to return real data (Crypto already works without it) — see [[Live-Pricing|Live Pricing]].
+- ~~**`FINNHUB_API_KEY`** Supabase secret~~ — **Complete (2026-09-30)**: set via the Supabase CLI (now installed and linked to the project); `refresh-market-price` (v5) and `adrec-pricing` (v2) are deployed and ACTIVE. See [[Live-Pricing|Live Pricing]] and [[Market-Data-Integration|Market Data Integration]].
 - Production Supabase credentials/env vars in Vercel, and confirming every migration under `supabase/migrations/` (through `0010`) is applied to whichever Supabase project the production deployment points at.
 
 ## Environment Hardening: `NEXT_PUBLIC_SITE_URL` (2026-09-30)
@@ -33,5 +33,5 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
-- [[Live-Pricing|Live Pricing]] — the `FINNHUB_API_KEY` secret still needed
+- [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)
 - [[Authentication-Security|Authentication & Security]] — `NEXT_PUBLIC_SITE_URL`

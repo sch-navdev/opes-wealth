@@ -54,8 +54,9 @@ High-net-worth individuals
 - [x] Step 8: CSV bank uploads — backend (parser, validation, `importBankCsvHistory`) + dropzone/column-mapping upload UI, verified light/dark + EN/FR — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]
-  - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) is real code gated on a `FINNHUB_API_KEY` secret Steve still needs to set. The required schema migration has been applied to the live project — [[Live-Pricing|Live Pricing]]
+  - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) `FINNHUB_API_KEY` is now set and the upgraded `refresh-market-price` function is deployed (2026-09-30; free tier = US tickers only). The required schema migration has been applied to the live project — [[Live-Pricing|Live Pricing]]
 - [ ] Step 10: Deployment (Vercel)
+  - [x] Environment & backend deployment (2026-09-30): Supabase CLI installed and linked, `FINNHUB_API_KEY` secret set, `refresh-market-price` + `adrec-pricing` Edge Functions deployed and active, mock DLD data purged from the live DB and mock DLD/ADREC results made read-only — [[Market-Data-Integration|Market Data Integration]], [[Deployment|Deployment]]
   - [x] Pre-deployment hardening — `tsc --noEmit` and `eslint .` fully clean (zero errors/warnings project-wide), `npm run build` succeeds with zero errors across all 11 routes — [[Deployment|Deployment]]
   - [ ] Actual deployment to Vercel — not done this session (no deploy credentials used; this is a shared-infrastructure action needing Steve's explicit go-ahead) — [[Deployment|Deployment]]
 
