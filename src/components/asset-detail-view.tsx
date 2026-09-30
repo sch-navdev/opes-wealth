@@ -84,6 +84,8 @@ import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import {
+  getAdrecLiveValuation,
+  type AdrecLiveValuationResult,
   refreshAdrecValuation,
   refreshDldValuation,
   refreshVehicleValuation,
@@ -263,6 +265,8 @@ export function AssetDetailView({
   const [adrecError, setAdrecError] = useState<string | null>(null);
   const [adrecMessage, setAdrecMessage] = useState<string | null>(null);
   const [isAdrecPending, startAdrecTransition] = useTransition();
+  const [liveValuation, setLiveValuation] = useState<AdrecLiveValuationResult | null>(null);
+  const [isLivePending, startLiveTransition] = useTransition();
   const [marketPriceError, setMarketPriceError] = useState<string | null>(null);
   const [marketPriceMessage, setMarketPriceMessage] = useState<string | null>(null);
   const [isMarketPricePending, startMarketPriceTransition] = useTransition();
@@ -548,6 +552,12 @@ export function AssetDetailView({
     return Number.isNaN(parsed.getTime())
       ? isoDate
       : axisDateFormatter.format(parsed);
+  }
+
+  function handleFetchLiveValuation() {
+    startLiveTransition(async () => {
+      setLiveValuation(await getAdrecLiveValuation(asset.id));
+    });
   }
 
   function handleRefreshFromAdrec() {
@@ -1105,6 +1115,49 @@ export function AssetDetailView({
             </div>
           </CardContent>
         </Card>
+
+        {isRealEstate && metadata.emirate === "abu_dhabi" && !metadata.is_offplan && (
+          <div className="space-y-2 rounded-md border border-border bg-muted p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">
+                {t("adrec_live_valuation")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleFetchLiveValuation}
+                disabled={isLivePending}
+              >
+                <CloudDownload className={cn("size-4", isLivePending && "animate-pulse")} />
+                {isLivePending ? t("adrec_fetching") : t("adrec_live_valuation_fetch")}
+              </Button>
+            </div>
+            {liveValuation?.ok === false && (
+              <p className="text-sm text-destructive" role="alert">
+                {t(
+                  ADREC_ERROR_KEYS[liveValuation.code.toUpperCase()] ??
+                    "adrec_error_network_error",
+                )}
+              </p>
+            )}
+            {liveValuation?.ok === true && (
+              <div className="space-y-1">
+                <p className="text-2xl font-semibold text-foreground">
+                  {maskValue(currencyFormatter.format(liveValuation.data.market_valuation))}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {t("adrec_live_valuation_meta", {
+                    date: liveValuation.data.valuation_date,
+                    ref: liveValuation.data.certificate_id,
+                  })}
+                  {liveValuation.isMock && ` · ${t("adrec_live_valuation_mock")}`}
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">{t("adrec_live_valuation_note")}</p>
+          </div>
+        )}
 
         {(adrecError || adrecMessage) && (
           <p

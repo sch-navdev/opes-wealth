@@ -30,7 +30,9 @@ import {
 import {
   getOffPlanProjectTracking,
   getReadyBuiltValuation,
+  fetchAdrecValuation,
   type AdrecErrorCode,
+  type AdrecValuationData,
 } from "@/lib/services/adrec-client";
 import type { AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
@@ -657,6 +659,59 @@ export async function refreshAdrecValuation(id: string): Promise<RefreshAdrecVal
     certificateId: result.certificateId,
     unrealizedGainAmount: unrealizedGain.amount,
   };
+}
+
+export type AdrecLiveValuationResult =
+  | { ok: true; isMock: boolean; data: AdrecValuationData }
+  | { ok: false; code: string; error: string };
+
+/**
+ * Display-only live ADREC valuation for a ready-built Abu Dhabi property —
+ * calls `fetchAdrecValuation` (the `adrec-pricing` Edge Function) with the
+ * asset's saved ADREC identifiers and returns the result **without
+ * persisting anything**; `refreshAdrecValuation` above is the action that
+ * writes a valuation into the asset/history.
+ */
+export async function getAdrecLiveValuation(id: string): Promise<AdrecLiveValuationResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, code: "unauthorized", error: "You must be signed in to fetch a valuation." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+
+  if (!asset || asset.asset_categories?.name !== "Real Estate") {
+    return { ok: false, code: "not_found", error: "Real Estate asset not found." };
+  }
+
+  const metadata = parseRealEstateMetadata(asset.metadata);
+  if (metadata.emirate !== "abu_dhabi" || metadata.is_offplan) {
+    return {
+      ok: false,
+      code: "invalid_request",
+      error: "Live ADREC valuation is only available for ready-built Abu Dhabi properties.",
+    };
+  }
+
+  return fetchAdrecValuation({
+    plotNumber: metadata.adrec_plot_number,
+    unitId: metadata.adrec_unit_id,
+    titleDeedNumber: metadata.adrec_title_deed,
+  });
 }
 
 /**

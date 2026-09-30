@@ -24,6 +24,9 @@
  * request function needs to change once real API access exists.
  */
 
+import { createClient } from "@/utils/supabase/server";
+import type { RealEstateMetadata } from "@/lib/real-estate";
+
 export type AdrecErrorCode =
   | "INVALID_REQUEST"
   | "INVALID_PLOT_NUMBER"
@@ -337,6 +340,76 @@ export async function getRentalTracking(
       municipality_number: request.municipalityNumber,
     }),
   );
+}
+
+// --- Live valuation via the `adrec-pricing` Edge Function ---------------
+
+export type AdrecValuationRequest = ReadyBuiltValuationRequest;
+
+/** Already mapped onto `RealEstateMetadata` (`market_valuation`) — the function returns these names directly, so callers never translate provider field names. `valuation_date`/`certificate_id` are provenance only. */
+export type AdrecValuationData = Pick<RealEstateMetadata, "market_valuation"> & {
+  market_valuation: number;
+  valuation_date: string;
+  certificate_id: string;
+};
+
+export type AdrecValuationResult =
+  | { ok: true; isMock: boolean; data: AdrecValuationData }
+  | { ok: false; code: string; error: string };
+
+/**
+ * Calls the `adrec-pricing` Edge Function (`supabase/functions/adrec-pricing`),
+ * which holds the ADREC credentials and owns the `MOCK_MODE` fallback, and
+ * normalizes every outcome — transport error, in-body `{ok:false}`, malformed
+ * success — into the standard `{ok, isMock, data}` / `{ok:false, code, error}`
+ * tuple. Codes here are the function's lowercase ones (`not_found`,
+ * `timeout`, …), unlike this module's other SCREAMING_SNAKE `AdrecErrorCode`s.
+ * Runs as the signed-in user (server Supabase client forwards their JWT).
+ */
+export async function fetchAdrecValuation(
+  request: AdrecValuationRequest,
+): Promise<AdrecValuationResult> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.functions.invoke("adrec-pricing", {
+    body: request,
+  });
+
+  if (error) {
+    return { ok: false, code: "network_error", error: error.message };
+  }
+
+  if (data?.ok === false) {
+    return {
+      ok: false,
+      code: typeof data.code === "string" ? data.code : "network_error",
+      error: typeof data.error === "string" ? data.error : "The valuation request failed.",
+    };
+  }
+
+  const d = data?.data;
+  if (
+    data?.ok !== true ||
+    typeof d?.market_valuation !== "number" ||
+    typeof d?.valuation_date !== "string" ||
+    typeof d?.certificate_id !== "string"
+  ) {
+    return {
+      ok: false,
+      code: "invalid_response",
+      error: "Received an unexpected response from the valuation service.",
+    };
+  }
+
+  return {
+    ok: true,
+    isMock: data.isMock === true,
+    data: {
+      market_valuation: d.market_valuation,
+      valuation_date: d.valuation_date,
+      certificate_id: d.certificate_id,
+    },
+  };
 }
 
 // --- Small deterministic hash for mock data (no external dependency) ----

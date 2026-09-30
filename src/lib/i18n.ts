@@ -395,6 +395,17 @@ const dictionary = {
     en: "Project status updated — {percent}% complete.",
     fr: "Statut du projet mis à jour — {percent} % terminé.",
   },
+  adrec_live_valuation: { en: "Live ADREC Valuation", fr: "Valorisation ADREC en direct" },
+  adrec_live_valuation_fetch: { en: "Check Live Valuation", fr: "Vérifier la valorisation" },
+  adrec_live_valuation_meta: {
+    en: "As of {date} · certificate {ref}",
+    fr: "Au {date} · certificat {ref}",
+  },
+  adrec_live_valuation_mock: { en: "sample data", fr: "données d'exemple" },
+  adrec_live_valuation_note: {
+    en: "Display only — does not change the saved valuation. Use Refresh from ADREC / DARI to save it.",
+    fr: "Affichage uniquement — ne modifie pas la valorisation enregistrée. Utilisez Actualiser via ADREC / DARI pour l'enregistrer.",
+  },
   adrec_project_status: { en: "Project Status", fr: "Statut du projet" },
   adrec_construction_stage: { en: "Construction Stage", fr: "Étape de construction" },
   adrec_error_invalid_request: {
