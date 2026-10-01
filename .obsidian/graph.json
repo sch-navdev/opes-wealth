@@ -1,0 +1,93 @@
+{
+  "collapse-filter": false,
+  "search": "-path:CLAUDE.md -path:README.md -path:AGENTS.md",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "path:\"PROJECT_TRACKER.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 13015868
+      }
+    },
+    {
+      "query": "path:\"tracker/Design-System.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 9133302
+      }
+    },
+    {
+      "query": "path:\"tracker/Authentication-Security.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 15680580
+      }
+    },
+    {
+      "query": "path:\"tracker/Database-Schema.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 3900150
+      }
+    },
+    {
+      "query": "path:\"tracker/Portfolio-Dashboard.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 1096065
+      }
+    },
+    {
+      "query": "path:\"tracker/Profile-Settings.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 15485081
+      }
+    },
+    {
+      "query": "path:\"tracker/Real-Estate-Multi-Currency.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 16096779
+      }
+    },
+    {
+      "query": "path:\"tracker/Codebase-Audits.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 1357990
+      }
+    },
+    {
+      "query": "path:\"tracker/Changelog.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 6583435
+      }
+    },
+    {
+      "query": "path:\"tracker/CSV-Bank-Uploads.md\" OR path:\"tracker/Live-Pricing.md\" OR path:\"tracker/Deployment.md\"",
+      "color": {
+        "a": 1,
+        "rgb": 7041664
+      }
+    }
+  ],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1.3,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 12,
+  "linkStrength": 1,
+  "linkDistance": 200,
+  "scale": 1.4769860980686471,
+  "close": false
+}
