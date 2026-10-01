@@ -30,6 +30,7 @@ import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { buildAssetInvested } from "@/lib/invested-capital";
 import { buildDccPortfolio } from "@/lib/dcc";
 import { ExportReportsCard } from "@/components/export-reports-card";
+import { getBankSyncMode } from "@/lib/banking/altareq";
 import {
   buildVehicleHistoryFromPurchase,
   parseVehicleMetadata,
@@ -193,11 +194,6 @@ export default async function DashboardPage({
     user.email?.[0]?.toUpperCase() ??
     "?";
 
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: displayCurrency,
-  });
-
   // "Total Assets" uses each asset's gross value and "Total Liabilities"
   // aggregates every debt (standalone liability rows, plus Real Estate's
   // linked-loan/off-plan balances via `lib/liabilities.ts`) — see that file's
@@ -311,6 +307,34 @@ export default async function DashboardPage({
   // Cash & bank accounts for the dashboard card: balance in the account's own
   // currency (the CSV import reconciles against it) and in the Base Currency,
   // plus the date of the newest balance on record.
+  // Open Finance links for the Cash accounts (non-secret columns only — the
+  // token columns are not selectable by the browser role, see migration 0020).
+  // If 0020 isn't applied yet this simply returns nothing.
+  const { data: bankLinks } = await supabase
+    .from("bank_account_links")
+    .select(
+      "asset_id, connection_id, last_synced_at, last_sync_status, last_sync_error, bank_connections(institution_name, is_sandbox, status, last_synced_at)",
+    )
+    .eq("profile_id", user.id)
+    // Sandbox links have no asset (migration 0020) — they live only in the banking view.
+    .eq("is_sandbox", false)
+    .returns<
+      {
+        asset_id: string;
+        connection_id: string;
+        last_synced_at: string | null;
+        last_sync_status: "ok" | "error" | null;
+        last_sync_error: string | null;
+        bank_connections: {
+          institution_name: string;
+          is_sandbox: boolean;
+          status: string;
+          last_synced_at: string | null;
+        } | null;
+      }[]
+    >();
+  const bankByAsset = new Map((bankLinks ?? []).map((l) => [l.asset_id, l]));
+
   const cashAccounts: CashAccount[] = (assets ?? [])
     .filter((a) => a.asset_categories?.name === "Cash" && !a.is_liability)
     .map((a) => ({
@@ -323,6 +347,19 @@ export default async function DashboardPage({
         (allHistory ?? [])
           .filter((h) => h.asset_id === a.id)
           .reduce<string | null>((max, h) => (!max || h.recorded_date > max ? h.recorded_date : max), null),
+      bank: (() => {
+        const link = bankByAsset.get(a.id);
+        if (!link?.bank_connections) return undefined;
+        return {
+          connectionId: link.connection_id,
+          institutionName: link.bank_connections.institution_name,
+          isSandbox: link.bank_connections.is_sandbox,
+          connectionStatus: link.bank_connections.status,
+          lastSyncedAt: link.last_synced_at ?? link.bank_connections.last_synced_at,
+          lastSyncStatus: link.last_sync_status,
+          lastSyncError: link.last_sync_error,
+        };
+      })(),
     }));
 
   return (
@@ -344,7 +381,7 @@ export default async function DashboardPage({
         </div>
         <div className="flex items-center gap-4">
           <DashboardHeaderControls
-            totalNetWorthFormatted={currencyFormatter.format(totalNetWorth)}
+            totalNetWorth={totalNetWorth}
             baseCurrency={displayCurrency}
           />
         </div>
@@ -352,13 +389,11 @@ export default async function DashboardPage({
 
       <main className="w-full space-y-6 px-4 py-10 sm:px-6 lg:px-8">
         <DashboardMetricCards
-          netWorthFormatted={currencyFormatter.format(totalNetWorth)}
-          assetsFormatted={currencyFormatter.format(totalAssetsValue)}
-          liabilitiesFormatted={currencyFormatter.format(totalLiabilitiesValue)}
+          netWorth={totalNetWorth}
+          assets={totalAssetsValue}
+          liabilities={totalLiabilitiesValue}
           hasLiabilities={totalLiabilitiesValue > 0}
-          unrealizedGainFormatted={currencyFormatter.format(
-            Math.abs(totalUnrealizedGain),
-          )}
+          unrealizedGain={Math.abs(totalUnrealizedGain)}
           unrealizedGainSign={
             totalUnrealizedGain > 0 ? "+" : totalUnrealizedGain < 0 ? "-" : null
           }
@@ -370,6 +405,7 @@ export default async function DashboardPage({
           accounts={cashAccounts}
           categories={categories ?? []}
           baseCurrency={displayCurrency}
+          bankSyncMode={getBankSyncMode()}
         />
 
         <DashboardAnalytics

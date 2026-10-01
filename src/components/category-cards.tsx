@@ -27,10 +27,10 @@ export function CategoryCards({
   selected: string | null;
   onSelect: (category: string) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const [sort, setSort] = useState<"share" | "alpha">("share");
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency });
+  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
 
   const byCategory = new Map<string, { count: number; total: number }>();
   for (const asset of assets) {
@@ -84,7 +84,7 @@ export function CategoryCards({
               type="button"
               onClick={() => onSelect(category)}
               aria-pressed={selected === category}
-              className="rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-xl text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Card
                 className={cn(

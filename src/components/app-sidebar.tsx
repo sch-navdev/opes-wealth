@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Factory, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, X } from "lucide-react";
+import { Factory, Landmark, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -13,6 +13,7 @@ import type { TranslationKey } from "@/lib/i18n";
 
 const NAV_ITEMS: { href: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }[] = [
   { href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark },
   { href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory },
   { href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings },
   { href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck },
@@ -104,7 +105,7 @@ function NavList({
  * Global app shell navigation, rendered once from `app/dashboard/layout.tsx`.
  * Expanded sidebar (icons + labels) at `lg+`, icon-only rail at `md`–`lg`
  * (pure CSS breakpoints, no JS toggle), and below `md` a top bar whose
- * hamburger opens a left-side drawer over a dimmed backdrop. Only semantic
+ * hamburger opens a start-side drawer over a dimmed backdrop. Only semantic
  * theme tokens are used so it follows `next-themes` light/dark.
  */
 export function AppSidebar() {
@@ -127,7 +128,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col border-r border-border bg-background transition-[width] duration-300 md:flex lg:w-64">
+      <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col border-e border-border bg-background transition-[width] duration-300 md:flex lg:w-64">
         <div className="flex h-16 items-center gap-3 border-b border-border px-4 lg:px-5">
           <Brand labelClassName="hidden lg:inline" />
         </div>
@@ -171,7 +172,7 @@ export function AppSidebar() {
           aria-modal="true"
           aria-label={t("menu")}
           className={cn(
-            "absolute inset-y-0 left-0 flex w-64 max-w-[80vw] flex-col border-r border-border bg-background shadow-xl transition-transform duration-300",
+            "absolute inset-y-0 start-0 flex w-64 max-w-[80vw] flex-col border-e border-border bg-background shadow-xl transition-transform duration-300",
             drawerOpen ? "translate-x-0" : "-translate-x-full",
           )}
         >

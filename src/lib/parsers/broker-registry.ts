@@ -17,6 +17,8 @@ export type BrokerDefinition = {
   name: string;
   /** Single-letter/short fallback shown in a card avatar — no logo image assets in this app yet. */
   logoInitial: string;
+  /** Website whose favicon is shown as the broker's logo (see `components/institution-logo.tsx`). */
+  domain: string;
   acceptedExtensions: string[];
   parse: (buffer: ArrayBuffer, fileName: string) => BrokerParseResult;
 };
@@ -26,6 +28,7 @@ export const BROKER_REGISTRY: Record<BrokerId, BrokerDefinition> = {
     id: "saxo",
     name: "Saxo Bank",
     logoInitial: "S",
+    domain: "home.saxo",
     acceptedExtensions: [".xlsx", ".csv"],
     parse: parseSaxoWorkbook,
   },
@@ -33,6 +36,7 @@ export const BROKER_REGISTRY: Record<BrokerId, BrokerDefinition> = {
     id: "sharesight",
     name: "Sharesight",
     logoInitial: "SH",
+    domain: "sharesight.com",
     acceptedExtensions: [".xlsx", ".csv"],
     parse: parseSharesightWorkbook,
   },

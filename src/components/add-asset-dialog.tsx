@@ -373,7 +373,7 @@ export function AddAssetDialog({
                     variant="outline"
                     size="icon-sm"
                     aria-label="Remove image"
-                    className="absolute -right-2 -top-2 size-5 rounded-full bg-card p-0"
+                    className="absolute -end-2 -top-2 size-5 rounded-full bg-card p-0"
                     onClick={() => removeImage(index)}
                   >
                     <X className="size-3" />
@@ -495,7 +495,7 @@ export function AddAssetDialog({
                         : "Value"}
               </Label>
               <div className="relative w-full min-w-0">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   {getCurrencySymbol(currency)}
                 </span>
                 <Input
@@ -505,7 +505,7 @@ export function AddAssetDialog({
                   step="any"
                   min="0"
                   placeholder="0.00"
-                  className="pl-12"
+                  className="ps-12"
                   defaultValue={
                     asset && isRealEstate
                       ? realEstateMetadata.market_valuation ?? asset.current_value

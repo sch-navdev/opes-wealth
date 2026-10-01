@@ -7,18 +7,22 @@ import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 
 export function DashboardHeaderControls({
-  totalNetWorthFormatted,
+  totalNetWorth,
   baseCurrency,
 }: {
-  totalNetWorthFormatted: string;
+  totalNetWorth: number;
   baseCurrency: string;
 }) {
   const { maskValue } = usePrivacy();
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
+  const totalNetWorthFormatted = new Intl.NumberFormat(intlLocale, {
+    style: "currency",
+    currency: baseCurrency,
+  }).format(totalNetWorth);
 
   return (
     <div className="flex items-center gap-3">
-      <div className="text-right">
+      <div className="text-end">
         <p className="text-xs text-muted-foreground">
           {t("net_worth")} · {baseCurrency}
         </p>

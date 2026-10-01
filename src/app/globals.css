@@ -111,3 +111,8 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
+
+/* Help chat screenshots: while capturing with "blur amounts" on, every amount is blurred. */
+.help-capture-mask .tabular-nums {
+  filter: blur(6px);
+}

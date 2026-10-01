@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/context/language-context";
 import { createClient } from "@/utils/supabase/client";
 
 type EnrollState = {
@@ -97,6 +98,7 @@ function RemoveFactorButton({
 }
 
 export function Setup2faForm() {
+  const { intlLocale } = useLanguage();
   const supabase = createClient();
 
   const [totpFactors, setTotpFactors] = useState<LinkedFactor[]>([]);
@@ -410,7 +412,7 @@ export function Setup2faForm() {
                 <div>
                   <p className="text-sm text-foreground">{factor.label}</p>
                   <p className="text-xs text-muted-foreground">
-                    Linked {new Date(factor.createdAt).toLocaleDateString()}
+                    Linked {new Date(factor.createdAt).toLocaleDateString(intlLocale)}
                   </p>
                 </div>
                 <RemoveFactorButton
@@ -517,7 +519,7 @@ export function Setup2faForm() {
                 <div>
                   <p className="text-sm text-foreground">{factor.label}</p>
                   <p className="text-xs text-muted-foreground">
-                    Linked {new Date(factor.createdAt).toLocaleDateString()}
+                    Linked {new Date(factor.createdAt).toLocaleDateString(intlLocale)}
                   </p>
                 </div>
                 <RemoveFactorButton

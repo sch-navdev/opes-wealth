@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LanguageSetting } from "@/components/language-setting";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
@@ -49,6 +50,10 @@ export default async function SettingsPage() {
           >
             Manage Two-Factor Authentication
           </Link>
+        </div>
+
+        <div className="mb-6 flex max-w-xs flex-col gap-1.5">
+          <LanguageSetting />
         </div>
 
         <ProfileForm

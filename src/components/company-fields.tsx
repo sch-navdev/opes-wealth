@@ -134,13 +134,13 @@ export function CompanyFields({
                 step="any"
                 min="0"
                 max="100"
-                className="pr-8"
+                className="pe-8"
                 value={value.ownership_percentage ?? ""}
                 onChange={(e) =>
                   set("ownership_percentage", e.target.value === "" ? null : Number(e.target.value))
                 }
               />
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+              <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                 %
               </span>
             </div>

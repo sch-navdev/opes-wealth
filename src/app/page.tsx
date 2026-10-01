@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
           Opes Wealth
         </span>
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <ThemeToggle />
           <Button asChild variant="outline">
             <Link href="/login">Sign In</Link>

@@ -4,16 +4,22 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useSyncExternalStore,
 } from "react";
-import { translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import { translate, type TranslationKey } from "@/lib/i18n";
+import { isLocale, localeInfo, type Locale } from "@/lib/locales";
 
 const STORAGE_KEY = "opes_locale";
 
 type LanguageContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
+  /** BCP-47 tag for `Intl.*` formatters (numbers, currencies, dates) in the current language. */
+  intlLocale: string;
+  /** Text direction of the current language (Arabic is right-to-left). */
+  dir: "ltr" | "rtl";
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
 };
 
@@ -29,7 +35,7 @@ function subscribe(listener: () => void): () => void {
 function getSnapshot(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === "en" || stored === "fr" ? stored : "en";
+    return isLocale(stored) ? stored : "en";
   } catch {
     return "en";
   }
@@ -60,7 +66,18 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale, setLocale, t]);
+  const info = localeInfo(locale);
+
+  // Reflect the language on <html> so the browser, screen readers and CSS (logical properties, `rtl:`) follow it.
+  useEffect(() => {
+    document.documentElement.lang = info.code;
+    document.documentElement.dir = info.dir;
+  }, [info.code, info.dir]);
+
+  const value = useMemo(
+    () => ({ locale, setLocale, intlLocale: info.intl, dir: info.dir, t }),
+    [locale, setLocale, info.intl, info.dir, t],
+  );
 
   return (
     <LanguageContext.Provider value={value}>

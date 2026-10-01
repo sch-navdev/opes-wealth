@@ -1,6 +1,7 @@
-export type Locale = "en" | "fr";
+import { EXTRA_TRANSLATIONS } from "@/lib/translations";
+import type { Locale } from "@/lib/locales";
 
-export const locales: Locale[] = ["en", "fr"];
+export { locales, type Locale } from "@/lib/locales";
 
 const dictionary = {
   // Add/Edit Asset dialog
@@ -1019,6 +1020,15 @@ const dictionary = {
     en: "The PDF is generated in your browser. What you type here is not saved and is never sent to a server.",
     fr: "Le PDF est généré dans votre navigateur. Ce que vous saisissez ici n'est pas enregistré et n'est jamais envoyé à un serveur.",
   },
+  language_switch: { en: "Language", fr: "Langue" },
+  language_switch_hint: {
+    en: "Applies instantly and is remembered in this browser. Numbers, currencies and dates follow the language's conventions.",
+    fr: "S'applique immédiatement et est mémorisée dans ce navigateur. Les nombres, devises et dates suivent les conventions de la langue.",
+  },
+  dcc_pdf_latin_only: {
+    en: "The PDF can be produced in English, French, Spanish, Italian and German; other languages need fonts the PDF generator doesn't include.",
+    fr: "Le PDF peut être produit en anglais, français, espagnol, italien et allemand ; les autres langues nécessitent des polices que le générateur de PDF n'inclut pas.",
+  },
   dcc_language: { en: "Document language", fr: "Langue du document" },
   dcc_lang_fr: { en: "Français", fr: "Français" },
   dcc_lang_en: { en: "English", fr: "English" },
@@ -1211,6 +1221,147 @@ const dictionary = {
   dcc_obj_retirement: { en: "Prepare for retirement", fr: "Préparer sa retraite" },
   dcc_obj_transmission: { en: "Prepare the transmission of one's wealth", fr: "Préparer la transmission de son patrimoine" },
   dcc_obj_business_transmission: { en: "Prepare the transmission of one's business", fr: "Préparer la transmission de son entreprise" },
+
+  // Open Finance bank sync (Cash & Bank card)
+  bank_status_manual: { en: "Manual / CSV", fr: "Manuel / CSV" },
+  bank_status_synced: { en: "Synced", fr: "Synchronisé" },
+  bank_status_sample: { en: "Sandbox", fr: "Sandbox" },
+  bank_status_error: { en: "Sync error", fr: "Erreur de synchro" },
+  bank_status_expired: { en: "Consent expired", fr: "Consentement expiré" },
+  bank_last_synced: { en: "Last synced {when}", fr: "Dernière synchro {when}" },
+  bank_never_synced: { en: "Not synced yet", fr: "Pas encore synchronisé" },
+  bank_sync_now: { en: "Sync now", fr: "Synchroniser" },
+  bank_disconnect: { en: "Disconnect", fr: "Déconnecter" },
+  bank_connect: { en: "Connect bank", fr: "Connecter une banque" },
+  bank_connect_title: { en: "Connect a UAE bank", fr: "Connecter une banque des EAU" },
+  bank_connect_desc: {
+    en: "Sync balances automatically through UAE Open Finance (Al Tareq). CSV uploads keep working for any account.",
+    fr: "Synchronisez vos soldes automatiquement via l'Open Finance des EAU (Al Tareq). Les imports CSV restent disponibles pour tout compte.",
+  },
+  bank_not_configured: {
+    en: "Open Finance sync isn't configured on this deployment yet.",
+    fr: "La synchronisation Open Finance n'est pas encore configurée sur ce déploiement.",
+  },
+  bank_sample_note: {
+    en: "Sandbox mode: these are fake banks and balances for testing. They appear only in the Banking view, are tagged Sandbox, and never touch your accounts or net worth.",
+    fr: "Mode sandbox : ces banques et soldes sont fictifs (test). Ils n'apparaissent que dans la vue Banques, portent l'étiquette Sandbox et n'affectent jamais vos comptes ni votre patrimoine net.",
+  },
+  bank_choose_bank: { en: "Choose your bank", fr: "Choisissez votre banque" },
+  bank_consent_note: {
+    en: "You'll be sent to your bank to approve read-only access to your account information. Opes Wealth never sees your bank password and cannot move money.",
+    fr: "Vous serez redirigé vers votre banque pour autoriser un accès en lecture seule à vos informations de compte. Opes Wealth ne voit jamais votre mot de passe bancaire et ne peut pas déplacer d'argent.",
+  },
+  bank_connecting: { en: "Connecting…", fr: "Connexion…" },
+  bank_continue: { en: "Continue", fr: "Continuer" },
+  bank_map_desc: {
+    en: "Link each bank account to one of your Cash accounts.",
+    fr: "Associez chaque compte bancaire à l'un de vos comptes de liquidités.",
+  },
+  bank_skip_account: { en: "Don't link", fr: "Ne pas associer" },
+  bank_create_cash_account: { en: "Create a new Cash account", fr: "Créer un nouveau compte de liquidités" },
+  bank_linking: { en: "Linking…", fr: "Association…" },
+  bank_link_and_sync: { en: "Link and sync", fr: "Associer et synchroniser" },
+  bank_pick_one_account: { en: "Choose at least one account to link.", fr: "Choisissez au moins un compte à associer." },
+  bank_done: { en: "{n} account(s) linked and synced.", fr: "{n} compte(s) associé(s) et synchronisé(s)." },
+  bank_done_sample: {
+    en: "{n} sandbox account(s) added — see them in the Banking view. Your real accounts and net worth are unchanged.",
+    fr: "{n} compte(s) sandbox ajouté(s) — voyez-les dans la vue Banques. Vos comptes réels et votre patrimoine net sont inchangés.",
+  },
+
+  // Consolidated banking view, UAE bank buttons, statement import
+  nav_banking: { en: "Banking", fr: "Banques" },
+  banking_title: { en: "Banking", fr: "Banques" },
+  banking_subtitle: {
+    en: "All your bank accounts in one place — manual, CSV-imported and synced. Sandbox accounts are kept apart.",
+    fr: "Tous vos comptes bancaires au même endroit — manuels, importés en CSV et synchronisés. Les comptes sandbox restent séparés.",
+  },
+  banking_open_view: { en: "Banking view", fr: "Vue Banques" },
+  banking_total_real: { en: "Real accounts (in net worth)", fr: "Comptes réels (dans le patrimoine net)" },
+  banking_total_sandbox: { en: "Sandbox accounts", fr: "Comptes sandbox" },
+  banking_sandbox_excluded_note: { en: "Never counted in net worth or in the real total.", fr: "Jamais comptés dans le patrimoine net ni dans le total réel de cette page." },
+  banking_accounts_count: { en: "{n} account(s)", fr: "{n} compte(s)" },
+  banking_filter_label: { en: "Show", fr: "Afficher" },
+  banking_filter_real: { en: "Real", fr: "Réels" },
+  banking_filter_sandbox: { en: "Sandbox", fr: "Sandbox" },
+  banking_filter_all: { en: "All", fr: "Tous" },
+  banking_group_other: { en: "Other / manual", fr: "Autres / manuels" },
+  banking_no_accounts: { en: "No accounts to show for this filter.", fr: "Aucun compte à afficher pour ce filtre." },
+  banking_not_in_net_worth: { en: "Not in net worth", fr: "Hors patrimoine net" },
+  sandbox_tag: { en: "Sandbox", fr: "Sandbox" },
+  bank_connect_uae_heading: { en: "Connect a UAE bank", fr: "Connecter une banque des EAU" },
+  // Help chat widget
+  help_button: { en: "Help", fr: "Aide" },
+  help_open: { en: "Open help chat", fr: "Ouvrir le chat d'aide" },
+  help_close: { en: "Close help chat", fr: "Fermer le chat d'aide" },
+  help_title: { en: "Help assistant", fr: "Assistant d'aide" },
+  help_subtitle: { en: "AI-powered; can make mistakes", fr: "Propulsé par l'IA ; peut se tromper" },
+  help_welcome: {
+    en: "Ask how to find a feature, why an import failed, or how a number is calculated. Attach a screenshot if something looks wrong.",
+    fr: "Demandez comment trouver une fonction, pourquoi un import a échoué ou comment un chiffre est calculé. Joignez une capture d'écran si quelque chose semble anormal.",
+  },
+  help_placeholder: { en: "Ask a question…", fr: "Posez une question…" },
+  help_send: { en: "Send", fr: "Envoyer" },
+  help_thinking: { en: "Thinking…", fr: "Réflexion…" },
+  help_capture: { en: "Attach a screenshot of this page", fr: "Joindre une capture d'écran de cette page" },
+  help_capture_hint: { en: "Screenshot this page for the assistant", fr: "Capturer cette page pour l'assistant" },
+  help_remove_screenshot: { en: "Remove", fr: "Retirer" },
+  help_screenshot_alt: { en: "Screenshot of the page", fr: "Capture d'écran de la page" },
+  help_mask_amounts: { en: "Blur amounts in screenshots", fr: "Flouter les montants dans les captures" },
+  help_privacy_note: {
+    en: "Messages and any screenshot you attach are sent to an AI provider to answer you; screenshots are not stored. Don't share passwords or account numbers. If the assistant finds a reproducible bug, a short description (no screenshot) is queued for the developers.",
+    fr: "Vos messages et les captures jointes sont envoyés à un fournisseur d'IA pour vous répondre ; les captures ne sont pas conservées. Ne partagez pas de mots de passe ni de numéros de compte. Si l'assistant détecte un bug reproductible, une courte description (sans capture) est transmise aux développeurs.",
+  },
+  help_error_generic: { en: "The assistant couldn't answer. Please try again.", fr: "L'assistant n'a pas pu répondre. Veuillez réessayer." },
+  help_error_rate: { en: "Too many questions in a short time. Please wait a minute.", fr: "Trop de questions en peu de temps. Patientez une minute." },
+  help_error_not_configured: { en: "The help assistant isn't set up on this deployment yet.", fr: "L'assistant d'aide n'est pas encore configuré sur ce déploiement." },
+  help_error_capture: { en: "Couldn't capture a screenshot of this page.", fr: "Impossible de capturer cette page." },
+
+  bank_connect_fr_heading: { en: "Connect a French bank", fr: "Connecter une banque française" },
+  bank_fr_psd2_note: {
+    en: "Live sync for French banks needs an EU open-banking (PSD2) provider, which isn't set up yet. Import a CSV statement instead — all the French banks below have a CSV profile.",
+    fr: "La synchronisation en direct des banques françaises nécessite un prestataire d'open banking européen (DSP2), pas encore configuré. Importez plutôt un relevé CSV — toutes les banques françaises ci-dessous ont un profil CSV.",
+  },
+  bank_connect_named: { en: "Connect {bank}", fr: "Connecter {bank}" },
+  stmt_open: { en: "Import bank statement (CSV)", fr: "Importer un relevé bancaire (CSV)" },
+  stmt_title: { en: "Import a bank statement", fr: "Importer un relevé bancaire" },
+  stmt_desc: {
+    en: "Drop a CSV from Wio, Emirates NBD, ADCB, FAB, BoursoBank, Société Générale, BNP Paribas or Crédit Agricole. Each account found is routed to its Cash account.",
+    fr: "Déposez un CSV de Wio, Emirates NBD, ADCB, FAB, BoursoBank, Société Générale, BNP Paribas ou Crédit Agricole. Chaque compte trouvé est dirigé vers son compte de liquidités.",
+  },
+  stmt_unverified_note: {
+    en: "The bank formats are best-effort presets, not verified against real exports. Check the preview below before importing, and change the bank if it picked the wrong one.",
+    fr: "Les formats bancaires sont des préréglages au mieux, non vérifiés sur de vrais exports. Vérifiez l'aperçu ci-dessous avant d'importer et changez de banque si le choix est erroné.",
+  },
+  stmt_choose_file: { en: "Choose a CSV file…", fr: "Choisir un fichier CSV…" },
+  stmt_bank: { en: "Bank", fr: "Banque" },
+  stmt_choose_bank: { en: "Choose the bank", fr: "Choisissez la banque" },
+  stmt_detected: { en: "Detected", fr: "Détectée" },
+  stmt_not_detected: {
+    en: "Couldn't recognise this file's bank. Pick the bank above.",
+    fr: "Banque du fichier non reconnue. Choisissez la banque ci-dessus.",
+  },
+  stmt_ambiguous: {
+    en: "Several banks match this layout equally — confirm the bank above.",
+    fr: "Plusieurs banques correspondent à ce format — confirmez la banque ci-dessus.",
+  },
+  stmt_account_unnamed: { en: "account (no number in file)", fr: "compte (sans numéro dans le fichier)" },
+  stmt_rows: { en: "{n} rows", fr: "{n} lignes" },
+  stmt_dont_import: { en: "Don't import", fr: "Ne pas importer" },
+  stmt_remember: {
+    en: "Remember this bank and account number for next time",
+    fr: "Mémoriser cette banque et ce numéro de compte pour la prochaine fois",
+  },
+  stmt_row_notes: {
+    en: "{errors} row(s) couldn't be read, {skipped} blank or footer line(s) ignored.",
+    fr: "{errors} ligne(s) illisible(s), {skipped} ligne(s) vide(s) ou de pied de page ignorée(s).",
+  },
+  stmt_import: { en: "Import", fr: "Importer" },
+  stmt_skipped: { en: "skipped", fr: "ignoré" },
+  stmt_currency_mismatch: {
+    en: "the file is in {file} but the account is in {account} — not imported.",
+    fr: "le fichier est en {file} mais le compte en {account} — non importé.",
+  },
+  stmt_imported: { en: "{n} balance point(s) imported into {account}.", fr: "{n} point(s) de solde importé(s) dans {account}." },
 
   // Cash & Bank dashboard card
   cash_bank_title: { en: "Cash & Bank accounts", fr: "Comptes bancaires et liquidités" },
@@ -1717,7 +1868,12 @@ export function translate(
   vars?: Record<string, string | number>,
 ): string {
   const entry = dictionary[key];
-  let text: string = entry ? entry[locale] : key;
+  const text0 = !entry
+    ? key
+    : locale === "en" || locale === "fr"
+      ? entry[locale]
+      : (EXTRA_TRANSLATIONS[locale]?.[key] ?? entry.en);
+  let text: string = text0;
   if (vars) {
     for (const [name, val] of Object.entries(vars)) {
       text = text.replace(`{${name}}`, String(val));

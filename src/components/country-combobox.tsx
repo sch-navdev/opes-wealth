@@ -58,7 +58,7 @@ export function CountryCombobox({
                 : selected.name
               : placeholder}
           </span>
-          <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+          <ChevronsUpDown className="ms-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[280px] border-border bg-popover p-0">
@@ -78,13 +78,13 @@ export function CountryCombobox({
                 >
                   <Check
                     className={cn(
-                      "mr-2 size-4",
+                      "me-2 size-4",
                       value === country[field] ? "opacity-100" : "opacity-0",
                     )}
                   />
                   <span className="flex-1 truncate">{country.name}</span>
                   {field === "dialCode" && (
-                    <span className="ml-2 text-muted-foreground">
+                    <span className="ms-2 text-muted-foreground">
                       {country.dialCode}
                     </span>
                   )}

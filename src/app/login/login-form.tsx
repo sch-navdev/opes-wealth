@@ -194,7 +194,7 @@ export function LoginForm() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Mail className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="email"
                 name="email"
@@ -202,7 +202,7 @@ export function LoginForm() {
                 placeholder="you@example.com"
                 required
                 autoComplete="email"
-                className="pl-9"
+                className="ps-9"
               />
             </div>
           </div>
@@ -258,7 +258,7 @@ export function LoginForm() {
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
               <div className="relative">
-                <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="firstName"
                   name="firstName"
@@ -266,7 +266,7 @@ export function LoginForm() {
                   placeholder="Jane"
                   required
                   autoComplete="given-name"
-                  className="pl-9"
+                  className="ps-9"
                 />
               </div>
             </div>
@@ -287,7 +287,7 @@ export function LoginForm() {
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <div className="relative">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Mail className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="email"
               name="email"
@@ -295,7 +295,7 @@ export function LoginForm() {
               placeholder="you@example.com"
               required
               autoComplete="email"
-              className="pl-9"
+              className="ps-9"
             />
           </div>
         </div>
@@ -314,7 +314,7 @@ export function LoginForm() {
             )}
           </div>
           <div className="relative">
-            <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               id="password"
               name="password"
@@ -322,7 +322,7 @@ export function LoginForm() {
               placeholder="••••••••"
               required
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              className="pl-9 pr-9"
+              className="ps-9 pe-9"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onBlur={() => setPasswordTouched(true)}
@@ -348,7 +348,7 @@ export function LoginForm() {
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -356,7 +356,7 @@ export function LoginForm() {
                 placeholder="••••••••"
                 required
                 autoComplete="new-password"
-                className="pl-9 pr-9"
+                className="ps-9 pe-9"
               />
               <PasswordVisibilityToggle
                 visible={showConfirmPassword}

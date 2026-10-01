@@ -46,6 +46,17 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - `0019_scpi_category.sql`: idempotent insert of the `SCPI` category. It was already seeded by `0001`, so this is a **no-op** on the live project; kept as a drift safeguard. No schema change; SCPI fields are metadata. See [[Portfolio-Dashboard|Portfolio Dashboard]].
 
+
+## Migration 0020 — Bank Connections (2026-10-01; provider now `altareq` | `psd2`, still unapplied)
+
+- `0020_bank_connections.sql` (**not applied yet**): `bank_connections` (provider, institution, status, `is_sandbox`, consent id/expiry, pending-OAuth `oauth_state` + `encrypted_code_verifier`, `encrypted_access_token`/`encrypted_refresh_token`, `token_expires_at`, `last_synced_at`, `last_sync_status`/`last_sync_error`) and `bank_account_links` (connection ↔ Cash `asset_id`, external account id, label, masked number, currency, `last_balance`, per-account sync status; unique per asset and per connection+account). RLS: select/delete own rows only. **Column-level privileges**: all privileges are revoked from `anon`/`authenticated` and only the non-secret columns are re-granted for select — so even the owner's browser session cannot read a token; writes and token reads go through the service role on the server. Also widens `asset_history_source_check` with `open_finance` (superset of 0015). See [[Market-Data-Integration|Market Data Integration]].
+
+
+## Migration 0021 — Bug Reports (2026-10-01, unapplied)
+
+- `bug_reports`: `fingerprint`, `title`, `summary`, `repro_steps`, `page_path`, `severity` (low|medium|high), `occurrences`, `reporter_ids uuid[]`, `status` (pending|sent|dismissed), `first_seen_at`, `last_seen_at`, `sent_at`, `external_ref`. A partial unique index allows one **pending** row per fingerprint (consolidation); sent rows are history.
+- RLS is on with **no policies** and all privileges revoked from `anon`/`authenticated`: only the service role (server) touches it. See [[Architecture|Architecture]] (AI Help Assistant).
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

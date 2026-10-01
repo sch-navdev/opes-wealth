@@ -9,8 +9,8 @@ export type ParsedCsv = {
   rows: Record<string, string>[];
 };
 
-export function parseCsv(text: string): ParsedCsv {
-  const table = parseCsvRows(text);
+export function parseCsv(text: string, delimiter = ","): ParsedCsv {
+  const table = parseCsvRows(text, delimiter);
   if (table.length === 0) {
     return { headers: [], rows: [] };
   }
@@ -27,7 +27,12 @@ export function parseCsv(text: string): ParsedCsv {
   return { headers, rows };
 }
 
-function parseCsvRows(text: string): string[][] {
+/** The raw table (every row, header included) with a configurable delimiter — French banks export semicolon-separated files. */
+export function parseCsvTable(text: string, delimiter = ","): string[][] {
+  return parseCsvRows(text, delimiter);
+}
+
+function parseCsvRows(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -55,7 +60,7 @@ function parseCsvRows(text: string): string[][] {
 
     if (char === '"') {
       inQuotes = true;
-    } else if (char === ",") {
+    } else if (char === delimiter) {
       row.push(field);
       field = "";
     } else if (char === "\n") {

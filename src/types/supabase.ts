@@ -146,6 +146,126 @@ export type Database = {
           },
         ]
       }
+      bank_connections: {
+        Row: {
+          id: string
+          profile_id: string
+          provider: string
+          institution_id: string
+          institution_name: string
+          status: string
+          is_sandbox: boolean
+          consent_id: string | null
+          consent_expires_at: string | null
+          oauth_state: string | null
+          encrypted_code_verifier: string | null
+          oauth_started_at: string | null
+          encrypted_access_token: string | null
+          encrypted_refresh_token: string | null
+          token_expires_at: string | null
+          last_synced_at: string | null
+          last_sync_status: string | null
+          last_sync_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          provider?: string
+          institution_id: string
+          institution_name: string
+          status?: string
+          is_sandbox?: boolean
+          consent_id?: string | null
+          consent_expires_at?: string | null
+          oauth_state?: string | null
+          encrypted_code_verifier?: string | null
+          oauth_started_at?: string | null
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          token_expires_at?: string | null
+          last_synced_at?: string | null
+          last_sync_status?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          provider?: string
+          institution_id?: string
+          institution_name?: string
+          status?: string
+          is_sandbox?: boolean
+          consent_id?: string | null
+          consent_expires_at?: string | null
+          oauth_state?: string | null
+          encrypted_code_verifier?: string | null
+          oauth_started_at?: string | null
+          encrypted_access_token?: string | null
+          encrypted_refresh_token?: string | null
+          token_expires_at?: string | null
+          last_synced_at?: string | null
+          last_sync_status?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bank_account_links: {
+        Row: {
+          id: string
+          profile_id: string
+          connection_id: string
+          asset_id: string | null
+          is_sandbox: boolean
+          external_account_id: string
+          account_label: string | null
+          masked_number: string | null
+          currency: string | null
+          last_balance: number | null
+          last_synced_at: string | null
+          last_sync_status: string | null
+          last_sync_error: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          connection_id: string
+          asset_id?: string | null
+          is_sandbox?: boolean
+          external_account_id: string
+          account_label?: string | null
+          masked_number?: string | null
+          currency?: string | null
+          last_balance?: number | null
+          last_synced_at?: string | null
+          last_sync_status?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          connection_id?: string
+          asset_id?: string | null
+          is_sandbox?: boolean
+          external_account_id?: string
+          account_label?: string | null
+          masked_number?: string | null
+          currency?: string | null
+          last_balance?: number | null
+          last_synced_at?: string | null
+          last_sync_status?: string | null
+          last_sync_error?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address_city: string | null

@@ -43,17 +43,17 @@ const DEVICE_LABEL_KEYS: Record<DeviceType, TranslationKey> = {
   app: "security_device_app",
 };
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function formatDateTime(iso: string): string {
+function formatDateTime(iso: string, locale: string): string {
   const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? iso : dateTimeFormatter.format(parsed);
+  return Number.isNaN(parsed.getTime())
+    ? iso
+    : new Intl.DateTimeFormat(locale, {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(parsed);
 }
 
 function RevokeButton({
@@ -123,7 +123,7 @@ export function SecuritySessions({
   sessions: SessionRow[];
   loadError: string | null;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -226,9 +226,9 @@ export function SecuritySessions({
                           {t("security_ip")}: {session.ip ?? t("security_unknown_ip")}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {t("security_last_active")}: {formatDateTime(session.lastActiveAt)}
+                          {t("security_last_active")}: {formatDateTime(session.lastActiveAt, intlLocale)}
                           {" · "}
-                          {t("security_signed_in")}: {formatDateTime(session.createdAt)}
+                          {t("security_signed_in")}: {formatDateTime(session.createdAt, intlLocale)}
                         </p>
                         {session.userAgent && (
                           <p

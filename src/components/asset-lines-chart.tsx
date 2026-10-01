@@ -37,15 +37,15 @@ function valueDash(index: number): string | undefined {
   return DASHES[Math.floor(index / COLORS.length) % DASHES.length];
 }
 
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-function formatTimestamp(ts: unknown): string {
+function formatTimestamp(ts: unknown, locale: string): string {
   const n = Number(ts);
-  return Number.isFinite(n) ? dateFormatter.format(new Date(n)) : "";
+  return Number.isFinite(n)
+    ? new Intl.DateTimeFormat(locale, {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date(n))
+    : "";
 }
 
 /**
@@ -68,9 +68,9 @@ export function AssetLinesChart({
   aggregateLabel: string;
   heightClassName?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat("en-US", {
+  const formatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency,
     maximumFractionDigits: 0,
@@ -107,7 +107,7 @@ export function AssetLinesChart({
             domain={["dataMin", "dataMax"]}
             stroke="var(--color-muted-foreground)"
             fontSize={12}
-            tickFormatter={formatTimestamp}
+            tickFormatter={(ts) => formatTimestamp(ts, intlLocale)}
           />
           <YAxis
             stroke="var(--color-muted-foreground)"
@@ -121,7 +121,7 @@ export function AssetLinesChart({
               border: "1px solid var(--color-border)",
               color: "var(--color-foreground)",
             }}
-            labelFormatter={formatTimestamp}
+            labelFormatter={(ts) => formatTimestamp(ts, intlLocale)}
             formatter={(value) => maskValue(formatter.format(Number(value)))}
             itemSorter={(item) => -Number(item.value ?? 0)}
           />

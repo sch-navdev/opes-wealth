@@ -23,7 +23,8 @@ import {
   type DccPerson,
   type DccWealthRow,
 } from "@/lib/dcc";
-import { translate, type Locale, type TranslationKey } from "@/lib/i18n";
+import { translate, type TranslationKey } from "@/lib/i18n";
+import { localeInfo, type Locale } from "@/lib/locales";
 
 const INK: [number, number, number] = [31, 41, 55];
 const ACCENT: [number, number, number] = [168, 124, 31];
@@ -48,7 +49,7 @@ export async function generateDccPdf(
 
   const t = (key: TranslationKey, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
-  const numberFormat = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+  const numberFormat = new Intl.NumberFormat(localeInfo(locale).intl, {
     maximumFractionDigits: 0,
   });
   // jsPDF's built-in fonts can't draw the narrow no-break space Intl uses as a thousands separator.

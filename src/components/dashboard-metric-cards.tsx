@@ -69,7 +69,7 @@ function MetricCard({
       type="button"
       onClick={onClick}
       title={hint}
-      className="rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded-xl text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Card
         className="h-full border-border bg-card transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300 hover:bg-muted motion-reduce:animate-none"
@@ -107,11 +107,11 @@ function BreakdownDialog({
   currency: string;
   onClose: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const formatter = useMemo(
-    () => new Intl.NumberFormat("en-US", { style: "currency", currency }),
-    [currency],
+    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    [intlLocale, currency],
   );
 
   const titleKey = {
@@ -151,10 +151,10 @@ function BreakdownDialog({
                   <TableHead className="text-muted-foreground">{t("breakdown_asset")}</TableHead>
                   {isGain ? (
                     <>
-                      <TableHead className="text-right text-muted-foreground">
+                      <TableHead className="text-end text-muted-foreground">
                         {t("breakdown_market_value")}
                       </TableHead>
-                      <TableHead className="text-right text-muted-foreground">
+                      <TableHead className="text-end text-muted-foreground">
                         {t("breakdown_cost_basis")}
                       </TableHead>
                     </>
@@ -163,7 +163,7 @@ function BreakdownDialog({
                       {t("breakdown_category")}
                     </TableHead>
                   )}
-                  <TableHead className="text-right text-muted-foreground">
+                  <TableHead className="text-end text-muted-foreground">
                     {isGain ? t("breakdown_gain") : t("breakdown_amount")}
                   </TableHead>
                 </TableRow>
@@ -189,10 +189,10 @@ function BreakdownDialog({
                     </TableCell>
                     {isGain ? (
                       <>
-                        <TableCell className="text-right tabular-nums text-foreground">
+                        <TableCell className="text-end tabular-nums text-foreground">
                           {money(row.marketValue ?? 0)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                        <TableCell className="text-end tabular-nums text-muted-foreground">
                           {money(row.costBasis ?? 0)}
                         </TableCell>
                       </>
@@ -205,7 +205,7 @@ function BreakdownDialog({
                     )}
                     <TableCell
                       className={cn(
-                        "text-right tabular-nums",
+                        "text-end tabular-nums",
                         row.amount < 0 ? "text-destructive" : "text-foreground",
                       )}
                     >
@@ -222,7 +222,7 @@ function BreakdownDialog({
                   >
                     {t("breakdown_total")}
                   </TableCell>
-                  <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                  <TableCell className="text-end font-semibold tabular-nums text-foreground">
                     {money(total)}
                   </TableCell>
                 </TableRow>
@@ -236,27 +236,36 @@ function BreakdownDialog({
 }
 
 export function DashboardMetricCards({
-  netWorthFormatted,
-  assetsFormatted,
-  liabilitiesFormatted,
+  netWorth,
+  assets,
+  liabilities,
   hasLiabilities,
-  unrealizedGainFormatted,
+  unrealizedGain,
   unrealizedGainSign,
   baseCurrency,
   breakdowns,
 }: {
-  netWorthFormatted: string;
-  assetsFormatted: string;
-  liabilitiesFormatted: string;
+  netWorth: number;
+  assets: number;
+  liabilities: number;
   hasLiabilities: boolean;
-  unrealizedGainFormatted: string;
+  unrealizedGain: number;
   unrealizedGainSign: "+" | "-" | null;
   baseCurrency: string;
   breakdowns: DashboardBreakdowns;
 }) {
   const { maskValue } = usePrivacy();
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const [open, setOpen] = useState<MetricKey | null>(null);
+
+  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
+    style: "currency",
+    currency: baseCurrency,
+  });
+  const netWorthFormatted = currencyFormatter.format(netWorth);
+  const assetsFormatted = currencyFormatter.format(assets);
+  const liabilitiesFormatted = currencyFormatter.format(liabilities);
+  const unrealizedGainFormatted = currencyFormatter.format(unrealizedGain);
 
   const gainColorClass =
     unrealizedGainSign === "+"

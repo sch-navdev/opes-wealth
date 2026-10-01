@@ -16,9 +16,9 @@ export function CompaniesSummary({
   totalEquity: number;
   baseCurrency: string;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: baseCurrency });
+  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
 
   const items = [
     { label: t("companies_count"), value: String(count) },

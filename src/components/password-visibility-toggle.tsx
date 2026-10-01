@@ -16,7 +16,7 @@ export function PasswordVisibilityToggle({
       onClick={onToggle}
       tabIndex={-1}
       aria-label={visible ? "Hide password" : "Show password"}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
     >
       {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
     </button>

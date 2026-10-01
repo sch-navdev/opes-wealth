@@ -53,8 +53,8 @@ export function ScpiFields({
   shares: number;
   currency: string;
 }) {
-  const { t } = useLanguage();
-  const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency });
+  const { t, intlLocale } = useLanguage();
+  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
 
   function set<K extends keyof ScpiMetadata>(key: K, next: ScpiMetadata[K]) {
     onChange({ ...value, [key]: next });

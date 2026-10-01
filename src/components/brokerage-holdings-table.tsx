@@ -41,8 +41,8 @@ export type BrokerageAsset = {
   purchase_date: string;
 };
 
-function formatMoney(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount);
+function formatMoneyWithLocale(amount: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
 }
 
 function signedClass(n: number | null) {
@@ -75,7 +75,9 @@ export function BrokerageHoldingsTable({
   onToggleAsset?: (id: string, checked: boolean) => void;
   onToggleAll?: (ids: string[], checked: boolean) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
+  const formatMoney = (amount: number, currency: string) =>
+    formatMoneyWithLocale(amount, currency, intlLocale);
   const { maskValue } = usePrivacy();
   const [isRefreshing, startRefresh] = useTransition();
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
@@ -277,13 +279,13 @@ export function BrokerageHoldingsTable({
                 </TableHead>
               )}
               <TableHead className="text-muted-foreground">{t("brokerage_holding")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_price")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_quantity")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_value")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_capital_gain")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_income")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_price")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_quantity")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_value")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_capital_gain")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_income")}</TableHead>
               <TableHead className="text-muted-foreground">{t("brokerage_currency")}</TableHead>
-              <TableHead className="text-right text-muted-foreground">{t("brokerage_return")}</TableHead>
+              <TableHead className="text-end text-muted-foreground">{t("brokerage_return")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -301,22 +303,22 @@ export function BrokerageHoldingsTable({
                           <CategoryIcon name="Equities" className="size-4" />
                           {acct.account ?? t("brokerage_other_holdings")}
                         </span>
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        <span className="ms-2 text-xs font-normal text-muted-foreground">
                           ({acct.rows.length})
                         </span>
                       </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums text-foreground">
+                      <TableCell className="text-end font-semibold tabular-nums text-foreground">
                         {money(acctSub.value)}
                       </TableCell>
-                      <TableCell className={cn("text-right tabular-nums", signedClass(acctSub.gain))}>
+                      <TableCell className={cn("text-end tabular-nums", signedClass(acctSub.gain))}>
                         {money(acctSub.gain)}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                      <TableCell className="text-end tabular-nums text-muted-foreground">
                         {acctSub.income ? money(acctSub.income) : "—"}
                       </TableCell>
                       <TableCell />
                       <TableCell
-                        className={cn("text-right tabular-nums", signedClass(acctSub.returnPct))}
+                        className={cn("text-end tabular-nums", signedClass(acctSub.returnPct))}
                       >
                         {pct(acctSub.returnPct)}
                       </TableCell>
@@ -329,24 +331,24 @@ export function BrokerageHoldingsTable({
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableCell
                       colSpan={columnCount - 5}
-                      className={cn("font-medium text-foreground", showAccountHeaders && "pl-6")}
+                      className={cn("font-medium text-foreground", showAccountHeaders && "ps-6")}
                     >
                       {group.exchange}
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      <span className="ms-2 text-xs font-normal text-muted-foreground">
                         ({group.rows.length})
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums text-foreground">
+                    <TableCell className="text-end font-medium tabular-nums text-foreground">
                       {money(sub.value)}
                     </TableCell>
-                    <TableCell className={cn("text-right tabular-nums", signedClass(sub.gain))}>
+                    <TableCell className={cn("text-end tabular-nums", signedClass(sub.gain))}>
                       {money(sub.gain)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-end tabular-nums text-muted-foreground">
                       {sub.income ? money(sub.income) : "—"}
                     </TableCell>
                     <TableCell colSpan={1} />
-                    <TableCell className={cn("text-right tabular-nums", signedClass(sub.returnPct))}>
+                    <TableCell className={cn("text-end tabular-nums", signedClass(sub.returnPct))}>
                       {pct(sub.returnPct)}
                     </TableCell>
                   </TableRow>
@@ -361,7 +363,7 @@ export function BrokerageHoldingsTable({
                           />
                         </TableCell>
                       )}
-                      <TableCell className={cn(showAccountHeaders && "pl-6")}>
+                      <TableCell className={cn(showAccountHeaders && "ps-6")}>
                         <div className="flex items-center gap-2">
                           <Avatar size="sm" className="rounded-md">
                             <AvatarFallback className="rounded-md">
@@ -383,7 +385,7 @@ export function BrokerageHoldingsTable({
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-foreground">
+                      <TableCell className="text-end tabular-nums text-foreground">
                         {metrics.price != null ? maskValue(formatMoney(metrics.price, asset.currency)) : "—"}
                         {metadata.day_change_pct != null && (
                           <p className={cn("text-xs", signedClass(metadata.day_change_pct))}>
@@ -391,20 +393,20 @@ export function BrokerageHoldingsTable({
                           </p>
                         )}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-foreground">
+                      <TableCell className="text-end tabular-nums text-foreground">
                         {maskValue(String(asset.quantity))}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-foreground">
+                      <TableCell className="text-end tabular-nums text-foreground">
                         {maskValue(formatMoney(asset.current_value, asset.currency))}
                       </TableCell>
                       <TableCell
-                        className={cn("text-right tabular-nums", signedClass(metrics.capitalGain))}
+                        className={cn("text-end tabular-nums", signedClass(metrics.capitalGain))}
                       >
                         {metrics.capitalGain != null
                           ? maskValue(formatMoney(metrics.capitalGain, asset.currency))
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                      <TableCell className="text-end tabular-nums text-muted-foreground">
                         {metrics.income ? maskValue(formatMoney(metrics.income, asset.currency)) : "—"}
                         {metrics.income > 0 && metrics.cost != null && metrics.cost > 0 && (
                           <p className="text-xs" title={t("brokerage_income_yield_hint")}>
@@ -413,7 +415,7 @@ export function BrokerageHoldingsTable({
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{asset.currency}</TableCell>
-                      <TableCell className={cn("text-right tabular-nums", signedClass(metrics.returnPct))}>
+                      <TableCell className={cn("text-end tabular-nums", signedClass(metrics.returnPct))}>
                         {pct(metrics.returnPct)}
                       </TableCell>
                     </TableRow>
@@ -430,17 +432,17 @@ export function BrokerageHoldingsTable({
               <TableCell colSpan={columnCount - 5} className="font-medium text-foreground">
                 {t("breakdown_total")}
               </TableCell>
-              <TableCell className="text-right font-semibold tabular-nums text-foreground">
+              <TableCell className="text-end font-semibold tabular-nums text-foreground">
                 {money(total.value)}
               </TableCell>
-              <TableCell className={cn("text-right tabular-nums", signedClass(total.gain))}>
+              <TableCell className={cn("text-end tabular-nums", signedClass(total.gain))}>
                 {money(total.gain)}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-end tabular-nums text-muted-foreground">
                 {total.income ? money(total.income) : "—"}
               </TableCell>
               <TableCell />
-              <TableCell className={cn("text-right tabular-nums", signedClass(total.returnPct))}>
+              <TableCell className={cn("text-end tabular-nums", signedClass(total.returnPct))}>
                 {pct(total.returnPct)}
               </TableCell>
             </TableRow>
@@ -455,7 +457,7 @@ export function BrokerageHoldingsTable({
             type="button"
             onClick={() => setShowClosed((v) => !v)}
             aria-expanded={showClosed}
-            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           >
             <span className="flex items-center gap-2 text-sm font-medium text-foreground">
               {t("brokerage_closed_positions")}
@@ -492,12 +494,12 @@ export function BrokerageHoldingsTable({
                     <TableHead className="text-muted-foreground">{t("brokerage_holding")}</TableHead>
                     <TableHead className="text-muted-foreground">{t("brokerage_opened_col")}</TableHead>
                     <TableHead className="text-muted-foreground">{t("brokerage_closed_col")}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t("brokerage_invested")}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t("brokerage_proceeds")}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t("brokerage_realized")}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t("brokerage_income")}</TableHead>
+                    <TableHead className="text-end text-muted-foreground">{t("brokerage_invested")}</TableHead>
+                    <TableHead className="text-end text-muted-foreground">{t("brokerage_proceeds")}</TableHead>
+                    <TableHead className="text-end text-muted-foreground">{t("brokerage_realized")}</TableHead>
+                    <TableHead className="text-end text-muted-foreground">{t("brokerage_income")}</TableHead>
                     <TableHead className="text-muted-foreground">{t("brokerage_currency")}</TableHead>
-                    <TableHead className="text-right text-muted-foreground">{t("brokerage_return")}</TableHead>
+                    <TableHead className="text-end text-muted-foreground">{t("brokerage_return")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -537,20 +539,20 @@ export function BrokerageHoldingsTable({
                         </TableCell>
                         <TableCell className="text-muted-foreground">{s.opened ?? "—"}</TableCell>
                         <TableCell className="text-muted-foreground">{s.closed ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground">
+                        <TableCell className="text-end tabular-nums text-foreground">
                           {cur(s.invested)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-foreground">
+                        <TableCell className="text-end tabular-nums text-foreground">
                           {cur(s.proceeds)}
                         </TableCell>
-                        <TableCell className={cn("text-right tabular-nums", signedClass(s.realized))}>
+                        <TableCell className={cn("text-end tabular-nums", signedClass(s.realized))}>
                           {cur(s.realized)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                        <TableCell className="text-end tabular-nums text-muted-foreground">
                           {s.income ? cur(s.income) : "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">{asset.currency}</TableCell>
-                        <TableCell className={cn("text-right tabular-nums", signedClass(s.returnPct))}>
+                        <TableCell className={cn("text-end tabular-nums", signedClass(s.returnPct))}>
                           {pct(s.returnPct)}
                         </TableCell>
                       </TableRow>
@@ -562,21 +564,21 @@ export function BrokerageHoldingsTable({
                     <TableCell colSpan={selectable ? 4 : 3} className="font-medium text-foreground">
                       {t("breakdown_total")}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-foreground">
+                    <TableCell className="text-end tabular-nums text-foreground">
                       {money(closedTotals.invested)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-foreground">
+                    <TableCell className="text-end tabular-nums text-foreground">
                       {money(closedTotals.proceeds)}
                     </TableCell>
-                    <TableCell className={cn("text-right tabular-nums", signedClass(closedTotals.realized))}>
+                    <TableCell className={cn("text-end tabular-nums", signedClass(closedTotals.realized))}>
                       {money(closedTotals.realized)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-end tabular-nums text-muted-foreground">
                       {closedTotals.income ? money(closedTotals.income) : "—"}
                     </TableCell>
                     <TableCell />
                     <TableCell
-                      className={cn("text-right tabular-nums", signedClass(closedTotals.returnPct))}
+                      className={cn("text-end tabular-nums", signedClass(closedTotals.returnPct))}
                     >
                       {pct(closedTotals.returnPct)}
                     </TableCell>

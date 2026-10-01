@@ -21,6 +21,7 @@ import { usePrivacy } from "@/context/privacy-context";
 import { convertAmount } from "@/lib/fx";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/language-context";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
@@ -65,8 +66,9 @@ export function PortfolioTable({
   onToggleAll?: (ids: string[], checked: boolean) => void;
 }) {
   const { maskValue } = usePrivacy();
+  const { intlLocale } = useLanguage();
 
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
+  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency: displayCurrency,
   });
@@ -114,12 +116,12 @@ export function PortfolioTable({
             )}
             <TableHead>Name</TableHead>
             <TableHead>Category</TableHead>
-            <TableHead className="text-right">Quantity</TableHead>
-            <TableHead className="text-right">
+            <TableHead className="text-end">Quantity</TableHead>
+            <TableHead className="text-end">
               Value ({displayCurrency})
             </TableHead>
-            <TableHead className="text-right">Performance</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-end">Performance</TableHead>
+            <TableHead className="text-end">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -286,12 +288,12 @@ export function PortfolioTable({
                   <TableCell className="text-muted-foreground">
                     {asset.asset_categories?.name ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                  <TableCell className="text-end tabular-nums text-muted-foreground">
                     {asset.quantity}
                   </TableCell>
                   <TableCell
                     className={cn(
-                      "text-right tabular-nums",
+                      "text-end tabular-nums",
                       asset.is_liability
                         ? "text-destructive"
                         : "text-foreground",
@@ -344,7 +346,7 @@ export function PortfolioTable({
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-end tabular-nums">
                     {convertedGain == null || gainPercent == null ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (
@@ -362,7 +364,7 @@ export function PortfolioTable({
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex justify-end gap-2">
                       {asset.is_liability ? (
                         <AddLiabilityDialog liability={assetForEdit} />

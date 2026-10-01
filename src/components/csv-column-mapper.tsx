@@ -112,7 +112,7 @@ export function CsvColumnMapper({
   onReset: () => void;
   onSuccess: (importedCount: number) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { headers, rows, fileName } = file;
   const [isPending, startTransition] = useTransition();
   const [importError, setImportError] = useState<string | null>(null);
@@ -150,8 +150,8 @@ export function CsvColumnMapper({
   const [startingBalanceTouched, setStartingBalanceTouched] = useState(false);
 
   const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat("en-US", { style: "currency", currency }),
-    [currency],
+    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    [intlLocale, currency],
   );
 
   const balanceResult = useMemo(() => {
@@ -453,7 +453,7 @@ export function CsvColumnMapper({
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-muted-foreground">{t("csv_parsed_date")}</TableHead>
-                  <TableHead className="text-right text-muted-foreground">
+                  <TableHead className="text-end text-muted-foreground">
                     {t("csv_parsed_balance")}
                   </TableHead>
                   <TableHead className="text-muted-foreground">
@@ -467,7 +467,7 @@ export function CsvColumnMapper({
                     <TableCell className="tabular-nums text-foreground">
                       {row.recorded_date}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-foreground">
+                    <TableCell className="text-end tabular-nums text-foreground">
                       {currencyFormatter.format(row.value)}
                     </TableCell>
                     <TableCell className="max-w-48 truncate text-muted-foreground">

@@ -211,7 +211,7 @@ export function AddLiabilityDialog({
             <div className="space-y-2">
               <Label htmlFor="liability_balance">{t("liability_balance")}</Label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   {getCurrencySymbol(currency)}
                 </span>
                 <Input
@@ -219,7 +219,7 @@ export function AddLiabilityDialog({
                   type="number"
                   step="any"
                   min="0"
-                  className="pl-12"
+                  className="ps-12"
                   value={balance}
                   onChange={(e) => setBalance(e.target.value)}
                   required

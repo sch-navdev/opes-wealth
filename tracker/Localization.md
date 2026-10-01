@@ -80,6 +80,39 @@
 
 - EN + FR: `yes`/`no`, `scpi_*`, `reports_*`, `export_xlsx*`, `dcc_*` — UI strings of the DCC dialog and every label of the generated PDF (field names, section titles, table headers, the 17 objectives, tax lines, warning text, signature labels), the latter rendered in the language chosen in the dialog rather than the UI language.
 
+
+## New Keys (Open Finance bank sync, 2026-10-01)
+
+- EN + FR: `bank_status_*`, `bank_last_synced`, `bank_never_synced`, `bank_sync_now`, `bank_disconnect`, `bank_connect*`, `bank_not_configured`, `bank_sample_note`, `bank_choose_bank`, `bank_consent_note`, `bank_map_desc`, `bank_link_and_sync`, `bank_done*` and related dialog strings. Error messages returned by the banking server actions are English-only, like the other server-action errors.
+
+
+## New Keys (Banking view, UAE bank buttons, statement import, sandbox wording, 2026-10-01)
+
+- EN + FR: `nav_banking`, `banking_*`, `sandbox_tag`, `bank_connect_uae_heading`, `bank_connect_named`, `stmt_*`; the existing `bank_status_sample`, `bank_sample_note` and `bank_done_sample` texts were reworded to "Sandbox".
+
+
+## New Keys (French bank row, 2026-10-01)
+
+- EN + FR: `bank_connect_fr_heading`, `bank_fr_psd2_note`.
+
+
+## New Keys (Help chat, 2026-10-01)
+
+- EN + FR: `help_button`, `help_open`, `help_close`, `help_title`, `help_subtitle`, `help_welcome`, `help_placeholder`, `help_send`, `help_thinking`, `help_capture`, `help_capture_hint`, `help_remove_screenshot`, `help_screenshot_alt`, `help_mask_amounts`, `help_privacy_note`, `help_error_generic`, `help_error_rate`, `help_error_not_configured`, `help_error_capture`. The assistant's own replies follow the language the user writes in (the app locale is passed as a hint).
+
+
+## Nine Languages (2026-10-01)
+
+- **Languages**: English, French (as before) plus Spanish, Italian, German, Arabic, Russian, Hindi and Simplified Chinese. The registry is `lib/locales.ts` (code, native name, short code, `Intl` tag, text direction); `lib/i18n.ts` re-exports `Locale`/`locales` from it.
+- **Where strings live**: English + French stay beside their keys in `lib/i18n.ts` (1,090 keys). The seven new languages are one file each in `lib/translations/<code>.ts` (key → text, wired in `translations/index.ts`). `translate()` falls back to the **English** text if a key is missing, never a raw key. Adding a key now means: add `en`+`fr` in `i18n.ts`, then the other seven in their files (or accept the English fallback).
+- **Coverage**: every key in the dictionary (UI labels, navigation, all asset categories and their form fields/placeholders, banking, export/report headings, DCC labels, the help chat) was translated for all seven languages; a script check confirmed no missing/extra keys, no empty strings and identical `{placeholders}` for each. **Translated by AI, not reviewed by native speakers or a finance/legal translator** — in particular the French-specific tax/legal DCC terms (IFI, BIC/BNC/BA, nue-propriété, PACS…) and SCPI terms have no real equivalent in several languages and are kept as acronyms or glossed; have each language reviewed before it is promoted to customers. Count placeholders use one form ("{n} accounts"), so plural agreement (Russian, Arabic) is approximate.
+- **Switching**: `LanguageSwitcher` is now a dropdown (native language names, compact "EN/FR/…" button) in the dashboard header, the login page, the landing page and a labelled selector on the Settings page. The choice is stored in `localStorage` (`opes_locale`) and applied instantly; `<html lang>` and `dir` follow it (`LanguageProvider`).
+- **RTL (Arabic)**: `dir="rtl"` is set on `<html>`; the code base's physical Tailwind classes (`ml-/mr-/pl-/pr-/left-/right-/text-left/text-right/border-l/border-r/rounded-l/rounded-r`) were converted to logical ones (`ms-/me-/ps-/pe-/start-/end-/text-start/text-end/border-s/border-e/rounded-s/rounded-e`) across all components, so layouts mirror; centred overlays (`left-1/2`, dialogs' `left-[50%]`) were deliberately left alone. Charts stay left-to-right. Directional icons (arrows, chevrons) are **not** individually mirrored and some third-party-style widgets may still look off — treat Arabic layout as needing a visual pass.
+- **Number, currency and date formats** follow the language through `useLanguage().intlLocale` (en-US, fr-FR, es-ES, it-IT, de-DE, ar-AE — Western digits —, ru-RU, hi-IN with lakh/crore grouping, zh-CN) instead of hard-coded "en-US"/"en-GB". Money in exports written to disk (Excel) is stored as numbers, so the viewer's own locale formats it.
+- **DCC PDF**: the on-screen DCC form and its labels exist in all nine languages, but the **PDF** can only be produced in English, French, Spanish, Italian and German: jsPDF's built-in fonts have no Cyrillic, Arabic, Devanagari or CJK glyphs and no Arabic shaping, so embedding fonts (and a shaping engine) would be needed for the other four. The dialog lists only the supported languages and says so (`dcc_pdf_latin_only`).
+- **Not translated**: some pages were never put through the dictionary and still show hard-coded English (Settings page headings and profile form, MFA setup, parts of Security and Login). The AI help assistant's replies follow the user's language but its system prompt is English.
+- **Cost**: the seven bundles add ~550 KB of source (≈ 150 KB gzipped) to the client JS because they are statically imported; they could be lazy-loaded per language if that matters.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

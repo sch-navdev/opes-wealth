@@ -197,7 +197,7 @@ export function ResetPasswordForm() {
       <div className="space-y-2">
         <Label htmlFor="new-password">New Password</Label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="new-password"
             name="password"
@@ -205,7 +205,7 @@ export function ResetPasswordForm() {
             placeholder="••••••••"
             required
             autoComplete="new-password"
-            className="pl-9 pr-9"
+            className="ps-9 pe-9"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onBlur={() => setPasswordTouched(true)}
@@ -228,7 +228,7 @@ export function ResetPasswordForm() {
       <div className="space-y-2">
         <Label htmlFor="confirm-new-password">Confirm New Password</Label>
         <div className="relative">
-          <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="confirm-new-password"
             name="confirmPassword"
@@ -236,7 +236,7 @@ export function ResetPasswordForm() {
             placeholder="••••••••"
             required
             autoComplete="new-password"
-            className="pl-9 pr-9"
+            className="ps-9 pe-9"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />

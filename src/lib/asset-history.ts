@@ -15,4 +15,5 @@ export type AssetHistorySource =
   | "finnhub"
   | "yahoo"
   | "broker_import"
-  | "vehicle_valuation";
+  | "vehicle_valuation"
+  | "open_finance";

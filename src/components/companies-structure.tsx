@@ -21,9 +21,9 @@ function NodeRow({
   baseCurrency: string;
   depth: number;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: baseCurrency });
+  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
   const md = node.metadata;
   const meta = [
     t(ENTITY_TYPE_LABEL_KEYS[md.entity_type]),

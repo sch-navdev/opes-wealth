@@ -23,7 +23,7 @@ function NumberField({
       <Label>{label}</Label>
       <div className="relative w-full min-w-0">
         {symbol && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
             {symbol}
           </span>
         )}
@@ -31,7 +31,7 @@ function NumberField({
           type="number"
           step="any"
           min="0"
-          className={symbol ? "pl-12" : undefined}
+          className={symbol ? "ps-12" : undefined}
           value={value ?? ""}
           onChange={(e) =>
             onChange(e.target.value === "" ? null : Number(e.target.value))

@@ -304,7 +304,7 @@ export function AssetDetailView({
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshValue, setRefreshValue] = useState("");
   const [refreshCurrency, setRefreshCurrency] = useState(asset.currency);
@@ -384,7 +384,7 @@ export function AssetDetailView({
     : null;
   const images = asset.images ?? [];
 
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
+  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency: asset.currency,
   });
@@ -839,13 +839,13 @@ export function AssetDetailView({
       : []),
   ];
 
-  const axisDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  const axisDateFormatter = new Intl.DateTimeFormat(intlLocale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
 
-  const lastPricedAtFormatter = new Intl.DateTimeFormat("en-GB", {
+  const lastPricedAtFormatter = new Intl.DateTimeFormat(intlLocale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -1026,7 +1026,7 @@ export function AssetDetailView({
       }
       setMarketPriceMessage(
         t(result.priced ? "wallet_synced" : "wallet_synced_unpriced", {
-          balance: result.balance.toLocaleString("en-US", { maximumFractionDigits: 8 }),
+          balance: result.balance.toLocaleString(intlLocale, { maximumFractionDigits: 8 }),
           ticker: asset.ticker_symbol ?? "",
         }),
       );
@@ -1260,7 +1260,7 @@ export function AssetDetailView({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-left sm:text-right">
+              <div className="text-start sm:text-end">
                 <p className="text-xs text-muted-foreground">
                   {isRealEstate ? t("net_equity") : t("value")}
                 </p>
@@ -1458,7 +1458,7 @@ export function AssetDetailView({
                       <Label htmlFor="new_value">{t("new_market_value")}</Label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
-                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                          <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                             {getCurrencySymbol(refreshCurrency)}
                           </span>
                           <Input
@@ -1466,7 +1466,7 @@ export function AssetDetailView({
                             type="number"
                             step="any"
                             min="0"
-                            className="pl-12"
+                            className="ps-12"
                             value={refreshValue}
                             onChange={(e) => setRefreshValue(e.target.value)}
                             required
@@ -2019,7 +2019,7 @@ export function AssetDetailView({
                         <TableRow>
                           <TableHead>{t("date")}</TableHead>
                           <TableHead>{t("source")}</TableHead>
-                          <TableHead className="text-right">{t("amount")}</TableHead>
+                          <TableHead className="text-end">{t("amount")}</TableHead>
                           <TableHead className="w-10" />
                         </TableRow>
                       </TableHeader>
@@ -2030,7 +2030,7 @@ export function AssetDetailView({
                               {point.recorded_date}
                             </TableCell>
                             <TableCell className="text-foreground">{point.source}</TableCell>
-                            <TableCell className="text-right text-foreground">
+                            <TableCell className="text-end text-foreground">
                               {maskValue(currencyFormatter.format(point.value))}
                             </TableCell>
                             <TableCell>
@@ -2210,7 +2210,7 @@ export function AssetDetailView({
                     <p className="text-xs text-muted-foreground">{t("mileage")}</p>
                     <p className="text-lg font-semibold text-foreground">
                       {vehicleMetadata.mileage != null
-                        ? maskValue(`${vehicleMetadata.mileage.toLocaleString()} km`)
+                        ? maskValue(`${vehicleMetadata.mileage.toLocaleString(intlLocale)} km`)
                         : "—"}
                     </p>
                   </CardContent>
@@ -2337,7 +2337,7 @@ export function AssetDetailView({
                         value={maskValue(currencyFormatter.format(netShare))}
                       />
                       {hasLoan ? (
-                        <div className="text-right">
+                        <div className="text-end">
                           <p className="text-xs text-muted-foreground">
                             {t("active_loan_balance")}
                           </p>
@@ -2451,11 +2451,11 @@ export function AssetDetailView({
                             <TableRow>
                               <TableHead>{t("milestone")}</TableHead>
                               <TableHead>{t("due_date")}</TableHead>
-                              <TableHead className="text-right">
+                              <TableHead className="text-end">
                                 {t("amount")}
                               </TableHead>
-                              <TableHead className="text-right">%</TableHead>
-                              <TableHead className="text-right">
+                              <TableHead className="text-end">%</TableHead>
+                              <TableHead className="text-end">
                                 {t("status")}
                               </TableHead>
                             </TableRow>
@@ -2479,17 +2479,17 @@ export function AssetDetailView({
                                   <TableCell className="text-muted-foreground">
                                     {milestone.due_date || "—"}
                                   </TableCell>
-                                  <TableCell className="text-right text-foreground">
+                                  <TableCell className="text-end text-foreground">
                                     {maskValue(
                                       currencyFormatter.format(
                                         milestone.amount,
                                       ),
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right text-muted-foreground">
+                                  <TableCell className="text-end text-muted-foreground">
                                     {milestone.percentage}%
                                   </TableCell>
-                                  <TableCell className="text-right">
+                                  <TableCell className="text-end">
                                     <Badge
                                       variant={
                                         milestone.status === "paid"
@@ -2633,7 +2633,7 @@ export function AssetDetailView({
                           <TableRow>
                             <TableHead>{t("description")}</TableHead>
                             <TableHead>{t("date")}</TableHead>
-                            <TableHead className="text-right">{t("amount")}</TableHead>
+                            <TableHead className="text-end">{t("amount")}</TableHead>
                             <TableHead className="w-10" />
                           </TableRow>
                         </TableHeader>
@@ -2646,7 +2646,7 @@ export function AssetDetailView({
                               <TableCell className="text-muted-foreground">
                                 {expense.date}
                               </TableCell>
-                              <TableCell className="text-right text-foreground">
+                              <TableCell className="text-end text-foreground">
                                 {maskValue(currencyFormatter.format(expense.amount))}
                               </TableCell>
                               <TableCell>
@@ -3284,16 +3284,16 @@ export function AssetDetailView({
                                       <TableRow>
                                         <TableHead>{t("payment_number")}</TableHead>
                                         <TableHead>{t("due_date")}</TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="text-end">
                                           {t("interest_rate")}
                                         </TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="text-end">
                                           {t("principal")}
                                         </TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="text-end">
                                           {t("interest_paid")}
                                         </TableHead>
-                                        <TableHead className="text-right">
+                                        <TableHead className="text-end">
                                           {t("outstanding_loan_balance")}
                                         </TableHead>
                                       </TableRow>
@@ -3305,20 +3305,20 @@ export function AssetDetailView({
                                           <TableCell className="text-muted-foreground">
                                             {entry.date}
                                           </TableCell>
-                                          <TableCell className="text-right text-muted-foreground">
+                                          <TableCell className="text-end text-muted-foreground">
                                             {entry.rateUsed.toFixed(2)}%
                                           </TableCell>
-                                          <TableCell className="text-right">
+                                          <TableCell className="text-end">
                                             {maskValue(
                                               currencyFormatter.format(entry.principalAmount),
                                             )}
                                           </TableCell>
-                                          <TableCell className="text-right">
+                                          <TableCell className="text-end">
                                             {maskValue(
                                               currencyFormatter.format(entry.interestAmount),
                                             )}
                                           </TableCell>
-                                          <TableCell className="text-right">
+                                          <TableCell className="text-end">
                                             {maskValue(
                                               currencyFormatter.format(entry.remainingBalance),
                                             )}
@@ -3367,7 +3367,7 @@ export function AssetDetailView({
                       label={t("mileage")}
                       value={
                         vehicleMetadata.mileage != null
-                          ? `${vehicleMetadata.mileage.toLocaleString()} km`
+                          ? `${vehicleMetadata.mileage.toLocaleString(intlLocale)} km`
                           : null
                       }
                     />
@@ -3525,7 +3525,7 @@ export function AssetDetailView({
                                 <TableRow>
                                   <TableHead className="text-muted-foreground">{t("scpi_quarter")}</TableHead>
                                   <TableHead className="text-muted-foreground">{t("scpi_dividend_date")}</TableHead>
-                                  <TableHead className="text-right text-muted-foreground">
+                                  <TableHead className="text-end text-muted-foreground">
                                     {t("scpi_dividend_amount")}
                                   </TableHead>
                                   <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
@@ -3536,7 +3536,7 @@ export function AssetDetailView({
                                   <TableRow key={d.id}>
                                     <TableCell className="text-foreground">{d.quarter || "—"}</TableCell>
                                     <TableCell className="tabular-nums text-foreground">{d.date}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-foreground">
+                                    <TableCell className="text-end tabular-nums text-foreground">
                                       {money(d.amount)}
                                     </TableCell>
                                     <TableCell
@@ -3712,10 +3712,10 @@ export function AssetDetailView({
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="text-muted-foreground">{t("pe_call_date")}</TableHead>
-                                  <TableHead className="text-right text-muted-foreground">
+                                  <TableHead className="text-end text-muted-foreground">
                                     {t("pe_call_amount")}
                                   </TableHead>
-                                  <TableHead className="text-right text-muted-foreground">%</TableHead>
+                                  <TableHead className="text-end text-muted-foreground">%</TableHead>
                                   <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -3723,10 +3723,10 @@ export function AssetDetailView({
                                 {calls.map((call) => (
                                   <TableRow key={call.id}>
                                     <TableCell className="tabular-nums text-foreground">{call.due_date}</TableCell>
-                                    <TableCell className="text-right tabular-nums text-foreground">
+                                    <TableCell className="text-end tabular-nums text-foreground">
                                       {maskValue(currencyFormatter.format(call.amount))}
                                     </TableCell>
-                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                    <TableCell className="text-end tabular-nums text-muted-foreground">
                                       {call.percentage ? `${call.percentage}%` : "—"}
                                     </TableCell>
                                     <TableCell
@@ -3799,7 +3799,7 @@ export function AssetDetailView({
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead className="text-muted-foreground">{t("pe_call_date")}</TableHead>
-                                    <TableHead className="text-right text-muted-foreground">
+                                    <TableHead className="text-end text-muted-foreground">
                                       {t("pe_projected_distribution")}
                                     </TableHead>
                                   </TableRow>
@@ -3808,7 +3808,7 @@ export function AssetDetailView({
                                   {dists.map((dist) => (
                                     <TableRow key={dist.id}>
                                       <TableCell className="tabular-nums text-foreground">{dist.due_date}</TableCell>
-                                      <TableCell className="text-right tabular-nums text-success">
+                                      <TableCell className="text-end tabular-nums text-success">
                                         {maskValue(currencyFormatter.format(dist.amount))}
                                       </TableCell>
                                     </TableRow>
@@ -3837,7 +3837,7 @@ export function AssetDetailView({
                   <DetailField label={t("exchange")} value={equityMetadata.exchange} />
                   <DetailField
                     label={t("shares_owned")}
-                    value={maskValue(asset.quantity.toLocaleString())}
+                    value={maskValue(asset.quantity.toLocaleString(intlLocale))}
                   />
                   <DetailField
                     label={t("average_cost_basis")}

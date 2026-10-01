@@ -6,16 +6,18 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen bg-background">
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute end-4 top-4 z-10 flex items-center gap-2">
+        <LanguageSwitcher />
         <ThemeToggle />
       </div>
-      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-border bg-card p-10 lg:flex">
+      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-e border-border bg-card p-10 lg:flex">
         <div
           className="pointer-events-none absolute inset-0"
           style={{

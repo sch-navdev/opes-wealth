@@ -31,6 +31,17 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 - **New `.env.example`** documents every variable (Supabase keys, `NEXT_PUBLIC_SITE_URL`, the local-only mock-auth vars). `.gitignore` previously ignored `.env*` entirely, so an `!.env.example` exception was added.
 - **Validation**: there is no central env schema, so `next.config.ts` now `console.warn`s at build/server start when `NODE_ENV === "production"` and `NEXT_PUBLIC_SITE_URL` is unset (a warning, not a build failure). `tsc --noEmit`/`eslint`/`npm run build` clean with the variable unset locally.
 
+
+## Open Finance Environment Variables (2026-10-01)
+
+- New optional server-side variables, documented in `.env.example`: `ALTAREQ_SANDBOX_MODE`, `ALTAREQ_CLIENT_ID`, `ALTAREQ_AUTH_URL`, `ALTAREQ_TOKEN_URL`, `ALTAREQ_API_BASE_URL`, `ALTAREQ_REDIRECT_URI` (`https://www.opeswealth.app/dashboard/banking/callback`), `ALTAREQ_CLIENT_CERT`/`ALTAREQ_CLIENT_KEY` (mTLS), and `BANK_TOKEN_ENCRYPTION_KEY` (generate: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). `SUPABASE_SERVICE_ROLE_KEY` (already present in Vercel) is also used by the bank-token code. **Do not set `ALTAREQ_SANDBOX_MODE` in production.** Nothing needs to be set for the app to keep working: without them the Connect bank button is simply disabled. See [[Market-Data-Integration|Market Data Integration]].
+
+
+## AI Help Assistant Environment Variables (2026-10-01)
+
+- `ANTHROPIC_API_KEY` (required for the chat; without it the widget reports it isn't set up), `ASSISTANT_MODEL` (optional, default `claude-sonnet-5-5`).
+- Daily bug flush: `CRON_SECRET` (Vercel sends it as a Bearer token to the cron in `vercel.json`), plus a destination: `GITHUB_ISSUES_TOKEN` + `GITHUB_ISSUES_REPO` (`owner/name`; token needs Issues write) and/or `BUG_REPORT_WEBHOOK_URL`. Apply migration `0021` first. Details: [[Architecture|Architecture]].
+
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)

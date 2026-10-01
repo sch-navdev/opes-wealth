@@ -16,9 +16,9 @@ export const currencies: Currency[] = [
 ];
 
 /** Short currency symbol/prefix for a code (e.g. "AED", "$", "€"). Falls back to the code itself for anything `Intl` doesn't recognize. */
-export function getCurrencySymbol(code: string): string {
+export function getCurrencySymbol(code: string, locale: string = "en-US"): string {
   try {
-    const parts = new Intl.NumberFormat("en-US", {
+    const parts = new Intl.NumberFormat(locale, {
       style: "currency",
       currency: code,
       currencyDisplay: "narrowSymbol",

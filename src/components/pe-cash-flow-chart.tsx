@@ -28,9 +28,9 @@ export function PeCashFlowChart({
   metadata: PrivateEquityMetadata;
   currency: string;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat("en-US", {
+  const formatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency,
     maximumFractionDigits: 0,

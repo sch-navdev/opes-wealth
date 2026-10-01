@@ -12,7 +12,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { InstitutionLogo } from "@/components/institution-logo";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -109,7 +109,7 @@ function SortableHead({
   const isActive = activeKey === sortKey;
   const Icon = isActive ? (direction === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
   return (
-    <TableHead className={align === "right" ? "text-right" : undefined}>
+    <TableHead className={align === "right" ? "text-end" : undefined}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}
@@ -431,7 +431,7 @@ export function AddInvestmentsDialog() {
                 key={key}
                 type="button"
                 onClick={() => selectMethod(key)}
-                className="flex flex-col items-start gap-2 border border-border bg-muted/30 p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                className="flex flex-col items-start gap-2 border border-border bg-muted/30 p-4 text-start transition-colors hover:border-primary hover:bg-primary/5"
               >
                 <Icon className="size-6 text-primary" />
                 <span className="text-sm font-medium text-foreground">{t(label as TranslationKey)}</span>
@@ -458,11 +458,7 @@ export function AddInvestmentsDialog() {
                   }}
                   className="flex flex-col items-center gap-2 border border-border bg-muted/30 p-4 transition-colors hover:border-primary hover:bg-primary/5"
                 >
-                  <Avatar size="lg" className="rounded-md">
-                    <AvatarFallback className="rounded-md text-lg font-semibold">
-                      {broker.logoInitial}
-                    </AvatarFallback>
-                  </Avatar>
+                  <InstitutionLogo kind="broker" id={broker.id} name={broker.name} size="lg" />
                   <span className="text-sm font-medium text-foreground">{broker.name}</span>
                 </button>
               ))}
@@ -833,7 +829,7 @@ export function AddInvestmentsDialog() {
                               <div className="font-medium text-foreground">
                                 {trade.ticker}
                                 {trade.exchange && (
-                                  <span className="ml-1 text-xs text-muted-foreground">{trade.exchange}</span>
+                                  <span className="ms-1 text-xs text-muted-foreground">{trade.exchange}</span>
                                 )}
                               </div>
                               <div className="text-xs text-muted-foreground">
@@ -867,7 +863,7 @@ export function AddInvestmentsDialog() {
                                 type="number"
                                 step="any"
                                 min="0"
-                                className="w-24 text-right"
+                                className="w-24 text-end"
                                 value={trade.quantity}
                                 onChange={(e) => updateTrade(index, "quantity", Number(e.target.value) || 0)}
                               />
@@ -877,7 +873,7 @@ export function AddInvestmentsDialog() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                className="w-28 text-right"
+                                className="w-28 text-end"
                                 value={trade.price}
                                 onChange={(e) => updateTrade(index, "price", Number(e.target.value) || 0)}
                               />
@@ -887,7 +883,7 @@ export function AddInvestmentsDialog() {
                                 type="number"
                                 step="0.000001"
                                 min="0"
-                                className="w-28 text-right"
+                                className="w-28 text-end"
                                 value={trade.exchangeRate ?? 1}
                                 onChange={(e) => updateTrade(index, "exchangeRate", Number(e.target.value) || 0)}
                               />
@@ -897,7 +893,7 @@ export function AddInvestmentsDialog() {
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                className="w-24 text-right"
+                                className="w-24 text-end"
                                 value={trade.brokerage ?? 0}
                                 onChange={(e) => updateTrade(index, "brokerage", Number(e.target.value) || 0)}
                               />
@@ -950,7 +946,7 @@ export function AddInvestmentsDialog() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t("holding_ticker")}</TableHead>
-                    <TableHead className="text-right">{t("investments_result_status")}</TableHead>
+                    <TableHead className="text-end">{t("investments_result_status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -959,7 +955,7 @@ export function AddInvestmentsDialog() {
                       <TableCell className="font-medium text-foreground">{result.ticker}</TableCell>
                       <TableCell
                         className={cn(
-                          "text-right",
+                          "text-end",
                           result.status === "error" ? "text-destructive" : "text-success",
                         )}
                         title={result.message}

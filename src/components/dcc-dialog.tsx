@@ -36,7 +36,7 @@ import {
   type DccRelation,
   type YesNo,
 } from "@/lib/dcc";
-import type { Locale } from "@/lib/i18n";
+import { LOCALE_INFO, PDF_LOCALES, type Locale } from "@/lib/locales";
 
 const NONE = "__none__";
 
@@ -189,7 +189,7 @@ export function DccDialog({
 }) {
   const { t, locale } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [docLocale, setDocLocale] = useState<Locale>(locale);
+  const [docLocale, setDocLocale] = useState<Locale>(PDF_LOCALES.includes(locale) ? locale : "en");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -271,10 +271,16 @@ export function DccDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fr">{t("dcc_lang_fr")}</SelectItem>
-                  <SelectItem value="en">{t("dcc_lang_en")}</SelectItem>
+                  {LOCALE_INFO.filter((l) => PDF_LOCALES.includes(l.code)).map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {!PDF_LOCALES.includes(locale) ? (
+                <p className="text-[11px] text-muted-foreground">{t("dcc_pdf_latin_only")}</p>
+              ) : null}
             </div>
             <div className="min-w-0 space-y-1">
               <Label className="text-xs text-muted-foreground">{t("dcc_password_label")}</Label>

@@ -93,7 +93,7 @@ function NumberField({
       <Label>{label}</Label>
       <div className="relative w-full min-w-0">
         {symbol && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
             {symbol}
           </span>
         )}
@@ -101,7 +101,7 @@ function NumberField({
           type="number"
           step="any"
           min="0"
-          className={symbol ? "pl-12" : undefined}
+          className={symbol ? "ps-12" : undefined}
           value={value ?? ""}
           onChange={(e) =>
             onChange(e.target.value === "" ? null : Number(e.target.value))
@@ -160,7 +160,7 @@ export function RealEstateFields({
   currency: string;
 }) {
   const currencySymbol = getCurrencySymbol(currency);
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   function set<K extends keyof RealEstateMetadata>(
     key: K,
     next: RealEstateMetadata[K],
@@ -486,7 +486,7 @@ export function RealEstateFields({
                 Total Paid to Date
               </p>
               <p className="text-sm font-medium text-success">
-                {value.paid_to_date.toLocaleString()}
+                {value.paid_to_date.toLocaleString(intlLocale)}
               </p>
             </div>
             <div className="min-w-0">
@@ -494,7 +494,7 @@ export function RealEstateFields({
                 Outstanding Balance
               </p>
               <p className="text-sm font-medium text-destructive">
-                {value.outstanding_balance.toLocaleString()}
+                {value.outstanding_balance.toLocaleString(intlLocale)}
               </p>
             </div>
           </div>
@@ -738,14 +738,14 @@ export function RealEstateFields({
               </SelectContent>
             </Select>
             <div className="relative min-w-0 flex-1">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+              <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                 {currencySymbol}
               </span>
               <Input
                 type="number"
                 step="any"
                 min="0"
-                className="w-full pl-12"
+                className="w-full ps-12"
                 value={value.registration_fee_amount || ""}
                 onChange={(e) =>
                   set(

@@ -74,7 +74,7 @@ export function RangeSelector({
           {t("range_from")}
           <Input
             type="date"
-            className="ml-2 inline-block h-8 w-36"
+            className="ms-2 inline-block h-8 w-36"
             value={value.from}
             onChange={(e) => onChange({ ...value, from: e.target.value })}
             aria-label={t("range_from")}
@@ -84,7 +84,7 @@ export function RangeSelector({
           {t("range_to")}
           <Input
             type="date"
-            className="ml-2 inline-block h-8 w-36"
+            className="ms-2 inline-block h-8 w-36"
             value={value.to}
             onChange={(e) => onChange({ ...value, to: e.target.value })}
             aria-label={t("range_to")}

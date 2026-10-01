@@ -76,7 +76,7 @@ export function PortfolioGroups({
   performanceByAsset?: Record<string, { amount: number; percent: number | null }>;
 }) {
   const { maskValue } = usePrivacy();
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   // Folders start closed — that's the whole point of grouping: a glance at
   // the category/count/subtotal without the full row list until asked for.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -122,7 +122,7 @@ export function PortfolioGroups({
     });
   }
 
-  const currencyFormatter = new Intl.NumberFormat("en-US", {
+  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency: displayCurrency,
   });
@@ -246,7 +246,7 @@ export function PortfolioGroups({
             className="border border-border"
           >
             <CollapsibleTrigger
-              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <div className="flex min-w-0 items-center gap-2">
                 <CategoryIcon name={group.name} />

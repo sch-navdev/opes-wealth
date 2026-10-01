@@ -55,8 +55,8 @@ export function PrivateEquityFields({
   onChange: (next: PrivateEquityMetadata) => void;
   currency: string;
 }) {
-  const { t } = useLanguage();
-  const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency });
+  const { t, intlLocale } = useLanguage();
+  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
 
   // Schedule generator inputs (not persisted — only the resulting calls are).
   const [percentPerCall, setPercentPerCall] = useState("10");
@@ -209,11 +209,11 @@ export function PrivateEquityFields({
               step="any"
               min="0"
               max="100"
-              className="pr-8"
+              className="pe-8"
               value={value.ownership_percentage ?? ""}
               onChange={(e) => set("ownership_percentage", numberOrNull(e.target.value))}
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
               %
             </span>
           </div>

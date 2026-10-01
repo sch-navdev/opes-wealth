@@ -49,7 +49,7 @@ export function CategoryExplorerPanel({
   today: string;
   onClose: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
 
   const sortedAssets = useMemo(
@@ -68,8 +68,8 @@ export function CategoryExplorerPanel({
   const [showInvested, setShowInvested] = useState(true);
 
   const formatter = useMemo(
-    () => new Intl.NumberFormat("en-US", { style: "currency", currency }),
-    [currency],
+    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    [intlLocale, currency],
   );
   const money = (n: number) => maskValue(formatter.format(n));
 
