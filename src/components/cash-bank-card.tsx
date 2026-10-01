@@ -8,8 +8,18 @@ import { BankLogoByName } from "@/components/institution-logo";
 import { Badge } from "@/components/ui/badge";
 import { disconnectBank, syncBankConnection } from "@/app/dashboard/banking/actions";
 import type { BankSyncMode } from "@/lib/banking/institutions";
+import { isBankAccountType, type BankAccountType } from "@/lib/bank-account";
+import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { AddAssetDialog } from "@/components/add-asset-dialog";
+
+const ACCOUNT_TYPE_KEYS: Record<BankAccountType, TranslationKey> = {
+  checking: "bank_account_type_checking",
+  savings: "bank_account_type_savings",
+  credit_card: "bank_account_type_credit_card",
+  term_deposit: "bank_account_type_term_deposit",
+  other: "bank_account_type_other",
+};
+import { AddBankAccountDialog } from "@/components/add-bank-account-dialog";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +36,9 @@ export type CashAccount = {
   baseValue: number;
   /** Date of the newest balance on record, if any. */
   lastDate: string | null;
+  /** Bank the account is with, and its kind (set by the Add account dialog or a statement import). */
+  institutionName?: string;
+  accountType?: string;
   /** Open Finance link, when this account is synced from a bank rather than (only) uploaded by CSV. */
   bank?: {
     connectionId: string;
@@ -61,12 +74,10 @@ function formatSyncTime(iso: string | null, locale: string): string | null {
  */
 export function CashBankCard({
   accounts,
-  categories,
   baseCurrency,
   bankSyncMode,
 }: {
   accounts: CashAccount[];
-  categories: { id: string; name: string }[];
   baseCurrency: string;
   /** Whether Open Finance sync is live, sample (development) or not configured. */
   bankSyncMode: BankSyncMode;
@@ -120,15 +131,7 @@ export function CashBankCard({
             mode={bankSyncMode}
             cashAccounts={accounts.map((a) => ({ id: a.id, name: a.name, isLinked: !!a.bank }))}
           />
-          <AddAssetDialog
-            categories={categories}
-            defaultCategoryName="Cash"
-            trigger={
-              <Button type="button" variant="outline" size="sm">
-                {t("cash_bank_add")}
-              </Button>
-            }
-          />
+          <AddBankAccountDialog />
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -147,12 +150,22 @@ export function CashBankCard({
                   className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
-                    <Link
-                      href={`/dashboard/assets/${account.id}`}
-                      className="truncate text-sm font-medium text-foreground hover:underline"
-                    >
-                      {account.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {account.institutionName && <BankLogoByName name={account.institutionName} />}
+                      <Link
+                        href={`/dashboard/assets/${account.id}`}
+                        className="truncate text-sm font-medium text-foreground hover:underline"
+                      >
+                        {account.name}
+                      </Link>
+                    </div>
+                    {(account.institutionName || account.accountType) && (
+                      <p className="text-xs text-muted-foreground">
+                        {[account.institutionName, isBankAccountType(account.accountType) ? t(ACCOUNT_TYPE_KEYS[account.accountType]) : null]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       {account.lastDate
                         ? t("cash_bank_last_balance", { date: account.lastDate })

@@ -25,6 +25,7 @@ import {
 } from "@/lib/dcc";
 import { translate, type TranslationKey } from "@/lib/i18n";
 import { localeInfo, type Locale } from "@/lib/locales";
+import { drawLogo, drawPdfChrome, loadPdfLogo, type PdfLogo } from "@/lib/pdf-branding";
 
 const INK: [number, number, number] = [31, 41, 55];
 const ACCENT: [number, number, number] = [168, 124, 31];
@@ -33,6 +34,8 @@ const BAND: [number, number, number] = [243, 244, 246];
 const MARGIN = 15;
 const PAGE_W = 210;
 const PAGE_H = 297;
+/** First content line on a page after the cover (clears the header logo band). */
+const TOP = 18;
 
 const BRACKETS = [50000, 75000, 100000, 200000, 500000];
 
@@ -40,7 +43,10 @@ export async function generateDccPdf(
   data: DccData,
   locale: Locale,
   password: string,
+  /** Override for tests; by default the logo is loaded from `/logo.png`. `null` = no logo. */
+  logoOverride?: PdfLogo | null,
 ): Promise<Blob> {
+  const logo = logoOverride === undefined ? await loadPdfLogo() : logoOverride;
   const [{ jsPDF }, autoTableModule] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
@@ -83,7 +89,7 @@ export async function generateDccPdf(
   function ensure(space: number) {
     if (y + space > PAGE_H - 20) {
       doc.addPage();
-      y = MARGIN;
+      y = TOP;
     }
   }
 
@@ -125,7 +131,7 @@ export async function generateDccPdf(
       head: [head],
       body: body.length > 0 ? body : [head.map((_, i) => (i === 0 ? t("dcc_none_recorded") : ""))],
       foot: opts?.foot ? [opts.foot] : undefined,
-      margin: { left: MARGIN, right: MARGIN },
+      margin: { left: MARGIN, right: MARGIN, top: 18, bottom: 20 },
       theme: "grid",
       styles: { font: "helvetica", fontSize: 8.5, textColor: INK, cellPadding: 1.8, lineColor: [209, 213, 219], lineWidth: 0.1 },
       headStyles: { fillColor: BAND, textColor: INK, fontStyle: "bold" },
@@ -163,6 +169,11 @@ export async function generateDccPdf(
   // ---- Cover ---------------------------------------------------------------
   doc.setFillColor(...BAND);
   doc.rect(0, 0, PAGE_W, 110, "F");
+  if (logo) drawLogo(doc, logo, MARGIN, 16, 24);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(...ACCENT);
+  doc.text("Opes Wealth", MARGIN + (logo ? (24 * logo.width) / logo.height + 4 : 0), 31);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
   doc.setTextColor(...INK);
@@ -199,7 +210,7 @@ export async function generateDccPdf(
   doc.text(`${t("dcc_generated_on")} ${today}`, MARGIN, 255);
   doc.text(t("dcc_confidential"), MARGIN, 261);
   doc.addPage();
-  y = MARGIN;
+  y = TOP;
 
   // ---- You and your spouse ------------------------------------------------------
   heading(t("dcc_section_you_spouse"));
@@ -395,16 +406,16 @@ export async function generateDccPdf(
   doc.text(`[ ] ${t("dcc_advisor_check_consistency")} ....................`, MARGIN + 3, y + 13);
   doc.text(`[ ] ${t("dcc_advisor_check_completeness")} ....................`, MARGIN + 3, y + 20);
 
-  // ---- Footer on every page except the cover --------------------------------------------------------------
-  const pages = doc.getNumberOfPages();
-  for (let i = 2; i <= pages; i++) {
-    doc.setPage(i);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...MUTED);
-    doc.text(`${t("dcc_title")} — ${clientName}`.trim(), MARGIN, PAGE_H - 8);
-    doc.text(`${i - 1} / ${pages - 1}`, PAGE_W - MARGIN, PAGE_H - 8, { align: "right" });
-  }
+  // ---- Header (logo) and footer (page numbers) on every page after the cover ---------------------------------
+  drawPdfChrome(doc, {
+    logo,
+    firstPage: 2,
+    margin: MARGIN,
+    pageWidth: PAGE_W,
+    pageHeight: PAGE_H,
+    leftCaption: `${t("dcc_title")} — ${clientName}`.trim(),
+    pageLabel: (n, total) => t("pdf_page_of", { n, total }),
+  });
 
   return doc.output("blob");
 }

@@ -343,6 +343,9 @@ export default async function DashboardPage({
       currency: a.currency,
       nativeValue: a.current_value,
       baseValue: convertToBaseCurrency(a.current_value, a.currency, displayCurrency, rates),
+      institutionName:
+        typeof a.metadata?.institution_name === "string" ? a.metadata.institution_name : undefined,
+      accountType: typeof a.metadata?.account_type === "string" ? a.metadata.account_type : undefined,
       lastDate:
         (allHistory ?? [])
           .filter((h) => h.asset_id === a.id)
@@ -403,7 +406,6 @@ export default async function DashboardPage({
 
         <CashBankCard
           accounts={cashAccounts}
-          categories={categories ?? []}
           baseCurrency={displayCurrency}
           bankSyncMode={getBankSyncMode()}
         />

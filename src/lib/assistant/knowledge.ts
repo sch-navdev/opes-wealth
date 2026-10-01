@@ -15,7 +15,7 @@ export const PRODUCT_KNOWLEDGE = `
 - Privacy mode (eye icon): hides amounts everywhere on screen.
 
 ## Categories
-Real Estate, SCPI, Brokerage Account (equities), Crypto, Precious Metals, Cash, Vehicles, Private Equity, Companies, Liabilities.
+Real Estate, REIT (shown as SCPI in the French interface; it is the app's real-estate fund / SCPI category), Brokerage Account (equities), Crypto, Precious Metals, Cash, Vehicles, Private Equity, Companies, Liabilities.
 
 ## Importing data
 - Broker trades: Add investments -> Upload from broker -> Saxo Bank or Sharesight (.xlsx or .csv). Trades are netted into one holding per instrument; re-uploading an overlapping export only adds trades not already imported (duplicates are matched on ticker, exchange, date, side, quantity, price). Review the trade table before importing; set the exchange rate / brokerage if needed.
@@ -30,7 +30,7 @@ Real Estate, SCPI, Brokerage Account (equities), Crypto, Precious Metals, Cash, 
 ## How numbers are calculated
 - Net worth = total of assets minus liabilities, every amount converted to the Base Currency (Settings) at stored/latest FX rates.
 - An asset's value comes from its latest value in its history (manual entries, CSV imports, market prices, broker holdings priced at the latest quote). Equity holdings = net quantity x latest price.
-- Charts: "Historical" uses recorded value history; "Projection" extends forward from the last value using the asset's growth/projection settings (real estate, private equity distributions, SCPI, etc.); invested-capital lines show what you put in versus market value.
+- Charts: "Historical" uses recorded value history; "Projection" extends forward from the last value using the asset's growth/projection settings (real estate, private equity distributions, REIT/SCPI, etc.); invested-capital lines show what you put in versus market value.
 - Liabilities (loans, capital calls) reduce net worth and are kept separate from assets.
 - Private equity: capital calls are liabilities; projected distributions and expected multiple/IRR are estimates you can override.
 - Export: the export page produces an Excel workbook and a bilingual PDF summary (DCC format).

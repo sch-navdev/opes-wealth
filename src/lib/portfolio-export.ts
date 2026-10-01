@@ -1,6 +1,6 @@
 /**
  * Full portfolio spreadsheet (.xlsx) — one workbook, one sheet per view:
- * Summary, Assets, Liabilities, Real Estate, Brokerage, SCPI (+ dividends),
+ * Summary, Assets, Liabilities, Real Estate, Brokerage, REIT (+ dividends),
  * Private Equity (+ cash flows), Companies and the complete Valuation History.
  * Numbers are written as real numeric cells (not formatted strings) so the
  * file can be summed, filtered and charted. Values are given in each asset's
@@ -225,7 +225,7 @@ export function buildPortfolioWorkbook(input: {
   const scpiDividendRows: Row[] = scpiAssets.flatMap((a) =>
     parseScpiMetadata(a.metadata).dividends.map(
       (d): Row => ({
-        SCPI: a.name,
+        REIT: a.name,
         Quarter: d.quarter,
         "Payment date": d.date,
         Amount: d.amount,
@@ -320,8 +320,8 @@ export function buildPortfolioWorkbook(input: {
   add("Liabilities", liabilityRows, ["Name", "Type", "Lender / detail", "Currency", "Amount owed", `Amount owed (${baseCurrency})`]);
   add("Real Estate", realEstateRows, Object.keys(realEstateRows[0] ?? {}));
   add("Brokerage", brokerageRows, Object.keys(brokerageRows[0] ?? {}));
-  add("SCPI", scpiRows, Object.keys(scpiRows[0] ?? {}));
-  add("SCPI Dividends", scpiDividendRows, ["SCPI", "Quarter", "Payment date", "Amount", "Currency", "Status"]);
+  add("REIT", scpiRows, Object.keys(scpiRows[0] ?? {}));
+  add("REIT Dividends", scpiDividendRows, ["REIT", "Quarter", "Payment date", "Amount", "Currency", "Status"]);
   add("Private Equity", peRows, Object.keys(peRows[0] ?? {}));
   add("PE Cash Flows", peFlowRows, ["Fund", "Type", "Date", "Amount", "Status"]);
   add("Companies", companyRows, Object.keys(companyRows[0] ?? {}));

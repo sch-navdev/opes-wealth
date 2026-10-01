@@ -113,6 +113,18 @@
 - **Not translated**: some pages were never put through the dictionary and still show hard-coded English (Settings page headings and profile form, MFA setup, parts of Security and Login). The AI help assistant's replies follow the user's language but its system prompt is English.
 - **Cost**: the seven bundles add ~550 KB of source (≈ 150 KB gzipped) to the client JS because they are statically imported; they could be lazy-loaded per language if that matters.
 
+
+## New Keys (Add bank account + Liabilities group, 2026-10-01)
+
+- All nine languages: `bank_account_*` (dialog title/desc, bank, type and the five type labels, name, balance/amount owed, as-of, reference + hint, credit limit, card note, save/saving, errors) and `liabilities_*` (empty state, column headers, property-loan / off-plan / capital-call types, auto-included note, standalone).
+
+
+## REIT vs SCPI Terminology (2026-10-01)
+
+- "SCPI" is the French vehicle; elsewhere the asset class is a REIT or its local form. The category and its mentions now use: **English REIT, Spanish SOCIMI, Italian SIIQ, German/Russian/Hindi/Chinese REIT, Arabic "صندوق استثمار عقاري (REIT)"** (category label; "REIT" in running text), and **French keeps SCPI**. Keys changed (all nine languages): `category_scpi`, `scpi_details`, `export_xlsx_desc`, `dcc_derived_note`, `dcc_nature_scpi`, `dcc_ifi_rights`. The Excel export's sheets are now "REIT" / "REIT Dividends". The assistant's knowledge base mentions both names.
+- **Caveats**: the internal category name in the database stays `SCPI` (it is the lookup key; only the displayed label changed) and so do code identifiers (`scpi_*` keys). An SCPI is **not legally identical to a REIT** (unlisted, French civil-partnership regime, own fee/withdrawal mechanics), so the SCPI-specific field labels (jouissance date, withdrawal value, TDVM, nue-propriété/usufruct) were left as they were. SOCIMI and SIIQ are the closest local equivalents, not exact legal matches — have the terminology confirmed by a local professional.
+- New key `pdf_page_of` ("Page {n} / {total}") in all nine languages.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

@@ -22,6 +22,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { BrokerageHoldingsTable } from "@/components/brokerage-holdings-table";
+import { LiabilitiesGroup } from "@/components/liabilities-group";
 import { PortfolioTable } from "@/components/portfolio-table";
 import { batchDeleteAssets } from "@/app/dashboard/actions";
 import { usePrivacy } from "@/context/privacy-context";
@@ -208,6 +209,8 @@ export function PortfolioGroups({
       )}
       {orderedIds.map((categoryId) => {
         const group = groups.get(categoryId)!;
+        // Liabilities get their own consolidated card below (standalone debts + debts inside other assets).
+        if (group.name === "Liabilities") return null;
         const isOpen = expanded[categoryId] ?? false;
         const translationKey = CATEGORY_NAME_KEYS[group.name];
         const label = translationKey ? t(translationKey) : group.name;
@@ -303,6 +306,7 @@ export function PortfolioGroups({
           </Collapsible>
         );
       })}
+      <LiabilitiesGroup assets={assets} displayCurrency={displayCurrency} rates={rates} />
     </div>
   );
 }

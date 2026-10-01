@@ -47,6 +47,8 @@ import {
   type EquityTrade,
 } from "@/lib/equities";
 import { tradeId } from "@/lib/parsers/broker-registry";
+import { getBank } from "@/lib/banking/institutions";
+import { isBankAccountType } from "@/lib/bank-account";
 import type { AggregatedHolding, ParsedIncome } from "@/lib/parsers/types";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { estimateOffplanValueAt } from "@/lib/real-estate-analytics";
@@ -2728,6 +2730,99 @@ export async function addLiability(formData: FormData) {
   if (error) return { error: error.message };
 
   const historyError = await recordLiabilityBalance(supabase, inserted.id, form.startDate, form.balance);
+  if (historyError) return { error: historyError.message };
+
+  revalidatePath("/dashboard", "layout");
+}
+
+/**
+ * Dedicated bank-account creation (the "Add account" dialog on Cash & bank).
+ * Checking / savings / term deposit / other -> a Cash asset holding the
+ * balance; credit card -> a standalone liability holding the amount OWED, so a
+ * card never counts as cash. Bank metadata (see `lib/bank-account.ts`) is
+ * stored so CSV statements for this account are routed to it automatically.
+ */
+export async function addBankAccount(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in to add an account." };
+
+  const bankKey = String(formData.get("bank_key") ?? "");
+  const bank = bankKey ? getBank(bankKey) : undefined;
+  if (bankKey && !bank) return { error: "Unknown bank." };
+  const institutionName = bank ? bank.name : String(formData.get("institution_name") ?? "").trim().slice(0, 100);
+  if (!institutionName) return { error: "Choose a bank or enter its name." };
+
+  const accountType = formData.get("account_type");
+  if (!isBankAccountType(accountType)) return { error: "Choose an account type." };
+
+  const name = String(formData.get("name") ?? "").trim().slice(0, 120);
+  if (!name) return { error: "Name is required." };
+
+  const balanceRaw = String(formData.get("current_value") ?? "").trim();
+  const balance = Number(balanceRaw);
+  if (balanceRaw === "" || !Number.isFinite(balance)) return { error: "Enter the balance." };
+  const isCard = accountType === "credit_card";
+  if (isCard && balance < 0) return { error: "Enter the amount owed (zero or more)." };
+
+  const currency = String(formData.get("currency") ?? "") || "USD";
+  const asOf = String(formData.get("purchase_date") ?? "") || new Date().toISOString().slice(0, 10);
+  const accountRef = String(formData.get("account_ref") ?? "").replace(/s+/g, "").slice(0, 40);
+  const limitRaw = String(formData.get("credit_limit") ?? "").trim();
+  const creditLimit = limitRaw === "" ? null : Number(limitRaw);
+  if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {
+    return { error: "Enter a valid credit limit." };
+  }
+
+  const bankMetadata = {
+    institution_name: institutionName,
+    ...(bank ? { bank_key: bank.key } : {}),
+    account_type: accountType,
+    ...(accountRef ? { account_ref: accountRef } : {}),
+  };
+
+  const { data: category } = await supabase
+    .from("asset_categories")
+    .select("id")
+    .eq("name", isCard ? "Liabilities" : "Cash")
+    .single<{ id: string }>();
+  if (!category) return { error: `The "${isCard ? "Liabilities" : "Cash"}" category is missing from this project.` };
+
+  const metadata: Json = isCard
+    ? {
+        ...bankMetadata,
+        liability_type: "credit_card",
+        lender_name: institutionName,
+        interest_rate: null,
+        monthly_payment: null,
+        credit_limit: creditLimit,
+      }
+    : { ...bankMetadata, ...(bank?.hasCsvProfile ? { bank_profile: bank.key } : {}) };
+
+  const { data: inserted, error } = await supabase
+    .from("assets")
+    .insert({
+      profile_id: user.id,
+      category_id: category.id,
+      name,
+      quantity: 1,
+      current_value: balance,
+      currency,
+      is_liability: isCard,
+      metadata,
+      images: [],
+      ticker_symbol: null,
+      purchase_date: asOf,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (error) return { error: error.message };
+
+  const historyError = isCard
+    ? await recordLiabilityBalance(supabase, inserted.id, asOf, balance)
+    : await syncAssetHistory(supabase, inserted.id, balance, "Cash", metadata, asOf);
   if (historyError) return { error: historyError.message };
 
   revalidatePath("/dashboard", "layout");
