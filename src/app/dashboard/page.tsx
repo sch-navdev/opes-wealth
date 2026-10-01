@@ -11,7 +11,6 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { AddLiabilityDialog } from "@/components/add-liability-dialog";
 import { CashBankCard, type CashAccount } from "@/components/cash-bank-card";
 import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
-import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
 import {
   DashboardMetricCards,
@@ -427,7 +426,6 @@ export default async function DashboardPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <CurrencySwitcher value={displayCurrency} />
             <AddInvestmentsDialog />
             <AddLiabilityDialog />
             <AddAssetDialog

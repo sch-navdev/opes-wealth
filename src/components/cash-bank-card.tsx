@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Landmark, RefreshCw, Upload } from "lucide-react";
+import { ChevronDown, Landmark, RefreshCw, Upload } from "lucide-react";
 import { BankConnectDialog } from "@/components/bank-connect-dialog";
 import { BankLogoByName } from "@/components/institution-logo";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { disconnectBank, syncBankConnection } from "@/app/dashboard/banking/actions";
-import type { BankSyncMode } from "@/lib/banking/institutions";
+import { bankByName, type BankSyncMode } from "@/lib/banking/institutions";
 import { isBankAccountType, type BankAccountType } from "@/lib/bank-account";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,6 @@ const ACCOUNT_TYPE_KEYS: Record<BankAccountType, TranslationKey> = {
 import { AddBankAccountDialog } from "@/components/add-bank-account-dialog";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 
@@ -66,11 +66,21 @@ function formatSyncTime(iso: string | null, locale: string): string | null {
       }).format(parsed);
 }
 
+/** Jurisdiction an account is grouped under: the bank's country when it is a known bank, otherwise "OTHER". */
+const COUNTRY_ORDER = ["AE", "FR", "OTHER"] as const;
+
+function accountCountry(account: CashAccount): string {
+  const bank = bankByName(account.institutionName ?? "") ?? bankByName(account.bank?.institutionName ?? "");
+  return bank?.country ?? "OTHER";
+}
+
 /**
- * Dashboard entry point for Cash / bank accounts: a quick summary (accounts,
- * total in the Base Currency) with a per-account "Import CSV" action that
- * opens the same dropzone → column-mapper flow as the asset page's Settings
- * tab. With no accounts yet it offers to create one (Add Asset, Cash preselected).
+ * Dashboard entry point for Cash / bank accounts. Collapsed by default like
+ * every other portfolio folder (count + total in the Base Currency on the
+ * row); expanded, the accounts are grouped by country (UAE, France, then
+ * anything else), each with a subtotal and a per-account "Import CSV" action
+ * that opens the same dropzone → column-mapper flow as the asset page's
+ * Settings tab. With no accounts yet it offers to create one.
  */
 export function CashBankCard({
   accounts,
@@ -107,39 +117,28 @@ export function CashBankCard({
   }
   const { maskValue } = usePrivacy();
   const baseFormatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
+  const [isOpen, setIsOpen] = useState(false);
   const total = accounts.reduce((sum, a) => sum + a.baseValue, 0);
 
-  return (
-    <Card className="border-border bg-card">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <span className="text-primary">
-            <Landmark className="size-4" />
-          </span>
-          {t("cash_bank_title")}
-          {accounts.length > 0 && (
-            <span className="text-xs font-normal text-muted-foreground">
-              ({accounts.length}) · {maskValue(baseFormatter.format(total))}
-            </span>
-          )}
-        </CardTitle>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/banking">{t("banking_open_view")}</Link>
-          </Button>
-          <BankConnectDialog
-            mode={bankSyncMode}
-            cashAccounts={accounts.map((a) => ({ id: a.id, name: a.name, isLinked: !!a.bank }))}
-          />
-          <AddBankAccountDialog />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {accounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("cash_bank_empty")}</p>
-        ) : (
-          <ul className="divide-y divide-border border border-border">
-            {accounts.map((account) => {
+  const byCountry = new Map<string, CashAccount[]>();
+  for (const account of accounts) {
+    const code = accountCountry(account);
+    byCountry.set(code, [...(byCountry.get(code) ?? []), account]);
+  }
+  const groups = COUNTRY_ORDER.filter((code) => byCountry.has(code)).map((code) => {
+    const list = byCountry.get(code) ?? [];
+    return {
+      code,
+      label:
+        code === "OTHER"
+          ? t("bank_account_type_other")
+          : (new Intl.DisplayNames([intlLocale], { type: "region" }).of(code) ?? code),
+      accounts: list,
+      total: list.reduce((sum, a) => sum + a.baseValue, 0),
+    };
+  });
+
+  const renderAccount = (account: CashAccount) => {
               const native = new Intl.NumberFormat(intlLocale, {
                 style: "currency",
                 currency: account.currency,
@@ -264,10 +263,61 @@ export function CashBankCard({
                   </div>
                 </li>
               );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border border-border bg-card">
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-4 px-4 py-3 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-primary">
+            <Landmark className="size-4" />
+          </span>
+          <span className="truncate font-medium text-foreground">{t("cash_bank_title")}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">({accounts.length})</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-sm font-medium tabular-nums text-foreground">
+            {maskValue(baseFormatter.format(total))}
+          </span>
+          <ChevronDown
+            className={cn("size-4 text-muted-foreground transition-transform", isOpen && "rotate-180")}
+          />
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="space-y-4 border-t border-border p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard/banking">{t("banking_open_view")}</Link>
+            </Button>
+            <BankConnectDialog
+              mode={bankSyncMode}
+              cashAccounts={accounts.map((a) => ({ id: a.id, name: a.name, isLinked: !!a.bank }))}
+            />
+            <AddBankAccountDialog />
+          </div>
+          {accounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("cash_bank_empty")}</p>
+          ) : (
+            groups.map((group) => (
+              <section key={group.code} className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium text-foreground">
+                    {group.label}
+                    <span className="ms-2 text-xs font-normal text-muted-foreground">({group.accounts.length})</span>
+                  </h3>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {maskValue(baseFormatter.format(group.total))}
+                  </span>
+                </div>
+                <ul className="divide-y divide-border border border-border">
+                  {group.accounts.map(renderAccount)}
+                </ul>
+              </section>
+            ))
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { CurrencySwitcher } from "@/components/currency-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,7 +22,7 @@ export function DashboardHeaderControls({
   }).format(totalNetWorth);
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <div className="text-end">
         <p className="text-xs text-muted-foreground">
           {t("net_worth")} · {baseCurrency}
@@ -30,6 +31,7 @@ export function DashboardHeaderControls({
           {maskValue(totalNetWorthFormatted)}
         </p>
       </div>
+      <CurrencySwitcher value={baseCurrency} className="w-32" />
       <PrivacyToggleButton />
       <LanguageSwitcher />
       <ThemeToggle />

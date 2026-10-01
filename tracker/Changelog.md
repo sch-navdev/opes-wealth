@@ -158,3 +158,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-01: Branded the DCC PDF (logo on cover and every page header via the shared `lib/pdf-branding.ts`, "Page n / total" footer in the user's language; the Excel export can't carry a logo) and corrected asset terminology so SCPI shows as REIT / SOCIMI / SIIQ outside France in all languages. See [[Portfolio-Dashboard|Portfolio Dashboard]] and [[Localization|Localization]].
 
 - 2026-10-01: Added `scripts/seed-demo.mts`, a manual script (not a migration) that creates/resets `demo@opeswealth.com` with a fictional multi-currency portfolio (banks, real estate with loans, private equity, brokerage, vehicles, liabilities) and monthly history; dry-run verified only. See [[Deployment|Deployment]].
+
+- 2026-10-01: The Cash & Bank accounts card now starts collapsed and groups accounts by country (UAE, France, Other); the currency switcher moved into the top header beside the Net Worth counter. See [[Portfolio-Dashboard|Portfolio Dashboard]].

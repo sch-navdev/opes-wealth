@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { currencies } from "@/lib/currencies";
 
-export function CurrencySwitcher({ value }: { value: string }) {
+export function CurrencySwitcher({ value, className }: { value: string; className?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -23,8 +23,8 @@ export function CurrencySwitcher({ value }: { value: string }) {
 
   return (
     <Select value={value} onValueChange={handleChange}>
-      <SelectTrigger className="w-40">
-        <SelectValue />
+      <SelectTrigger className={className ?? "w-40"}>
+        <SelectValue>{value}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {currencies.map((currency) => (
