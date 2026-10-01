@@ -160,3 +160,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-01: Added `scripts/seed-demo.mts`, a manual script (not a migration) that creates/resets `demo@opeswealth.com` with a fictional multi-currency portfolio (banks, real estate with loans, private equity, brokerage, vehicles, liabilities) and monthly history; dry-run verified only. See [[Deployment|Deployment]].
 
 - 2026-10-01: The Cash & Bank accounts card now starts collapsed and groups accounts by country (UAE, France, Other); the currency switcher moved into the top header beside the Net Worth counter. See [[Portfolio-Dashboard|Portfolio Dashboard]].
+
+- 2026-10-01: Added vehicle expense tracking: an Expenses tab per vehicle with a dated, categorized ledger (add, edit, delete), category breakdown and history, counted in Total Cost of Ownership. See [[Portfolio-Dashboard|Portfolio Dashboard]].

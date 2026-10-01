@@ -4,6 +4,63 @@
  * — no dedicated `vehicles` table). Consumed by `vehicle-fields.tsx` (add/edit
  * form) and the Specifications tab of `asset-detail-view.tsx` (read-only display).
  */
+/** Expense categories offered in the log. A stored value outside this list (e.g. from a future version) is shown as-is. */
+export const VEHICLE_EXPENSE_CATEGORIES = [
+  "maintenance",
+  "fuel",
+  "insurance",
+  "registration",
+  "tires",
+  "parking",
+  "modifications",
+  "other",
+] as const;
+
+export type VehicleExpenseCategory = (typeof VEHICLE_EXPENSE_CATEGORIES)[number];
+
+export function isVehicleExpenseCategory(value: unknown): value is VehicleExpenseCategory {
+  return typeof value === "string" && (VEHICLE_EXPENSE_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * One dated running cost of the vehicle (service, fuel, insurance renewal…),
+ * in the asset's own currency. Kept as a ledger in `metadata.expenses` — the
+ * same idea as a property's `property_expenses` — so costs accumulate over
+ * time instead of overwriting a single lump figure.
+ */
+export type VehicleExpense = {
+  id: string;
+  date: string;
+  category: VehicleExpenseCategory;
+  /** Optional free-text detail ("Annual service at the dealer"). */
+  description: string;
+  amount: number;
+};
+
+export function nextVehicleExpenseId(): string {
+  return `vexp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function sumVehicleExpenses(expenses: VehicleExpense[]): number {
+  return expenses.reduce((sum, e) => sum + e.amount, 0);
+}
+
+/** Totals per category, largest first (categories with no spend are left out). */
+export function vehicleExpensesByCategory(
+  expenses: VehicleExpense[],
+): { category: string; total: number; count: number }[] {
+  const map = new Map<string, { total: number; count: number }>();
+  for (const e of expenses) {
+    const entry = map.get(e.category) ?? { total: 0, count: 0 };
+    entry.total += e.amount;
+    entry.count += 1;
+    map.set(e.category, entry);
+  }
+  return [...map.entries()]
+    .map(([category, v]) => ({ category, ...v }))
+    .sort((a, b) => b.total - a.total);
+}
+
 export type VehicleMetadata = {
   vin: string;
   make: string;
@@ -19,6 +76,8 @@ export type VehicleMetadata = {
   market_valuation: number | null;
   last_valuation_source: string;
   last_valuation_date: string;
+  /** Dated expense ledger (see `VehicleExpense`); counts toward Total Cost of Ownership on top of the lump-sum cost fields above. */
+  expenses: VehicleExpense[];
 };
 
 export const EMPTY_VEHICLE_METADATA: VehicleMetadata = {
@@ -35,6 +94,7 @@ export const EMPTY_VEHICLE_METADATA: VehicleMetadata = {
   market_valuation: null,
   last_valuation_source: "",
   last_valuation_date: "",
+  expenses: [],
 };
 
 /**
@@ -46,9 +106,11 @@ export function parseVehicleMetadata(raw: unknown): VehicleMetadata {
     return EMPTY_VEHICLE_METADATA;
   }
 
+  const r = raw as Partial<VehicleMetadata>;
   return {
     ...EMPTY_VEHICLE_METADATA,
-    ...(raw as Partial<VehicleMetadata>),
+    ...r,
+    expenses: Array.isArray(r.expenses) ? r.expenses : [],
   };
 }
 
@@ -82,7 +144,8 @@ export function sumVehicleOwnershipCosts(metadata: VehicleMetadata): number {
   return (
     (metadata.maintenance_costs ?? 0) +
     (metadata.modifications ?? 0) +
-    (metadata.insurance_registration ?? 0)
+    (metadata.insurance_registration ?? 0) +
+    sumVehicleExpenses(metadata.expenses)
   );
 }
 

@@ -72,6 +72,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VehicleExpenses } from "@/components/vehicle-expenses";
 import {
   Collapsible,
   CollapsibleContent,
@@ -1752,6 +1753,9 @@ export function AssetDetailView({
             {isRealEstate && (
               <TabsTrigger value="tenancy">{t("tab_tenancy")}</TabsTrigger>
             )}
+            {isVehicle && (
+              <TabsTrigger value="expenses">{t("tab_vehicle_expenses")}</TabsTrigger>
+            )}
             <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
           </TabsList>
 
@@ -2746,6 +2750,16 @@ export function AssetDetailView({
                   </p>
                 </CardContent>
               </Card>
+            </TabsContent>
+          )}
+
+          {isVehicle && vehicleMetadata && (
+            <TabsContent value="expenses" className="space-y-6">
+              <VehicleExpenses
+                assetId={asset.id}
+                currency={asset.currency}
+                expenses={vehicleMetadata.expenses}
+              />
             </TabsContent>
           )}
 

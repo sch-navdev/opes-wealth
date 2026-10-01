@@ -624,6 +624,25 @@ const vehicles: VehicleDef[] = [
 ];
 
 vehicles.forEach((v) => {
+  // A dated expense ledger (metadata.expenses): a few entries a year since purchase.
+  const plan: [number, string, string, number][] = [
+    [4, "maintenance", "Annual service", 0.006],
+    [7, "tires", "Tire replacement", 0.008],
+    [10, "insurance", "Insurance renewal", 0.03],
+    [14, "fuel", "Fuel and charging, quarter", 0.005],
+    [16, "registration", "Registration renewal", 0.004],
+    [22, "maintenance", "Brake service", 0.007],
+    [26, "insurance", "Insurance renewal", 0.03],
+  ];
+  const expenses = plan
+    .map(([months, category, description, pct], i) => ({
+      id: `vexp-demo-${v.seed}-${i + 1}`,
+      date: addMonths(v.date, months),
+      category,
+      description,
+      amount: Math.round(v.price * pct),
+    }))
+    .filter((e) => e.date <= TODAY);
   addAsset({
     category: "Vehicles",
     name: v.name,
@@ -644,6 +663,7 @@ vehicles.forEach((v) => {
       market_valuation: v.market,
       last_valuation_source: "manual",
       last_valuation_date: TODAY,
+      expenses,
     },
     history: path(v.date, TODAY, v.price, v.market, 0.004, v.seed),
   });
