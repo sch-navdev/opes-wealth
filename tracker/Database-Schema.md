@@ -57,6 +57,11 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `bug_reports`: `fingerprint`, `title`, `summary`, `repro_steps`, `page_path`, `severity` (low|medium|high), `occurrences`, `reporter_ids uuid[]`, `status` (pending|sent|dismissed), `first_seen_at`, `last_seen_at`, `sent_at`, `external_ref`. A partial unique index allows one **pending** row per fingerprint (consolidation); sent rows are history.
 - RLS is on with **no policies** and all privileges revoked from `anon`/`authenticated`: only the service role (server) touches it. See [[Architecture|Architecture]] (AI Help Assistant).
 
+
+## Demo Data (2026-10-01)
+
+- `scripts/seed-demo.mts` (not a migration) writes a demo user's `profiles`, `assets` and `asset_history` rows through the service role; it needs migrations up to 0019 for the categories. See [[Deployment|Deployment]] (Demo Account & Seed Script).
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas
