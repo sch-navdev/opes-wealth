@@ -78,6 +78,28 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { AddLiabilityDialog } from "@/components/add-liability-dialog";
+import { ENTITY_TYPE_LABEL_KEYS } from "@/components/company-fields";
+import { STAGE_LABEL_KEYS } from "@/components/private-equity-fields";
+import { PeCashFlowChart } from "@/components/pe-cash-flow-chart";
+import { SCPI_MODE_LABEL_KEYS } from "@/components/scpi-fields";
+import {
+  parseScpiMetadata,
+  scpiAverageYield,
+  scpiEntryFees,
+  scpiInvested,
+  scpiReceived,
+  scpiTrailingYield,
+  scpiWithdrawalValue,
+} from "@/lib/scpi";
+import { parseCompanyMetadata } from "@/lib/companies";
+import {
+  calledCapital,
+  fundReturns,
+  isOverdue,
+  pendingCapitalCallsTotal,
+  unfundedCommitment,
+} from "@/lib/private-equity";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { TenancyContractDialog } from "@/components/tenancy-contract-dialog";
 import { PropertyDocumentDialog } from "@/components/property-document-dialog";
@@ -327,6 +349,8 @@ export function AssetDetailView({
   const isRealEstate = categoryName === "Real Estate";
   const isVehicle = categoryName === "Vehicles";
   const isPrivateEquity = categoryName === "Private Equity";
+  const isCompany = categoryName === "Companies";
+  const isScpi = categoryName === "SCPI";
   const isEquity = categoryName === "Equities";
   const isCrypto = categoryName === "Crypto";
   const isPreciousMetal = categoryName === "Precious Metals";
@@ -2733,23 +2757,36 @@ export function AssetDetailView({
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex items-center gap-3">
-                <AddAssetDialog
-                  categories={categories}
-                  asset={{
-                    id: asset.id,
-                    name: asset.name,
-                    category_id: asset.category_id,
-                    quantity: asset.quantity,
-                    current_value: asset.current_value,
-                    currency: asset.currency,
-                    metadata: asset.metadata,
-                    images: asset.images,
-                    ticker_symbol: asset.ticker_symbol,
-                    purchase_date: asset.purchase_date,
-                  }}
-                />
+                {asset.is_liability ? (
+                  <AddLiabilityDialog
+                    liability={{
+                      id: asset.id,
+                      name: asset.name,
+                      current_value: asset.current_value,
+                      currency: asset.currency,
+                      metadata: asset.metadata,
+                      purchase_date: asset.purchase_date,
+                    }}
+                  />
+                ) : (
+                  <AddAssetDialog
+                    categories={categories}
+                    asset={{
+                      id: asset.id,
+                      name: asset.name,
+                      category_id: asset.category_id,
+                      quantity: asset.quantity,
+                      current_value: asset.current_value,
+                      currency: asset.currency,
+                      metadata: asset.metadata,
+                      images: asset.images,
+                      ticker_symbol: asset.ticker_symbol,
+                      purchase_date: asset.purchase_date,
+                    }}
+                  />
+                )}
                 {isRealEstate && <PropertyDocumentDialog assetId={asset.id} />}
-                {!isRealEstate && !isVehicle && (
+                {!isRealEstate && !isVehicle && !asset.is_liability && (
                   <CsvImportDialog
                     assetId={asset.id}
                     currentValue={asset.current_value}
@@ -3411,6 +3448,176 @@ export function AssetDetailView({
               </>
             )}
 
+            {isScpi && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("scpi_details")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(() => {
+                    const scpi = parseScpiMetadata(asset.metadata);
+                    const invested = scpiInvested(scpi, asset.quantity);
+                    const fees = scpiEntryFees(scpi, asset.quantity);
+                    const unit = scpiWithdrawalValue(scpi);
+                    const trailing = scpiTrailingYield(scpi, asset.quantity, today);
+                    const average = scpiAverageYield(scpi);
+                    const dividends = [...scpi.dividends].sort((a, b) => b.date.localeCompare(a.date));
+                    const money = (n: number) => maskValue(currencyFormatter.format(n));
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                          <DetailField label={t("scpi_management_company")} value={scpi.management_company} />
+                          <DetailField label={t("scpi_sector")} value={scpi.sector} />
+                          <DetailField label={t("scpi_geography")} value={scpi.geography} />
+                          <DetailField
+                            label={t("scpi_holding_mode")}
+                            value={t(SCPI_MODE_LABEL_KEYS[scpi.holding_mode])}
+                          />
+                          <DetailField label={t("scpi_shares")} value={String(asset.quantity)} />
+                          <DetailField
+                            label={t("scpi_subscription_price")}
+                            value={scpi.subscription_price != null ? money(scpi.subscription_price) : null}
+                          />
+                          <DetailField
+                            label={t("scpi_entry_fee")}
+                            value={scpi.entry_fee_pct != null ? `${scpi.entry_fee_pct}%` : null}
+                          />
+                          <DetailField
+                            label={t("scpi_withdrawal_value")}
+                            value={unit != null ? money(unit) : null}
+                          />
+                          <DetailField label={t("scpi_invested")} value={money(invested)} />
+                          <DetailField label={t("scpi_fees_paid")} value={money(fees)} />
+                          <DetailField label={t("scpi_jouissance_date")} value={scpi.jouissance_date || null} />
+                          <DetailField
+                            label={t("scpi_financed_by_credit")}
+                            value={scpi.financed_by_credit ? t("yes") : t("no")}
+                          />
+                          <DetailField
+                            label={t("scpi_dividends_received")}
+                            value={money(scpiReceived(scpi))}
+                          />
+                          <DetailField
+                            label={t("scpi_realised_yield")}
+                            value={trailing != null ? `${trailing.toFixed(2)}%` : null}
+                          />
+                          <DetailField
+                            label={t("scpi_target_yield")}
+                            value={scpi.target_yield_pct != null ? `${scpi.target_yield_pct}%` : null}
+                          />
+                          <DetailField
+                            label={t("scpi_average_yield")}
+                            value={average != null ? `${average.toFixed(2)}%` : null}
+                          />
+                        </div>
+                        {scpi.yield_history.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            {[...scpi.yield_history]
+                              .sort((a, b) => b.year - a.year)
+                              .map((y) => `${y.year}: ${y.rate}%`)
+                              .join(" · ")}
+                          </p>
+                        )}
+                        {dividends.length > 0 ? (
+                          <div className="overflow-x-auto border border-border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-muted-foreground">{t("scpi_quarter")}</TableHead>
+                                  <TableHead className="text-muted-foreground">{t("scpi_dividend_date")}</TableHead>
+                                  <TableHead className="text-right text-muted-foreground">
+                                    {t("scpi_dividend_amount")}
+                                  </TableHead>
+                                  <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {dividends.map((d) => (
+                                  <TableRow key={d.id}>
+                                    <TableCell className="text-foreground">{d.quarter || "—"}</TableCell>
+                                    <TableCell className="tabular-nums text-foreground">{d.date}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-foreground">
+                                      {money(d.amount)}
+                                    </TableCell>
+                                    <TableCell
+                                      className={d.status === "received" ? "text-success" : "text-muted-foreground"}
+                                    >
+                                      {d.status === "received"
+                                        ? t("scpi_status_received")
+                                        : t("scpi_status_expected")}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{t("scpi_no_dividends")}</p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
+            {isCompany && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("company_details")}</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {(() => {
+                    const company = parseCompanyMetadata(asset.metadata);
+                    return (
+                      <>
+                        <DetailField label={t("company_legal_name")} value={company.legal_name} />
+                        <DetailField
+                          label={t("company_entity_type")}
+                          value={t(ENTITY_TYPE_LABEL_KEYS[company.entity_type])}
+                        />
+                        <DetailField label={t("company_jurisdiction")} value={company.jurisdiction} />
+                        <DetailField
+                          label={t("company_registration_number")}
+                          value={company.registration_number}
+                        />
+                        <DetailField label={t("company_industry")} value={company.industry} />
+                        <DetailField label={t("company_role")} value={company.role} />
+                        <DetailField
+                          label={t("company_ownership_percentage")}
+                          value={
+                            company.ownership_percentage != null
+                              ? maskValue(`${company.ownership_percentage}%`)
+                              : null
+                          }
+                        />
+                        <DetailField
+                          label={t("company_held_via")}
+                          value={
+                            company.held_via === "holding"
+                              ? `${t("company_held_holding")}${company.holding_name ? ` · ${company.holding_name}` : ""}`
+                              : t("company_held_personal")
+                          }
+                        />
+                        <DetailField
+                          label={t("company_equity_value")}
+                          value={
+                            company.company_value != null
+                              ? maskValue(currencyFormatter.format(company.company_value))
+                              : null
+                          }
+                        />
+                        <DetailField
+                          label={t("company_valuation_date")}
+                          value={company.valuation_date || company.valuation_method || null}
+                        />
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
             {isPrivateEquity && privateEquityMetadata && (
               <Card className="border-border bg-card">
                 <CardHeader>
@@ -3419,6 +3626,13 @@ export function AssetDetailView({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <DetailField label={t("pe_manager")} value={privateEquityMetadata.manager} />
+                  <DetailField label={t("pe_strategy")} value={privateEquityMetadata.strategy} />
+                  <DetailField label={t("pe_vintage_year")} value={privateEquityMetadata.vintage_year} />
+                  <DetailField
+                    label={t("pe_lifecycle_stage")}
+                    value={t(STAGE_LABEL_KEYS[privateEquityMetadata.lifecycle_stage])}
+                  />
                   <DetailField
                     label={t("entity_name")}
                     value={privateEquityMetadata.entity_name}
@@ -3438,6 +3652,178 @@ export function AssetDetailView({
                 </CardContent>
               </Card>
             )}
+
+            {isPrivateEquity && privateEquityMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("pe_commitment_heading")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(() => {
+                    const pe = privateEquityMetadata;
+                    const commitment = pe.commitment_amount;
+                    const called = calledCapital(pe);
+                    const unfunded = unfundedCommitment(pe);
+                    const pending = pendingCapitalCallsTotal(pe);
+                    const calledPct =
+                      commitment && commitment > 0 ? Math.min(100, (called / commitment) * 100) : null;
+                    const calls = [...pe.capital_calls].sort((a, b) =>
+                      a.due_date.localeCompare(b.due_date),
+                    );
+                    return (
+                      <>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                          <DetailField
+                            label={t("pe_commitment_amount")}
+                            value={commitment != null ? maskValue(currencyFormatter.format(commitment)) : null}
+                          />
+                          <DetailField
+                            label={t("pe_called_capital")}
+                            value={maskValue(currencyFormatter.format(called))}
+                          />
+                          <DetailField
+                            label={t("pe_unfunded")}
+                            value={maskValue(currencyFormatter.format(unfunded))}
+                          />
+                          <DetailField
+                            label={t("pe_distributions")}
+                            value={
+                              pe.distributions_to_date != null
+                                ? maskValue(currencyFormatter.format(pe.distributions_to_date))
+                                : null
+                            }
+                          />
+                          <DetailField
+                            label={t("pe_liability_counted")}
+                            value={maskValue(currencyFormatter.format(pending))}
+                          />
+                        </div>
+                        {calledPct != null && (
+                          <div className="space-y-1">
+                            <ProgressBar percent={calledPct} colorClassName="bg-primary" />
+                            <p className="text-xs text-muted-foreground">
+                              {t("pe_called_progress", { pct: calledPct.toFixed(1) })}
+                            </p>
+                          </div>
+                        )}
+                        {calls.length > 0 ? (
+                          <div className="overflow-x-auto border border-border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="text-muted-foreground">{t("pe_call_date")}</TableHead>
+                                  <TableHead className="text-right text-muted-foreground">
+                                    {t("pe_call_amount")}
+                                  </TableHead>
+                                  <TableHead className="text-right text-muted-foreground">%</TableHead>
+                                  <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {calls.map((call) => (
+                                  <TableRow key={call.id}>
+                                    <TableCell className="tabular-nums text-foreground">{call.due_date}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-foreground">
+                                      {maskValue(currencyFormatter.format(call.amount))}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                      {call.percentage ? `${call.percentage}%` : "—"}
+                                    </TableCell>
+                                    <TableCell
+                                      className={cn(
+                                        call.status === "paid" ? "text-success" : "text-foreground",
+                                        isOverdue(call, today) && "text-destructive",
+                                      )}
+                                    >
+                                      {call.status === "paid"
+                                        ? t("pe_call_paid")
+                                        : isOverdue(call, today)
+                                          ? t("pe_call_overdue")
+                                          : t("pe_call_pending")}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{t("pe_no_calls")}</p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            )}
+
+            {isPrivateEquity &&
+              privateEquityMetadata &&
+              (privateEquityMetadata.projected_distributions.length > 0 ||
+                privateEquityMetadata.capital_calls.length > 0) && (
+                <Card className="border-border bg-card">
+                  <CardHeader>
+                    <CardTitle className="text-foreground">{t("pe_cash_flows_heading")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(() => {
+                      const pe = privateEquityMetadata;
+                      const returns = fundReturns(pe);
+                      const manual = pe.projection_mode === "manual";
+                      const dists = [...pe.projected_distributions].sort((a, b) =>
+                        a.due_date.localeCompare(b.due_date),
+                      );
+                      return (
+                        <>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                            <DetailField
+                              label={t("pe_total_projected_distributions")}
+                              value={maskValue(currencyFormatter.format(returns.totalDistributions))}
+                            />
+                            <DetailField
+                              label={t("pe_expected_multiple")}
+                              value={returns.multiple != null ? `${returns.multiple.toFixed(2)}x` : null}
+                            />
+                            <DetailField
+                              label={t("pe_expected_irr")}
+                              value={returns.irr != null ? `${(returns.irr * 100).toFixed(1)}%` : null}
+                            />
+                            <DetailField
+                              label={t("pe_projection_source")}
+                              value={manual ? t("pe_mode_manual") : t("pe_mode_model")}
+                            />
+                          </div>
+                          <PeCashFlowChart metadata={pe} currency={asset.currency} />
+                          {dists.length > 0 && (
+                            <div className="overflow-x-auto border border-border">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="text-muted-foreground">{t("pe_call_date")}</TableHead>
+                                    <TableHead className="text-right text-muted-foreground">
+                                      {t("pe_projected_distribution")}
+                                    </TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {dists.map((dist) => (
+                                    <TableRow key={dist.id}>
+                                      <TableCell className="tabular-nums text-foreground">{dist.due_date}</TableCell>
+                                      <TableCell className="text-right tabular-nums text-success">
+                                        {maskValue(currencyFormatter.format(dist.amount))}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">{t("pe_projection_note")}</p>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+              )}
 
             {isEquity && equityMetadata && (
               <Card className="border-border bg-card">

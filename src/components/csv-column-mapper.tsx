@@ -38,6 +38,7 @@ type AmountMode = "single" | "creditDebit";
 const DATE_FORMATS: BankCsvDateFormat[] = ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"];
 const NONE = "__none__";
 const PREVIEW_ROWS = 3;
+const PARSED_PREVIEW_ROWS = 5;
 
 function guessColumn(headers: string[], keyword: string): string {
   return headers.find((h) => h.toLowerCase().includes(keyword)) ?? "";
@@ -155,18 +156,31 @@ export function CsvColumnMapper({
 
   const balanceResult = useMemo(() => {
     if (mode !== "balance" || !dateColumn || !balanceColumn) return null;
-    return parseBankCsvRows(rows, { dateColumn, balanceColumn, dateFormat });
-  }, [mode, rows, dateColumn, balanceColumn, dateFormat]);
+    return parseBankCsvRows(rows, { dateColumn, balanceColumn, dateFormat, descriptionColumn });
+  }, [mode, rows, dateColumn, balanceColumn, dateFormat, descriptionColumn]);
 
   const transactionResult = useMemo(() => {
     if (mode !== "transactions" || !dateColumn) return null;
     if (amountMode === "single") {
       if (!amountColumn) return null;
-      return parseTransactionRows(rows, { dateColumn, dateFormat, amountMode, amountColumn });
+      return parseTransactionRows(rows, {
+        dateColumn,
+        dateFormat,
+        amountMode,
+        amountColumn,
+        descriptionColumn,
+      });
     }
     if (!creditColumn || !debitColumn) return null;
-    return parseTransactionRows(rows, { dateColumn, dateFormat, amountMode, creditColumn, debitColumn });
-  }, [mode, rows, dateColumn, dateFormat, amountMode, amountColumn, creditColumn, debitColumn]);
+    return parseTransactionRows(rows, {
+      dateColumn,
+      dateFormat,
+      amountMode,
+      creditColumn,
+      debitColumn,
+      descriptionColumn,
+    });
+  }, [mode, rows, dateColumn, dateFormat, amountMode, amountColumn, creditColumn, debitColumn, descriptionColumn]);
 
   // Starting balance (immediately before the earliest transaction) is derived
   // by working back from today's known total, so the last computed point
@@ -209,6 +223,14 @@ export function CsvColumnMapper({
           ]),
     { label: t("csv_description_column"), column: descriptionColumn },
   ].filter((c) => c.column !== "");
+
+  // What will actually be written, newest first — the final balance is the
+  // one the account will show afterwards.
+  const parsedPreview = importResult
+    ? [...importResult.validRows]
+        .sort((a, b) => b.recorded_date.localeCompare(a.recorded_date))
+        .slice(0, PARSED_PREVIEW_ROWS)
+    : [];
 
   function handleImport() {
     if (!importResult || importResult.validRows.length === 0) return;
@@ -418,6 +440,49 @@ export function CsvColumnMapper({
           {importResult.validRows.length === 0 && (
             <p className="text-destructive" role="alert">
               {t("csv_no_valid_rows")}
+            </p>
+          )}
+        </div>
+      )}
+
+      {importResult && importResult.validRows.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">{t("csv_parsed_preview_title")}</p>
+          <div className="overflow-x-auto rounded-md border border-border bg-background">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-muted-foreground">{t("csv_parsed_date")}</TableHead>
+                  <TableHead className="text-right text-muted-foreground">
+                    {t("csv_parsed_balance")}
+                  </TableHead>
+                  <TableHead className="text-muted-foreground">
+                    {t("csv_parsed_description")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parsedPreview.map((row) => (
+                  <TableRow key={row.recorded_date}>
+                    <TableCell className="tabular-nums text-foreground">
+                      {row.recorded_date}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground">
+                      {currencyFormatter.format(row.value)}
+                    </TableCell>
+                    <TableCell className="max-w-48 truncate text-muted-foreground">
+                      {row.description ?? "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {importResult.validRows.length > PARSED_PREVIEW_ROWS && (
+            <p className="text-xs text-muted-foreground">
+              {t("csv_parsed_preview_more", {
+                n: importResult.validRows.length - PARSED_PREVIEW_ROWS,
+              })}
             </p>
           )}
         </div>

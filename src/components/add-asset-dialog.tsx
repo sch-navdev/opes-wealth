@@ -27,6 +27,8 @@ import { VehicleFields } from "@/components/vehicle-fields";
 import { PrivateEquityFields } from "@/components/private-equity-fields";
 import { EquityFields } from "@/components/equity-fields";
 import { CryptoFields } from "@/components/crypto-fields";
+import { CompanyFields } from "@/components/company-fields";
+import { ScpiFields } from "@/components/scpi-fields";
 import { PreciousMetalsFields } from "@/components/precious-metals-fields";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
@@ -59,6 +61,18 @@ import {
   getPreciousMetalErrors,
   parsePreciousMetalMetadata,
 } from "@/lib/precious-metals";
+import {
+  EMPTY_COMPANY_METADATA,
+  companyStakeValue,
+  getCompanyMetadataErrors,
+  parseCompanyMetadata,
+} from "@/lib/companies";
+import {
+  EMPTY_SCPI_METADATA,
+  getScpiMetadataErrors,
+  parseScpiMetadata,
+  scpiCurrentValue,
+} from "@/lib/scpi";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -86,9 +100,15 @@ export function AddAssetDialog({
   categories,
   asset,
   trigger,
+  defaultCategoryName,
+  companies = [],
 }: {
   categories: Category[];
   asset?: AssetForEdit;
+  /** Preselects a category when creating (e.g. "Cash" from the dashboard's Cash & Bank card). */
+  defaultCategoryName?: string;
+  /** Tracked Companies, offered as the holding vehicle when adding/editing a Company held via a holding. */
+  companies?: { id: string; name: string }[];
   /** Custom trigger element (e.g. a "+ Add Loan" button elsewhere on the page). Falls back to the default Edit/Add Asset button. */
   trigger?: React.ReactNode;
 }) {
@@ -101,7 +121,9 @@ export function AddAssetDialog({
   const formRef = useRef<HTMLFormElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const [categoryId, setCategoryId] = useState(asset?.category_id ?? "");
+  const [categoryId, setCategoryId] = useState(
+    asset?.category_id ?? categories.find((c) => c.name === defaultCategoryName)?.id ?? "",
+  );
   const [currency, setCurrency] = useState(asset?.currency ?? "USD");
   const [images, setImages] = useState<string[]>(asset?.images ?? []);
   const [tickerSymbol, setTickerSymbol] = useState(asset?.ticker_symbol ?? "");
@@ -126,6 +148,12 @@ export function AddAssetDialog({
       : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
   );
   const [quantityInput, setQuantityInput] = useState(asset?.quantity ?? 1);
+  const [scpiMetadata, setScpiMetadata] = useState(() =>
+    asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA,
+  );
+  const [companyMetadata, setCompanyMetadata] = useState(() =>
+    asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA,
+  );
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
@@ -134,9 +162,13 @@ export function AddAssetDialog({
   const isEquity = selectedCategory?.name === "Equities";
   const isCrypto = selectedCategory?.name === "Crypto";
   const isPreciousMetal = selectedCategory?.name === "Precious Metals";
+  const isCompany = selectedCategory?.name === "Companies";
+  const isScpi = selectedCategory?.name === "SCPI";
 
   function resetState() {
-    setCategoryId(asset?.category_id ?? "");
+    setCategoryId(
+      asset?.category_id ?? categories.find((c) => c.name === defaultCategoryName)?.id ?? "",
+    );
     setCurrency(asset?.currency ?? "USD");
     setImages(asset?.images ?? []);
     setTickerSymbol(asset?.ticker_symbol ?? "");
@@ -161,6 +193,8 @@ export function AddAssetDialog({
         : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
     );
     setQuantityInput(asset?.quantity ?? 1);
+    setCompanyMetadata(asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA);
+    setScpiMetadata(asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA);
   }
 
   async function handleImageFileSelected(
@@ -237,6 +271,33 @@ export function AddAssetDialog({
         return;
       }
       formData.set("metadata", JSON.stringify(cryptoMetadata));
+    } else if (isScpi) {
+      const shares = Number(formData.get("quantity"));
+      const errors = getScpiMetadataErrors(scpiMetadata, shares);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      // Value = shares × withdrawal value (what a sale would return today).
+      formData.set("current_value", String(scpiCurrentValue(scpiMetadata, shares) ?? 0));
+      formData.set("metadata", JSON.stringify(scpiMetadata));
+    } else if (isCompany) {
+      const errors = getCompanyMetadataErrors(companyMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      // The Value field holds the equity value of 100% of the entity;
+      // `current_value` is YOUR stake in it (value × ownership %).
+      const equityValue = Number(formData.get("current_value"));
+      formData.set(
+        "current_value",
+        String(companyStakeValue(equityValue, companyMetadata.ownership_percentage)),
+      );
+      formData.set(
+        "metadata",
+        JSON.stringify({ ...companyMetadata, company_value: equityValue }),
+      );
     } else if (isPreciousMetal) {
       const errors = getPreciousMetalErrors(metalMetadata);
       if (errors.length > 0) {
@@ -369,7 +430,10 @@ export function AddAssetDialog({
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => (
+                {/* Liabilities have their own flow (Add Liability), so they're not offered here. */}
+                {categories
+                  .filter((category) => category.name !== "Liabilities" || category.id === asset?.category_id)
+                  .map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
                   </SelectItem>
@@ -407,7 +471,7 @@ export function AddAssetDialog({
 
           <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="min-w-0 space-y-2">
-              <Label htmlFor="quantity">Quantity</Label>
+              <Label htmlFor="quantity">{isScpi ? t("scpi_shares") : "Quantity"}</Label>
               <Input
                 id="quantity"
                 name="quantity"
@@ -420,7 +484,15 @@ export function AddAssetDialog({
             </div>
             <div className="min-w-0 space-y-2">
               <Label htmlFor="current_value">
-                {isRealEstate ? "Current Market Valuation" : "Value"}
+                {isRealEstate
+                  ? "Current Market Valuation"
+                  : isCompany
+                    ? t("company_equity_value")
+                    : isPrivateEquity
+                      ? t("pe_nav_label")
+                      : isScpi
+                        ? t("scpi_value_label")
+                        : "Value"}
               </Label>
               <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -437,9 +509,11 @@ export function AddAssetDialog({
                   defaultValue={
                     asset && isRealEstate
                       ? realEstateMetadata.market_valuation ?? asset.current_value
-                      : asset?.current_value ?? ""
+                      : asset && isCompany
+                        ? companyMetadata.company_value ?? asset.current_value
+                        : asset?.current_value ?? ""
                   }
-                  required
+                  required={!isScpi}
                 />
               </div>
               {isRealEstate && (
@@ -489,6 +563,24 @@ export function AddAssetDialog({
             <PrivateEquityFields
               value={privateEquityMetadata}
               onChange={setPrivateEquityMetadata}
+              currency={currency}
+            />
+          )}
+
+          {isScpi && (
+            <ScpiFields
+              value={scpiMetadata}
+              onChange={setScpiMetadata}
+              shares={quantityInput}
+              currency={currency}
+            />
+          )}
+
+          {isCompany && (
+            <CompanyFields
+              value={companyMetadata}
+              onChange={setCompanyMetadata}
+              holdingOptions={companies.filter((c) => c.id !== asset?.id)}
             />
           )}
 

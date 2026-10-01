@@ -14,6 +14,7 @@
  *    plus each installment marked paid, on its due date. Loan principal repaid
  *    later is NOT added (it already shows up as equity growth).
  *  - Vehicles: purchase price + ownership costs on the purchase date.
+ *  - SCPI: shares × subscription price (entry fee included) on the purchase date.
  */
 import { buildInvestedCapitalSeries, parseEquityMetadata } from "@/lib/equities";
 import {
@@ -23,12 +24,15 @@ import {
   sumAcquisitionFees,
 } from "@/lib/real-estate";
 import { calculateVehicleTotalCost, parseVehicleMetadata } from "@/lib/vehicles";
+import { parseScpiMetadata, scpiInvested } from "@/lib/scpi";
 
 export function buildAssetInvested(asset: {
   category: string;
   purchase_date: string | null;
   metadata: unknown;
   current_value: number;
+  /** Shares held (SCPI) — `assets.quantity`. */
+  quantity?: number;
 }): [string, number][] | undefined {
   const purchaseDate = asset.purchase_date;
 
@@ -63,6 +67,12 @@ export function buildAssetInvested(asset: {
     const cost = calculateTotalCost(md, marketValuation);
     const loan = md.linked_loan.amount ?? 0;
     return [[purchaseDate, Math.max(0, cost - loan)]];
+  }
+
+  if (asset.category === "SCPI") {
+    const md = parseScpiMetadata(asset.metadata);
+    const invested = scpiInvested(md, asset.quantity ?? 0);
+    return invested > 0 && purchaseDate ? [[purchaseDate, invested]] : undefined;
   }
 
   if (asset.category === "Vehicles") {

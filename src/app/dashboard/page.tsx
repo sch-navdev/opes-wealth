@@ -8,6 +8,8 @@ import {
 } from "@/utils/supabase/mock-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { AddLiabilityDialog } from "@/components/add-liability-dialog";
+import { CashBankCard, type CashAccount } from "@/components/cash-bank-card";
 import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
@@ -26,6 +28,8 @@ import {
 import { buildNetWorthSeries, thinHistory, type AssetLineInput } from "@/lib/portfolio-performance";
 import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { buildAssetInvested } from "@/lib/invested-capital";
+import { buildDccPortfolio } from "@/lib/dcc";
+import { ExportReportsCard } from "@/components/export-reports-card";
 import {
   buildVehicleHistoryFromPurchase,
   parseVehicleMetadata,
@@ -94,7 +98,9 @@ export default async function DashboardPage({
         .returns<AssetRow[]>(),
       supabase
         .from("profiles")
-        .select("first_name, avatar_base64, default_currency")
+        .select(
+          "first_name, last_name, avatar_base64, default_currency, phone_number, address_street, address_city, address_postal_code, address_country",
+        )
         .eq("id", user.id)
         .single(),
       getExchangeRatesFromUsd(),
@@ -244,7 +250,18 @@ export default async function DashboardPage({
     const liability = toBase(assetLiability(asset));
     const base = { id: asset.id, name: asset.name, category };
     if (gross !== 0) breakdowns.assets.push({ ...base, amount: gross });
-    if (liability !== 0) breakdowns.liabilities.push({ ...base, amount: liability });
+    if (liability !== 0) {
+      const loan =
+        category === "Real Estate" && !asset.is_liability
+          ? parseRealEstateMetadata(asset.metadata).linked_loan
+          : null;
+      breakdowns.liabilities.push({
+        ...base,
+        amount: liability,
+        // The debt that comes from this property's own linked loan / off-plan balance.
+        linkedLender: loan && (loan.amount || loan.outstanding_principal) ? loan.lender_name || "" : undefined,
+      });
+    }
     if (gross - liability !== 0) {
       breakdowns.netWorth.push({ ...base, amount: gross - liability });
     }
@@ -284,11 +301,29 @@ export default async function DashboardPage({
       purchase_date: asset.purchase_date,
       metadata: asset.metadata,
       current_value: asset.current_value,
+      quantity: asset.quantity,
     })?.map(([date, amount]): [string, number] => [
       date,
       convertToBaseCurrency(amount, asset.currency, displayCurrency, rates),
     ]),
   }));
+
+  // Cash & bank accounts for the dashboard card: balance in the account's own
+  // currency (the CSV import reconciles against it) and in the Base Currency,
+  // plus the date of the newest balance on record.
+  const cashAccounts: CashAccount[] = (assets ?? [])
+    .filter((a) => a.asset_categories?.name === "Cash" && !a.is_liability)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      currency: a.currency,
+      nativeValue: a.current_value,
+      baseValue: convertToBaseCurrency(a.current_value, a.currency, displayCurrency, rates),
+      lastDate:
+        (allHistory ?? [])
+          .filter((h) => h.asset_id === a.id)
+          .reduce<string | null>((max, h) => (!max || h.recorded_date > max ? h.recorded_date : max), null),
+    }));
 
   return (
     <>
@@ -331,6 +366,12 @@ export default async function DashboardPage({
           breakdowns={breakdowns}
         />
 
+        <CashBankCard
+          accounts={cashAccounts}
+          categories={categories ?? []}
+          baseCurrency={displayCurrency}
+        />
+
         <DashboardAnalytics
           series={performanceSeries}
           assets={assetLines}
@@ -350,7 +391,13 @@ export default async function DashboardPage({
           <div className="flex items-center gap-2">
             <CurrencySwitcher value={displayCurrency} />
             <AddInvestmentsDialog />
-            <AddAssetDialog categories={categories ?? []} />
+            <AddLiabilityDialog />
+            <AddAssetDialog
+              categories={categories ?? []}
+              companies={(assets ?? [])
+                .filter((a) => a.asset_categories?.name === "Companies")
+                .map((a) => ({ id: a.id, name: a.name }))}
+            />
           </div>
         </div>
 
@@ -360,6 +407,22 @@ export default async function DashboardPage({
           displayCurrency={displayCurrency}
           rates={rates}
           performanceByAsset={performanceByAsset}
+        />
+
+        <ExportReportsCard
+          baseCurrency={displayCurrency}
+          portfolio={buildDccPortfolio(assets ?? [], displayCurrency, rates, today)}
+          profile={{
+            firstName: profile?.first_name ?? "",
+            lastName: profile?.last_name ?? "",
+            phone: profile?.phone_number ?? "",
+            address: profile?.address_street ?? "",
+            postalCity: [profile?.address_postal_code, profile?.address_city]
+              .filter(Boolean)
+              .join(" - "),
+            country: profile?.address_country ?? "",
+            email: user.email ?? "",
+          }}
         />
       </main>
     </>

@@ -23,11 +23,15 @@ export type BankCsvColumnMapping = {
   dateColumn: string;
   balanceColumn: string;
   dateFormat: BankCsvDateFormat;
+  /** Optional — shown in the import preview only (`asset_history` has no column for it). */
+  descriptionColumn?: string;
 };
 
 export type ParsedBankCsvRow = {
   recorded_date: string; // always normalized to YYYY-MM-DD
   value: number;
+  /** Preview-only text from the mapped Description column; never persisted. */
+  description?: string;
 };
 
 export type BankCsvRowError = {
@@ -164,7 +168,10 @@ export function parseBankCsvRows(
     }
     seenDates.add(recorded_date);
 
-    validRows.push({ recorded_date, value });
+    const description = mapping.descriptionColumn
+      ? row[mapping.descriptionColumn]?.trim() || undefined
+      : undefined;
+    validRows.push({ recorded_date, value, description });
   });
 
   return { validRows, errors };
@@ -176,6 +183,7 @@ export function parseBankCsvRows(
 export type ParsedTransactionRow = {
   recorded_date: string;
   amount: number;
+  description?: string;
 };
 
 export type BankCsvTransactionMapping =
@@ -184,6 +192,7 @@ export type BankCsvTransactionMapping =
       dateFormat: BankCsvDateFormat;
       amountMode: "single";
       amountColumn: string;
+      descriptionColumn?: string;
     }
   | {
       dateColumn: string;
@@ -191,6 +200,7 @@ export type BankCsvTransactionMapping =
       amountMode: "creditDebit";
       creditColumn: string;
       debitColumn: string;
+      descriptionColumn?: string;
     };
 
 export type BankCsvTransactionResult = {
@@ -265,7 +275,10 @@ export function parseTransactionRows(
       amount = Math.abs(credit) - Math.abs(debit);
     }
 
-    validRows.push({ recorded_date, amount });
+    const description = mapping.descriptionColumn
+      ? row[mapping.descriptionColumn]?.trim() || undefined
+      : undefined;
+    validRows.push({ recorded_date, amount, description });
   });
 
   return { validRows, errors };
@@ -289,8 +302,12 @@ export function computeRunningBalance(
   startingBalance: number,
 ): ParsedBankCsvRow[] {
   const byDate = new Map<string, number>();
+  const descriptions = new Map<string, string[]>();
   for (const t of transactions) {
     byDate.set(t.recorded_date, (byDate.get(t.recorded_date) ?? 0) + t.amount);
+    if (t.description) {
+      descriptions.set(t.recorded_date, [...(descriptions.get(t.recorded_date) ?? []), t.description]);
+    }
   }
 
   const sortedDates = Array.from(byDate.keys()).sort();
@@ -299,7 +316,9 @@ export function computeRunningBalance(
 
   for (const date of sortedDates) {
     runningBalance += byDate.get(date)!;
-    result.push({ recorded_date: date, value: round2(runningBalance) });
+    // Several same-day transactions collapse into one point: list them all.
+    const description = descriptions.get(date)?.join(" · ");
+    result.push({ recorded_date: date, value: round2(runningBalance), description });
   }
 
   return result;

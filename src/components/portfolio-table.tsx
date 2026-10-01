@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddAssetDialog, type AssetForEdit } from "@/components/add-asset-dialog";
+import { AddLiabilityDialog } from "@/components/add-liability-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { usePrivacy } from "@/context/privacy-context";
 import { convertAmount } from "@/lib/fx";
@@ -161,7 +162,8 @@ export function PortfolioTable({
               // off-plan. `assetLiability` is the same figure the dashboard's
               // Total Liabilities card uses (amortized balance), so they agree.
               const mortgageOwed =
-                asset.asset_categories?.name === "Real Estate" && !isOffplan
+                (asset.asset_categories?.name === "Real Estate" && !isOffplan) ||
+                asset.asset_categories?.name === "Private Equity"
                   ? assetLiability(asset)
                   : 0;
               const mortgageTotal = mortgageOwed > 0 ? grossAssetValue(asset) : 0;
@@ -362,7 +364,11 @@ export function PortfolioTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <AddAssetDialog categories={categories} asset={assetForEdit} />
+                      {asset.is_liability ? (
+                        <AddLiabilityDialog liability={assetForEdit} />
+                      ) : (
+                        <AddAssetDialog categories={categories} asset={assetForEdit} />
+                      )}
                       <DeleteAssetButton id={asset.id} />
                     </div>
                   </TableCell>

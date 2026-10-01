@@ -26,10 +26,13 @@ export function CsvImportDialog({
   assetId,
   currentValue,
   currency,
+  trigger,
 }: {
   assetId: string;
   currentValue: number;
   currency: string;
+  /** Custom trigger (e.g. the dashboard Cash card's compact button); defaults to the Settings-tab button. */
+  trigger?: React.ReactNode;
 }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -49,10 +52,12 @@ export function CsvImportDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Upload className="size-4" />
-          {t("import_bank_history")}
-        </Button>
+        {trigger ?? (
+          <Button type="button" variant="outline" size="sm">
+            <Upload className="size-4" />
+            {t("import_bank_history")}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-background sm:max-w-lg">
         <DialogHeader>

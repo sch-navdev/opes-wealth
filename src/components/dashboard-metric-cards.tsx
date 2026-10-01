@@ -34,6 +34,8 @@ export type BreakdownRow = {
   /** Unrealized-gain breakdown only. */
   marketValue?: number;
   costBasis?: number;
+  /** Liabilities breakdown: set (possibly "") when the debt is this property's own linked loan — shows which asset it belongs to. */
+  linkedLender?: string;
 };
 
 export type DashboardBreakdowns = {
@@ -177,6 +179,13 @@ function BreakdownDialog({
                       >
                         {row.name}
                       </Link>
+                      {row.linkedLender !== undefined && (
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          {row.linkedLender
+                            ? t("liability_linked_loan_lender", { lender: row.linkedLender })
+                            : t("liability_linked_loan")}
+                        </span>
+                      )}
                     </TableCell>
                     {isGain ? (
                       <>

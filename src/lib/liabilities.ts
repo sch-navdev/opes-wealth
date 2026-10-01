@@ -1,5 +1,6 @@
 import { canAmortize, getOutstandingPrincipalAt } from "@/lib/amortization";
 import { parseRealEstateMetadata, resolveOutstandingLoanBalance } from "@/lib/real-estate";
+import { parsePrivateEquityMetadata, pendingCapitalCallsTotal } from "@/lib/private-equity";
 
 export type AssetForLiabilities = {
   current_value: number;
@@ -49,6 +50,13 @@ export function assetLiability(asset: AssetForLiabilities): number {
       : resolveOutstandingLoanBalance(loan);
     const offplanBalance = metadata.is_offplan ? metadata.outstanding_balance : 0;
     return loanBalance + offplanBalance;
+  }
+
+  // Private Equity (drawdown fund): capital calls still pending are a
+  // forward-looking obligation, the same idea as an off-plan property's
+  // unpaid instalments. `current_value` stays the fund's NAV (gross).
+  if (asset.asset_categories?.name === "Private Equity") {
+    return pendingCapitalCallsTotal(parsePrivateEquityMetadata(asset.metadata));
   }
 
   return 0;

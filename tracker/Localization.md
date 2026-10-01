@@ -60,6 +60,26 @@
 
 - EN + FR: `range_from`, `range_to`, `range_reset`, `range_swapped`, `category_sort_label`, `category_sort_share`, `category_sort_alpha`.
 
+
+## New Keys (Cash & Bank card, Liabilities, parsed preview, 2026-10-01)
+
+- EN + FR: `cash_bank_*`, `liability_*` (incl. `liability_linked_loan*`), `currency_label`, `csv_parsed_*`.
+
+
+## New Keys (Companies module, Private Equity commitment & capital calls, 2026-10-01)
+
+- EN + FR: `nav_companies`, `category_companies`, `companies_*`, `company_*` (incl. entity-type labels), and `pe_*` (lifecycle stages, commitment, called/unfunded, schedule generator, call statuses, liability switch and its caveat, validation messages).
+
+
+## New Keys (Private Equity projections & manual override, 2026-10-01)
+
+- EN + FR: `pe_mode_*`, `pe_presets`/`pe_preset_*`, `pe_expected_*`, `pe_dist_*`, `pe_shape_*`, `pe_generate_lifecycle`, `pe_manual_*`, `pe_add_*`, `pe_returns_*`, `pe_cash_flows_heading`, `pe_chart_*`, `pe_projection_*`, `pe_distribution_invalid`, `pe_multiple_invalid`; `pe_calls_desc` reworded for the full lifecycle.
+
+
+## New Keys (SCPI, Reports & Exports, DCC document, 2026-10-01)
+
+- EN + FR: `yes`/`no`, `scpi_*`, `reports_*`, `export_xlsx*`, `dcc_*` — UI strings of the DCC dialog and every label of the generated PDF (field names, section titles, table headers, the 17 objectives, tax lines, warning text, signature labels), the latter rendered in the language chosen in the dialog rather than the UI language.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

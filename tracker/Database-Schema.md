@@ -36,6 +36,16 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - `0017_precious_metals_category.sql` — seeds the `Precious Metals` row in `asset_categories`; see [[Live-Pricing|Live Pricing]].
 - Both are written but **applied by the user** (`supabase db push` or the SQL editor). They are additive and idempotent (`create or replace`, `on conflict do nothing`). `0015` (history-source superset) from OW6 is still listed as pending too.
 
+
+## Migration 0018 — Companies Category (2026-10-01)
+
+- `0018_companies_category.sql` seeds the `Companies` row in `asset_categories` (idempotent). Metadata-only otherwise; the Private Equity redesign needs no migration. Written but **applied by the user**, with `0015`–`0017` still pending. See [[Portfolio-Dashboard|Portfolio Dashboard]].
+
+
+## Migration 0019 — SCPI Category (2026-10-01)
+
+- `0019_scpi_category.sql`: idempotent insert of the `SCPI` category. It was already seeded by `0001`, so this is a **no-op** on the live project; kept as a drift safeguard. No schema change; SCPI fields are metadata. See [[Portfolio-Dashboard|Portfolio Dashboard]].
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

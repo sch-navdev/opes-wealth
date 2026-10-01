@@ -54,6 +54,7 @@ export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   Equities: "category_equities",
   Crypto: "category_crypto",
   "Precious Metals": "category_precious_metals",
+  Companies: "category_companies",
   Cash: "category_cash",
   Liabilities: "category_liabilities",
   Vehicles: "category_vehicles",
@@ -215,10 +216,13 @@ export function PortfolioGroups({
           // Real Estate: net equity from today's amortized loan (market value −
           // liability), matching the rows and the dashboard cards, rather than the
           // stored `current_value` snapshot.
+          // Private Equity: NAV minus the capital calls still to be paid, so
+          // the folder subtotal matches the dashboard's Net Worth cards.
           const mortgageOwed =
-            asset.asset_categories?.name === "Real Estate" &&
             !asset.is_liability &&
-            asset.metadata?.is_offplan !== true
+            ((asset.asset_categories?.name === "Real Estate" &&
+              asset.metadata?.is_offplan !== true) ||
+              asset.asset_categories?.name === "Private Equity")
               ? assetLiability(asset)
               : 0;
           const nativeValue =

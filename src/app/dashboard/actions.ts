@@ -67,6 +67,7 @@ import {
   type WalletChain,
 } from "@/lib/market-data/wallet-balance";
 import { parseCryptoMetadata } from "@/lib/crypto";
+import { parsePrivateEquityMetadata, pendingCapitalCallsTotal } from "@/lib/private-equity";
 import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
@@ -174,6 +175,11 @@ async function syncAssetHistory(
     }
 
     addPoint(snapshotDate, marketValuation, currentValue);
+  } else if (categoryName === "Private Equity") {
+    // NAV is the gross value; capital calls still pending are a forward
+    // liability, so Net Worth (which sums `net_equity`) sees NAV minus them.
+    const owed = pendingCapitalCallsTotal(parsePrivateEquityMetadata(metadata));
+    addPoint(snapshotDate, currentValue, currentValue - owed);
   } else {
     addPoint(snapshotDate, currentValue, currentValue);
   }
@@ -216,6 +222,10 @@ export async function addAsset(formData: FormData) {
     }
   }
 
+  if (await isLiabilitiesCategory(supabase, categoryId)) {
+    return { error: "Liabilities are added with Add Liability, not Add Asset." };
+  }
+
   const { data: inserted, error } = await supabase
     .from("assets")
     .insert({
@@ -246,7 +256,7 @@ export async function addAsset(formData: FormData) {
     purchaseDate,
   );
 
-  revalidatePath("/dashboard");
+  revalidatePath("/dashboard", "layout");
 }
 
 export async function updateAsset(id: string, formData: FormData) {
@@ -340,12 +350,13 @@ export async function updateAssetValuation(
 
   const { data: asset } = await supabase
     .from("assets")
-    .select("id, metadata, asset_categories(name)")
+    .select("id, metadata, is_liability, asset_categories(name)")
     .eq("id", id)
     .eq("profile_id", user.id)
     .single<{
       id: string;
       metadata: Json | null;
+      is_liability: boolean;
       asset_categories: { name: string } | null;
     }>();
 
@@ -357,7 +368,12 @@ export async function updateAssetValuation(
   const recordedDate = date || new Date().toISOString().slice(0, 10);
   const isToday = recordedDate === new Date().toISOString().slice(0, 10);
 
-  let netEquity = newValue;
+  // A liability's history stores the balance owed as `value` and its NEGATIVE
+  // as `net_equity`, which is what the Net Worth chart sums.
+  let netEquity = asset.is_liability ? -newValue : newValue;
+  if (asset.asset_categories?.name === "Private Equity") {
+    netEquity = newValue - pendingCapitalCallsTotal(parsePrivateEquityMetadata(asset.metadata));
+  }
   let nextMetadata = asset.metadata;
 
   if (isRealEstate) {
@@ -380,7 +396,15 @@ export async function updateAssetValuation(
   if (isToday) {
     const { error: updateError } = await supabase
       .from("assets")
-      .update({ current_value: netEquity, metadata: nextMetadata })
+      .update({
+        // Liabilities store the balance owed; Private Equity stores gross NAV
+        // (its pending capital calls are subtracted at the dashboard level).
+        current_value:
+          asset.is_liability || asset.asset_categories?.name === "Private Equity"
+            ? newValue
+            : netEquity,
+        metadata: nextMetadata,
+      })
       .eq("id", id)
       .eq("profile_id", user.id);
 
@@ -2616,4 +2640,136 @@ export async function syncCryptoWallet(
   revalidatePath("/dashboard", "layout");
   revalidatePath(`/dashboard/assets/${id}`);
   return { ok: true, balance: balance.balance, totalValue, priced };
+}
+
+async function isLiabilitiesCategory(supabase: SupabaseClient, categoryId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("asset_categories")
+    .select("name")
+    .eq("id", categoryId)
+    .single<{ name: string }>();
+  return data?.name === "Liabilities";
+}
+
+function parseLiabilityForm(formData: FormData) {
+  const metadataRaw = formData.get("metadata") as string | null;
+  let metadata: Json = {};
+  if (metadataRaw) {
+    try {
+      metadata = JSON.parse(metadataRaw);
+    } catch {
+      return { error: "Invalid metadata payload." } as const;
+    }
+  }
+  return {
+    name: String(formData.get("name") ?? "").trim(),
+    balance: Number(formData.get("current_value")),
+    currency: (formData.get("currency") as string) || "USD",
+    startDate: (formData.get("purchase_date") as string) || new Date().toISOString().slice(0, 10),
+    metadata,
+  } as const;
+}
+
+/** Writes the liability's balance for a date: `value` = owed, `net_equity` = −owed (what Net Worth sums). */
+async function recordLiabilityBalance(
+  supabase: SupabaseClient,
+  assetId: string,
+  date: string,
+  balance: number,
+) {
+  return upsertHistoryRows(supabase, [
+    { asset_id: assetId, recorded_date: date, value: balance, net_equity: -balance, source: "manual" },
+  ]);
+}
+
+/**
+ * Dedicated liability creation (loan, mortgage, credit card…): always the
+ * "Liabilities" category with `is_liability = true`, `current_value` = balance
+ * owed (positive). Kept out of `addAsset`, which now rejects that category.
+ */
+export async function addLiability(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in to add a liability." };
+
+  const form = parseLiabilityForm(formData);
+  if ("error" in form) return { error: form.error };
+  if (!form.name) return { error: "Name is required." };
+  if (!Number.isFinite(form.balance) || form.balance < 0) {
+    return { error: "Enter the balance owed (zero or more)." };
+  }
+
+  const { data: category } = await supabase
+    .from("asset_categories")
+    .select("id")
+    .eq("name", "Liabilities")
+    .single<{ id: string }>();
+  if (!category) return { error: 'The "Liabilities" category is missing from this project.' };
+
+  const { data: inserted, error } = await supabase
+    .from("assets")
+    .insert({
+      profile_id: user.id,
+      category_id: category.id,
+      name: form.name,
+      quantity: 1,
+      current_value: form.balance,
+      currency: form.currency,
+      is_liability: true,
+      metadata: form.metadata,
+      images: [],
+      ticker_symbol: null,
+      purchase_date: form.startDate,
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (error) return { error: error.message };
+
+  const historyError = await recordLiabilityBalance(supabase, inserted.id, form.startDate, form.balance);
+  if (historyError) return { error: historyError.message };
+
+  revalidatePath("/dashboard", "layout");
+}
+
+export async function updateLiability(id: string, formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in to update a liability." };
+
+  const form = parseLiabilityForm(formData);
+  if ("error" in form) return { error: form.error };
+  if (!form.name) return { error: "Name is required." };
+  if (!Number.isFinite(form.balance) || form.balance < 0) {
+    return { error: "Enter the balance owed (zero or more)." };
+  }
+
+  const { error } = await supabase
+    .from("assets")
+    .update({
+      name: form.name,
+      current_value: form.balance,
+      currency: form.currency,
+      metadata: form.metadata,
+      purchase_date: form.startDate,
+    })
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .eq("is_liability", true);
+  if (error) return { error: error.message };
+
+  // Today's snapshot, like `updateAsset`; earlier points are left alone.
+  const historyError = await recordLiabilityBalance(
+    supabase,
+    id,
+    new Date().toISOString().slice(0, 10),
+    form.balance,
+  );
+  if (historyError) return { error: historyError.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
 }
