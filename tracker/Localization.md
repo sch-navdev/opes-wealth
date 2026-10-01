@@ -45,6 +45,21 @@
 ## New Keys (Historical Purchase & Valuation Dates, 2026-09-28)
 `purchase_date` (Add/Edit Asset dialog's new mandatory field) and `valuation_date` (the manual Refresh Valuation dialog's new date picker) added in both English and French. See [[Portfolio-Dashboard|Portfolio Dashboard]].
 
+
+## New Keys (OW7: Security, Explorer/Projection, Precious Metals, Crypto Wallet, 2026-10-01)
+
+- EN + FR added to `src/lib/i18n.ts`: `security_*` and `nav_security` (Security page), `category_cards_*`, `explorer_*`, `timeline_*`, `view_*`, `projection_*` (category cards, explorer dialog, Historical/Projection and Grouped/Individual toggles), `metal_*`, `category_precious_metals`, `refresh_metal_spot`, `quantity_pieces` (Precious Metals), `crypto_source_*`/`crypto_wallet_*`/`crypto_exchange_*`/`crypto_chain_*`, `sync_wallet`, `wallet_*` (Crypto wallet sync). The server-action error strings on the Security page (`revokeSession`) are English-only, like the other server-action errors.
+
+
+## New Keys (Chart Range, Combined View, Invested Capital, 2026-10-01)
+
+- EN + FR: `timeline_combined`, `range_label`, `range_all`, `chart_show_invested`, `chart_invested`, `projection_invested_note`.
+
+
+## New Keys (Custom Range, Category Sorting, 2026-10-01)
+
+- EN + FR: `range_from`, `range_to`, `range_reset`, `range_swapped`, `category_sort_label`, `category_sort_share`, `category_sort_alpha`.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

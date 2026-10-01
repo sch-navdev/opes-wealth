@@ -29,6 +29,13 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - The live `asset_history_source_check` was found to allow only `manual, file_import, dld, adrec, dubailand, yahoo, finnhub, saxo` — not the values in `src/lib/asset-history.ts` (`broker_import`, `csv_import`, `coingecko`, `dari`, `vehicle_valuation`), so Saxo/CSV/crypto/ADREC/vehicle history writes were being rejected. How it drifted is unknown (it doesn't match migrations 0010/0011/0013 or my 0014). **Migration `0015_asset_history_source_superset.sql`** replaces it with the union of the app's values and the live ones; it is **not applied yet**. Until it is, history writes that hit a CHECK violation are retried as `manual` (see [[Portfolio-Dashboard|Portfolio Dashboard]]). Worth re-checking the other tables' constraints against the migrations directory for similar drift.
 
+
+## OW7 Migrations — Not Yet Applied (2026-10-01)
+
+- `0016_security_sessions.sql` — `list_my_sessions()` / `revoke_my_session(uuid)` SECURITY DEFINER functions for the Security page; see [[Authentication-Security|Authentication & Security]].
+- `0017_precious_metals_category.sql` — seeds the `Precious Metals` row in `asset_categories`; see [[Live-Pricing|Live Pricing]].
+- Both are written but **applied by the user** (`supabase db push` or the SQL editor). They are additive and idempotent (`create or replace`, `on conflict do nothing`). `0015` (history-source superset) from OW6 is still listed as pending too.
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

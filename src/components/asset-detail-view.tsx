@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, Car, CloudDownload, Download, FileText, Landmark, LineChart, Minus, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Car, CloudDownload, Coins, Download, FileText, Landmark, LineChart, Minus, RefreshCw, Wallet } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -92,7 +92,9 @@ import {
   type DldCertificate,
   refreshAdrecValuation,
   refreshDldValuation,
+  refreshMetalPrice,
   refreshVehicleValuation,
+  syncCryptoWallet,
   updateAssetValuation,
   addPropertyExpense,
   deletePropertyExpense,
@@ -128,6 +130,7 @@ import {
 } from "@/lib/real-estate-analytics";
 import {
   calculateVehicleTotalCost,
+  buildVehicleHistoryFromPurchase,
   parseVehicleMetadata,
   resolveVehicleValuation,
 } from "@/lib/vehicles";
@@ -138,6 +141,11 @@ import {
   parseEquityMetadata,
 } from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
+import {
+  fineTroyOunces,
+  parsePreciousMetalMetadata,
+} from "@/lib/precious-metals";
+import { METAL_FORM_LABEL_KEYS, METAL_LABEL_KEYS } from "@/components/precious-metals-fields";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 import { fetchMarketPrice } from "@/lib/market-data/market-price";
@@ -182,6 +190,9 @@ const MARKET_PRICE_ERROR_KEYS: Record<string, TranslationKey> = {
   rate_limited: "market_price_error_rate_limited",
   invalid_response: "market_price_error_invalid_response",
   network_error: "market_price_error_network_error",
+  invalid_address: "wallet_error_invalid_address",
+  not_a_wallet: "wallet_error_not_a_wallet",
+  missing_weight: "metal_weight_required",
 };
 
 /** Maps `refreshDldValuation`'s `DldErrorCode` to a localized message key, following the `MARKET_PRICE_ERROR_KEYS` pattern rather than the old DARI stub's flat raw-string errors (that stub has since been superseded by the ADREC/DARI integration below). */
@@ -318,12 +329,17 @@ export function AssetDetailView({
   const isPrivateEquity = categoryName === "Private Equity";
   const isEquity = categoryName === "Equities";
   const isCrypto = categoryName === "Crypto";
+  const isPreciousMetal = categoryName === "Precious Metals";
   const metadata = parseRealEstateMetadata(asset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
   // Baseline = purchase price, else the earliest valuation entry; current =
   // the latest valuation entry (see `resolveVehicleValuation`).
   const vehicleValuation = vehicleMetadata
-    ? resolveVehicleValuation(vehicleMetadata, history, asset.current_value)
+    ? resolveVehicleValuation(
+        vehicleMetadata,
+        history.filter((h) => !asset.purchase_date || h.recorded_date >= asset.purchase_date),
+        asset.current_value,
+      )
     : null;
   const vehicleTotalCost = vehicleMetadata
     ? calculateVehicleTotalCost(
@@ -337,6 +353,8 @@ export function AssetDetailView({
     : null;
   const equityMetadata = isEquity ? parseEquityMetadata(asset.metadata) : null;
   const cryptoMetadata = isCrypto ? parseCryptoMetadata(asset.metadata) : null;
+  const metalMetadata = isPreciousMetal ? parsePreciousMetalMetadata(asset.metadata) : null;
+  const isWalletHolding = cryptoMetadata?.holding_source === "wallet";
   const avgCostBasis = equityMetadata
     ? estimateCostBasisUnitPrice(equityMetadata.trades)
     : null;
@@ -565,7 +583,25 @@ export function AssetDetailView({
   const purchaseAnchorValue = metadata.contract_price ?? metadata.purchasePrice ?? marketValuation;
 
   let displayHistory = sortedHistory;
-  if (purchaseAnchorDate) {
+  if (isVehicle && vehicleMetadata) {
+    // Vehicles: the curve starts strictly on the recorded purchase date (at
+    // the purchase price when known) and runs to today — never at "today"
+    // just because that is the only row, nor before the purchase. Equity is
+    // the value itself (no loan netting for vehicles).
+    displayHistory = buildVehicleHistoryFromPurchase(
+      sortedHistory,
+      asset.purchase_date,
+      vehicleMetadata.purchase_price,
+      today,
+      (date, value): AssetHistoryPoint => ({
+        id: `vehicle-purchase-${date}`,
+        recorded_date: date,
+        value,
+        net_equity: value,
+        source: "manual",
+      }),
+    ).map((h) => ({ ...h, net_equity: h.value }));
+  } else if (purchaseAnchorDate) {
     displayHistory = sortedHistory.filter(
       (h) => h.recorded_date >= purchaseAnchorDate,
     );
@@ -933,6 +969,46 @@ export function AssetDetailView({
     });
   }
 
+  function handleRefreshMetalPrice() {
+    setMarketPriceError(null);
+    setMarketPriceMessage(null);
+
+    startMarketPriceTransition(async () => {
+      const result = await refreshMetalPrice(asset.id);
+      if (!result.ok) {
+        const key = MARKET_PRICE_ERROR_KEYS[result.code];
+        setMarketPriceError(key ? t(key) : result.error);
+        return;
+      }
+      setMarketPriceMessage(
+        t("metal_price_updated", {
+          price: currencyFormatter.format(result.spotPrice),
+          value: currencyFormatter.format(result.totalValue),
+        }),
+      );
+    });
+  }
+
+  function handleSyncWallet() {
+    setMarketPriceError(null);
+    setMarketPriceMessage(null);
+
+    startMarketPriceTransition(async () => {
+      const result = await syncCryptoWallet(asset.id);
+      if (!result.ok) {
+        const key = MARKET_PRICE_ERROR_KEYS[result.code];
+        setMarketPriceError(key ? t(key) : result.error);
+        return;
+      }
+      setMarketPriceMessage(
+        t(result.priced ? "wallet_synced" : "wallet_synced_unpriced", {
+          balance: result.balance.toLocaleString("en-US", { maximumFractionDigits: 8 }),
+          ticker: asset.ticker_symbol ?? "",
+        }),
+      );
+    });
+  }
+
   function handleRefreshFromDld() {
     setDldError(null);
     setDldMessage(null);
@@ -1292,6 +1368,32 @@ export function AssetDetailView({
                   </AlertDialogContent>
                 </AlertDialog>
               )}
+              {isPreciousMetal && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t("refresh_metal_spot")}
+                  title={t("refresh_metal_spot")}
+                  onClick={handleRefreshMetalPrice}
+                  disabled={isMarketPricePending}
+                >
+                  <Coins className={cn("size-4", isMarketPricePending && "animate-pulse")} />
+                </Button>
+              )}
+              {isCrypto && isWalletHolding && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t("sync_wallet")}
+                  title={t("sync_wallet")}
+                  onClick={handleSyncWallet}
+                  disabled={isMarketPricePending}
+                >
+                  <Wallet className={cn("size-4", isMarketPricePending && "animate-pulse")} />
+                </Button>
+              )}
               {(isEquity || isCrypto) && (
                 <Button
                   type="button"
@@ -1581,12 +1683,15 @@ export function AssetDetailView({
           </p>
         )}
 
-        {(isEquity || isCrypto) && (
+        {(isEquity || isCrypto || isPreciousMetal) && (
           <div className="space-y-1">
             {(() => {
-              const lastPrice = (equityMetadata ?? cryptoMetadata)?.last_unit_price ?? null;
+              const lastPrice = isPreciousMetal
+                ? (metalMetadata?.last_spot_price ?? null)
+                : ((equityMetadata ?? cryptoMetadata)?.last_unit_price ?? null);
               const lastPricedAt = formatLastPricedAt(
-                (equityMetadata ?? cryptoMetadata)?.last_priced_at ?? null,
+                (isPreciousMetal ? metalMetadata : (equityMetadata ?? cryptoMetadata))
+                  ?.last_priced_at ?? null,
               );
               if (lastPrice == null) {
                 return (
@@ -1597,7 +1702,8 @@ export function AssetDetailView({
               }
               return (
                 <p className="text-xs text-muted-foreground">
-                  {t("unit_price")}: {maskValue(currencyFormatter.format(lastPrice))}
+                  {isPreciousMetal ? t("metal_spot_per_oz") : t("unit_price")}:{" "}
+                  {maskValue(currencyFormatter.format(lastPrice))}
                   {lastPricedAt && ` · ${t("last_updated")}: ${lastPricedAt}`}
                 </p>
               );
@@ -3375,6 +3481,53 @@ export function AssetDetailView({
               </Card>
             )}
 
+            {isPreciousMetal && metalMetadata && (
+              <Card className="border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground">{t("metal_details")}</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <DetailField label={t("metal_type")} value={t(METAL_LABEL_KEYS[metalMetadata.metal])} />
+                  <DetailField label={t("metal_form")} value={t(METAL_FORM_LABEL_KEYS[metalMetadata.form])} />
+                  <DetailField label={t("quantity_pieces")} value={String(asset.quantity)} />
+                  <DetailField
+                    label={t("metal_weight_per_unit")}
+                    value={
+                      metalMetadata.weight_per_unit != null
+                        ? `${metalMetadata.weight_per_unit} ${metalMetadata.weight_unit}`
+                        : null
+                    }
+                  />
+                  <DetailField label={t("metal_purity")} value={String(metalMetadata.purity)} />
+                  <DetailField
+                    label={t("metal_fine_weight_label")}
+                    value={`${fineTroyOunces(metalMetadata, asset.quantity).toFixed(4)} oz t`}
+                  />
+                  <DetailField
+                    label={t("metal_premium")}
+                    value={metalMetadata.premium_pct != null ? `${metalMetadata.premium_pct}%` : null}
+                  />
+                  <DetailField
+                    label={t("metal_spot_per_oz")}
+                    value={
+                      metalMetadata.last_spot_price != null
+                        ? maskValue(currencyFormatter.format(metalMetadata.last_spot_price))
+                        : null
+                    }
+                  />
+                  <DetailField label={t("metal_serial")} value={metalMetadata.serial_number || null} />
+                  <DetailField
+                    label={t("metal_storage")}
+                    value={metalMetadata.storage_location || null}
+                  />
+                  <DetailField
+                    label={t("last_updated")}
+                    value={formatLastPricedAt(metalMetadata.last_priced_at)}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             {isCrypto && cryptoMetadata && (
               <Card className="border-border bg-card">
                 <CardHeader>
@@ -3385,6 +3538,31 @@ export function AssetDetailView({
                 <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
                   <DetailField label={t("coingecko_id")} value={cryptoMetadata.coingecko_id} />
+                  <DetailField
+                    label={t("crypto_holding_source")}
+                    value={isWalletHolding ? t("crypto_source_wallet") : t("crypto_source_manual")}
+                  />
+                  {isWalletHolding ? (
+                    <>
+                      <DetailField
+                        label={t("crypto_wallet_chain")}
+                        value={cryptoMetadata.wallet_chain || null}
+                      />
+                      <DetailField
+                        label={t("crypto_wallet_address")}
+                        value={cryptoMetadata.wallet_address || null}
+                      />
+                      <DetailField
+                        label={t("wallet_last_synced")}
+                        value={formatLastPricedAt(cryptoMetadata.last_synced_at)}
+                      />
+                    </>
+                  ) : (
+                    <DetailField
+                      label={t("crypto_exchange_name")}
+                      value={cryptoMetadata.exchange_name || null}
+                    />
+                  )}
                   <DetailField
                     label={t("unit_price")}
                     value={

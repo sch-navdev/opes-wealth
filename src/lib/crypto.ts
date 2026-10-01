@@ -1,3 +1,7 @@
+import { isValidWalletAddress, type WalletChain } from "@/lib/market-data/wallet-balance";
+
+export type CryptoHoldingSource = "manual" | "wallet";
+
 /**
  * Metadata shape for the "Crypto" asset category, stored in
  * `assets.metadata` (same jsonb-per-category pattern as `RealEstateMetadata`
@@ -15,6 +19,20 @@
 export type CryptoMetadata = {
   /** CoinGecko's coin id, e.g. "bitcoin", "ethereum" — found in the coin's CoinGecko URL. */
   coingecko_id: string;
+  /**
+   * How the quantity is kept current: `manual` (typed in — e.g. coins held on
+   * an exchange) or `wallet` (read from a public on-chain address by
+   * "Sync wallet"). Absent on rows saved before OW7 — treated as `manual`.
+   */
+  holding_source: CryptoHoldingSource;
+  /** Exchange / custodian name for manual holdings (e.g. "Binance", "Coinbase", "Ledger"). */
+  exchange_name: string;
+  /** Wallet holdings only: the chain and PUBLIC address that are read (never keys). */
+  wallet_chain: WalletChain | "";
+  wallet_address: string;
+  /** Last successful wallet sync (ISO) and the balance it read, in whole coins. */
+  last_synced_at: string | null;
+  last_synced_balance: number | null;
   last_unit_price: number | null;
   last_priced_at: string | null;
   last_price_source: string | null;
@@ -22,6 +40,12 @@ export type CryptoMetadata = {
 
 export const EMPTY_CRYPTO_METADATA: CryptoMetadata = {
   coingecko_id: "",
+  holding_source: "manual",
+  exchange_name: "",
+  wallet_chain: "",
+  wallet_address: "",
+  last_synced_at: null,
+  last_synced_balance: null,
   last_unit_price: null,
   last_priced_at: null,
   last_price_source: null,
@@ -53,6 +77,14 @@ export function getCryptoMetadataErrors(metadata: CryptoMetadata): string[] {
   const errors: string[] = [];
 
   if (!metadata.coingecko_id.trim()) errors.push("crypto_coingecko_id_required");
+
+  if (metadata.holding_source === "wallet") {
+    if (!metadata.wallet_chain) {
+      errors.push("crypto_wallet_chain_required");
+    } else if (!isValidWalletAddress(metadata.wallet_chain, metadata.wallet_address)) {
+      errors.push("crypto_wallet_address_invalid");
+    }
+  }
 
   return errors;
 }

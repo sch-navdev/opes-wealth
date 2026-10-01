@@ -53,6 +53,7 @@ export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   SCPI: "category_scpi",
   Equities: "category_equities",
   Crypto: "category_crypto",
+  "Precious Metals": "category_precious_metals",
   Cash: "category_cash",
   Liabilities: "category_liabilities",
   Vehicles: "category_vehicles",

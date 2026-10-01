@@ -27,6 +27,7 @@ import { VehicleFields } from "@/components/vehicle-fields";
 import { PrivateEquityFields } from "@/components/private-equity-fields";
 import { EquityFields } from "@/components/equity-fields";
 import { CryptoFields } from "@/components/crypto-fields";
+import { PreciousMetalsFields } from "@/components/precious-metals-fields";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
@@ -52,6 +53,12 @@ import {
   getCryptoMetadataErrors,
   parseCryptoMetadata,
 } from "@/lib/crypto";
+import {
+  DEFAULT_PURITY,
+  EMPTY_PRECIOUS_METAL_METADATA,
+  getPreciousMetalErrors,
+  parsePreciousMetalMetadata,
+} from "@/lib/precious-metals";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -113,6 +120,12 @@ export function AddAssetDialog({
   const [cryptoMetadata, setCryptoMetadata] = useState(() =>
     asset ? parseCryptoMetadata(asset.metadata) : EMPTY_CRYPTO_METADATA,
   );
+  const [metalMetadata, setMetalMetadata] = useState(() =>
+    asset
+      ? parsePreciousMetalMetadata(asset.metadata)
+      : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
+  );
+  const [quantityInput, setQuantityInput] = useState(asset?.quantity ?? 1);
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
@@ -120,6 +133,7 @@ export function AddAssetDialog({
   const isPrivateEquity = selectedCategory?.name === "Private Equity";
   const isEquity = selectedCategory?.name === "Equities";
   const isCrypto = selectedCategory?.name === "Crypto";
+  const isPreciousMetal = selectedCategory?.name === "Precious Metals";
 
   function resetState() {
     setCategoryId(asset?.category_id ?? "");
@@ -141,6 +155,12 @@ export function AddAssetDialog({
     setCryptoMetadata(
       asset ? parseCryptoMetadata(asset.metadata) : EMPTY_CRYPTO_METADATA,
     );
+    setMetalMetadata(
+      asset
+        ? parsePreciousMetalMetadata(asset.metadata)
+        : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
+    );
+    setQuantityInput(asset?.quantity ?? 1);
   }
 
   async function handleImageFileSelected(
@@ -217,6 +237,13 @@ export function AddAssetDialog({
         return;
       }
       formData.set("metadata", JSON.stringify(cryptoMetadata));
+    } else if (isPreciousMetal) {
+      const errors = getPreciousMetalErrors(metalMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      formData.set("metadata", JSON.stringify(metalMetadata));
     }
 
     startTransition(async () => {
@@ -388,6 +415,7 @@ export function AddAssetDialog({
                 step="any"
                 min="0"
                 defaultValue={asset?.quantity ?? 1}
+                onChange={(e) => setQuantityInput(Number(e.target.value))}
               />
             </div>
             <div className="min-w-0 space-y-2">
@@ -469,7 +497,19 @@ export function AddAssetDialog({
           )}
 
           {isCrypto && (
-            <CryptoFields value={cryptoMetadata} onChange={setCryptoMetadata} />
+            <CryptoFields
+              value={cryptoMetadata}
+              onChange={setCryptoMetadata}
+              onTickerSuggest={setTickerSymbol}
+            />
+          )}
+
+          {isPreciousMetal && (
+            <PreciousMetalsFields
+              value={metalMetadata}
+              onChange={setMetalMetadata}
+              quantity={quantityInput}
+            />
           )}
 
           {error && (

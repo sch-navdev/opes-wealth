@@ -56,6 +56,17 @@ import {
   toRealEstateMetadataPatch,
   type PropertyDocumentType,
 } from "@/lib/property-document-parser";
+import {
+  calculateMetalValue,
+  parsePreciousMetalMetadata,
+} from "@/lib/precious-metals";
+import { fetchMetalSpotUsd } from "@/lib/market-data/metals-spot";
+import {
+  fetchWalletBalance,
+  isValidWalletAddress,
+  type WalletChain,
+} from "@/lib/market-data/wallet-balance";
+import { parseCryptoMetadata } from "@/lib/crypto";
 import type { Json } from "@/types/supabase";
 
 function parseImages(formData: FormData): string[] {
@@ -2368,4 +2379,241 @@ export async function deleteAssetHistoryPoint(assetId: string, historyId: string
 
   revalidatePath("/dashboard", "layout");
   revalidatePath(`/dashboard/assets/${assetId}`);
+}
+
+/**
+ * Precious Metals: reprices a holding from the live spot price (USD per troy
+ * ounce, `lib/market-data/metals-spot.ts`), converts it into the asset's own
+ * currency, and sets `current_value` = pure-metal weight × spot × quantity
+ * (+ the optional dealer premium) — see `calculateMetalValue`. Records the
+ * spot price used into `metadata` and upserts today's `asset_history` row,
+ * exactly like `persistQuote` does for Equities/Crypto.
+ */
+export async function refreshMetalPrice(
+  id: string,
+): Promise<
+  | { ok: true; spotPrice: number; totalValue: number; asOf: string }
+  | { ok: false; code: string; error: string }
+> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, code: "unauthenticated", error: "You must be signed in to refresh a price." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, quantity, currency, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      quantity: number;
+      currency: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+  if (!asset || asset.asset_categories?.name !== "Precious Metals") {
+    return { ok: false, code: "not_found", error: "Precious Metals asset not found." };
+  }
+
+  const metal = parsePreciousMetalMetadata(asset.metadata);
+  if (!metal.weight_per_unit || !(metal.weight_per_unit > 0)) {
+    return { ok: false, code: "missing_weight", error: "Set the weight per bar/coin first." };
+  }
+
+  const spot = await fetchMetalSpotUsd(metal.metal);
+  if (!spot.ok) return { ok: false, code: spot.code, error: spot.error };
+
+  const rates = asset.currency === "USD" ? {} : await getExchangeRatesFromUsd();
+  const spotInAssetCurrency = convertAmount(spot.usdPerTroyOunce, "USD", asset.currency, rates);
+  const totalValue = calculateMetalValue(metal, asset.quantity ?? 1, spotInAssetCurrency);
+
+  const existing =
+    asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
+      ? (asset.metadata as Record<string, Json>)
+      : {};
+  const { error: updateError } = await supabase
+    .from("assets")
+    .update({
+      current_value: totalValue,
+      metadata: {
+        ...existing,
+        last_spot_price: spotInAssetCurrency,
+        last_priced_at: spot.asOf,
+        last_price_source: spot.source,
+      },
+    })
+    .eq("id", id)
+    .eq("profile_id", user.id);
+  if (updateError) return { ok: false, code: "db_error", error: updateError.message };
+
+  const historyError = await upsertHistoryRows(supabase, [
+    {
+      asset_id: id,
+      recorded_date: spot.asOf.slice(0, 10),
+      value: totalValue,
+      net_equity: totalValue,
+      source: spot.source,
+    },
+  ]);
+  if (historyError) return { ok: false, code: "db_error", error: historyError.message };
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
+  return { ok: true, spotPrice: spotInAssetCurrency, totalValue, asOf: spot.asOf };
+}
+
+/** CoinGecko quote for a Crypto asset via the `refresh-market-price` Edge Function — the server-side twin of `fetchMarketPrice` (browser). */
+async function fetchLiveCryptoQuote(
+  supabase: SupabaseClient,
+  assetId: string,
+  coingeckoId: string,
+  currency: string,
+): Promise<{ ok: true; quote: LiveQuote } | { ok: false; code: string; error: string }> {
+  const { data, error } = await supabase.functions.invoke("refresh-market-price", {
+    body: { assetId, category: "crypto", coingeckoId, currency },
+  });
+
+  if (error) {
+    try {
+      const body = await (error as { context?: Response }).context?.json();
+      if (body?.error) {
+        return { ok: false, code: body.error.code ?? "network_error", error: body.error.message };
+      }
+    } catch {
+      // fall through
+    }
+    return { ok: false, code: "network_error", error: error.message };
+  }
+  if (data?.error) {
+    return { ok: false, code: data.error.code ?? "network_error", error: data.error.message };
+  }
+  if (typeof data?.unitPrice !== "number" || !(data.unitPrice > 0)) {
+    return { ok: false, code: "invalid_response", error: "Received an unexpected quote response." };
+  }
+  return {
+    ok: true,
+    quote: {
+      unitPrice: data.unitPrice,
+      currency: String(data.currency ?? currency).toUpperCase(),
+      asOf: data.asOf ?? new Date().toISOString(),
+      source: (data.source ?? "coingecko") as AssetHistorySource,
+    },
+  };
+}
+
+/**
+ * Crypto wallet sync: reads the native-coin balance of the asset's PUBLIC
+ * wallet address (`lib/market-data/wallet-balance.ts` — Bitcoin, Ethereum or
+ * Solana), stores it as the asset's `quantity`, then reprices it from
+ * CoinGecko (`current_value = balance × price`). If the quote fails the new
+ * quantity is still saved and valued at the last known unit price, so a
+ * CoinGecko hiccup never leaves a stale balance. Only `wallet` holdings can
+ * be synced; exchange/manual holdings keep their typed quantity.
+ */
+export async function syncCryptoWallet(
+  id: string,
+): Promise<
+  | { ok: true; balance: number; totalValue: number | null; priced: boolean }
+  | { ok: false; code: string; error: string }
+> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, code: "unauthenticated", error: "You must be signed in to sync a wallet." };
+  }
+
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, quantity, currency, metadata, asset_categories(name)")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .single<{
+      id: string;
+      quantity: number;
+      currency: string;
+      metadata: Json | null;
+      asset_categories: { name: string } | null;
+    }>();
+  if (!asset || asset.asset_categories?.name !== "Crypto") {
+    return { ok: false, code: "not_found", error: "Crypto asset not found." };
+  }
+
+  const crypto = parseCryptoMetadata(asset.metadata);
+  if (crypto.holding_source !== "wallet" || !crypto.wallet_chain) {
+    return { ok: false, code: "not_a_wallet", error: "This holding isn't linked to a wallet address." };
+  }
+  if (!isValidWalletAddress(crypto.wallet_chain, crypto.wallet_address)) {
+    return { ok: false, code: "invalid_address", error: "The saved wallet address isn't valid." };
+  }
+
+  const balance = await fetchWalletBalance(crypto.wallet_chain as WalletChain, crypto.wallet_address);
+  if (!balance.ok) return { ok: false, code: balance.code, error: balance.error };
+
+  const existing =
+    asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
+      ? (asset.metadata as Record<string, Json>)
+      : {};
+  const syncedMetadata: Record<string, Json> = {
+    ...existing,
+    last_synced_at: new Date().toISOString(),
+    last_synced_balance: balance.balance,
+  };
+
+  // Always persist the fresh balance first.
+  const { error: balanceError } = await supabase
+    .from("assets")
+    .update({ quantity: balance.balance, metadata: syncedMetadata })
+    .eq("id", id)
+    .eq("profile_id", user.id);
+  if (balanceError) return { ok: false, code: "db_error", error: balanceError.message };
+
+  const quote = crypto.coingecko_id
+    ? await fetchLiveCryptoQuote(supabase, id, crypto.coingecko_id, asset.currency)
+    : null;
+
+  let totalValue: number | null = null;
+  let priced = false;
+  const target = {
+    id,
+    quantity: balance.balance,
+    currency: asset.currency,
+    metadata: syncedMetadata as Json,
+  };
+  if (quote?.ok) {
+    const rates = quote.quote.currency !== asset.currency ? await getExchangeRatesFromUsd() : {};
+    const persisted = await persistQuote(supabase, user.id, target, quote.quote, rates);
+    if ("error" in persisted) return { ok: false, code: "db_error", error: persisted.error };
+    totalValue = persisted.totalValue;
+    priced = true;
+  } else if (crypto.last_unit_price != null) {
+    totalValue = balance.balance * crypto.last_unit_price;
+    const { error } = await supabase
+      .from("assets")
+      .update({ current_value: totalValue })
+      .eq("id", id)
+      .eq("profile_id", user.id);
+    if (error) return { ok: false, code: "db_error", error: error.message };
+    const historyError = await upsertHistoryRows(supabase, [
+      {
+        asset_id: id,
+        recorded_date: new Date().toISOString().slice(0, 10),
+        value: totalValue,
+        net_equity: totalValue,
+        source: "manual",
+      },
+    ]);
+    if (historyError) return { ok: false, code: "db_error", error: historyError.message };
+  }
+
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${id}`);
+  return { ok: true, balance: balance.balance, totalValue, priced };
 }

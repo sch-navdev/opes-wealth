@@ -199,7 +199,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      list_my_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          created_at: string
+          last_active_at: string
+          user_agent: string | null
+          ip: string | null
+          aal: string | null
+          is_current: boolean
+        }[]
+      }
+      revoke_my_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

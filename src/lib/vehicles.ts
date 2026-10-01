@@ -102,6 +102,58 @@ export function calculateVehicleTotalCost(
 
 export type VehicleValuePoint = { recorded_date: string; value: number };
 
+/**
+ * Valuation history as it should be PLOTTED: starting strictly on the
+ * purchase date, running to `today`.
+ *
+ * Why this exists: a vehicle's chart used to plot every `asset_history` row it
+ * had, so a vehicle whose only rows were recent (a valuation refresh, or an
+ * edit — `updateAsset` re-stamps today's snapshot) started "today" instead of
+ * on the day it was bought, and rows dated before the purchase (a stale
+ * purchase date edited later) leaked in too. Now:
+ *
+ * - rows before `purchaseDate` are dropped;
+ * - a point is guaranteed ON `purchaseDate`: the purchase price when one was
+ *   entered (it overrides a stored row on that day), otherwise the earliest
+ *   kept valuation (or, failing that, the last one before the purchase) so
+ *   the line starts flat at the first known value instead of being invented;
+ * - the line is carried flat to `today` so it spans the whole ownership period.
+ *
+ * `make` builds a synthetic row of the caller's own row type. With no
+ * `purchaseDate` (or a future one) the input is returned untouched.
+ */
+export function buildVehicleHistoryFromPurchase<
+  T extends { recorded_date: string; value: number },
+>(
+  sortedHistory: T[],
+  purchaseDate: string | null | undefined,
+  purchasePrice: number | null | undefined,
+  today: string,
+  make: (date: string, value: number) => T,
+): T[] {
+  if (!purchaseDate || purchaseDate > today) return sortedHistory;
+
+  const kept = sortedHistory.filter((h) => h.recorded_date >= purchaseDate);
+  const before = sortedHistory.filter((h) => h.recorded_date < purchaseDate);
+  const hasPrice = purchasePrice != null && purchasePrice > 0;
+  const anchorValue = hasPrice
+    ? purchasePrice
+    : (kept[0]?.value ?? before[before.length - 1]?.value ?? null);
+  if (anchorValue == null) return sortedHistory;
+
+  const result = kept.some((h) => h.recorded_date === purchaseDate)
+    ? hasPrice
+      ? kept.map((h) =>
+          h.recorded_date === purchaseDate ? { ...h, value: anchorValue } : h,
+        )
+      : kept
+    : [make(purchaseDate, anchorValue), ...kept];
+
+  const last = result[result.length - 1];
+  if (last.recorded_date < today) result.push(make(today, last.value));
+  return result;
+}
+
 export type VehicleValuation = {
   /** The cost baseline: the purchase price if one was entered, else the EARLIEST valuation entry; `null` if there's nothing to compare against. */
   baselineCost: number | null;

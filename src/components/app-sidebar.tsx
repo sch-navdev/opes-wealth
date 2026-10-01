@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, Menu, Settings, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -14,6 +14,7 @@ import type { TranslationKey } from "@/lib/i18n";
 const NAV_ITEMS: { href: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }[] = [
   { href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard },
   { href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings },
+  { href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck },
 ];
 
 function isActiveHref(pathname: string, href: string) {

@@ -15,7 +15,7 @@ import {
   DashboardMetricCards,
   type DashboardBreakdowns,
 } from "@/components/dashboard-metric-cards";
-import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
+import { DashboardAnalytics } from "@/components/dashboard-analytics";
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
 import {
@@ -23,9 +23,14 @@ import {
   convertToBaseCurrency,
   getExchangeRatesFromUsd,
 } from "@/lib/fx";
-import { buildNetWorthSeries } from "@/lib/portfolio-performance";
+import { buildNetWorthSeries, thinHistory, type AssetLineInput } from "@/lib/portfolio-performance";
 import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
-import { parseVehicleMetadata, resolveVehicleValuation } from "@/lib/vehicles";
+import { buildAssetInvested } from "@/lib/invested-capital";
+import {
+  buildVehicleHistoryFromPurchase,
+  parseVehicleMetadata,
+  resolveVehicleValuation,
+} from "@/lib/vehicles";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import {
   calculateTotalCost,
@@ -114,22 +119,50 @@ export default async function DashboardPage({
     (assets ?? []).map((a) => a.id),
   );
 
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Each asset's history rows, in its own currency. Vehicles are plotted from
+  // their recorded purchase date (see `buildVehicleHistoryFromPurchase`), not
+  // from whenever the first row happens to be — and never before the purchase.
+  const historyByAsset = new Map<string, typeof allHistory>();
+  for (const asset of assets ?? []) {
+    const rows = allHistory.filter((h) => h.asset_id === asset.id);
+    historyByAsset.set(
+      asset.id,
+      asset.asset_categories?.name === "Vehicles"
+        ? buildVehicleHistoryFromPurchase(
+            rows,
+            asset.purchase_date,
+            parseVehicleMetadata(asset.metadata).purchase_price,
+            today,
+            (date, value) => ({
+              asset_id: asset.id,
+              recorded_date: date,
+              value,
+              net_equity: value,
+            }),
+          ).map((h) => ({ ...h, net_equity: h.value }))
+        : rows,
+    );
+  }
+
+  const baseHistory = (asset: AssetRow) =>
+    (historyByAsset.get(asset.id) ?? []).map((h) => ({
+      recorded_date: h.recorded_date,
+      value: convertToBaseCurrency(h.value, asset.currency, displayCurrency, rates),
+      net_equity:
+        h.net_equity != null
+          ? convertToBaseCurrency(h.net_equity, asset.currency, displayCurrency, rates)
+          : null,
+    }));
+
   const performanceSeries = buildNetWorthSeries(
     (assets ?? []).map((asset) => ({
       category: asset.asset_categories?.name ?? "—",
-      history: (allHistory ?? [])
-        .filter((h) => h.asset_id === asset.id)
-        .map((h) => ({
-          recorded_date: h.recorded_date,
-          value: convertToBaseCurrency(h.value, asset.currency, displayCurrency, rates),
-          net_equity:
-            h.net_equity != null
-              ? convertToBaseCurrency(h.net_equity, asset.currency, displayCurrency, rates)
-              : null,
-        })),
+      history: baseHistory(asset),
     })),
     // Run the series to today so it doesn't stop at the last recorded row.
-    new Date().toISOString().slice(0, 10),
+    today,
   );
 
   // Performance column for categories with no cost basis of their own:
@@ -141,7 +174,9 @@ export default async function DashboardPage({
     if (asset.asset_categories?.name !== "Vehicles") continue;
     const { change } = resolveVehicleValuation(
       parseVehicleMetadata(asset.metadata),
-      (allHistory ?? []).filter((h) => h.asset_id === asset.id),
+      (allHistory ?? []).filter(
+        (h) => h.asset_id === asset.id && (!asset.purchase_date || h.recorded_date >= asset.purchase_date),
+      ),
       asset.current_value,
     );
     if (change) performanceByAsset[asset.id] = change;
@@ -227,6 +262,34 @@ export default async function DashboardPage({
     }
   }
 
+  // Per-asset input for the category cards / explorer / forward projections.
+  const netWorthById = new Map(breakdowns.netWorth.map((row) => [row.id, row.amount]));
+  const keepDailyFrom = new Date(new Date(`${today}T00:00:00Z`).getTime() - 430 * 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const assetLines: AssetLineInput[] = (assets ?? []).map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    category: asset.asset_categories?.name ?? "—",
+    currentValue: netWorthById.get(asset.id) ?? 0,
+    // Older rows are thinned to keep the payload small; the last ~14 months
+    // stay daily so the 1M / 6M / 1Y zoom ranges keep their detail.
+    history: thinHistory(
+      baseHistory(asset).map((h): [string, number] => [h.recorded_date, h.net_equity ?? h.value]),
+      300,
+      keepDailyFrom,
+    ),
+    invested: buildAssetInvested({
+      category: asset.asset_categories?.name ?? "—",
+      purchase_date: asset.purchase_date,
+      metadata: asset.metadata,
+      current_value: asset.current_value,
+    })?.map(([date, amount]): [string, number] => [
+      date,
+      convertToBaseCurrency(amount, asset.currency, displayCurrency, rates),
+    ]),
+  }));
+
   return (
     <>
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -268,7 +331,12 @@ export default async function DashboardPage({
           breakdowns={breakdowns}
         />
 
-        <PortfolioPerformanceChart series={performanceSeries} currency={displayCurrency} />
+        <DashboardAnalytics
+          series={performanceSeries}
+          assets={assetLines}
+          currency={displayCurrency}
+          today={today}
+        />
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

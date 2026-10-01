@@ -974,6 +974,217 @@ const dictionary = {
     en: "Couldn't reach the pricing provider. Check your connection and try again.",
     fr: "Impossible de joindre le fournisseur de prix. Vérifiez votre connexion et réessayez.",
   },
+
+  // Security dashboard (/dashboard/security)
+  nav_security: { en: "Security", fr: "Sécurité" },
+  security_title: { en: "Security", fr: "Sécurité" },
+  security_subtitle: {
+    en: "See where your account is signed in and sign out any device you don't recognise.",
+    fr: "Voyez où votre compte est connecté et déconnectez tout appareil que vous ne reconnaissez pas.",
+  },
+  security_manage_mfa: {
+    en: "Manage Two-Factor Authentication",
+    fr: "Gérer l'authentification à deux facteurs",
+  },
+  security_sessions_heading: { en: "Active sessions", fr: "Sessions actives" },
+  security_sessions_desc: {
+    en: "Every device currently signed in to your Opes Wealth account.",
+    fr: "Chaque appareil actuellement connecté à votre compte Opes Wealth.",
+  },
+  security_this_device: { en: "This device", fr: "Cet appareil" },
+  security_device_computer: { en: "Computer", fr: "Ordinateur" },
+  security_device_mobile: { en: "Mobile", fr: "Mobile" },
+  security_device_app: { en: "App", fr: "Application" },
+  security_ip: { en: "IP address", fr: "Adresse IP" },
+  security_unknown_ip: { en: "Unknown", fr: "Inconnue" },
+  security_last_active: { en: "Last active", fr: "Dernière activité" },
+  security_signed_in: { en: "Signed in", fr: "Connecté le" },
+  security_revoke: { en: "Log out", fr: "Déconnecter" },
+  security_revoke_title: { en: "Log out this device?", fr: "Déconnecter cet appareil ?" },
+  security_revoke_desc: {
+    en: "It will be signed out and must log in again. Its current access can take up to an hour to fully lapse.",
+    fr: "Il sera déconnecté et devra se reconnecter. Son accès actuel peut mettre jusqu'à une heure à expirer complètement.",
+  },
+  security_revoking: { en: "Logging out…", fr: "Déconnexion…" },
+  security_revoke_others: { en: "Log out all other devices", fr: "Déconnecter tous les autres appareils" },
+  security_revoke_others_title: {
+    en: "Log out all other devices?",
+    fr: "Déconnecter tous les autres appareils ?",
+  },
+  security_revoke_others_desc: {
+    en: "{n} other session(s) will be signed out. This device stays signed in.",
+    fr: "{n} autre(s) session(s) seront déconnectée(s). Cet appareil reste connecté.",
+  },
+  security_no_sessions: { en: "No active sessions found.", fr: "Aucune session active trouvée." },
+  security_load_error: {
+    en: "Couldn't load your sessions.",
+    fr: "Impossible de charger vos sessions.",
+  },
+  security_migration_hint: {
+    en: "If this is a new deployment, the session-management migration (0016_security_sessions.sql) may not be applied yet.",
+    fr: "S'il s'agit d'un nouveau déploiement, la migration de gestion des sessions (0016_security_sessions.sql) n'est peut-être pas encore appliquée.",
+  },
+  security_jwt_note: {
+    en: "A signed-out device can no longer refresh its login; access it already holds can remain valid for up to an hour (Supabase's default token lifetime).",
+    fr: "Un appareil déconnecté ne peut plus renouveler sa connexion ; l'accès qu'il détient déjà peut rester valide jusqu'à une heure (durée de vie par défaut des jetons Supabase).",
+  },
+
+  // Dashboard category cards, explorer & forward-looking toggle
+  category_cards_heading: { en: "Asset categories", fr: "Catégories d'actifs" },
+  category_cards_hint: {
+    en: "Click a category to explore its assets",
+    fr: "Cliquez sur une catégorie pour explorer ses actifs",
+  },
+  category_cards_share: { en: "{pct}% of portfolio", fr: "{pct} % du portefeuille" },
+  timeline_historical: { en: "Historical", fr: "Historique" },
+  timeline_projection: { en: "Projection", fr: "Projection" },
+  timeline_combined: { en: "Historical + Projection", fr: "Historique + Projection" },
+  range_label: { en: "Date range", fr: "Période" },
+  range_all: { en: "All", fr: "Tout" },
+  range_from: { en: "From", fr: "Du" },
+  range_to: { en: "To", fr: "Au" },
+  range_reset: { en: "Reset", fr: "Réinitialiser" },
+  range_swapped: { en: "Dates swapped (From was after To).", fr: "Dates inversées (le début était après la fin)." },
+  category_sort_label: { en: "Sort by", fr: "Trier par" },
+  category_sort_share: { en: "% of Portfolio", fr: "% du portefeuille" },
+  category_sort_alpha: { en: "Alphabetical", fr: "Alphabétique" },
+  chart_show_invested: { en: "Show invested capital", fr: "Afficher le capital investi" },
+  chart_invested: { en: "Invested capital", fr: "Capital investi" },
+  view_aggregate: { en: "Grouped line", fr: "Ligne groupée" },
+  view_individual: { en: "Individual lines", fr: "Lignes individuelles" },
+  projection_horizon_years: { en: "{n} yr", fr: "{n} ans" },
+  projection_growth_override: { en: "Growth % / yr", fr: "Croissance % / an" },
+  projection_growth_auto: { en: "auto", fr: "auto" },
+  projection_invested_note: {
+    en: "Invested capital = what you paid in: Equities cost basis of the open position; Real Estate down payment + fees (off-plan: installments paid + fees); Vehicles purchase price + ownership costs. Categories without cost data show no line.",
+    fr: "Capital investi = ce que vous avez payé : coût de revient de la position ouverte (actions) ; apport + frais (immobilier, sur plan : échéances payées + frais) ; prix d'achat + frais d'entretien (véhicules). Les catégories sans données de coût n'ont pas de courbe.",
+  },
+  projection_dashboard_note: {
+    en: "Illustrative extrapolation, not a forecast: each asset compounds from today's value at its own historical growth rate (or a category assumption where history is short or driven by deposits). No future deposits, loan repayments, rent or fees are modelled. Type a % to apply one rate to everything.",
+    fr: "Extrapolation illustrative, pas une prévision : chaque actif progresse à partir de sa valeur actuelle à son propre taux de croissance historique (ou à une hypothèse par catégorie lorsque l'historique est court ou dû à des versements). Aucun versement futur, remboursement, loyer ni frais n'est modélisé. Saisissez un % pour appliquer un même taux à tout.",
+  },
+  explorer_no_data: {
+    en: "No history to plot yet.",
+    fr: "Aucun historique à afficher pour l'instant.",
+  },
+  explorer_desc: {
+    en: "Tick the assets to include. Values in {currency}.",
+    fr: "Cochez les actifs à inclure. Valeurs en {currency}.",
+  },
+  explorer_assets_heading: {
+    en: "Assets ({selected}/{total})",
+    fr: "Actifs ({selected}/{total})",
+  },
+  explorer_clear: { en: "Clear", fr: "Tout décocher" },
+  explorer_select_all: { en: "Select all", fr: "Tout cocher" },
+  explorer_selected_total: { en: "Selected total", fr: "Total sélectionné" },
+  explorer_pick_one: {
+    en: "Select at least one asset to see its line.",
+    fr: "Sélectionnez au moins un actif pour voir sa courbe.",
+  },
+  explorer_selection_label: { en: "Selection ({n} assets)", fr: "Sélection ({n} actifs)" },
+
+  // Precious Metals module
+  category_precious_metals: { en: "Precious Metals", fr: "Métaux précieux" },
+  metal_details: { en: "Precious Metal Details", fr: "Détails du métal précieux" },
+  metal_type: { en: "Metal", fr: "Métal" },
+  metal_form: { en: "Form", fr: "Forme" },
+  metal_gold: { en: "Gold", fr: "Or" },
+  metal_silver: { en: "Silver", fr: "Argent" },
+  metal_platinum: { en: "Platinum", fr: "Platine" },
+  metal_form_bar: { en: "Bar", fr: "Lingot" },
+  metal_form_coin: { en: "Coin", fr: "Pièce" },
+  metal_weight_per_unit: { en: "Weight per bar/coin", fr: "Poids par lingot/pièce" },
+  metal_weight_unit: { en: "Weight unit", fr: "Unité de poids" },
+  metal_unit_g: { en: "grams", fr: "grammes" },
+  metal_unit_kg: { en: "kilograms", fr: "kilogrammes" },
+  metal_unit_oz: { en: "troy oz", fr: "once troy" },
+  metal_purity: { en: "Purity (fineness)", fr: "Titre (pureté)" },
+  metal_purity_hint: {
+    en: "0–1, e.g. 0.9999 for a gold bar, 0.999 for silver.",
+    fr: "0–1, p. ex. 0,9999 pour un lingot d'or, 0,999 pour l'argent.",
+  },
+  metal_premium: { en: "Dealer premium (%)", fr: "Prime du négociant (%)" },
+  metal_premium_hint: {
+    en: "Added on top of spot; leave blank to value at spot.",
+    fr: "Ajoutée au cours spot ; laissez vide pour valoriser au spot.",
+  },
+  metal_serial: { en: "Serial / hallmark", fr: "N° de série / poinçon" },
+  metal_storage: { en: "Storage location", fr: "Lieu de stockage" },
+  metal_storage_placeholder: {
+    en: "e.g. Home safe, bank vault, custodian",
+    fr: "p. ex. coffre-fort, banque, dépositaire",
+  },
+  metal_fine_weight: { en: "Pure metal: {oz} troy oz", fr: "Métal pur : {oz} once troy" },
+  metal_fine_weight_label: { en: "Pure metal weight", fr: "Poids de métal pur" },
+  metal_value_hint: {
+    en: "Use \"Refresh spot price\" after saving to value it live.",
+    fr: "Utilisez « Actualiser le cours spot » après l'enregistrement pour la valoriser en direct.",
+  },
+  metal_weight_required: {
+    en: "Enter the weight of one bar or coin.",
+    fr: "Saisissez le poids d'un lingot ou d'une pièce.",
+  },
+  metal_purity_invalid: {
+    en: "Purity must be between 0 and 1.",
+    fr: "Le titre doit être compris entre 0 et 1.",
+  },
+  metal_premium_invalid: {
+    en: "That premium isn't realistic.",
+    fr: "Cette prime n'est pas réaliste.",
+  },
+  refresh_metal_spot: { en: "Refresh spot price", fr: "Actualiser le cours spot" },
+  metal_spot_per_oz: { en: "Spot price / troy oz", fr: "Cours spot / once troy" },
+  metal_price_updated: {
+    en: "Spot {price}/oz — holding valued at {value}.",
+    fr: "Spot {price}/once — position valorisée à {value}.",
+  },
+  quantity_pieces: { en: "Pieces", fr: "Pièces" },
+
+  // Crypto: wallet sync + exchange holdings
+  crypto_holding_source: { en: "Holding type", fr: "Type de détention" },
+  crypto_source_manual: { en: "Exchange / manual", fr: "Plateforme / manuel" },
+  crypto_source_wallet: { en: "Wallet address (auto-sync)", fr: "Adresse de portefeuille (synchro auto)" },
+  crypto_wallet_chain: { en: "Blockchain", fr: "Blockchain" },
+  crypto_wallet_chain_placeholder: { en: "Choose a blockchain", fr: "Choisissez une blockchain" },
+  crypto_chain_bitcoin: { en: "Bitcoin (BTC)", fr: "Bitcoin (BTC)" },
+  crypto_chain_ethereum: { en: "Ethereum (ETH)", fr: "Ethereum (ETH)" },
+  crypto_chain_solana: { en: "Solana (SOL)", fr: "Solana (SOL)" },
+  crypto_wallet_address: { en: "Public wallet address", fr: "Adresse publique du portefeuille" },
+  crypto_wallet_address_placeholder: { en: "bc1… / 0x… / base58", fr: "bc1… / 0x… / base58" },
+  crypto_wallet_hint: {
+    en: "Public address only — never enter a seed phrase or private key. Only the chain's native coin is read (not tokens); add tokens as separate assets.",
+    fr: "Adresse publique uniquement — ne saisissez jamais de phrase secrète ni de clé privée. Seule la monnaie native de la blockchain est lue (pas les jetons) ; ajoutez les jetons comme actifs distincts.",
+  },
+  crypto_exchange_name: { en: "Exchange / custodian", fr: "Plateforme / dépositaire" },
+  crypto_exchange_name_placeholder: { en: "e.g. Binance, Coinbase, Ledger", fr: "p. ex. Binance, Coinbase, Ledger" },
+  crypto_exchange_hint: {
+    en: "Coins held on an exchange are entered by hand: set the Quantity above.",
+    fr: "Les cryptos détenues sur une plateforme se saisissent à la main : renseignez la quantité ci-dessus.",
+  },
+  crypto_wallet_chain_required: { en: "Choose the wallet's blockchain.", fr: "Choisissez la blockchain du portefeuille." },
+  crypto_wallet_address_invalid: {
+    en: "That wallet address isn't valid for the chosen blockchain.",
+    fr: "Cette adresse n'est pas valide pour la blockchain choisie.",
+  },
+  sync_wallet: { en: "Sync wallet balance", fr: "Synchroniser le solde du portefeuille" },
+  wallet_synced: {
+    en: "Wallet synced: {balance} {ticker}, repriced.",
+    fr: "Portefeuille synchronisé : {balance} {ticker}, prix actualisé.",
+  },
+  wallet_synced_unpriced: {
+    en: "Wallet synced: {balance} {ticker} (live price unavailable — valued at the last known price).",
+    fr: "Portefeuille synchronisé : {balance} {ticker} (prix en direct indisponible — valorisé au dernier prix connu).",
+  },
+  wallet_last_synced: { en: "Last wallet sync", fr: "Dernière synchro du portefeuille" },
+  wallet_error_invalid_address: {
+    en: "The saved wallet address isn't valid.",
+    fr: "L'adresse de portefeuille enregistrée n'est pas valide.",
+  },
+  wallet_error_not_a_wallet: {
+    en: "This holding isn't linked to a wallet address.",
+    fr: "Cette position n'est pas liée à une adresse de portefeuille.",
+  },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;
