@@ -1291,4 +1291,6 @@ export const zh: Record<string, string> = {
   "approvals_field_owners": "所有权份额",
   "dcc_clear_saved": "清除已保存的信息",
   "dcc_cleared": "已删除保存的信息，之后不会再自动填充。",
+  "photo_uploading": "上传中…",
+  "photo_upload_failed": "照片上传失败，请重试。",
 };

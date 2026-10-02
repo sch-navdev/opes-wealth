@@ -1291,4 +1291,6 @@ export const ar: Record<string, string> = {
   "approvals_field_owners": "حصص الملكية",
   "dcc_clear_saved": "مسح البيانات المحفوظة",
   "dcc_cleared": "تم حذف البيانات المحفوظة ولن تُملأ مسبقًا بعد الآن.",
+  "photo_uploading": "جارٍ الرفع…",
+  "photo_upload_failed": "تعذّر رفع الصورة. يُرجى المحاولة مرة أخرى.",
 };

@@ -1291,4 +1291,6 @@ export const ru: Record<string, string> = {
   "approvals_field_owners": "Доли владения",
   "dcc_clear_saved": "Удалить сохранённые данные",
   "dcc_cleared": "Сохранённые данные удалены. Они больше не будут подставляться.",
+  "photo_uploading": "Загрузка…",
+  "photo_upload_failed": "Не удалось загрузить фото. Попробуйте ещё раз.",
 };

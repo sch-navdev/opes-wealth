@@ -9,7 +9,17 @@ if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_SITE_URL) 
   );
 }
 
+// Asset photos are served from Supabase Storage (public bucket `asset-photos`).
+const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : null;
+
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: supabaseHost
+      ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/asset-photos/**" }]
+      : [],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "5mb",

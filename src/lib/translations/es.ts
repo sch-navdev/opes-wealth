@@ -1291,4 +1291,6 @@ export const es: Record<string, string> = {
   "approvals_field_owners": "Porcentajes de titularidad",
   "dcc_clear_saved": "Borrar datos guardados",
   "dcc_cleared": "Datos guardados eliminados. Ya no se rellenarán automáticamente.",
+  "photo_uploading": "Subiendo…",
+  "photo_upload_failed": "No se pudo subir la foto. Inténtalo de nuevo.",
 };

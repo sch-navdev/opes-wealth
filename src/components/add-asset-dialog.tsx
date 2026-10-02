@@ -38,7 +38,7 @@ import {
 } from "@/lib/exotic-assets";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
-import { resizeImageToBase64 } from "@/lib/crop-image";
+import { discardUploadedPhoto, uploadAssetPhoto } from "@/lib/asset-photos-client";
 import {
   EMPTY_REAL_ESTATE_METADATA,
   MAX_ASSET_IMAGES,
@@ -144,6 +144,9 @@ export function AddAssetDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Photos uploaded during THIS editing session and not saved yet: deleted again if removed or the dialog is dismissed.
+  const sessionUploads = useRef<Set<string>>(new Set());
   const [ownerRows, setOwnerRows] = useState<OwnerFormRow[]>(() =>
     initialOwners && initialOwners.length > 0 ? initialOwners : [soloOwner()],
   );
@@ -246,12 +249,30 @@ export function AddAssetDialog({
     e.target.value = "";
     if (!file || images.length >= MAX_ASSET_IMAGES) return;
 
-    const resized = await resizeImageToBase64(file);
-    setImages((prev) => [...prev, resized]);
+    // The photo is uploaded as a real file to Supabase Storage right away;
+    // only its public URL goes into the form (and later into assets.images).
+    setError(null);
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadAssetPhoto(file);
+      sessionUploads.current.add(url);
+      setImages((prev) => [...prev, url]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("photo_upload_failed"));
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   function removeImage(index: number) {
+    const url = images[index];
+    if (url && sessionUploads.current.delete(url)) void discardUploadedPhoto(url);
     setImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function discardUnsavedUploads() {
+    for (const url of sessionUploads.current) void discardUploadedPhoto(url);
+    sessionUploads.current.clear();
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -388,6 +409,8 @@ export function AddAssetDialog({
         setError(/^(owners_|change_)/.test(result.error) ? t(result.error as TranslationKey, { total: Math.round(ownersTotal(ownerRows) * 100) / 100 }) : result.error);
         return;
       }
+      // The server accepted the form: its photos are now referenced, keep them.
+      sessionUploads.current.clear();
       if (result && "pending" in result && result.pending) {
         // A registered co-owner must approve first: nothing changed yet.
         setNotice(t("change_pending_notice"));
@@ -405,7 +428,10 @@ export function AddAssetDialog({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) resetState();
+        if (!next) {
+          discardUnsavedUploads();
+          resetState();
+        }
       }}
     >
       <DialogTrigger asChild>
@@ -471,7 +497,7 @@ export function AddAssetDialog({
                   size="sm"
                   onClick={() => imageInputRef.current?.click()}
                 >
-                  {images.length === 0 ? "Upload Image" : "Add Image"}
+                  {uploadingPhoto ? t("photo_uploading") : images.length === 0 ? "Upload Image" : "Add Image"}
                 </Button>
               )}
               <input

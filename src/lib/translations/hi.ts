@@ -1291,4 +1291,6 @@ export const hi: Record<string, string> = {
   "approvals_field_owners": "स्वामित्व हिस्सेदारी",
   "dcc_clear_saved": "सहेजा गया विवरण मिटाएँ",
   "dcc_cleared": "सहेजा गया विवरण हटा दिया गया। अब यह पहले से नहीं भरा जाएगा।",
+  "photo_uploading": "अपलोड हो रहा है…",
+  "photo_upload_failed": "फ़ोटो अपलोड नहीं हो सका। कृपया फिर से कोशिश करें।",
 };

@@ -2072,6 +2072,10 @@ const dictionary = {
   // OW9: transaction dedupe, exotic assets, broker directory, passive income
   dcc_clear_saved: { en: "Clear saved details", fr: "Effacer les données enregistrées" },
   dcc_cleared: { en: "Saved details deleted. They will no longer be pre-filled.", fr: "Données enregistrées supprimées. Elles ne seront plus pré-remplies." },
+
+  // OW9: transaction dedupe, exotic assets, broker directory, passive income
+  photo_uploading: { en: "Uploading…", fr: "Envoi en cours…" },
+  photo_upload_failed: { en: "The photo could not be uploaded. Please try again.", fr: "La photo n'a pas pu être envoyée. Veuillez réessayer." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

@@ -80,6 +80,10 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - **`0026_client_knowledge.sql`** — `client_knowledge_documents` (`profile_id` primary key, `data` jsonb, `updated_at`) with own-row select/insert/update/delete RLS. See [[Profile-Settings|Profile & Settings]] for the privacy caveat. **Not applied** at the time of writing.
 
+## Migration 0027 — asset photo bucket (2026-10-02)
+
+- **`0027_asset_photos_bucket.sql`** — creates the public Storage bucket `asset-photos` (3 MB, webp/jpeg) and own-folder insert/update/delete policies on `storage.objects`. `assets.images` (text[]) is unchanged but now holds URLs. See [[Portfolio-Dashboard|Portfolio Dashboard]]. **Apply before the deploy that uploads photos.**
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

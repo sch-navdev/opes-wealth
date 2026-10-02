@@ -1291,4 +1291,6 @@ export const it: Record<string, string> = {
   "approvals_field_owners": "Quote di proprietà",
   "dcc_clear_saved": "Cancella i dati salvati",
   "dcc_cleared": "Dati salvati eliminati. Non saranno più precompilati.",
+  "photo_uploading": "Caricamento…",
+  "photo_upload_failed": "Impossibile caricare la foto. Riprova.",
 };

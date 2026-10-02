@@ -1291,4 +1291,6 @@ export const de: Record<string, string> = {
   "approvals_field_owners": "Eigentumsanteile",
   "dcc_clear_saved": "Gespeicherte Angaben löschen",
   "dcc_cleared": "Gespeicherte Angaben gelöscht. Sie werden nicht mehr vorausgefüllt.",
+  "photo_uploading": "Wird hochgeladen …",
+  "photo_upload_failed": "Das Foto konnte nicht hochgeladen werden. Bitte versuche es erneut.",
 };

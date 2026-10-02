@@ -53,6 +53,10 @@ export const ASSET_IMAGE_MAX_SIZE = 1440;
 export const ASSET_IMAGE_QUALITY = 0.9;
 
 /**
+ * LEGACY: encodes a photo as a base64 data URL. Asset photos are now uploaded as
+ * files to Supabase Storage (`lib/asset-photos-client.ts`); this remains for
+ * anything that still needs an inline string.
+ *
  * Reads `file`, downscales it ONLY if its long edge exceeds `maxSize`
  * (never upscales, never crops — the original aspect ratio is kept exactly),
  * and re-encodes it as a JPEG data URL. Unlike `getCroppedImage`, there's no

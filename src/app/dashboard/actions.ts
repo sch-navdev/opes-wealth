@@ -70,6 +70,8 @@ import { parseCryptoMetadata } from "@/lib/crypto";
 import { parsePrivateEquityMetadata, pendingCapitalCallsTotal } from "@/lib/private-equity";
 import type { Json } from "@/types/supabase";
 import { syncAssetHistory } from "@/lib/asset-history-sync";
+import { isAllowedPhotoSrc } from "@/lib/asset-photos";
+import { removeAssetPhotos } from "@/lib/asset-photos-server";
 import { validateOwners } from "@/lib/ownership";
 import { parseOwnersField, replaceOwners, routeAssetEdit } from "@/lib/shared-assets/server";
 
@@ -78,7 +80,11 @@ function parseImages(formData: FormData): string[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
+    // Only photos in OUR storage bucket (or legacy base64 still being migrated): an
+    // arbitrary external URL would be loaded by every co-owner's browser.
+    return Array.isArray(parsed)
+      ? parsed.filter((v): v is string => typeof v === "string" && isAllowedPhotoSrc(v))
+      : [];
   } catch {
     return [];
   }
@@ -223,6 +229,13 @@ export async function updateAsset(id: string, formData: FormData) {
     return { pending: true as const };
   }
 
+  const { data: before } = await supabase
+    .from("assets")
+    .select("images")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .maybeSingle<{ images: string[] | null }>();
+
   const { data: updated, error } = await supabase
     .from("assets")
     .update({
@@ -252,6 +265,9 @@ export async function updateAsset(id: string, formData: FormData) {
     updated.asset_categories?.name,
     metadata,
   );
+
+  // Photos dropped by this edit: delete their files from storage (best effort).
+  await removeAssetPhotos((before?.images ?? []).filter((u) => !images.includes(u)));
 
   // Direct edit by the creator: persist any owner changes too (only when owners were sent).
   if (ownersInput) {
@@ -1070,6 +1086,13 @@ export async function deleteAsset(id: string) {
     return { error: "You must be signed in to delete an asset." };
   }
 
+  const { data: doomed } = await supabase
+    .from("assets")
+    .select("images")
+    .eq("id", id)
+    .eq("profile_id", user.id)
+    .maybeSingle<{ images: string[] | null }>();
+
   const { error } = await supabase
     .from("assets")
     .delete()
@@ -1080,6 +1103,7 @@ export async function deleteAsset(id: string) {
     return { error: error.message };
   }
 
+  await removeAssetPhotos(doomed?.images ?? []);
   revalidatePath("/dashboard", "layout");
 }
 
@@ -1107,6 +1131,13 @@ export async function batchDeleteAssets(ids: string[]) {
     return { error: "No assets selected." };
   }
 
+  const { data: doomed } = await supabase
+    .from("assets")
+    .select("images")
+    .in("id", ids)
+    .eq("profile_id", user.id)
+    .returns<{ images: string[] | null }[]>();
+
   const { error } = await supabase
     .from("assets")
     .delete()
@@ -1117,6 +1148,7 @@ export async function batchDeleteAssets(ids: string[]) {
     return { error: error.message };
   }
 
+  await removeAssetPhotos((doomed ?? []).flatMap((a) => a.images ?? []));
   revalidatePath("/dashboard", "layout");
 }
 
