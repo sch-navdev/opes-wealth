@@ -24,11 +24,14 @@ export function FutureProjectsCard({
   projects,
   liquidCash,
   existingMonthlyDebt,
+  defaultMonthlyIncome,
 }: {
   baseCurrency: string;
   projects: ProjectInput[];
   liquidCash: number;
   existingMonthlyDebt: number;
+  /** Income assumed until the visitor types one on the planning page (the demo account). */
+  defaultMonthlyIncome?: number;
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
@@ -36,7 +39,7 @@ export function FutureProjectsCard({
   const [incomeText] = useStored("ow_planning_income");
   const [ratioText] = useStored("ow_planning_ratio");
 
-  const income = Number(incomeText) > 0 ? Number(incomeText) : null;
+  const income = Number(incomeText) > 0 ? Number(incomeText) : (defaultMonthlyIncome ?? null);
   const maxRatio = Number(ratioText) > 0 ? Number(ratioText) : DEFAULT_MAX_DEBT_RATIO;
   const results = useMemo(
     () => evaluateProjects(projects, { liquidCash, existingMonthlyDebt, monthlyIncome: income, maxDebtRatioPct: maxRatio }),

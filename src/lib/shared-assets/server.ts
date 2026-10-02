@@ -93,6 +93,28 @@ async function displayName(service: Service, profileId: string): Promise<string>
   return name || "A co-owner";
 }
 
+/**
+ * Cancels pending change requests that are waiting on someone who is no longer a co-owner
+ * (they were removed or replaced, so they can never answer and the request would block
+ * every later edit for a week). Their approval rows go; a request left with none is deleted.
+ */
+async function purgeStalePending(service: Service, assetId: string): Promise<void> {
+  const owners = await listOwnerRows(service, assetId);
+  const ownerIds = new Set(owners.map((o) => o.profile_id).filter((id): id is string => !!id));
+  const { data: requests } = await service
+    .from("asset_change_requests")
+    .select("id")
+    .eq("asset_id", assetId)
+    .eq("status", "pending");
+  for (const r of requests ?? []) {
+    const { data: approvals } = await service.from("change_approvals").select("id, profile_id, status").eq("change_request_id", r.id);
+    const stale = (approvals ?? []).filter((a) => a.status === "pending" && !ownerIds.has(a.profile_id));
+    if (stale.length === 0) continue;
+    await service.from("change_approvals").delete().in("id", stale.map((a) => a.id));
+    if ((approvals ?? []).length === stale.length) await service.from("asset_change_requests").delete().eq("id", r.id);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Invites
 // ---------------------------------------------------------------------------
@@ -213,6 +235,7 @@ export async function replaceOwners(opts: {
   if (deleteError) return { ok: false, error: deleteError.message };
   const { error: insertError } = await service.from("asset_owners").insert(rows);
   if (insertError) return { ok: false, error: insertError.message };
+  await purgeStalePending(service, opts.assetId);
 
   const invited: string[] = [];
   for (const o of toInvite) {
@@ -448,6 +471,7 @@ export async function routeAssetEdit(opts: {
   // The creator edits freely when nobody else has joined; a co-owner always needs the creator.
   if (isCreator && approvers.length === 0) return { mode: "direct" };
 
+  await purgeStalePending(service, opts.assetId);
   const { data: pending } = await service
     .from("asset_change_requests")
     .select("id")
@@ -698,7 +722,9 @@ export async function loadOwnershipStatus(assetId: string, userId: string): Prom
       createdAt: req.created_at,
       expiresAt: req.expires_at,
       timeLeft: timeLeft(req.expires_at),
-      approvals: (approvals ?? []).map((a) => {
+      approvals: (approvals ?? [])
+        .filter((a) => rows.some((r) => r.profile_id === a.profile_id))
+        .map((a) => {
         const owner = rows.find((r) => r.profile_id === a.profile_id);
         return {
           profileId: a.profile_id,
@@ -713,6 +739,8 @@ export async function loadOwnershipStatus(assetId: string, userId: string): Prom
       }),
     };
   }
+  // A request whose approvers have all left the asset is stale: do not show it.
+  if (request && request.approvals.length === 0) request = null;
   return { isCreator: asset.profile_id === userId, owners, request };
 }
 

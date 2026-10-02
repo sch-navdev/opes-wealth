@@ -1465,4 +1465,8 @@ export const zh: Record<string, string> = {
   "pw_rule_upper": "至少一个大写字母",
   "pw_rule_number": "至少一个数字",
   "pw_rule_special": "至少一个特殊字符",
+  "auth_confirm_title": "确认以继续",
+  "auth_confirm_desc": "为了您的安全，请点击按钮以完成邮件链接中的这一步。",
+  "auth_confirm_button": "继续",
+  "ownership_resend_approval": "重新发送审批请求",
 };

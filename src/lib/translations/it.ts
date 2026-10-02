@@ -1465,4 +1465,8 @@ export const it: Record<string, string> = {
   "pw_rule_upper": "Almeno una lettera maiuscola",
   "pw_rule_number": "Almeno un numero",
   "pw_rule_special": "Almeno un carattere speciale",
+  "auth_confirm_title": "Conferma per continuare",
+  "auth_confirm_desc": "Per sicurezza, premi il pulsante per completare questo passaggio dal link della tua email.",
+  "auth_confirm_button": "Continua",
+  "ownership_resend_approval": "Reinvia la richiesta di approvazione",
 };

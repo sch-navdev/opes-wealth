@@ -5,7 +5,7 @@
     Opes Wealth — Supabase Auth email template: Confirm sign up
     Paste into: Supabase dashboard → Authentication → Email Templates → Confirm sign up.
     Subject suggestion: Confirm your Opes Wealth account
-    Template variables used: {{ .ConfirmationURL }}, {{ .Email }}
+    Template variables used: {{ .TokenHash }}, {{ .Email }}
   -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -87,13 +87,13 @@
                 <tr>
                   <td class="px cta" align="center" style="padding:20px 48px 8px 48px;">
                     <!--[if mso]>
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ .ConfirmationURL }}" style="height:52px; v-text-anchor:middle; width:300px;" arcsize="0%" stroke="f" fillcolor="#C69B3C">
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://www.opeswealth.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/dashboard" style="height:52px; v-text-anchor:middle; width:300px;" arcsize="0%" stroke="f" fillcolor="#C69B3C">
                       <w:anchorlock/>
                       <center style="color:#06101E; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; letter-spacing:2px; text-transform:uppercase;">Confirm my email</center>
                     </v:roundrect>
                     <![endif]-->
                     <!--[if !mso]><!-- -->
-                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block; background-color:#C69B3C; color:#06101E; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; letter-spacing:2px; text-transform:uppercase; line-height:52px; padding:0 40px; border:1px solid #C69B3C;">Confirm my email</a>
+                    <a href="https://www.opeswealth.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/dashboard" target="_blank" style="display:inline-block; background-color:#C69B3C; color:#06101E; font-family:Arial,Helvetica,sans-serif; font-size:14px; font-weight:bold; letter-spacing:2px; text-transform:uppercase; line-height:52px; padding:0 40px; border:1px solid #C69B3C;">Confirm my email</a>
                     <!--<![endif]-->
                   </td>
                 </tr>
@@ -105,7 +105,7 @@
                 <tr>
                   <td class="px" style="padding:28px 48px 0 48px; font-family:Arial,Helvetica,sans-serif; font-size:12px; line-height:19px; color:#9AA3B5;">
                     If the button does not open, copy this address into your browser:<br>
-                    <a href="{{ .ConfirmationURL }}" style="color:#C69B3C; word-break:break-all;">{{ .ConfirmationURL }}</a>
+                    <a href="https://www.opeswealth.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/dashboard" style="color:#C69B3C; word-break:break-all;">https://www.opeswealth.app/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/dashboard</a>
                   </td>
                 </tr>
                 <tr>

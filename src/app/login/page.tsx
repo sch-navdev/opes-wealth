@@ -12,7 +12,8 @@ import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { T } from "@/components/translated-text";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   return (
     <div className="relative flex min-h-screen bg-background">
       <div className="absolute end-4 top-4 z-10 flex items-center gap-2">
@@ -57,7 +58,7 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LoginForm />
+            <LoginForm initialError={error ? error.slice(0, 200) : null} />
           </CardContent>
         </Card>
       </div>

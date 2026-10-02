@@ -30,3 +30,6 @@ export function userIdFromAccessToken(token: string | null | undefined): string 
     return null;
   }
 }
+
+/** Monthly income (in the demo's base currency) assumed on the Future Projects screens when the visitor has not typed one. */
+export const DEMO_MONTHLY_INCOME = 60000;

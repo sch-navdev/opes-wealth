@@ -6,6 +6,7 @@ import { applyOwnershipFactors, loadCoOwnedAssets, loadOwnershipFactors } from "
 import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
 import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
 import { PlanningBoard } from "@/components/planning-board";
+import { DEMO_MONTHLY_INCOME, isDemoUser } from "@/lib/demo-mode";
 
 type HoldingRow = {
   id: string;
@@ -56,6 +57,7 @@ export default async function PlanningPage() {
       categories={categories ?? []}
       liquidCash={liquidCash}
       existingMonthlyDebt={existingMonthlyDebt}
+      defaultMonthlyIncome={isDemoUser(user.id) ? DEMO_MONTHLY_INCOME : undefined}
       projects={simulations.map((row) => ({
         edit: {
           id: row.id,

@@ -1465,4 +1465,8 @@ export const ru: Record<string, string> = {
   "pw_rule_upper": "Хотя бы одна заглавная буква",
   "pw_rule_number": "Хотя бы одна цифра",
   "pw_rule_special": "Хотя бы один спецсимвол",
+  "auth_confirm_title": "Подтвердите, чтобы продолжить",
+  "auth_confirm_desc": "Для вашей безопасности нажмите кнопку, чтобы завершить этот шаг по ссылке из письма.",
+  "auth_confirm_button": "Продолжить",
+  "ownership_resend_approval": "Отправить запрос на согласование снова",
 };

@@ -1465,4 +1465,8 @@ export const es: Record<string, string> = {
   "pw_rule_upper": "Al menos una mayúscula",
   "pw_rule_number": "Al menos un número",
   "pw_rule_special": "Al menos un carácter especial",
+  "auth_confirm_title": "Confirma para continuar",
+  "auth_confirm_desc": "Por tu seguridad, pulsa el botón para completar este paso desde el enlace de tu correo.",
+  "auth_confirm_button": "Continuar",
+  "ownership_resend_approval": "Reenviar solicitud de aprobación",
 };

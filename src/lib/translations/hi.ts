@@ -1465,4 +1465,8 @@ export const hi: Record<string, string> = {
   "pw_rule_upper": "कम से कम एक बड़ा अक्षर",
   "pw_rule_number": "कम से कम एक अंक",
   "pw_rule_special": "कम से कम एक विशेष वर्ण",
+  "auth_confirm_title": "जारी रखने के लिए पुष्टि करें",
+  "auth_confirm_desc": "आपकी सुरक्षा के लिए, अपने ईमेल लिंक से यह चरण पूरा करने हेतु बटन दबाएँ।",
+  "auth_confirm_button": "जारी रखें",
+  "ownership_resend_approval": "अनुमोदन अनुरोध दोबारा भेजें",
 };

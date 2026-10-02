@@ -2270,6 +2270,14 @@ const dictionary = {
   pw_rule_upper: { en: "At least one uppercase letter", fr: "Au moins une majuscule" },
   pw_rule_number: { en: "At least one number", fr: "Au moins un chiffre" },
   pw_rule_special: { en: "At least one special character", fr: "Au moins un caractère spécial" },
+
+  // Email link confirm page
+  auth_confirm_title: { en: "Confirm to continue", fr: "Confirmez pour continuer" },
+  auth_confirm_desc: { en: "For your security, press the button to complete this step from your email link.", fr: "Pour votre sécurité, appuyez sur le bouton pour terminer cette étape depuis le lien de votre e-mail." },
+  auth_confirm_button: { en: "Continue", fr: "Continuer" },
+
+  // Approval resend label
+  ownership_resend_approval: { en: "Resend approval request", fr: "Renvoyer la demande d'approbation" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

@@ -40,6 +40,7 @@ import {
 import { loadPendingApprovals } from "@/lib/shared-assets/server";
 import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
 import { FutureProjectsCard } from "@/components/future-projects-card";
+import { DEMO_MONTHLY_INCOME, isDemoUser } from "@/lib/demo-mode";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import {
   buildVehicleHistoryFromPurchase,
@@ -463,6 +464,7 @@ export default async function DashboardPage({
           baseCurrency={displayCurrency}
           projects={simulationRows.map((row) => toProjectInput(row, displayCurrency, rates))}
           {...summariseHoldings(assets ?? [], displayCurrency, rates)}
+          defaultMonthlyIncome={isDemoUser(user.id) ? DEMO_MONTHLY_INCOME : undefined}
         />
 
         <DashboardAnalytics

@@ -40,11 +40,11 @@ function isNextRedirectError(err: unknown): boolean {
   );
 }
 
-export function LoginForm() {
+export function LoginForm({ initialError = null }: { initialError?: string | null }) {
   const { t } = useLanguage();
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [password, setPassword] = useState("");
   const [passwordTouched, setPasswordTouched] = useState(false);
   const [showPassword, setShowPassword] = useState(false);

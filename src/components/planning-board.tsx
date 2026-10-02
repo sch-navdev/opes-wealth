@@ -49,12 +49,15 @@ export function PlanningBoard({
   liquidCash,
   existingMonthlyDebt,
   projects,
+  defaultMonthlyIncome,
 }: {
   baseCurrency: string;
   categories: { id: string; name: string }[];
   liquidCash: number;
   existingMonthlyDebt: number;
   projects: PlanningProject[];
+  /** Income assumed until the visitor types one (the demo account). */
+  defaultMonthlyIncome?: number;
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
@@ -74,7 +77,7 @@ export function PlanningBoard({
     }
   };
 
-  const income = Number(incomeText) > 0 ? Number(incomeText) : null;
+  const income = Number(incomeText) > 0 ? Number(incomeText) : (defaultMonthlyIncome ?? null);
   const maxRatio = Number(ratioText) > 0 ? Number(ratioText) : DEFAULT_MAX_DEBT_RATIO;
 
   const results = useMemo(
@@ -155,7 +158,7 @@ export function PlanningBoard({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="plan_income">{t("planning_income")} ({baseCurrency})</Label>
-            <Input id="plan_income" type="number" min="0" step="any" value={incomeText} onChange={(e) => setIncomeText(e.target.value)} />
+            <Input id="plan_income" type="number" min="0" step="any" placeholder={defaultMonthlyIncome ? String(defaultMonthlyIncome) : undefined} value={incomeText} onChange={(e) => setIncomeText(e.target.value)} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="plan_ratio">{t("planning_max_ratio")}</Label>

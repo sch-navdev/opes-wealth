@@ -107,7 +107,7 @@ export function OwnershipStatusPanel({ assetId, status }: { assetId: string; sta
                         disabled={pending}
                         onClick={() => run(() => resendApprovalEmail(status.request!.id, a.profileId))}
                       >
-                        {t("ownership_resend")}
+                        {t("ownership_resend_approval")}
                       </Button>
                     )}
                   </span>

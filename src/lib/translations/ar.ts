@@ -1465,4 +1465,8 @@ export const ar: Record<string, string> = {
   "pw_rule_upper": "حرف كبير واحد على الأقل",
   "pw_rule_number": "رقم واحد على الأقل",
   "pw_rule_special": "رمز خاص واحد على الأقل",
+  "auth_confirm_title": "أكّد للمتابعة",
+  "auth_confirm_desc": "لأمانك، اضغط على الزر لإكمال هذه الخطوة من رابط بريدك الإلكتروني.",
+  "auth_confirm_button": "متابعة",
+  "ownership_resend_approval": "إعادة إرسال طلب الموافقة",
 };

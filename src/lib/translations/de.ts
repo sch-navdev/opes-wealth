@@ -1465,4 +1465,8 @@ export const de: Record<string, string> = {
   "pw_rule_upper": "Mindestens ein Großbuchstabe",
   "pw_rule_number": "Mindestens eine Ziffer",
   "pw_rule_special": "Mindestens ein Sonderzeichen",
+  "auth_confirm_title": "Zum Fortfahren bestätigen",
+  "auth_confirm_desc": "Zu Ihrer Sicherheit: Tippen Sie auf die Schaltfläche, um diesen Schritt aus dem Link in Ihrer E-Mail abzuschließen.",
+  "auth_confirm_button": "Weiter",
+  "ownership_resend_approval": "Genehmigungsanfrage erneut senden",
 };

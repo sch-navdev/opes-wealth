@@ -26,6 +26,10 @@ they show literally when you open a file in a browser and are filled in when the
 
 \* the invite template's logo no longer uses `.SiteURL`; it points at the absolute logo URL above.
 
+## Links point to opeswealth.app (changed 2026-10-02)
+
+The five templates with a button (confirm sign up, invite, magic link, change email, reset password) no longer use `{{ .ConfirmationURL }}`, which is a `…supabase.co` address that does not match the sender and makes mail providers suspicious. They link to **`https://www.opeswealth.app/auth/confirm?token_hash={{ .TokenHash }}&type=…&next=…`** instead (the address is written out in full, not built from `{{ .SiteURL }}`, so a wrong Site URL setting cannot break it). That page shows a **Continue** button; pressing it signs the person in (`src/app/auth/confirm`). The button exists because mail scanners open links automatically and would otherwise use up the one-time token. Invitation links go to `/reset-password` so the invited person chooses a password. **After editing a template, push it again** (`scripts/push-auth-emails.mts`, or paste it into Supabase).
+
 ## Notes
 - **Security notifications are off by default** in Supabase: turn each toggle on (Security section, then **Save changes**) for the email to be sent. They use only `{{ .SiteURL }}` on purpose — the richer variables (old/new address, provider, factor type) are not used because their exact names could not be verified, and a wrong variable makes a template fail to render. If you confirm them in the dashboard's template preview you can add detail lines.
 - The **Reauthentication** and **Magic link** templates show the one-time code `{{ .Token }}`.

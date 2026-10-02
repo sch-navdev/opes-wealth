@@ -183,3 +183,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Demo account gets Blue Book, depreciation and Future Projects seed data and a read-only mode (database deny policies, server write shim, Saved (Demo Mode) toast) — [[Demo-Mode|Demo Mode]]
 - 2026-10-02: Registered co-owners now get a "shared with you" email with sent date/time and a resend button; the dashboard no longer edits shared assets from their scaled figures — [[Co-Ownership|Co-Ownership]]
 - 2026-10-02: Vehicle form drops the Value field (value moves by button only) and every PDF import is fixed (pdf-parse failed on Buffers inside Next) — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-02: Email links now point to opeswealth.app/auth/confirm (button-press confirmation) instead of the Supabase address, to reduce junk placement; sign-in page shows link errors — [[Authentication-Security|Authentication & Security]]
+- 2026-10-02: Stale approval requests for removed co-owners are cleaned up and the two resend buttons are labelled distinctly — [[Co-Ownership|Co-Ownership]]
