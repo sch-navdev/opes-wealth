@@ -1,0 +1,138 @@
+{
+  "_readme": "Dummy, fully fictional Client Knowledge Document (DCC) data for the demo client Alexander Vance. The app deliberately NEVER stores DCC data (it is typed into the DCC dialog and the PDF is generated in the browser — see src/lib/dcc.ts), so this cannot be seeded into Supabase. It mirrors the DccData shape (minus `portfolio`, which the app derives from the demo assets) so every field can be copied into the dialog or loaded by a future demo-fill button. The profile fields the app DOES store (name, phone, address) are seeded by scripts/seed-demo.mts. All names, numbers and identifiers are invented.",
+  "advisorName": "Camille Rousseau",
+  "advisorPhone": "+33 1 42 00 00 41",
+  "advisorEmail": "camille.rousseau@example-wealth.test",
+  "advisorFirm": "Rousseau & Associés Gestion Privée",
+  "clientTitle": "Mr",
+  "you": {
+    "civility": "Mr",
+    "fullName": "VANCE Alexander James",
+    "birthDate": "1981-04-17",
+    "birthPlace": "London, United Kingdom",
+    "nationalities": "British, French",
+    "legalCapacity": "Full legal capacity",
+    "idType": "Passport",
+    "idNumber": "DEMO-123456789",
+    "idExpiry": "2031-08-30",
+    "address": "Marina Promenade, Apartment 2104, Dubai Marina Residences",
+    "postalCity": "00000 - Dubai",
+    "country": "United Arab Emirates",
+    "mobile": "+971 50 555 0142",
+    "phone": "+971 4 555 0100",
+    "email": "alexander.vance@example.test",
+    "maritalStatus": "Married",
+    "marriageDate": "2009-06-20",
+    "marriagePlace": "Paris, France",
+    "marriageRegime": "Separation of property (séparation de biens)",
+    "pep": "no",
+    "profession": "Management consultant and company director",
+    "csp": "Business owners and senior executives",
+    "seniority": "18 years",
+    "employmentStatus": "Self-employed / company director",
+    "employer": "Vance Strategy Consulting Ltd",
+    "retirementAge": "62",
+    "taxedIncomeTax": "no",
+    "taxedWealthTax": "no",
+    "usPerson": "no",
+    "usCitizen": "no",
+    "usResident": "no",
+    "tin": "France SPI 1 23 45 678 901 2 (UAE resident: no personal income tax)",
+    "knowledgeLevel": "Advanced",
+    "riskProfile": "Balanced to dynamic"
+  },
+  "includeSpouse": true,
+  "spouse": {
+    "civility": "Mrs",
+    "fullName": "VANCE Isabelle Marie (née Laurent)",
+    "birthDate": "1984-11-02",
+    "birthPlace": "Lyon, France",
+    "nationalities": "French",
+    "legalCapacity": "Full legal capacity",
+    "idType": "National identity card",
+    "idNumber": "DEMO-987654321",
+    "idExpiry": "2032-02-14",
+    "address": "Marina Promenade, Apartment 2104, Dubai Marina Residences",
+    "postalCity": "00000 - Dubai",
+    "country": "United Arab Emirates",
+    "mobile": "+971 50 555 0178",
+    "phone": "+971 4 555 0100",
+    "email": "isabelle.vance@example.test",
+    "maritalStatus": "Married",
+    "marriageDate": "2009-06-20",
+    "marriagePlace": "Paris, France",
+    "marriageRegime": "Separation of property (séparation de biens)",
+    "pep": "no",
+    "profession": "Architect",
+    "csp": "Liberal professions",
+    "seniority": "14 years",
+    "employmentStatus": "Self-employed",
+    "employer": "Laurent Architecture FZ-LLC",
+    "retirementAge": "64",
+    "taxedIncomeTax": "no",
+    "taxedWealthTax": "no",
+    "usPerson": "no",
+    "usCitizen": "no",
+    "usResident": "no",
+    "tin": "France SPI 2 84 11 69 123 456 7",
+    "knowledgeLevel": "Intermediate",
+    "riskProfile": "Balanced"
+  },
+  "relations": [
+    { "name": "VANCE Oliver Henry", "relation": "Son", "birthDate": "2012-03-09", "phone": "+971 50 555 0190", "email": "" },
+    { "name": "VANCE Charlotte Rose", "relation": "Daughter", "birthDate": "2015-09-21", "phone": "", "email": "" },
+    { "name": "Martin Hale, Hale & Partners LLP", "relation": "Legal counsel", "birthDate": "", "phone": "+44 20 5550 0188", "email": "martin.hale@example-law.test" },
+    { "name": "Sofia Ghali, Ghali Audit & Tax", "relation": "Chartered accountant", "birthDate": "", "phone": "+971 4 555 0166", "email": "sofia.ghali@example-audit.test" },
+    { "name": "Camille Rousseau, Rousseau & Associés", "relation": "Wealth manager", "birthDate": "", "phone": "+33 1 42 00 00 41", "email": "camille.rousseau@example-wealth.test" }
+  ],
+  "extraIncome": [
+    { "label": "Director dividends, Vance Holding SAS", "nature": "Dividends", "amount": 96000, "holder": "Alexander" },
+    { "label": "Architecture practice net income", "nature": "Self-employed income", "amount": 78000, "holder": "Isabelle" }
+  ],
+  "extraCharges": [
+    { "label": "Children's international school fees", "nature": "Education", "amount": 41000, "holder": "Joint" },
+    { "label": "Private health insurance", "nature": "Insurance", "amount": 9800, "holder": "Joint" }
+  ],
+  "objectives": {
+    "precaution": { "priority": "1", "horizon": "1" },
+    "build_wealth": { "priority": "2", "horizon": "10" },
+    "optimize": { "priority": "3", "horizon": "3" },
+    "help_children": { "priority": "4", "horizon": "12" },
+    "retirement": { "priority": "5", "horizon": "20" },
+    "protect_family": { "priority": "6", "horizon": "5" },
+    "transmission": { "priority": "7", "horizon": "25" },
+    "business_transmission": { "priority": "8", "horizon": "15" }
+  },
+  "precautionAmount": "250000",
+  "taxIncome": {
+    "Tax residence": "United Arab Emirates (since 2019)",
+    "Reference taxable income": "0 (no personal income tax in the UAE)",
+    "French-source income": "Property-free; none declared"
+  },
+  "taxWealth": {
+    "French wealth tax (IFI)": "Not liable (no French real estate)",
+    "Taxable real estate assets": "0"
+  },
+  "taxYear": "2025",
+  "_additionalKycNotes": {
+    "taxResidencies": [
+      { "country": "United Arab Emirates", "since": "2019", "taxResidenceCertificate": "Held (valid until 2027)" },
+      { "country": "France", "note": "Former resident until 2019; French-source rules reviewed annually with the accountant" },
+      { "country": "United Kingdom", "note": "Non-resident; UK company director, UK-source consultancy income taxed at company level" }
+    ],
+    "addresses": {
+      "primaryResidence": "Marina Promenade, Apartment 2104, Dubai Marina Residences, Dubai, UAE (P.O. Box 500123)",
+      "secondary": "12 Rue de Lisbonne, 75008 Paris, France (family apartment, used 6 weeks a year)",
+      "correspondence": "Vance Holding SAS, 25 Avenue George V, 75008 Paris, France"
+    },
+    "familyStructure": "Married (separation of property) with two children, Oliver (2012) and Charlotte (2015); spouse is co-signatory on the Paris and Dubai household accounts.",
+    "preferredBrokers": ["Saxo Bank", "Interactive Brokers"],
+    "externalAdvisors": {
+      "wealthManager": "Camille Rousseau, Rousseau & Associés Gestion Privée",
+      "accountant": "Sofia Ghali, Ghali Audit & Tax (Dubai)",
+      "legalCounsel": "Martin Hale, Hale & Partners LLP (London)"
+    },
+    "sourceOfWealth": "Founder income from Vance Strategy Consulting Ltd, retained earnings in Vance Holding SAS, real estate appreciation, and an early-stage investment in an AI startup.",
+    "investmentExperience": "Equities and ETFs 15+ years; private equity funds 6 years; direct startup investing 4 years; no complex derivatives."
+  }
+}

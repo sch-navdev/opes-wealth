@@ -3,7 +3,8 @@
  * with a rich, clearly fictional portfolio — multi-currency bank accounts,
  * real estate with amortizing loans (plus an off-plan unit), private equity
  * with capital calls, a brokerage account, vehicles, a startup holding with
- * funding rounds, exotic assets (watch, fine wine, art) and standalone
+ * funding rounds, exotic assets (watch, fine wine, art), two companies, French /
+ * US / UK bank accounts with transaction ledgers, and standalone
  * liabilities — each with a monthly value history.
  *
  * It is a SCRIPT, not a migration, on purpose: a migration would create a
@@ -25,6 +26,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+// Same fingerprint the app's import uses (src/lib/transactions.ts: node:crypto only, no @/ imports).
+import { fingerprintTransactions } from "../src/lib/transactions.ts";
 
 const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "demo@opeswealth.com";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "DemoPassword2026!";
@@ -196,18 +199,142 @@ function addAsset(a: Omit<SeedAsset, "id" | "quantity" | "ticker" | "isLiability
 
 // ---- Cash & bank accounts (logos come from `bank_key`) ---------------------
 
-type CashDef = { bank: string; key: string; name: string; type: string; currency: string; balance: number; opened: string; ref: string };
+type CashDef = {
+  bank: string;
+  key: string;
+  name: string;
+  type: string;
+  currency: string;
+  balance: number;
+  opened: string;
+  ref: string;
+  /** Region of the bank: when set, the account gets a generated transaction ledger (and a balance history derived from it). */
+  region?: "FR" | "US" | "UK";
+  /** A spending-pot account of a region that already has a main current account: top-ups in and card spend only (no salary or bills — those would duplicate the main account's). */
+  pot?: boolean;
+};
 
 const cashAccounts: CashDef[] = [
   { bank: "Emirates NBD", key: "enbd", name: "Emirates NBD Current Account", type: "checking", currency: "AED", balance: 285400, opened: "2022-01-10", ref: "4471" },
   { bank: "Wio Bank", key: "wio", name: "Wio Savings Space", type: "savings", currency: "AED", balance: 640000, opened: "2023-04-02", ref: "9023" },
   { bank: "First Abu Dhabi Bank", key: "fab", name: "FAB USD Account", type: "checking", currency: "USD", balance: 120000, opened: "2022-09-15", ref: "6612" },
   { bank: "ADCB", key: "adcb", name: "ADCB 12-Month Term Deposit", type: "term_deposit", currency: "AED", balance: 500000, opened: "2025-11-01", ref: "3308" },
-  { bank: "BNP Paribas", key: "bnp_paribas", name: "BNP Paribas Compte Courant", type: "checking", currency: "EUR", balance: 48750, opened: "2019-09-01", ref: "2210" },
-  { bank: "BoursoBank", key: "boursobank", name: "BoursoBank Livret Épargne", type: "savings", currency: "EUR", balance: 62300, opened: "2021-06-20", ref: "7745" },
+  { bank: "BNP Paribas", key: "bnp_paribas", name: "BNP Paribas Compte Courant", type: "checking", currency: "EUR", balance: 48750, opened: "2019-09-01", ref: "2210", region: "FR" },
+  { bank: "BoursoBank", key: "boursobank", name: "BoursoBank Livret Épargne", type: "savings", currency: "EUR", balance: 62300, opened: "2021-06-20", ref: "7745", region: "FR" },
+  { bank: "Crédit Agricole", key: "credit_agricole", name: "Crédit Agricole Livret A", type: "savings", currency: "EUR", balance: 22950, opened: "2017-02-14", ref: "5182", region: "FR" },
+  // United States
+  { bank: "Chase", key: "chase", name: "Chase Total Checking", type: "checking", currency: "USD", balance: 18420, opened: "2020-01-20", ref: "3391", region: "US" },
+  { bank: "Chase", key: "chase", name: "Chase Savings", type: "savings", currency: "USD", balance: 54200, opened: "2020-01-20", ref: "3407", region: "US" },
+  { bank: "Ally Bank", key: "ally", name: "Ally High-Yield Savings", type: "savings", currency: "USD", balance: 86500, opened: "2021-09-08", ref: "8854", region: "US" },
+  // United Kingdom
+  { bank: "Barclays", key: "barclays", name: "Barclays Premier Current Account", type: "checking", currency: "GBP", balance: 12780, opened: "2014-05-12", ref: "6620", region: "UK" },
+  { bank: "Barclays", key: "barclays", name: "Barclays Rainy Day Saver", type: "savings", currency: "GBP", balance: 31400, opened: "2018-11-03", ref: "6633", region: "UK" },
+  { bank: "Monzo", key: "monzo", name: "Monzo Personal Account", type: "checking", currency: "GBP", balance: 3260, opened: "2022-03-17", ref: "1175", region: "UK", pot: true },
 ];
 
+// ---- Transaction ledgers (FR / US / UK accounts) ---------------------------
+//
+// Deterministic (no randomness): ~90 days of salary / transfers in, rent,
+// groceries, dining, transport, utilities and subscriptions, in each region's
+// own vocabulary. The balance history is derived from the ledger and ends
+// exactly on the account's balance; the rows are also written to the app's
+// `transactions` table (migration 0022) with the app's own fingerprint.
+
+type Tx = { date: string; amount: number; description: string };
+type Region = "FR" | "US" | "UK";
+
+const REGION_DATA: Record<
+  Region,
+  { salary: [string, number]; fixed: [string, number, number][]; spend: [string, number][]; interest: string; saver: string }
+> = {
+  FR: {
+    salary: ["VIR SEPA SALAIRE VANCE HOLDING SAS", 5200],
+    fixed: [["PRLV LOYER RESIDENCE PARIS 16", -1850, 5], ["PRLV EDF ELECTRICITE", -96, 12], ["PRLV ORANGE FIBRE", -39.99, 16], ["PRLV NAVIGO ANNUEL", -90.8, 2]],
+    spend: [["CB CARREFOUR MARKET", -64], ["CB MONOPRIX", -41], ["CB LE BISTROT DU COIN", -58], ["CB UBER TRIP", -17], ["CB PHARMACIE", -23], ["CB FNAC", -72]],
+    interest: "INTERETS LIVRET",
+    saver: "VIR PERMANENT EPARGNE",
+  },
+  US: {
+    salary: ["ACH CREDIT VANCE CAPITAL LLC PAYROLL", 6900],
+    fixed: [["ACH DEBIT AVALON APARTMENTS RENT", -2650, 1], ["ACH DEBIT CON EDISON", -118, 11], ["ACH DEBIT VERIZON WIRELESS", -85, 14], ["ACH DEBIT GEICO AUTO", -142, 20]],
+    spend: [["POS WHOLE FOODS MARKET", -112], ["POS TRADER JOES", -58], ["POS SHAKE SHACK", -24], ["POS UBER *TRIP", -21], ["POS CVS PHARMACY", -19], ["POS AMAZON.COM", -67]],
+    interest: "INTEREST PAYMENT",
+    saver: "ONLINE TRANSFER FROM CHK",
+  },
+  UK: {
+    salary: ["BGC VANCE STRATEGY CONSULTING LTD", 4800],
+    fixed: [["DD LANDLORD LONDON PROPERTIES", -1650, 1], ["DD THAMES WATER", -34, 9], ["DD BRITISH GAS", -88, 13], ["DD COUNCIL TAX WESTMINSTER", -165, 3]],
+    spend: [["CARD TESCO STORES", -49], ["CARD SAINSBURYS", -63], ["CARD PRET A MANGER", -9.4], ["CARD TFL TRAVEL", -7.7], ["CARD BOOTS", -14], ["CARD WAITROSE", -78]],
+    interest: "INTEREST PAID",
+    saver: "TRANSFER FROM CURRENT",
+  },
+};
+
+function buildLedger(def: CashDef, seed: number): Tx[] {
+  const region = def.region as Region;
+  const data = REGION_DATA[region];
+  const txs: Tx[] = [];
+  const dayOfMonth = (monthsBack: number, day: number) => {
+    const d = new Date(`${TODAY}T00:00:00Z`);
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() - monthsBack);
+    d.setUTCDate(day);
+    return d.toISOString().slice(0, 10);
+  };
+  for (let m = 0; m <= 3; m++) {
+    if (def.pot) {
+      txs.push({ date: dayOfMonth(m, 2), amount: 900, description: "TOP UP FROM BARCLAYS" });
+    } else if (def.type === "checking") {
+      txs.push({ date: dayOfMonth(m, 27), amount: data.salary[1], description: data.salary[0] });
+      for (const [desc, amount, day] of data.fixed) txs.push({ date: dayOfMonth(m, day), amount, description: desc });
+    } else {
+      // Savings: a monthly transfer in and a little interest.
+      txs.push({ date: dayOfMonth(m, 28), amount: round2(600 + 220 * wiggle(m, seed)), description: data.saver });
+      txs.push({ date: dayOfMonth(m, 30), amount: round2(def.balance * 0.0035), description: data.interest });
+    }
+  }
+  if (def.type === "checking") {
+    for (let i = 0, day = def.pot ? 1 : 0; day < 92; i++, day += def.pot ? 4 : 3) {
+      const [desc, base] = data.spend[(i + seed) % data.spend.length];
+      const d = new Date(`${TODAY}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - day);
+      txs.push({ date: d.toISOString().slice(0, 10), amount: round2(base * (1 + 0.25 * wiggle(i, seed))), description: desc });
+    }
+  }
+  return txs.filter((t) => t.date <= TODAY && t.date >= def.opened).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Seeded ledgers, written to the `transactions` table by seed(). */
+const seededTransactions: { assetId: string; currency: string; txs: Tx[] }[] = [];
+
 cashAccounts.forEach((c, i) => {
+  if (c.region) {
+    // Ledger-driven account: balance history = running balance of the transactions, ending on `c.balance`.
+    const txs = buildLedger(c, i + 3);
+    const net = txs.reduce((sum, t) => sum + t.amount, 0);
+    const startBalance = round2(c.balance - net);
+    const firstDate = txs[0]?.date ?? TODAY;
+    const history: Point[] = [{ date: firstDate, value: startBalance }];
+    let running = startBalance;
+    for (const t of txs) {
+      running = round2(running + t.amount);
+      const last = history[history.length - 1];
+      if (last.date === t.date) last.value = running;
+      else history.push({ date: t.date, value: running });
+    }
+    history[history.length - 1].value = c.balance;
+    addAsset({
+      category: "Cash",
+      name: c.name,
+      currentValue: c.balance,
+      currency: c.currency,
+      purchaseDate: firstDate,
+      metadata: { institution_name: c.bank, bank_key: c.key, account_type: c.type, account_ref: c.ref, bank_profile: c.key },
+      history,
+    });
+    seededTransactions.push({ assetId: assets[assets.length - 1].id, currency: c.currency, txs });
+    return;
+  }
   const from = addMonths(TODAY, c.type === "term_deposit" ? -11 : -30);
   const start = c.opened > from ? c.opened : from;
   const startBalance = c.type === "term_deposit" ? c.balance : c.balance * (0.78 + 0.02 * (i % 3));
@@ -670,6 +797,64 @@ vehicles.forEach((v) => {
   });
 });
 
+// ---- Companies (src/lib/companies.ts) ----------------------------------------
+//
+// Value = equity value of 100% of the entity; `current_value` = YOUR stake
+// (value x ownership %). The UK consultancy is held THROUGH the French holding
+// (a tracked Company), and the holding's value excludes that subsidiary, so Net
+// Worth does not count it twice.
+
+addAsset({
+  category: "Companies",
+  name: "Vance Holding SAS",
+  currentValue: 1850000,
+  currency: "EUR",
+  purchaseDate: "2018-03-12",
+  metadata: {
+    legal_name: "Vance Holding SAS",
+    entity_type: "holding",
+    jurisdiction: "France",
+    registration_number: "RCS Paris 912 345 678",
+    industry: "Holding company / asset management",
+    incorporation_date: "2018-03-12",
+    role: "President and sole shareholder",
+    ownership_percentage: 100,
+    held_via: "personal",
+    holding_company_id: "",
+    holding_name: "",
+    company_value: 1850000,
+    valuation_method: "Net asset value: cash and listed securities (excludes the UK subsidiary)",
+    valuation_date: "2026-09-30",
+  },
+  history: path("2021-01-01", TODAY, 1180000, 1850000, 0.02, 101),
+});
+const vanceHoldingId = assets[assets.length - 1].id;
+
+addAsset({
+  category: "Companies",
+  name: "Vance Strategy Consulting Ltd",
+  currentValue: 1150000,
+  currency: "GBP",
+  purchaseDate: "2016-05-04",
+  metadata: {
+    legal_name: "Vance Strategy Consulting Ltd",
+    entity_type: "ltd",
+    jurisdiction: "United Kingdom (England & Wales)",
+    registration_number: "Company No. 10234567",
+    industry: "Management consulting",
+    incorporation_date: "2016-05-04",
+    role: "Director and majority shareholder",
+    ownership_percentage: 100,
+    held_via: "holding",
+    holding_company_id: vanceHoldingId,
+    holding_name: "",
+    company_value: 1150000,
+    valuation_method: "EBITDA multiple (4.5x trailing twelve months)",
+    valuation_date: "2026-09-30",
+  },
+  history: path("2021-01-01", TODAY, 640000, 1150000, 0.03, 103),
+});
+
 // ---- Startups & unlisted (src/lib/startups.ts) -----------------------------
 //
 // Shares live in `quantity`; value = shares × the latest round's price. The
@@ -839,7 +1024,7 @@ debts.forEach((d) => {
 // Summary (rough USD view with fixed FX, only to sanity-check the picture)
 // ---------------------------------------------------------------------------
 
-const FX_TO_USD: Record<string, number> = { USD: 1, AED: 1 / 3.6725, EUR: 1.08 };
+const FX_TO_USD: Record<string, number> = { USD: 1, AED: 1 / 3.6725, EUR: 1.08, GBP: 1.27 };
 const usd = (amount: number, currency: string) => amount * (FX_TO_USD[currency] ?? 1);
 
 function summarize() {
@@ -903,7 +1088,7 @@ async function seed() {
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
       email_confirm: true,
-      user_metadata: { first_name: "Demo", last_name: "Investor" },
+      user_metadata: { first_name: "Alexander", last_name: "Vance" },
     });
     if (error || !data.user) throw error ?? new Error("createUser returned no user.");
     userId = data.user.id;
@@ -913,10 +1098,15 @@ async function seed() {
   // 2. Profile (the signup trigger normally makes it; upsert covers the rest).
   const { error: profileError } = await db.from("profiles").upsert({
     id: userId,
-    first_name: "Demo",
-    last_name: "Investor",
+    first_name: "Alexander",
+    last_name: "Vance",
     default_currency: "USD",
+    phone_number: "+971 50 555 0142",
+    address_street: "Marina Promenade, Apartment 2104, Dubai Marina Residences",
+    address_po_box: "P.O. Box 500123",
     address_city: "Dubai",
+    address_postal_code: "00000",
+    address_landmark: "Next to Marina Walk, opposite Dubai Marina Mall",
     address_country: "United Arab Emirates",
   });
   if (profileError) throw profileError;
@@ -965,7 +1155,25 @@ async function seed() {
     const { error } = await db.from("asset_history").insert(historyRows.slice(i, i + 500));
     if (error) throw error;
   }
-  console.log(`Inserted ${assets.length} assets and ${historyRows.length} history rows.`);
+  const txRows = seededTransactions.flatMap((l) =>
+    fingerprintTransactions(l.txs.map((t) => ({ date: t.date, amount: t.amount, description: t.description })), l.currency).map(
+      (t) => ({
+        profile_id: userId,
+        asset_id: l.assetId,
+        fingerprint: t.fingerprint,
+        booked_date: t.date,
+        amount: t.amount,
+        currency: t.currency,
+        description: t.description,
+        source: "csv_import",
+      }),
+    ),
+  );
+  for (let i = 0; i < txRows.length; i += 500) {
+    const { error } = await db.from("transactions").insert(txRows.slice(i, i + 500));
+    if (error) throw error;
+  }
+  console.log(`Inserted ${assets.length} assets, ${historyRows.length} history rows and ${txRows.length} transactions.`);
   console.log(`Sign in as ${DEMO_EMAIL}.`);
 }
 
