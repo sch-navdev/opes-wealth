@@ -1319,4 +1319,6 @@ export const it: Record<string, string> = {
   "ownership_revoke_confirm": "Smettere di condividere questo asset con {name}? Il suo invito non funzionerà più e la sua quota tornerà a te. Non serve l'approvazione di nessun altro.",
   "ownership_revoke_joined": "Questa persona si è già unita: le modifiche richiedono la sua approvazione.",
   "ownership_revoked": "Condivisione revocata.",
+  "owners_auto_label": "Adatta automaticamente la mia quota",
+  "owners_auto_hint": "La tua quota è ciò che lasciano i co-proprietari, quindi il totale resta sempre 100%. Deseleziona per impostare ogni quota a mano.",
 };

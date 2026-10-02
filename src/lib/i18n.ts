@@ -2108,6 +2108,10 @@ const dictionary = {
 
   // Co-owner notification status
   ownership_revoked: { en: "Sharing revoked.", fr: "Partage retiré." },
+
+  // Co-owner notification status
+  owners_auto_label: { en: "Adjust my share automatically", fr: "Ajuster ma part automatiquement" },
+  owners_auto_hint: { en: "Your share is whatever the co-owners leave, so the total always stays at 100%. Untick to set every share by hand.", fr: "Votre part est ce que laissent les co-propriétaires, le total reste donc toujours à 100 %. Décochez pour fixer chaque part manuellement." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

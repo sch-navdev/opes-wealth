@@ -97,8 +97,17 @@ export default async function DashboardPage({
 
   const ASSET_COLUMNS =
     "id, profile_id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)";
-  const [{ data: categories }, { data: ownAssetRows }, { data: profile }, rates] =
-    await Promise.all([
+  // Everything here depends only on the user id, so it runs at the same time: each
+  // sequential query costs a full round trip to the database.
+  const [
+    { data: categories },
+    { data: ownAssetRows },
+    { data: profile },
+    rates,
+    sharedWithMe,
+    pendingApprovals,
+    { data: savedDccRow },
+  ] = await Promise.all([
       supabase.from("asset_categories").select("id, name").order("name"),
       supabase
         .from("assets")
@@ -114,25 +123,20 @@ export default async function DashboardPage({
         .eq("id", user.id)
         .single(),
       getExchangeRatesFromUsd(),
+      loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, new Set()),
+      loadPendingApprovals(user.id),
+      // Last Client Knowledge Document entries (migration 0026); null until saved or if the table doesn't exist yet.
+      supabase.from("client_knowledge_documents").select("data").eq("profile_id", user.id).maybeSingle(),
     ]);
 
   // Co-ownership (migration 0025): assets shared WITH me are added and every asset
   // is reduced to MY share, so each total below (net worth, categories, charts,
   // passive income…) is pro-rata — $1M held 50% counts as $500k. With the
   // migration unapplied there are no owner rows and everything stays at 100%.
-  const unscaledAssets = [
-    ...(ownAssetRows ?? []),
-    ...(await loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, new Set((ownAssetRows ?? []).map((a) => a.id)))),
-  ];
+  const ownIds = new Set((ownAssetRows ?? []).map((a) => a.id));
+  const unscaledAssets = [...(ownAssetRows ?? []), ...sharedWithMe.filter((a) => !ownIds.has(a.id))];
   const factorById = await loadOwnershipFactors(supabase, user.id, unscaledAssets);
   const assets: AssetRow[] = applyOwnershipFactors(unscaledAssets, factorById);
-  const pendingApprovals = await loadPendingApprovals(user.id);
-  // Last Client Knowledge Document entries (migration 0026); null until saved or if the table doesn't exist yet.
-  const { data: savedDccRow } = await supabase
-    .from("client_knowledge_documents")
-    .select("data")
-    .eq("profile_id", user.id)
-    .maybeSingle();
 
   const { currency: currencyParam } = await searchParams;
   // The dashboard's Base Currency: every asset's native `currency` is

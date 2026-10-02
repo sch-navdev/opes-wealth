@@ -1319,4 +1319,6 @@ export const zh: Record<string, string> = {
   "ownership_revoke_confirm": "停止与 {name} 共享此资产？其邀请将失效，份额退回给您。无需其他人批准。",
   "ownership_revoke_joined": "此人已加入，更改需要其批准。",
   "ownership_revoked": "已撤销共享。",
+  "owners_auto_label": "自动调整我的份额",
+  "owners_auto_hint": "您的份额即共同所有人所余部分，因此总和始终为 100%。取消勾选可手动设置每个份额。",
 };

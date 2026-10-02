@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,19 +93,35 @@ export function OwnershipFields({
   onNotifyChange: (next: boolean) => void;
 }) {
   const { t } = useLanguage();
+  // On: the creator's share is always what the co-owners leave (100% minus theirs), so
+  // adding a co-owner "just works". Off: every share is typed by hand.
+  const [auto, setAuto] = useState(true);
   const total = ownersTotal(value);
   const ok = Math.abs(total - 100) <= 0.005;
 
+  /** With auto on, the creator's row takes the remainder. */
+  function balanced(rows: OwnerFormRow[]): OwnerFormRow[] {
+    if (!auto) return rows;
+    const others = rows.filter((r) => !r.isCreator).reduce((sum, r) => sum + (Number(r.percentage) || 0), 0);
+    const mine = String(Math.max(0, Math.round((100 - others) * 100) / 100));
+    return rows.map((r) => (r.isCreator ? { ...r, percentage: mine } : r));
+  }
+
   function update(key: string, patch: Partial<OwnerFormRow>) {
-    onChange(value.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    onChange(balanced(value.map((r) => (r.key === key ? { ...r, ...patch } : r))));
   }
 
   function add() {
-    const remaining = Math.max(0, Math.round((100 - total) * 100) / 100);
-    onChange([
-      ...value,
-      { key: newOwnerKey(), name: "", email: "", percentage: remaining > 0 ? String(remaining) : "", isCreator: false, isYou: false },
-    ]);
+    // Auto: a new co-owner starts with an equal share of the asset; manual: whatever is unallocated.
+    const share = auto
+      ? Math.round((100 / (value.length + 1)) * 100) / 100
+      : Math.max(0, Math.round((100 - total) * 100) / 100);
+    onChange(
+      balanced([
+        ...value,
+        { key: newOwnerKey(), name: "", email: "", percentage: share > 0 ? String(share) : "", isCreator: false, isYou: false },
+      ]),
+    );
   }
 
   return (
@@ -157,6 +174,7 @@ export function OwnershipFields({
                   className="pe-7"
                   value={row.percentage}
                   onChange={(e) => update(row.key, { percentage: e.target.value })}
+                  disabled={auto && row.isCreator}
                 />
                 <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
               </div>
@@ -168,7 +186,7 @@ export function OwnershipFields({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={t("owners_remove")}
-                  onClick={() => onChange(value.filter((r) => r.key !== row.key))}
+                  onClick={() => onChange(balanced(value.filter((r) => r.key !== row.key)))}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -187,6 +205,28 @@ export function OwnershipFields({
           {t("owners_total", { total: Math.round(total * 100) / 100 })}
         </p>
       </div>
+
+      {value.length > 1 && (
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 border border-border bg-muted/30 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0 accent-primary"
+            checked={auto}
+            onChange={(e) => {
+              setAuto(e.target.checked);
+              if (e.target.checked) {
+                const others = value.filter((r) => !r.isCreator).reduce((sum, r) => sum + (Number(r.percentage) || 0), 0);
+                const mine = String(Math.max(0, Math.round((100 - others) * 100) / 100));
+                onChange(value.map((r) => (r.isCreator ? { ...r, percentage: mine } : r)));
+              }
+            }}
+          />
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium text-foreground">{t("owners_auto_label")}</span>
+            <span className="block text-xs text-muted-foreground">{t("owners_auto_hint")}</span>
+          </span>
+        </label>
+      )}
 
       {value.length > 1 && (
         <label className="flex min-h-11 cursor-pointer items-start gap-3 border border-border bg-muted/30 p-3">

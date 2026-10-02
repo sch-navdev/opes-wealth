@@ -1319,4 +1319,6 @@ export const es: Record<string, string> = {
   "ownership_revoke_confirm": "¿Dejar de compartir este activo con {name}? Su invitación dejará de funcionar y su parte vuelve a ti. Nadie más tiene que aprobarlo.",
   "ownership_revoke_joined": "Esta persona ya se ha unido, por lo que los cambios requieren su aprobación.",
   "ownership_revoked": "Acceso compartido revocado.",
+  "owners_auto_label": "Ajustar mi parte automáticamente",
+  "owners_auto_hint": "Tu parte es lo que dejan los copropietarios, así que el total siempre es 100 %. Desmarca para fijar cada parte a mano.",
 };

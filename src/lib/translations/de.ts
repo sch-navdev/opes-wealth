@@ -1319,4 +1319,6 @@ export const de: Record<string, string> = {
   "ownership_revoke_confirm": "Diesen Vermögenswert nicht mehr mit {name} teilen? Die Einladung wird ungültig und der Anteil geht an dich zurück. Niemand sonst muss zustimmen.",
   "ownership_revoke_joined": "Diese Person ist bereits beigetreten, daher braucht es ihre Zustimmung.",
   "ownership_revoked": "Freigabe widerrufen.",
+  "owners_auto_label": "Meinen Anteil automatisch anpassen",
+  "owners_auto_hint": "Dein Anteil ist, was die Miteigentümer übrig lassen, die Summe bleibt also immer 100 %. Abwählen, um jeden Anteil von Hand festzulegen.",
 };
