@@ -43,6 +43,12 @@ const NONE = "__none__";
 
 import { clearClientKnowledge, saveClientKnowledge } from "@/app/dashboard/dcc-actions";
 
+/** Local time as YYYYMMDD_HHMMSS (e.g. 20261002_153045): makes every generated file name unique. */
+export function fileTimestamp(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
 export type DccProfilePrefill = {
   firstName: string;
   lastName: string;
@@ -237,7 +243,7 @@ export function DccDialog({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `DCC-${new Date().toISOString().slice(0, 10)}-${docLocale}.pdf`;
+      link.download = `DCC-${fileTimestamp()}-${docLocale}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
       // Remember these entries for next time (never the wealth tables or the PDF password).

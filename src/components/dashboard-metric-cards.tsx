@@ -23,6 +23,7 @@ import {
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
+import { NumberTicker } from "@/components/number-ticker";
 import { cn } from "@/lib/utils";
 
 /** One asset's contribution to a dashboard total, already converted into the Base Currency. */
@@ -57,7 +58,7 @@ function MetricCard({
   hint,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   icon: React.ReactNode;
   valueClassName?: string;
   animationDelayMs: number;
@@ -262,10 +263,10 @@ export function DashboardMetricCards({
     style: "currency",
     currency: baseCurrency,
   });
-  const netWorthFormatted = currencyFormatter.format(netWorth);
-  const assetsFormatted = currencyFormatter.format(assets);
-  const liabilitiesFormatted = currencyFormatter.format(liabilities);
-  const unrealizedGainFormatted = currencyFormatter.format(unrealizedGain);
+  // Headline figures count up on load and whenever they change; Privacy Mode masks each frame.
+  const ticker = (n: number) => (
+    <NumberTicker value={n} format={(v) => maskValue(currencyFormatter.format(v))} />
+  );
 
   const gainColorClass =
     unrealizedGainSign === "+"
@@ -284,7 +285,7 @@ export function DashboardMetricCards({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label={t("net_worth")}
-          value={maskValue(netWorthFormatted)}
+          value={ticker(netWorth)}
           icon={<Wallet className="size-4" />}
           animationDelayMs={0}
           onClick={() => setOpen("netWorth")}
@@ -292,7 +293,7 @@ export function DashboardMetricCards({
         />
         <MetricCard
           label={t("total_assets")}
-          value={maskValue(assetsFormatted)}
+          value={ticker(assets)}
           icon={<TrendingUp className="size-4" />}
           animationDelayMs={75}
           onClick={() => setOpen("assets")}
@@ -300,7 +301,7 @@ export function DashboardMetricCards({
         />
         <MetricCard
           label={t("total_liabilities")}
-          value={maskValue(liabilitiesFormatted)}
+          value={ticker(liabilities)}
           icon={<TrendingDown className="size-4" />}
           valueClassName={hasLiabilities ? "text-destructive" : undefined}
           animationDelayMs={150}
@@ -310,9 +311,10 @@ export function DashboardMetricCards({
         <MetricCard
           label={t("real_estate_unrealized_gain")}
           value={
-            unrealizedGainSign
-              ? `${unrealizedGainSign}${maskValue(unrealizedGainFormatted)}`
-              : maskValue(unrealizedGainFormatted)
+            <>
+              {unrealizedGainSign}
+              {ticker(unrealizedGain)}
+            </>
           }
           icon={
             unrealizedGainSign === "-" ? (

@@ -268,6 +268,7 @@ export function PortfolioTable({
                         <AvatarImage
                           src={asset.images?.[0] || undefined}
                           alt=""
+                          className="object-contain"
                         />
                         <AvatarFallback className="rounded-md">
                           {categoryIconFor(asset.asset_categories?.name) ? (

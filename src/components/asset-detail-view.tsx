@@ -1208,7 +1208,7 @@ export function AssetDetailView({
                     aria-label="View images"
                   >
                     <Avatar size="lg" className="rounded-md">
-                      <AvatarImage src={images[0] || undefined} alt="" />
+                      <AvatarImage src={images[0] || undefined} alt="" className="object-contain" />
                       <AvatarFallback className="rounded-md">
                         {isRealEstate ? (
                           <Building2 className="size-5" />
@@ -1229,7 +1229,7 @@ export function AssetDetailView({
                     <CarouselContent>
                       {images.map((src, index) => (
                         <CarouselItem key={index}>
-                          <div className="relative aspect-square w-full overflow-hidden rounded-md">
+                          <div className="relative h-[65vh] w-full overflow-hidden rounded-md bg-muted">
                             {/* `unoptimized`: these are already client-resized
                                 base64 data URIs (see `resizeImageToBase64` in
                                 `lib/crop-image.ts`) — there's no remote asset
@@ -1239,7 +1239,7 @@ export function AssetDetailView({
                               alt={`${asset.name} ${index + 1}`}
                               fill
                               unoptimized
-                              className="object-cover"
+                              className="object-contain"
                             />
                           </div>
                         </CarouselItem>

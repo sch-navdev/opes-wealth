@@ -442,7 +442,7 @@ export function AddAssetDialog({
               {images.map((src, index) => (
                 <div key={index} className="relative">
                   <Avatar size="lg" className="rounded-md">
-                    <AvatarImage src={src} alt="" />
+                    <AvatarImage src={src} alt="" className="object-contain" />
                     <AvatarFallback className="rounded-md">?</AvatarFallback>
                   </Avatar>
                   <Button

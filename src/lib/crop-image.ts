@@ -48,16 +48,23 @@ export async function getCroppedImage(
   return canvas.toDataURL("image/jpeg", quality);
 }
 
+/** Asset photos: long edge, and JPEG quality (was 400px / 0.8, which blurred photos). */
+export const ASSET_IMAGE_MAX_SIZE = 1440;
+export const ASSET_IMAGE_QUALITY = 0.9;
+
 /**
- * Reads `file`, downscales it (preserving aspect ratio) to fit within
- * `maxSize` x `maxSize`, and re-encodes it as a JPEG data URL. Unlike
- * `getCroppedImage`, there's no interactive crop step — used for the
- * asset image/logo uploader, where a square crop isn't required.
+ * Reads `file`, downscales it ONLY if its long edge exceeds `maxSize`
+ * (never upscales, never crops — the original aspect ratio is kept exactly),
+ * and re-encodes it as a JPEG data URL. Unlike `getCroppedImage`, there's no
+ * crop step — used for the asset image/logo uploader. Transparent areas (PNG
+ * logos) are painted white first, because JPEG has no alpha and would
+ * otherwise turn them black. Defaults suit photos: 1440px at 0.9 quality is
+ * typically 0.3–0.7 MB each (3 per asset, well inside the 5 MB action limit).
  */
 export async function resizeImageToBase64(
   file: File,
-  maxSize = 400,
-  quality = 0.8,
+  maxSize = ASSET_IMAGE_MAX_SIZE,
+  quality = ASSET_IMAGE_QUALITY,
 ): Promise<string> {
   const rawDataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -81,6 +88,10 @@ export async function resizeImageToBase64(
     throw new Error("Could not get a 2D canvas context.");
   }
 
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(image, 0, 0, width, height);
 
   return canvas.toDataURL("image/jpeg", quality);
