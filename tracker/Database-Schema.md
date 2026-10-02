@@ -72,6 +72,10 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - **`0024_startups_category.sql`** — seeds the `Startups` category (`on conflict (slug) do nothing`). No columns: startup fields and funding rounds live in `assets.metadata`, shares in `assets.quantity` — see [[Portfolio-Dashboard|Portfolio Dashboard]]. **Unapplied** at the time of writing (together with 0022/0023).
 
+## Migration 0025 — co-ownership (2026-10-02)
+
+- **`0025_co_ownership.sql`** — `asset_owners`, `asset_change_requests`, `change_approvals`, the `is_asset_member` helper, co-owner read policies on `assets`/`asset_history`, the signup linking trigger and `profile_id_for_email`. Full description in [[Co-Ownership|Co-Ownership]]. **Not applied.**
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

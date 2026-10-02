@@ -52,6 +52,10 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 - **Not created**: no `bank_connections`/`bank_account_links`. Live bank sync isn't available yet and a fabricated "live" connection would carry no tokens and show a sync error; the banks appear via the Cash accounts' `bank_key` metadata instead.
 - **Caveats**: all names, VINs, account references and prices are invented; brokerage prices are illustrative, so the app's own price refresh will replace them with live quotes. Anyone who knows the published password can sign in and edit that account, so on production use a password you keep private (set `DEMO_PASSWORD`) or reset/disable it after the demo. **Not yet run against any database**: verified only by a dry run plus tsc/lint/build; the first `--yes` run (and how the dashboard looks afterwards) is still to be checked.
 
+## Co-ownership deploy checklist (2026-10-02)
+
+- Apply `0025_co_ownership.sql`. Set `CRON_SECRET` on Vercel (the new `/api/cron/expire-changes` job, 06:30 UTC, uses it like the bug-report cron). Add `<site>/auth/callback` to Supabase's allowed redirect URLs and review the project's invite email template. `CO_OWNER_INVITE_EMAILS=off` suppresses invite emails (useful on preview deployments). See [[Co-Ownership|Co-Ownership]].
+
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)

@@ -171,6 +171,7 @@ import {
 import { METAL_FORM_LABEL_KEYS, METAL_LABEL_KEYS } from "@/components/precious-metals-fields";
 import { ExoticAssetCard } from "@/components/exotic-asset-card";
 import { StartupCard } from "@/components/startup-card";
+import { OwnershipSummary, type OwnerFormRow } from "@/components/ownership-fields";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 import { fetchMarketPrice } from "@/lib/market-data/market-price";
@@ -299,11 +300,14 @@ export function AssetDetailView({
   history,
   categories,
   ratesFromUsd,
+  owners = [],
 }: {
   asset: AssetDetail;
   history: AssetHistoryPoint[];
   categories: Category[];
   ratesFromUsd: Record<string, number>;
+  /** Owner rows when the asset is shared (empty = a single owner). */
+  owners?: OwnerFormRow[];
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
@@ -2358,6 +2362,7 @@ export function AssetDetailView({
                       ) : (
                         <AddAssetDialog
                           categories={categories}
+                          owners={owners}
                           asset={{
                             id: asset.id,
                             name: asset.name,
@@ -2789,6 +2794,7 @@ export function AssetDetailView({
                 ) : (
                   <AddAssetDialog
                     categories={categories}
+                    owners={owners}
                     asset={{
                       id: asset.id,
                       name: asset.name,
@@ -3884,6 +3890,8 @@ export function AssetDetailView({
                 </CardContent>
               </Card>
             )}
+
+            {owners.length > 1 && <OwnershipSummary rows={owners} />}
 
             {isStartup && (
               <StartupCard

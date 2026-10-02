@@ -499,7 +499,23 @@ properties.forEach((p) => {
       outstanding_balance: 0,
       payment_schedule: [],
       linked_loan: p.loan,
-      tenancy_contracts: [],
+      // Rented apartments: a past lease and the current 12-month lease, ~5.5% gross yield.
+      tenancy_contracts:
+        p.propertyType === "Apartment"
+          ? [
+              { start: addMonths(TODAY, -16), end: addMonths(TODAY, -5), rent: 0.052, tenant: "Demo Tenant A" },
+              { start: addMonths(TODAY, -4), end: addMonths(TODAY, 8), rent: 0.055, tenant: "Demo Tenant B" },
+            ].map((c, i) => ({
+              id: `tenancy-demo-${p.name.length}-${i + 1}`,
+              tenant_name: c.tenant,
+              start_date: c.start,
+              end_date: c.end,
+              annual_rent: Math.round(p.market * c.rent),
+              contract_value: Math.round(p.market * c.rent),
+              imported_from_file: "",
+              uploaded_at: c.start,
+            }))
+          : [],
       property_expenses: [],
     },
     history,
@@ -578,6 +594,8 @@ function privateEquity(opts: {
   ownership: number;
   start: string;
   seed: number;
+  /** Expected future distributions (drive the passive-income projection). */
+  projected?: { monthsAhead: number; amount: number }[];
 }) {
   const calls = opts.calls.map((c, i) => ({
     id: `call-${i + 1}`,
@@ -608,7 +626,11 @@ function privateEquity(opts: {
       nav_date: addMonths(TODAY, -3),
       count_unfunded_as_liability: true,
       projection_mode: "model",
-      projected_distributions: [],
+      projected_distributions: (opts.projected ?? []).map((d, i) => ({
+        id: `dist-demo-${opts.seed}-${i + 1}`,
+        due_date: addMonths(TODAY, d.monthsAhead),
+        amount: d.amount,
+      })),
       expected_multiple: opts.multiple,
       expected_irr_manual: null,
     },
@@ -638,6 +660,7 @@ privateEquity({
   ownership: 2.5,
   start: "2023-06-30",
   seed: 61,
+  projected: [{ monthsAhead: 5, amount: 22000 }, { monthsAhead: 10, amount: 18000 }],
 });
 
 privateEquity({
@@ -680,7 +703,7 @@ type EquityDef = {
 const equities: EquityDef[] = [
   { ticker: "AAPL", name: "Apple Inc.", isin: "US0378331005", exchange: "NASDAQ", mic: "XNAS", currency: "USD", last: 228.4, seed: 3,
     trades: [{ date: "2023-03-14", side: "buy", qty: 80, price: 142.5 }, { date: "2024-01-22", side: "buy", qty: 40, price: 171.2 }],
-    income: [{ date: "2025-02-13", perShare: 0.25 }, { date: "2025-08-14", perShare: 0.26 }] },
+    income: [{ date: addMonths(TODAY, -8), perShare: 0.25 }, { date: addMonths(TODAY, -2), perShare: 0.26 }] },
   { ticker: "MSFT", name: "Microsoft Corporation", isin: "US5949181045", exchange: "NASDAQ", mic: "XNAS", currency: "USD", last: 468, seed: 5,
     trades: [{ date: "2022-11-08", side: "buy", qty: 45, price: 285 }, { date: "2024-06-03", side: "buy", qty: 15, price: 402 }] },
   { ticker: "NVDA", name: "NVIDIA Corporation", isin: "US67066G1040", exchange: "NASDAQ", mic: "XNAS", currency: "USD", last: 182, seed: 7,
@@ -691,7 +714,7 @@ const equities: EquityDef[] = [
     trades: [{ date: "2022-10-03", side: "buy", qty: 20, price: 805 }] },
   { ticker: "TTE", name: "TotalEnergies SE", isin: "FR0000120271", exchange: "EURONEXT", mic: "XPAR", currency: "EUR", last: 58.9, seed: 17,
     trades: [{ date: "2023-02-20", side: "buy", qty: 300, price: 54.2 }],
-    income: [{ date: "2025-03-28", perShare: 0.79 }, { date: "2025-07-03", perShare: 0.85 }, { date: "2025-10-02", perShare: 0.85 }] },
+    income: [{ date: addMonths(TODAY, -10), perShare: 0.79 }, { date: addMonths(TODAY, -7), perShare: 0.85 }, { date: addMonths(TODAY, -4), perShare: 0.85 }, { date: addMonths(TODAY, -1), perShare: 0.85 }] },
 ];
 
 equities.forEach((e, idx) => {
@@ -740,6 +763,66 @@ equities.forEach((e, idx) => {
   });
   void idx;
 });
+
+// ---- REIT / SCPI (src/lib/scpi.ts) -------------------------------------------
+//
+// 150 shares at 1,080 EUR (12% entry fee), paid quarterly on the 15th of
+// Jan/Apr/Jul/Oct. Past payments are "received", later ones "expected".
+{
+  const shares = 150;
+  const price = 1080;
+  const feePct = 12;
+  const targetYield = 6.1;
+  const withdrawal = round2(price * (1 - feePct / 100));
+  const perQuarter = round2((shares * price * targetYield) / 100 / 4);
+  const dividends: { id: string; date: string; amount: number; status: "received" | "expected"; quarter: string }[] = [];
+  for (let k = -5; k <= 1; k++) {
+    const d = new Date(`${TODAY}T00:00:00Z`);
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + k * 3);
+    const month = Math.floor(d.getUTCMonth() / 3) * 3; // 0, 3, 6, 9
+    d.setUTCMonth(month);
+    d.setUTCDate(15);
+    const date = d.toISOString().slice(0, 10);
+    const quarterIndex = ((month + 9) % 12) / 3 + 1; // Jan -> T4, Apr -> T1, Jul -> T2, Oct -> T3
+    const quarterYear = month === 0 ? d.getUTCFullYear() - 1 : d.getUTCFullYear();
+    if (date < "2023-01-01" || dividends.some((x) => x.date === date)) continue;
+    dividends.push({
+      id: `div-demo-${date}`,
+      date,
+      amount: perQuarter,
+      status: date <= TODAY ? "received" : "expected",
+      quarter: `T${quarterIndex} ${quarterYear}`,
+    });
+  }
+  addAsset({
+    category: "SCPI",
+    name: "Corum Origin (SCPI)",
+    quantity: shares,
+    currentValue: round2(shares * withdrawal),
+    currency: "EUR",
+    purchaseDate: "2023-03-20",
+    metadata: {
+      management_company: "Corum Asset Management (fictional)",
+      sector: "Diversified commercial real estate",
+      geography: "Europe",
+      holding_mode: "pleine_propriete",
+      financed_by_credit: false,
+      jouissance_date: "2023-07-01",
+      subscription_price: price,
+      entry_fee_pct: feePct,
+      withdrawal_value: withdrawal,
+      target_yield_pct: targetYield,
+      yield_history: [
+        { id: "yield-2023", year: 2023, rate: 6.0 },
+        { id: "yield-2024", year: 2024, rate: 6.2 },
+        { id: "yield-2025", year: 2025, rate: 6.1 },
+      ],
+      dividends,
+    },
+    history: path("2023-03-20", TODAY, round2(shares * price), round2(shares * withdrawal), 0.004, 111),
+  });
+}
 
 // ---- Vehicles --------------------------------------------------------------
 
@@ -1020,6 +1103,53 @@ debts.forEach((d) => {
   });
 });
 
+// ---- Shared ownership (migration 0025) ---------------------------------------
+//
+// Three shared assets, every co-owner UNREGISTERED (no account, so no approval
+// is needed and nobody is emailed — rows are inserted directly): a property
+// shared 50/50 with "Von", a company shared 33% with Jamie Taylor, a vehicle
+// shared 20% with a non-user email. The dashboard then counts only the demo
+// user's share of each. Skipped quietly if the migration isn't applied.
+
+type SharedDef = { match: (a: SeedAsset) => boolean; owners: { name: string; email: string; pct: number }[] };
+const sharedDefs: SharedDef[] = [
+  {
+    match: (a) => a.category === "Real Estate" && !a.isLiability && a === assets.find((x) => x.category === "Real Estate"),
+    owners: [{ name: "Von", email: "von@example.test", pct: 50 }],
+  },
+  { match: (a) => a.name === "Vance Strategy Consulting Ltd", owners: [{ name: "Jamie Taylor", email: "jamie.taylor@example.test", pct: 33 }] },
+  { match: (a) => a.name === "Mercedes-Benz G 63 AMG", owners: [{ name: "Sam Cousin", email: "sam.cousin@example.test", pct: 20 }] },
+];
+
+function sharedOwnerRows(userId: string) {
+  const rows: Json[] = [];
+  for (const def of sharedDefs) {
+    const asset = assets.find(def.match);
+    if (!asset) continue;
+    const others = def.owners.reduce((sum, o) => sum + o.pct, 0);
+    rows.push({
+      asset_id: asset.id,
+      profile_id: userId,
+      name: "Alexander Vance",
+      email: DEMO_EMAIL.toLowerCase(),
+      ownership_percentage: 100 - others,
+      is_creator: true,
+    });
+    for (const o of def.owners) {
+      rows.push({
+        asset_id: asset.id,
+        profile_id: null,
+        name: o.name,
+        email: o.email,
+        ownership_percentage: o.pct,
+        is_creator: false,
+        invited_at: null,
+      });
+    }
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // Summary (rough USD view with fixed FX, only to sanity-check the picture)
 // ---------------------------------------------------------------------------
@@ -1174,6 +1304,18 @@ async function seed() {
     if (error) throw error;
   }
   console.log(`Inserted ${assets.length} assets, ${historyRows.length} history rows and ${txRows.length} transactions.`);
+
+  const ownerRows = sharedOwnerRows(userId as string);
+  const { error: ownersError } = await db.from("asset_owners").insert(ownerRows);
+  if (ownersError) {
+    if (ownersError.code === "42P01" || /asset_owners/.test(ownersError.message)) {
+      console.log("Shared-ownership rows skipped: apply migration 0025_co_ownership.sql first.");
+    } else {
+      throw ownersError;
+    }
+  } else {
+    console.log(`Inserted ${ownerRows.length} owner rows (3 shared assets).`);
+  }
   console.log(`Sign in as ${DEMO_EMAIL}.`);
 }
 

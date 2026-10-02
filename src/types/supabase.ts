@@ -215,6 +215,105 @@ export type Database = {
         }
         Relationships: []
       }
+      asset_owners: {
+        Row: {
+          id: string
+          asset_id: string
+          profile_id: string | null
+          name: string
+          email: string | null
+          ownership_percentage: number
+          is_creator: boolean
+          invited_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          asset_id: string
+          profile_id?: string | null
+          name?: string
+          email?: string | null
+          ownership_percentage: number
+          is_creator?: boolean
+          invited_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          asset_id?: string
+          profile_id?: string | null
+          name?: string
+          email?: string | null
+          ownership_percentage?: number
+          is_creator?: boolean
+          invited_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      asset_change_requests: {
+        Row: {
+          id: string
+          asset_id: string
+          requested_by: string
+          proposed_payload: Json
+          status: string
+          auto_approved: boolean
+          created_at: string
+          expires_at: string
+          resolved_at: string | null
+        }
+        Insert: {
+          id?: string
+          asset_id: string
+          requested_by: string
+          proposed_payload: Json
+          status?: string
+          auto_approved?: boolean
+          created_at?: string
+          expires_at?: string
+          resolved_at?: string | null
+        }
+        Update: {
+          id?: string
+          asset_id?: string
+          requested_by?: string
+          proposed_payload?: Json
+          status?: string
+          auto_approved?: boolean
+          created_at?: string
+          expires_at?: string
+          resolved_at?: string | null
+        }
+        Relationships: []
+      }
+      change_approvals: {
+        Row: {
+          id: string
+          change_request_id: string
+          profile_id: string
+          status: string
+          decided_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          change_request_id: string
+          profile_id: string
+          status?: string
+          decided_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          change_request_id?: string
+          profile_id?: string
+          status?: string
+          decided_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           id: string
@@ -358,6 +457,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      profile_id_for_email: {
+        Args: { p_email: string }
+        Returns: string | null
+      }
       list_my_sessions: {
         Args: Record<PropertyKey, never>
         Returns: {

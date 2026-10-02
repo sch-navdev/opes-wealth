@@ -81,6 +81,14 @@ import {
 } from "@/lib/scpi";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import { StartupFields } from "@/components/startup-fields";
+import {
+  OwnershipFields,
+  ownersTotal,
+  soloOwner,
+  toOwnerInputs,
+  type OwnerFormRow,
+} from "@/components/ownership-fields";
+import { validateOwners } from "@/lib/ownership";
 import { CategoryIcon } from "@/components/category-icon";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import {
@@ -117,6 +125,7 @@ export function AddAssetDialog({
   trigger,
   defaultCategoryName,
   companies = [],
+  owners: initialOwners,
 }: {
   categories: Category[];
   asset?: AssetForEdit;
@@ -126,12 +135,18 @@ export function AddAssetDialog({
   companies?: { id: string; name: string }[];
   /** Custom trigger element (e.g. a "+ Add Loan" button elsewhere on the page). Falls back to the default Edit/Add Asset button. */
   trigger?: React.ReactNode;
+  /** Existing owners of a shared asset (edit mode). Empty/absent = a single owner. */
+  owners?: OwnerFormRow[];
 }) {
   const isEditMode = !!asset;
   const { t } = useLanguage();
 
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [ownerRows, setOwnerRows] = useState<OwnerFormRow[]>(() =>
+    initialOwners && initialOwners.length > 0 ? initialOwners : [soloOwner()],
+  );
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -218,6 +233,8 @@ export function AddAssetDialog({
     setQuantityInput(asset?.quantity ?? 1);
     setExoticMetadata(asset ? parseExoticMetadata(asset.metadata) : EMPTY_EXOTIC_METADATA);
     setStartupMetadata(asset ? parseStartupMetadata(asset.metadata) : EMPTY_STARTUP_METADATA);
+    setOwnerRows(initialOwners && initialOwners.length > 0 ? initialOwners : [soloOwner()]);
+    setNotice(null);
     setCompanyMetadata(asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA);
     setScpiMetadata(asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA);
   }
@@ -246,6 +263,18 @@ export function AddAssetDialog({
 
     const formData = new FormData(form);
     formData.set("images", JSON.stringify(images));
+
+    // Ownership & co-owners: sent only for a shared asset (or one that WAS shared,
+    // so removing every co-owner is saved). Must total exactly 100%.
+    const hadOwners = !!initialOwners && initialOwners.length > 0;
+    if (ownerRows.length > 1 || hadOwners) {
+      const ownerErrors = validateOwners(toOwnerInputs(ownerRows));
+      if (ownerErrors.length > 0) {
+        setError(t(ownerErrors[0] as TranslationKey, { total: Math.round(ownersTotal(ownerRows) * 100) / 100 }));
+        return;
+      }
+      formData.set("owners", JSON.stringify(toOwnerInputs(ownerRows)));
+    }
     formData.set("ticker_symbol", tickerSymbol.trim());
 
     if ((isEquity || isCrypto) && !tickerSymbol.trim()) {
@@ -354,8 +383,14 @@ export function AddAssetDialog({
         ? await updateAsset(asset.id, formData)
         : await addAsset(formData);
 
-      if (result?.error) {
-        setError(result.error);
+      if (result && "error" in result && result.error) {
+        // Server-side validation and workflow errors come back as translation keys.
+        setError(/^(owners_|change_)/.test(result.error) ? t(result.error as TranslationKey, { total: Math.round(ownersTotal(ownerRows) * 100) / 100 }) : result.error);
+        return;
+      }
+      if (result && "pending" in result && result.pending) {
+        // A registered co-owner must approve first: nothing changed yet.
+        setNotice(t("change_pending_notice"));
         return;
       }
 
@@ -660,6 +695,14 @@ export function AddAssetDialog({
           {isStartup && <StartupFields value={startupMetadata} onChange={setStartupMetadata} />}
 
           {isExotic && <ExoticAssetsFields value={exoticMetadata} onChange={setExoticMetadata} />}
+
+          <OwnershipFields value={ownerRows} onChange={setOwnerRows} />
+
+          {notice && (
+            <p className="border border-primary bg-primary/5 p-3 text-sm text-foreground" role="status">
+              {notice}
+            </p>
+          )}
 
           {error && (
             <p className="text-sm text-destructive" role="alert">

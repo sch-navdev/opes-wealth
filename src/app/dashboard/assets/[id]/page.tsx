@@ -8,6 +8,7 @@ import {
 } from "@/utils/supabase/mock-auth";
 import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/components/asset-detail-view";
 import { getExchangeRatesFromUsd } from "@/lib/fx";
+import type { OwnerFormRow } from "@/components/ownership-fields";
 
 export default async function AssetDetailsPage({
   params,
@@ -42,8 +43,7 @@ export default async function AssetDetailsPage({
           "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)",
         )
         .eq("id", id)
-        .eq("profile_id", user.id)
-        .single<AssetDetail>(),
+        .single<AssetDetail & { profile_id: string }>(),
       supabase
         .from("asset_history")
         .select("id, recorded_date, value, net_equity, source")
@@ -58,12 +58,31 @@ export default async function AssetDetailsPage({
     notFound();
   }
 
+  // Co-ownership (migration 0025): the creator and every registered co-owner may open the asset.
+  const { data: ownerRows } = await supabase
+    .from("asset_owners")
+    .select("profile_id, name, email, ownership_percentage, is_creator")
+    .eq("asset_id", id)
+    .order("is_creator", { ascending: false });
+  if (asset.profile_id !== user.id && !(ownerRows ?? []).some((r) => r.profile_id === user.id)) {
+    notFound();
+  }
+  const owners: OwnerFormRow[] = (ownerRows ?? []).map((r, i) => ({
+    key: `owner-${i}`,
+    name: r.name,
+    email: r.email ?? "",
+    percentage: String(Number(r.ownership_percentage)),
+    isCreator: r.is_creator,
+    isYou: r.profile_id === user.id,
+  }));
+
   return (
     <AssetDetailView
       asset={asset}
       history={history ?? []}
       categories={categories ?? []}
       ratesFromUsd={rates}
+      owners={owners}
     />
   );
 }

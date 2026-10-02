@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { applyOwnershipFactors, loadCoOwnedAssets, loadOwnershipFactors } from "@/lib/shared-assets/load";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import {
   createMockAdminClient,
@@ -63,7 +64,24 @@ export default async function CompaniesPage({
         .returns<CompanyRow[]>()
     : { data: [] as CompanyRow[] };
 
-  const rows = companies ?? [];
+  // Co-ownership: add companies shared with me and show MY share of each stake.
+  const COMPANY_COLUMNS = "id, profile_id, name, currency, current_value, quantity, metadata, asset_categories(name)";
+  const ownCompanies = (companies ?? []) as (CompanyRow & { profile_id?: string })[];
+  const sharedCompanies = companyCategory
+    ? await loadCoOwnedAssets<CompanyRow & { profile_id: string; quantity: number; asset_categories: { name: string } | null }>(
+        supabase,
+        user.id,
+        COMPANY_COLUMNS,
+        new Set(ownCompanies.map((c) => c.id)),
+        { categoryId: companyCategory.id },
+      )
+    : [];
+  const withOwner = [
+    ...ownCompanies.map((c) => ({ ...c, profile_id: c.profile_id ?? user.id, quantity: 1, asset_categories: { name: "Companies" } })),
+    ...sharedCompanies,
+  ];
+  const companyFactors = await loadOwnershipFactors(supabase, user.id, withOwner);
+  const rows: CompanyRow[] = applyOwnershipFactors(withOwner, companyFactors);
   const structure = buildHoldingStructure(rows);
   const baseValues: Record<string, number> = {};
   let totalStake = 0;

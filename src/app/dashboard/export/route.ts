@@ -8,6 +8,16 @@ import {
 import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
 import { buildPortfolioWorkbook, type ExportAsset } from "@/lib/portfolio-export";
+import {
+  applyOwnershipFactors,
+  loadCoOwnedAssets,
+  loadOwnershipFactors,
+  scaleHistoryRows,
+} from "@/lib/shared-assets/load";
+
+const EXPORT_COLUMNS =
+  "id, profile_id, name, category_id, quantity, current_value, currency, is_liability, metadata, ticker_symbol, purchase_date, asset_categories(name)";
+type OwnedExportAsset = ExportAsset & { profile_id: string; asset_categories: { name: string } | null };
 
 export const dynamic = "force-dynamic";
 /** The history sheet pages through every asset_history row. */
@@ -34,12 +44,10 @@ export async function GET(request: Request) {
   const [{ data: assets }, { data: profile }, rates] = await Promise.all([
     supabase
       .from("assets")
-      .select(
-        "id, name, category_id, quantity, current_value, currency, is_liability, metadata, ticker_symbol, purchase_date, asset_categories(name)",
-      )
+      .select(EXPORT_COLUMNS)
       .eq("profile_id", user.id)
       .order("name")
-      .returns<ExportAsset[]>(),
+      .returns<OwnedExportAsset[]>(),
     supabase
       .from("profiles")
       .select("first_name, last_name, default_currency")
@@ -53,10 +61,19 @@ export async function GET(request: Request) {
     ? (requested as string)
     : profile?.default_currency || DEFAULT_BASE_CURRENCY;
 
-  const rows = assets ?? [];
-  const history = await fetchAllAssetHistory(
-    supabase,
-    rows.map((a) => a.id),
+  // Co-ownership: include shared assets and report the user's share of each.
+  const unscaled = [
+    ...(assets ?? []),
+    ...(await loadCoOwnedAssets<OwnedExportAsset>(supabase, user.id, EXPORT_COLUMNS, new Set((assets ?? []).map((a) => a.id)))),
+  ];
+  const factors = await loadOwnershipFactors(supabase, user.id, unscaled);
+  const rows = applyOwnershipFactors(unscaled, factors);
+  const history = scaleHistoryRows(
+    await fetchAllAssetHistory(
+      supabase,
+      rows.map((a) => a.id),
+    ),
+    factors,
   );
 
   const today = new Date().toISOString().slice(0, 10);

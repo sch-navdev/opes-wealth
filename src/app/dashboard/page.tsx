@@ -31,6 +31,13 @@ import { buildDccPortfolio } from "@/lib/dcc";
 import { ExportReportsCard } from "@/components/export-reports-card";
 import { PassiveIncomeCard } from "@/components/passive-income-card";
 import { buildPassiveIncome } from "@/lib/passive-income";
+import {
+  applyOwnershipFactors,
+  loadCoOwnedAssets,
+  loadOwnershipFactors,
+  scaleHistoryRows,
+} from "@/lib/shared-assets/load";
+import { loadPendingApprovals } from "@/lib/shared-assets/server";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import {
   buildVehicleHistoryFromPurchase,
@@ -49,6 +56,7 @@ export const maxDuration = 60;
 
 type AssetRow = {
   id: string;
+  profile_id: string;
   name: string;
   category_id: string;
   quantity: number;
@@ -87,14 +95,14 @@ export default async function DashboardPage({
     redirect("/login/mfa");
   }
 
-  const [{ data: categories }, { data: assets }, { data: profile }, rates] =
+  const ASSET_COLUMNS =
+    "id, profile_id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)";
+  const [{ data: categories }, { data: ownAssetRows }, { data: profile }, rates] =
     await Promise.all([
       supabase.from("asset_categories").select("id, name").order("name"),
       supabase
         .from("assets")
-        .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)",
-        )
+        .select(ASSET_COLUMNS)
         .eq("profile_id", user.id)
         .order("created_at", { ascending: false })
         .returns<AssetRow[]>(),
@@ -107,6 +115,18 @@ export default async function DashboardPage({
         .single(),
       getExchangeRatesFromUsd(),
     ]);
+
+  // Co-ownership (migration 0025): assets shared WITH me are added and every asset
+  // is reduced to MY share, so each total below (net worth, categories, charts,
+  // passive income…) is pro-rata — $1M held 50% counts as $500k. With the
+  // migration unapplied there are no owner rows and everything stays at 100%.
+  const unscaledAssets = [
+    ...(ownAssetRows ?? []),
+    ...(await loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, new Set((ownAssetRows ?? []).map((a) => a.id)))),
+  ];
+  const factorById = await loadOwnershipFactors(supabase, user.id, unscaledAssets);
+  const assets: AssetRow[] = applyOwnershipFactors(unscaledAssets, factorById);
+  const pendingApprovals = await loadPendingApprovals(user.id);
 
   const { currency: currencyParam } = await searchParams;
   // The dashboard's Base Currency: every asset's native `currency` is
@@ -122,10 +142,12 @@ export default async function DashboardPage({
   // above, since it needs the asset ids first).
   // Paged + unwindowed (`fetchAllAssetHistory`): the chart starts at the
   // earliest row in the database, not at whatever one response could hold.
-  const allHistory = await fetchAllAssetHistory(
+  const rawHistory = await fetchAllAssetHistory(
     supabase,
     (assets ?? []).map((a) => a.id),
   );
+  // History rows are stored for the WHOLE asset: reduce them to my share too.
+  const allHistory = scaleHistoryRows(rawHistory, factorById);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -394,6 +416,7 @@ export default async function DashboardPage({
           <DashboardHeaderControls
             totalNetWorth={totalNetWorth}
             baseCurrency={displayCurrency}
+            pendingApprovals={pendingApprovals}
           />
         </div>
       </header>

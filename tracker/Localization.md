@@ -134,6 +134,10 @@
 
 - **51 new keys in all nine languages:** `category_startups`, `startup_*` (form, card, round ledger, option/strike wording, validation) and the exotic wine/art additions (`exotic_kind*`, `exotic_producer/vintage/region/bottles/artist/title/medium`, hints and validation). Same caveat: AI-made, not native-reviewed. "SAFE" is kept as the English acronym everywhere; BSPCE is French-specific and kept as is.
 
+## OW11 keys (2026-10-02)
+
+- **34 new keys in all nine languages** for co-ownership: `owners_*` (form, summary, seven validation messages), `change_pending_*` and `approvals_*` (header panel and field names). Same caveat: AI-made, not native-reviewed. The server returns validation errors as keys (`owners_*`, `change_pending_exists`), which the modal translates.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from
