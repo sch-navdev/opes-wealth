@@ -168,6 +168,7 @@ export async function addAsset(formData: FormData) {
       assetName: name,
       creatorProfileId: user.id,
       owners: ownersInput,
+      notify: formData.get("notify") !== "0",
     });
     if (!res.ok) return { error: res.error };
   }
@@ -222,6 +223,7 @@ export async function updateAsset(id: string, formData: FormData) {
       purchase_date: purchaseDate,
     },
     owners: ownersInput,
+    notify: formData.get("notify") !== "0",
   });
   if (routed.mode === "error") return { error: routed.error };
   if (routed.mode === "pending") {
@@ -276,6 +278,7 @@ export async function updateAsset(id: string, formData: FormData) {
       assetName: name,
       creatorProfileId: user.id,
       owners: ownersInput,
+      notify: formData.get("notify") !== "0",
     });
     if (!res.ok) return { error: res.error };
   }

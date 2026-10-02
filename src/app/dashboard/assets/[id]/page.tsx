@@ -9,6 +9,7 @@ import {
 import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/components/asset-detail-view";
 import { getExchangeRatesFromUsd } from "@/lib/fx";
 import type { OwnerFormRow } from "@/components/ownership-fields";
+import { loadOwnershipStatus } from "@/lib/shared-assets/server";
 
 export default async function AssetDetailsPage({
   params,
@@ -76,6 +77,8 @@ export default async function AssetDetailsPage({
     isYou: r.profile_id === user.id,
   }));
 
+  const ownershipStatus = owners.length > 1 && !mockUserId ? await loadOwnershipStatus(id, user.id) : null;
+
   return (
     <AssetDetailView
       asset={asset}
@@ -83,6 +86,7 @@ export default async function AssetDetailsPage({
       categories={categories ?? []}
       ratesFromUsd={rates}
       owners={owners}
+      ownershipStatus={ownershipStatus}
     />
   );
 }

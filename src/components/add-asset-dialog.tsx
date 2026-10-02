@@ -151,6 +151,7 @@ export function AddAssetDialog({
   const [ownerRows, setOwnerRows] = useState<OwnerFormRow[]>(() =>
     initialOwners && initialOwners.length > 0 ? initialOwners : [soloOwner()],
   );
+  const [notifyCoOwners, setNotifyCoOwners] = useState(true);
   const [isPending, startTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +239,7 @@ export function AddAssetDialog({
     setExoticMetadata(asset ? parseExoticMetadata(asset.metadata) : EMPTY_EXOTIC_METADATA);
     setStartupMetadata(asset ? parseStartupMetadata(asset.metadata) : EMPTY_STARTUP_METADATA);
     setOwnerRows(initialOwners && initialOwners.length > 0 ? initialOwners : [soloOwner()]);
+    setNotifyCoOwners(true);
     setNotice(null);
     setCompanyMetadata(asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA);
     setScpiMetadata(asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA);
@@ -296,6 +298,7 @@ export function AddAssetDialog({
         return;
       }
       formData.set("owners", JSON.stringify(toOwnerInputs(ownerRows)));
+      formData.set("notify", notifyCoOwners ? "1" : "0");
     }
     formData.set("ticker_symbol", tickerSymbol.trim());
 
@@ -414,7 +417,7 @@ export function AddAssetDialog({
       sessionUploads.current.clear();
       if (result && "pending" in result && result.pending) {
         // A registered co-owner must approve first: nothing changed yet.
-        setNotice(t("change_pending_notice"));
+        setNotice(t("change_pending_notice") + " " + t("change_pending_see_status"));
         return;
       }
 
@@ -723,7 +726,7 @@ export function AddAssetDialog({
 
           {isExotic && <ExoticAssetsFields value={exoticMetadata} onChange={setExoticMetadata} />}
 
-          <OwnershipFields value={ownerRows} onChange={setOwnerRows} />
+          <OwnershipFields value={ownerRows} onChange={setOwnerRows} notify={notifyCoOwners} onNotifyChange={setNotifyCoOwners} />
 
           {notice && (
             <p className="border border-primary bg-primary/5 p-3 text-sm text-foreground" role="status">

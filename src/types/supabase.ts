@@ -225,6 +225,8 @@ export type Database = {
           ownership_percentage: number
           is_creator: boolean
           invited_at: string | null
+          invite_status: string
+          invite_error: string | null
           created_at: string
         }
         Insert: {
@@ -236,6 +238,8 @@ export type Database = {
           ownership_percentage: number
           is_creator?: boolean
           invited_at?: string | null
+          invite_status?: string
+          invite_error?: string | null
           created_at?: string
         }
         Update: {
@@ -247,6 +251,8 @@ export type Database = {
           ownership_percentage?: number
           is_creator?: boolean
           invited_at?: string | null
+          invite_status?: string
+          invite_error?: string | null
           created_at?: string
         }
         Relationships: []
@@ -294,6 +300,9 @@ export type Database = {
           profile_id: string
           status: string
           decided_at: string | null
+          notify_status: string
+          notified_at: string | null
+          notify_error: string | null
           created_at: string
         }
         Insert: {
@@ -302,6 +311,9 @@ export type Database = {
           profile_id: string
           status?: string
           decided_at?: string | null
+          notify_status?: string
+          notified_at?: string | null
+          notify_error?: string | null
           created_at?: string
         }
         Update: {
@@ -310,6 +322,9 @@ export type Database = {
           profile_id?: string
           status?: string
           decided_at?: string | null
+          notify_status?: string
+          notified_at?: string | null
+          notify_error?: string | null
           created_at?: string
         }
         Relationships: []

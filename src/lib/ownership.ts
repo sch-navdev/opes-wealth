@@ -84,6 +84,20 @@ export function otherRegisteredOwners<T extends Pick<OwnerRow, "profile_id">>(
   return (rows ?? []).filter((r): r is T & { profile_id: string } => !!r.profile_id && r.profile_id !== selfId);
 }
 
+/**
+ * Time left before a pending change auto-applies: whole days while there is more
+ * than a day to go, then hours (rounded up) for the last 24 hours.
+ */
+export type TimeLeft = { unit: "days" | "hours" | "expired"; n: number };
+
+export function timeLeft(expiresAt: string, now: number = Date.now()): TimeLeft {
+  const ms = Date.parse(expiresAt) - now;
+  if (!(ms > 0)) return { unit: "expired", n: 0 };
+  const hours = ms / 3_600_000;
+  if (hours >= 24) return { unit: "days", n: Math.floor(hours / 24) };
+  return { unit: "hours", n: Math.max(1, Math.ceil(hours)) };
+}
+
 // ---------------------------------------------------------------------------
 // Pro-rata scaling
 // ---------------------------------------------------------------------------

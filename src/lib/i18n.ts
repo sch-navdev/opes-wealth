@@ -2076,6 +2076,38 @@ const dictionary = {
   // OW9: transaction dedupe, exotic assets, broker directory, passive income
   photo_uploading: { en: "Uploading…", fr: "Envoi en cours…" },
   photo_upload_failed: { en: "The photo could not be uploaded. Please try again.", fr: "La photo n'a pas pu être envoyée. Veuillez réessayer." },
+
+  // Co-owner notification status
+  owners_notify_label: { en: "Notify co-owners by email", fr: "Prévenir les co-propriétaires par email" },
+  owners_notify_hint: { en: "Sends an invitation to co-owners without an account, or asks the others to review the change. You can resend later.", fr: "Envoie une invitation aux co-propriétaires sans compte, ou demande aux autres d'examiner la modification. Vous pourrez renvoyer l'email plus tard." },
+  change_pending_see_status: { en: "Follow it under “Sharing & approval status” on the asset page.", fr: "Suivez-la dans « Statut du partage et des approbations » sur la page de l'actif." },
+  ownership_status_title: { en: "Sharing & approval status", fr: "Statut du partage et des approbations" },
+  ownership_pending_request: { en: "Change proposed by {name}", fr: "Modification proposée par {name}" },
+  ownership_auto_apply: { en: "Applied automatically if nobody answers before the deadline.", fr: "Appliquée automatiquement si personne ne répond avant l'échéance." },
+  ownership_time_days: { en: "{n} days left", fr: "{n} jours restants" },
+  ownership_time_day: { en: "{n} day left", fr: "{n} jour restant" },
+  ownership_time_hours: { en: "{n} hours left", fr: "{n} heures restantes" },
+  ownership_time_hour: { en: "{n} hour left", fr: "{n} heure restante" },
+  ownership_time_expired: { en: "Deadline reached, applying shortly", fr: "Échéance atteinte, application imminente" },
+  ownership_email_sent: { en: "Email sent {date}", fr: "Email envoyé le {date}" },
+  ownership_email_failed: { en: "Email failed: {reason}", fr: "Échec de l'email : {reason}" },
+  ownership_email_not_sent: { en: "Not emailed", fr: "Aucun email envoyé" },
+  ownership_approval_waiting: { en: "Waiting for approval", fr: "En attente d'approbation" },
+  ownership_approval_approved: { en: "Approved", fr: "Approuvé" },
+  ownership_approval_rejected: { en: "Rejected", fr: "Refusé" },
+  ownership_joined: { en: "Has an account", fr: "A un compte" },
+  ownership_invite_pending: { en: "Hasn't joined yet", fr: "N'a pas encore rejoint" },
+  ownership_resend: { en: "Resend email", fr: "Renvoyer l'email" },
+  ownership_resend_invite: { en: "Resend invitation", fr: "Renvoyer l'invitation" },
+  ownership_resend_done: { en: "Email sent.", fr: "Email envoyé." },
+
+  // Co-owner notification status
+  ownership_revoke: { en: "Revoke sharing", fr: "Retirer le partage" },
+  ownership_revoke_confirm: { en: "Stop sharing this asset with {name}? Their invitation will stop working and their share returns to you. No one else needs to approve this.", fr: "Arrêter de partager cet actif avec {name} ? Son invitation ne fonctionnera plus et sa part vous revient. Aucune autre approbation n'est nécessaire." },
+  ownership_revoke_joined: { en: "This person has already joined, so changes need their approval.", fr: "Cette personne a déjà rejoint : les modifications nécessitent son approbation." },
+
+  // Co-owner notification status
+  ownership_revoked: { en: "Sharing revoked.", fr: "Partage retiré." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

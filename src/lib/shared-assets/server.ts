@@ -21,10 +21,13 @@ import { syncAssetHistory } from "@/lib/asset-history-sync";
 import {
   normalizeEmail,
   otherRegisteredOwners,
+  timeLeft,
   validateOwners,
   type OwnerInput,
   type OwnerRow,
+  type TimeLeft,
 } from "@/lib/ownership";
+import { sendApprovalEmail } from "@/lib/shared-assets/notify";
 import type { Json } from "@/types/supabase";
 
 type Service = ReturnType<typeof createServiceClient>;
@@ -41,7 +44,8 @@ export type AssetFields = {
   purchase_date: string;
 };
 
-export type ChangePayload = { fields: AssetFields; owners?: OwnerInput[] | null };
+/** `notify: false` = the requester chose not to email the co-owners (default: notify). */
+export type ChangePayload = { fields: AssetFields; owners?: OwnerInput[] | null; notify?: boolean };
 
 const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.opeswealth.app";
 
@@ -70,6 +74,16 @@ export async function listOwnerRows(service: Service, assetId: string): Promise<
     .select("profile_id, name, email, ownership_percentage, is_creator")
     .eq("asset_id", assetId);
   return (data ?? []).map((r) => ({ ...r, ownership_percentage: Number(r.ownership_percentage) }));
+}
+
+/**
+ * Has this account finished sign-up? An invited user exists in Auth (and has a
+ * profile) from the moment of the invitation but cannot sign in or answer an
+ * approval until they accept it, so they must not block edits.
+ */
+async function hasJoined(service: Service, profileId: string): Promise<boolean> {
+  const { data } = await service.auth.admin.getUserById(profileId);
+  return !!data.user?.email_confirmed_at || !!data.user?.last_sign_in_at;
 }
 
 async function displayName(service: Service, profileId: string): Promise<string> {
@@ -123,13 +137,21 @@ export async function replaceOwners(opts: {
   assetName: string;
   creatorProfileId: string;
   owners: OwnerInput[];
+  /** Email the invitation to new co-owners without an account (default true). */
+  notify?: boolean;
 }): Promise<{ ok: true; invited: string[] } | { ok: false; error: string }> {
   const errors = validateOwners(opts.owners);
   if (errors.length > 0) return { ok: false, error: errors[0] };
 
+  const notify = opts.notify !== false;
   const service = opts.service ?? createServiceClient();
   const previous = await listOwnerRows(service, opts.assetId);
   const previousEmails = new Set(previous.map((r) => (r.email ? normalizeEmail(r.email) : "")));
+  // Rows are rewritten wholesale, so carry over what was already known about each invitation.
+  const { data: priorInvites } = await service
+    .from("asset_owners")
+    .select("email, invited_at, invite_status, invite_error")
+    .eq("asset_id", opts.assetId);
   const inviterName = await displayName(service, opts.creatorProfileId);
 
   const rows: {
@@ -140,6 +162,8 @@ export async function replaceOwners(opts: {
     ownership_percentage: number;
     is_creator: boolean;
     invited_at: string | null;
+    invite_status: string;
+    invite_error: string | null;
   }[] = [];
   const toInvite: OwnerInput[] = [];
 
@@ -153,14 +177,16 @@ export async function replaceOwners(opts: {
         ownership_percentage: o.percentage,
         is_creator: true,
         invited_at: null,
+        invite_status: "not_sent",
+        invite_error: null,
       });
       continue;
     }
     const email = normalizeEmail(o.email);
     const { data: existingId } = await service.rpc("profile_id_for_email", { p_email: email });
-    const prior = previous.find((r) => r.email && normalizeEmail(r.email) === email);
+    const prior = (priorInvites ?? []).find((r) => r.email && normalizeEmail(r.email) === email);
     const isNew = !previousEmails.has(email);
-    if (isNew && !existingId) toInvite.push(o);
+    if (isNew && !existingId && notify) toInvite.push(o);
     rows.push({
       asset_id: opts.assetId,
       profile_id: (existingId as string | null) ?? null,
@@ -168,7 +194,9 @@ export async function replaceOwners(opts: {
       email,
       ownership_percentage: o.percentage,
       is_creator: false,
-      invited_at: isNew && !existingId ? new Date().toISOString() : prior ? null : null,
+      invited_at: prior?.invited_at ?? null,
+      invite_status: prior?.invite_status ?? "not_sent",
+      invite_error: prior?.invite_error ?? null,
     });
   }
 
@@ -186,8 +214,157 @@ export async function replaceOwners(opts: {
       assetName: opts.assetName,
     });
     if (res.sent) invited.push(normalizeEmail(o.email));
+    await recordInvite(service, opts.assetId, normalizeEmail(o.email), res);
   }
   return { ok: true, invited };
+}
+
+/** Stores the outcome of an invitation email on the owner's row. */
+async function recordInvite(service: Service, assetId: string, email: string, res: { sent: boolean; reason?: string }) {
+  await service
+    .from("asset_owners")
+    .update({
+      invite_status: res.sent ? "sent" : "failed",
+      invite_error: res.sent ? null : (res.reason ?? "Unknown error"),
+      ...(res.sent ? { invited_at: new Date().toISOString() } : {}),
+    })
+    .eq("asset_id", assetId)
+    .eq("email", email);
+}
+
+/** Re-sends the join invitation to a co-owner (creator only; checked by the caller). */
+export async function resendInvite(assetId: string, email: string): Promise<{ sent: boolean; reason?: string }> {
+  const service = createServiceClient();
+  const { data: asset } = await service.from("assets").select("name, profile_id").eq("id", assetId).single();
+  if (!asset) return { sent: false, reason: "Asset not found." };
+  const { data: owner } = await service
+    .from("asset_owners")
+    .select("name")
+    .eq("asset_id", assetId)
+    .eq("email", normalizeEmail(email))
+    .single();
+  if (!owner) return { sent: false, reason: "Co-owner not found." };
+  const res = await inviteCoOwner(service, {
+    email: normalizeEmail(email),
+    name: owner.name,
+    inviterName: await displayName(service, asset.profile_id),
+    assetName: asset.name,
+  });
+  await recordInvite(service, assetId, normalizeEmail(email), res);
+  return res;
+}
+
+/**
+ * Stops sharing the asset with a co-owner who has NOT accepted their invitation yet,
+ * without anyone else's approval (creator only; the caller checks that). Their share
+ * returns to the creator, any change waiting on them is cancelled, and a never-used
+ * invited account with no other shares is deleted so the invitation link stops working.
+ */
+export async function revokeCoOwner(
+  assetId: string,
+  creatorId: string,
+  email: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const service = createServiceClient();
+  const { data: asset } = await service.from("assets").select("profile_id").eq("id", assetId).single();
+  if (!asset || asset.profile_id !== creatorId) return { ok: false, error: "Only the asset's creator can do this." };
+
+  const { data: rows } = await service
+    .from("asset_owners")
+    .select("id, profile_id, email, ownership_percentage, is_creator")
+    .eq("asset_id", assetId);
+  const target = (rows ?? []).find((r) => !r.is_creator && r.email && normalizeEmail(r.email) === normalizeEmail(email));
+  if (!target) return { ok: false, error: "Co-owner not found." };
+  if (target.profile_id && (await hasJoined(service, target.profile_id))) {
+    return { ok: false, error: "ownership_revoke_joined" };
+  }
+
+  // Cancel any change request that was waiting for this person.
+  if (target.profile_id) {
+    const { data: theirs } = await service
+      .from("change_approvals")
+      .select("change_request_id, asset_change_requests!inner(asset_id, status)")
+      .eq("profile_id", target.profile_id)
+      .eq("asset_change_requests.asset_id", assetId)
+      .eq("asset_change_requests.status", "pending");
+    for (const a of theirs ?? []) await service.from("asset_change_requests").delete().eq("id", a.change_request_id);
+  }
+
+  const remaining = (rows ?? []).filter((r) => r.id !== target.id);
+  if (remaining.length <= 1) {
+    // Only the creator is left: the asset is solely theirs again.
+    await service.from("asset_owners").delete().eq("asset_id", assetId);
+  } else {
+    await service.from("asset_owners").delete().eq("id", target.id);
+    const creatorRow = remaining.find((r) => r.is_creator);
+    if (creatorRow) {
+      await service
+        .from("asset_owners")
+        .update({ ownership_percentage: Number(creatorRow.ownership_percentage) + Number(target.ownership_percentage) })
+        .eq("id", creatorRow.id);
+    }
+  }
+
+  // Remove an invited account that never signed in and has no other shares or assets.
+  if (target.profile_id) {
+    const [{ count: shares }, { count: assets }] = await Promise.all([
+      service.from("asset_owners").select("id", { count: "exact", head: true }).eq("profile_id", target.profile_id),
+      service.from("assets").select("id", { count: "exact", head: true }).eq("profile_id", target.profile_id),
+    ]);
+    if (!shares && !assets) await service.auth.admin.deleteUser(target.profile_id);
+  }
+  return { ok: true };
+}
+
+/**
+ * Emails the "please review this change" message to the pending approvers of a
+ * request (or just `onlyProfileId`) and records, per approver, whether it was sent.
+ */
+export async function notifyApprovers(
+  service: Service,
+  requestId: string,
+  onlyProfileId?: string,
+): Promise<{ sent: number; failed: number }> {
+  const { data: request } = await service
+    .from("asset_change_requests")
+    .select("asset_id, requested_by, expires_at, status")
+    .eq("id", requestId)
+    .single();
+  if (!request || request.status !== "pending") return { sent: 0, failed: 0 };
+  const { data: asset } = await service.from("assets").select("name").eq("id", request.asset_id).single();
+  const owners = await listOwnerRows(service, request.asset_id);
+  const requesterName = await displayName(service, request.requested_by);
+
+  let approvals = (
+    await service.from("change_approvals").select("id, profile_id").eq("change_request_id", requestId).eq("status", "pending")
+  ).data ?? [];
+  if (onlyProfileId) approvals = approvals.filter((a) => a.profile_id === onlyProfileId);
+
+  let sent = 0;
+  let failed = 0;
+  for (const a of approvals) {
+    const owner = owners.find((o) => o.profile_id === a.profile_id);
+    const res = owner?.email
+      ? await sendApprovalEmail(owner.email, {
+          recipientName: owner.name,
+          requesterName,
+          assetName: asset?.name ?? "a shared asset",
+          expiresAt: request.expires_at,
+          reviewUrl: `${siteUrl()}/dashboard/assets/${request.asset_id}`,
+        })
+      : { sent: false as const, reason: "No email address on file." };
+    await service
+      .from("change_approvals")
+      .update(
+        res.sent
+          ? { notify_status: "sent", notified_at: new Date().toISOString(), notify_error: null }
+          : { notify_status: "failed", notify_error: res.reason },
+      )
+      .eq("id", a.id);
+    if (res.sent) sent += 1;
+    else failed += 1;
+  }
+  return { sent, failed };
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +388,8 @@ export async function routeAssetEdit(opts: {
   assetId: string;
   fields: AssetFields;
   owners: OwnerInput[] | null;
+  /** Email the approvers (default true). */
+  notify?: boolean;
 }): Promise<RouteResult> {
   const service = createServiceClient();
   const { data: asset } = await service.from("assets").select("id, profile_id, name").eq("id", opts.assetId).single();
@@ -227,8 +406,13 @@ export async function routeAssetEdit(opts: {
     if (errors.length > 0) return { mode: "error", error: errors[0] };
   }
 
-  const approvers = otherRegisteredOwners(rows, opts.userId);
-  // The creator edits freely when nobody else is registered; a co-owner always needs the creator.
+  // Approvers = the other owners who have actually joined; people who were invited but have not
+  // accepted yet cannot answer, so they never block an edit.
+  const approvers: (OwnerRow & { profile_id: string })[] = [];
+  for (const o of otherRegisteredOwners(rows, opts.userId)) {
+    if (await hasJoined(service, o.profile_id)) approvers.push(o);
+  }
+  // The creator edits freely when nobody else has joined; a co-owner always needs the creator.
   if (isCreator && approvers.length === 0) return { mode: "direct" };
 
   const { data: pending } = await service
@@ -239,7 +423,8 @@ export async function routeAssetEdit(opts: {
     .limit(1);
   if (pending && pending.length > 0) return { mode: "error", error: "change_pending_exists" };
 
-  const payload: ChangePayload = { fields: opts.fields, owners: opts.owners };
+  const notify = opts.notify !== false;
+  const payload: ChangePayload = { fields: opts.fields, owners: opts.owners, notify };
   const { data: request, error } = await service
     .from("asset_change_requests")
     .insert({ asset_id: opts.assetId, requested_by: opts.userId, proposed_payload: payload as unknown as Json })
@@ -254,6 +439,7 @@ export async function routeAssetEdit(opts: {
     await service.from("asset_change_requests").delete().eq("id", request.id);
     return { mode: "error", error: approvalError.message };
   }
+  if (notify) await notifyApprovers(service, request.id);
   return { mode: "pending", requestId: request.id };
 }
 
@@ -302,6 +488,7 @@ export async function applyChangeRequest(
       assetName: f.name,
       creatorProfileId: asset.profile_id,
       owners: payload.owners,
+      notify: payload.notify,
     });
     if (!res.ok) return { ok: false, error: res.error };
   }
@@ -376,6 +563,123 @@ export async function expirePendingRequests(): Promise<{ applied: number; failed
     else failed.push({ id: r.id, error: res.error });
   }
   return { applied, failed };
+}
+
+// ---------------------------------------------------------------------------
+// Sharing & approval status (asset page)
+// ---------------------------------------------------------------------------
+
+export type OwnerStatus = {
+  key: string;
+  name: string;
+  email: string;
+  percentage: number;
+  isCreator: boolean;
+  isYou: boolean;
+  /** Has an account that finished sign-up. */
+  joined: boolean;
+  inviteStatus: "not_sent" | "sent" | "failed";
+  invitedAt: string | null;
+  inviteError: string | null;
+};
+
+export type ApprovalStatus = {
+  profileId: string;
+  name: string;
+  email: string;
+  status: "pending" | "approved" | "rejected";
+  decidedAt: string | null;
+  notifyStatus: "not_sent" | "sent" | "failed";
+  notifiedAt: string | null;
+  notifyError: string | null;
+};
+
+export type OwnershipStatus = {
+  /** The signed-in user created the asset (may resend invitations). */
+  isCreator: boolean;
+  owners: OwnerStatus[];
+  request: null | {
+    id: string;
+    requesterName: string;
+    /** The signed-in user proposed it (may resend the review emails). */
+    isMine: boolean;
+    createdAt: string;
+    expiresAt: string;
+    timeLeft: TimeLeft;
+    approvals: ApprovalStatus[];
+  };
+};
+
+/** Who was emailed and what is awaiting approval for a shared asset. Caller must have checked membership. */
+export async function loadOwnershipStatus(assetId: string, userId: string): Promise<OwnershipStatus | null> {
+  const service = createServiceClient();
+  const { data: asset } = await service.from("assets").select("profile_id").eq("id", assetId).single();
+  if (!asset) return null;
+  const { data: rows } = await service
+    .from("asset_owners")
+    .select("profile_id, name, email, ownership_percentage, is_creator, invited_at, invite_status, invite_error")
+    .eq("asset_id", assetId)
+    .order("is_creator", { ascending: false });
+  if (!rows || rows.length < 2) return null;
+
+  // Which registered co-owners have finished sign-up (an invited user has not confirmed yet).
+  const joined = new Map<string, boolean>();
+  for (const r of rows) {
+    if (!r.profile_id || joined.has(r.profile_id)) continue;
+    joined.set(r.profile_id, await hasJoined(service, r.profile_id));
+  }
+
+  const owners: OwnerStatus[] = rows.map((r, i) => ({
+    key: `owner-${i}`,
+    name: r.name,
+    email: r.email ?? "",
+    percentage: Number(r.ownership_percentage),
+    isCreator: r.is_creator,
+    isYou: r.profile_id === userId,
+    joined: r.profile_id ? (joined.get(r.profile_id) ?? false) : false,
+    inviteStatus: r.invite_status as OwnerStatus["inviteStatus"],
+    invitedAt: r.invited_at,
+    inviteError: r.invite_error,
+  }));
+
+  const { data: req } = await service
+    .from("asset_change_requests")
+    .select("id, requested_by, created_at, expires_at")
+    .eq("asset_id", assetId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let request: OwnershipStatus["request"] = null;
+  if (req) {
+    const { data: approvals } = await service
+      .from("change_approvals")
+      .select("profile_id, status, decided_at, notify_status, notified_at, notify_error")
+      .eq("change_request_id", req.id);
+    request = {
+      id: req.id,
+      requesterName: await displayName(service, req.requested_by),
+      isMine: req.requested_by === userId,
+      createdAt: req.created_at,
+      expiresAt: req.expires_at,
+      timeLeft: timeLeft(req.expires_at),
+      approvals: (approvals ?? []).map((a) => {
+        const owner = rows.find((r) => r.profile_id === a.profile_id);
+        return {
+          profileId: a.profile_id,
+          name: owner?.name ?? "",
+          email: owner?.email ?? "",
+          status: a.status as ApprovalStatus["status"],
+          decidedAt: a.decided_at,
+          notifyStatus: a.notify_status as ApprovalStatus["notifyStatus"],
+          notifiedAt: a.notified_at,
+          notifyError: a.notify_error,
+        };
+      }),
+    };
+  }
+  return { isCreator: asset.profile_id === userId, owners, request };
 }
 
 // ---------------------------------------------------------------------------

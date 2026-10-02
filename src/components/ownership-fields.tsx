@@ -82,9 +82,14 @@ export function OwnershipSummary({ rows }: { rows: OwnerFormRow[] }) {
 export function OwnershipFields({
   value,
   onChange,
+  notify,
+  onNotifyChange,
 }: {
   value: OwnerFormRow[];
   onChange: (next: OwnerFormRow[]) => void;
+  /** Email the co-owners (invitation / approval request) when saving. */
+  notify: boolean;
+  onNotifyChange: (next: boolean) => void;
 }) {
   const { t } = useLanguage();
   const total = ownersTotal(value);
@@ -182,6 +187,21 @@ export function OwnershipFields({
           {t("owners_total", { total: Math.round(total * 100) / 100 })}
         </p>
       </div>
+
+      {value.length > 1 && (
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 border border-border bg-muted/30 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0 accent-primary"
+            checked={notify}
+            onChange={(e) => onNotifyChange(e.target.checked)}
+          />
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium text-foreground">{t("owners_notify_label")}</span>
+            <span className="block text-xs text-muted-foreground">{t("owners_notify_hint")}</span>
+          </span>
+        </label>
+      )}
     </div>
   );
 }

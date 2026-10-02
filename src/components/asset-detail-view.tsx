@@ -173,6 +173,8 @@ import { ExoticAssetCard } from "@/components/exotic-asset-card";
 import { StartupCard } from "@/components/startup-card";
 import { photoThumbUrl } from "@/lib/asset-photos";
 import { OwnershipSummary, type OwnerFormRow } from "@/components/ownership-fields";
+import { OwnershipStatusPanel } from "@/components/ownership-status";
+import type { OwnershipStatus } from "@/lib/shared-assets/server";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 import { fetchMarketPrice } from "@/lib/market-data/market-price";
@@ -302,6 +304,7 @@ export function AssetDetailView({
   categories,
   ratesFromUsd,
   owners = [],
+  ownershipStatus = null,
 }: {
   asset: AssetDetail;
   history: AssetHistoryPoint[];
@@ -309,6 +312,8 @@ export function AssetDetailView({
   ratesFromUsd: Record<string, number>;
   /** Owner rows when the asset is shared (empty = a single owner). */
   owners?: OwnerFormRow[];
+  /** Who was emailed and what awaits approval (shared assets only). */
+  ownershipStatus?: OwnershipStatus | null;
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
@@ -3893,6 +3898,7 @@ export function AssetDetailView({
             )}
 
             {owners.length > 1 && <OwnershipSummary rows={owners} />}
+            {ownershipStatus && <OwnershipStatusPanel assetId={asset.id} status={ownershipStatus} />}
 
             {isStartup && (
               <StartupCard
