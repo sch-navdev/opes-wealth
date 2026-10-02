@@ -33,14 +33,17 @@ create index if not exists transactions_asset_date_idx
 
 alter table public.transactions enable row level security;
 
+drop policy if exists "transactions_select_own" on public.transactions;
 create policy "transactions_select_own"
   on public.transactions for select to authenticated
   using (auth.uid() = profile_id);
 
+drop policy if exists "transactions_insert_own" on public.transactions;
 create policy "transactions_insert_own"
   on public.transactions for insert to authenticated
   with check (auth.uid() = profile_id);
 
+drop policy if exists "transactions_delete_own" on public.transactions;
 create policy "transactions_delete_own"
   on public.transactions for delete to authenticated
   using (auth.uid() = profile_id);
