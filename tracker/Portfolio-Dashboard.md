@@ -334,6 +334,11 @@ Verified visually in the browser (via a disposable local-only preview route, rem
 - **Fixes after a real Argus certificate (2026-10-02):** the parser reads the supplied French Argus attestation correctly (81 240 EUR, 29/09/2026, source Argus), so the failure the user saw was elsewhere; the read action now logs and shows the underlying server error. The guide value now has its **own currency** (any of the app's currencies; the PDF's currency is detected) and is a **dated log** (`metadata.blue_book_log`, each entry removable; the earlier single value migrates into it on read). The vehicle chart shows **three curves**: market value (recorded valuations only), purchase price (flat from the purchase date) and Blue Book (converted to the asset currency at today's rates). The old chart overwrote a market value dated on the purchase date with the purchase price; that no longer happens.
 - 43 new i18n keys in 9 languages.
 
+## Vehicle form: one cost figure, value by button only (2026-10-02)
+
+- The add/edit form no longer has a **Value** field for vehicles. The purchase price is the only cost figure; the value changes only through Refresh Valuation (market value) or the Blue Book dialog, so a form edit cannot overwrite a market value. A new vehicle starts at its purchase price (hidden `current_value`); an edit keeps the current value.
+- **PDF import bug fixed for every PDF.** Inside Next's server runtime the old pdf.js behind `pdf-parse` fails with "bad XRef entry" on a Node `Buffer` (valid PDFs, including the Argus certificate), though plain Node reads them. Reproduced with a production build and fixed by passing a `Uint8Array`: all PDF reads go through `lib/pdf-text.ts` (Blue Book, tenancy contracts, property documents), and `pdf-parse` is listed in `serverExternalPackages`. Verified on the real certificate in a production build (81,240 EUR, 29/09/2026, Argus); not yet in production.
+
 ## Related
 - [[Database-Schema|Database Schema]] — `assets` table, `profiles` trigger, migration `0012`'s `purchase_date` column, `asset_history`'s cascade delete, migration `0013`'s new `vehicle_valuation` source
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — Real Estate sub-form rendered inside the Add/Edit dialog, FX conversion of the Value column, the cost-basis/Equity/amortization helpers `lib/liabilities.ts` reuses

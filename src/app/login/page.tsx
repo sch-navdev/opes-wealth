@@ -9,6 +9,7 @@ import {
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
+import { T } from "@/components/translated-text";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
@@ -29,18 +30,17 @@ export default function LoginPage() {
         />
         <div className="relative max-w-md">
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
-            Private Wealth, Clearly Seen
+            <T k="landing_tagline" />
           </p>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
-            One view of everything you own.
+            <T k="landing_headline" />
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Real estate, holdings, and cash together in a single, private
-            dashboard — built for individuals who expect precision.
+            <T k="login_lead" />
           </p>
           <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
             <ShieldCheck className="size-4 text-primary" />
-            Secured with passkeys and two-factor authentication
+            <T k="login_secured" />
           </div>
         </div>
         <p className="relative text-xs text-muted-foreground">
@@ -53,7 +53,7 @@ export default function LoginPage() {
           <CardHeader>
             <Image src="/logo.png" alt="Opes Wealth" width={80} height={80} priority />
             <CardDescription className="text-muted-foreground">
-              Sign in to access your wealth dashboard.
+              <T k="login_card_desc" />
             </CardDescription>
           </CardHeader>
           <CardContent>

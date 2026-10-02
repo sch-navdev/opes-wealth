@@ -2224,6 +2224,52 @@ const dictionary = {
 
   // Demo mode
   demo_saved: { en: "Saved (Demo Mode)", fr: "Enregistré (mode démo)" },
+
+  // Shared asset edit link
+  edit_on_asset_page: { en: "Shared asset: edit it on its page", fr: "Actif partagé : à modifier sur sa page" },
+
+  // Landing and sign-in pages
+  landing_sign_in: { en: "Sign In", fr: "Se connecter" },
+  landing_tagline: { en: "Private Wealth, Clearly Seen", fr: "Un patrimoine privé, en toute clarté" },
+  landing_headline: { en: "One view of everything you own.", fr: "Une seule vue de tout ce que vous possédez." },
+  landing_body: { en: "Opes Wealth brings your real estate, holdings, and cash together in a single, private dashboard — built for individuals who expect precision.", fr: "Opes Wealth réunit votre immobilier, vos placements et votre trésorerie dans un tableau de bord unique et privé, conçu pour ceux qui exigent de la précision." },
+  landing_cta: { en: "Sign In to Your Dashboard", fr: "Accéder à votre tableau de bord" },
+  login_lead: { en: "Real estate, holdings, and cash together in a single, private dashboard — built for individuals who expect precision.", fr: "Immobilier, placements et trésorerie réunis dans un tableau de bord unique et privé, conçu pour ceux qui exigent de la précision." },
+  login_secured: { en: "Secured with passkeys and two-factor authentication", fr: "Protégé par des clés d'accès et l'authentification à deux facteurs" },
+  login_card_desc: { en: "Sign in to access your wealth dashboard.", fr: "Connectez-vous pour accéder à votre tableau de bord patrimonial." },
+  auth_email: { en: "Email", fr: "E-mail" },
+  auth_password: { en: "Password", fr: "Mot de passe" },
+  auth_confirm_password: { en: "Confirm Password", fr: "Confirmer le mot de passe" },
+  auth_first_name: { en: "First Name", fr: "Prénom" },
+  auth_last_name: { en: "Last Name", fr: "Nom" },
+  auth_forgot_password: { en: "Forgot password?", fr: "Mot de passe oublié ?" },
+  auth_remember_me: { en: "Remember me", fr: "Se souvenir de moi" },
+  auth_login: { en: "Login", fr: "Connexion" },
+  auth_create_account: { en: "Create Account", fr: "Créer un compte" },
+  auth_sign_up: { en: "Sign Up", fr: "S'inscrire" },
+  auth_no_account: { en: "Don't have an account?", fr: "Pas encore de compte ?" },
+  auth_have_account: { en: "Already have an account?", fr: "Vous avez déjà un compte ?" },
+  auth_please_wait: { en: "Please wait…", fr: "Veuillez patienter…" },
+  auth_or_email: { en: "or continue with email", fr: "ou continuer avec l'e-mail" },
+  auth_signin_passkey: { en: "Sign in with Passkey", fr: "Se connecter avec une clé d'accès" },
+  auth_waiting_passkey: { en: "Waiting for passkey…", fr: "En attente de la clé d'accès…" },
+  auth_no_passkey: { en: "No passkey found. Please log in with your email and password, then register a passkey in your dashboard.", fr: "Aucune clé d'accès trouvée. Connectez-vous avec votre e-mail et votre mot de passe, puis enregistrez une clé d'accès dans votre tableau de bord." },
+  auth_meet_requirements: { en: "Please meet all password requirements above.", fr: "Veuillez respecter toutes les exigences de mot de passe ci-dessus." },
+  auth_passwords_mismatch: { en: "Passwords do not match.", fr: "Les mots de passe ne correspondent pas." },
+  auth_something_wrong: { en: "Something went wrong. Please try again.", fr: "Une erreur est survenue. Veuillez réessayer." },
+  auth_account_created: { en: "Account created successfully.", fr: "Compte créé avec succès." },
+  auth_verify_email: { en: "Please check your email to verify your account before logging in.", fr: "Consultez votre e-mail pour vérifier votre compte avant de vous connecter." },
+  auth_back_to_login: { en: "Back to Login", fr: "Retour à la connexion" },
+  auth_check_your_email: { en: "Check your email.", fr: "Consultez votre e-mail." },
+  auth_reset_sent: { en: "If an account exists for that address, we've sent a link to reset your password.", fr: "Si un compte existe pour cette adresse, nous avons envoyé un lien pour réinitialiser votre mot de passe." },
+  auth_forgot_intro: { en: "Enter the email on your account and we'll send you a link to reset your password.", fr: "Saisissez l'e-mail de votre compte et nous vous enverrons un lien pour réinitialiser votre mot de passe." },
+  auth_sending: { en: "Sending…", fr: "Envoi…" },
+  auth_send_reset: { en: "Send Reset Link", fr: "Envoyer le lien" },
+  pw_rule_length: { en: "At least 8 characters", fr: "Au moins 8 caractères" },
+  pw_rule_lower: { en: "At least one lowercase letter", fr: "Au moins une minuscule" },
+  pw_rule_upper: { en: "At least one uppercase letter", fr: "Au moins une majuscule" },
+  pw_rule_number: { en: "At least one number", fr: "Au moins un chiffre" },
+  pw_rule_special: { en: "At least one special character", fr: "Au moins un caractère spécial" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

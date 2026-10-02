@@ -10,6 +10,17 @@ import { PasswordVisibilityToggle } from "@/components/password-visibility-toggl
 import { login, signup, requestPasswordReset } from "@/app/auth/actions";
 import { createClient } from "@/utils/supabase/client";
 import { getPasswordRequirementErrors } from "@/lib/auth-validation";
+import { useLanguage } from "@/context/language-context";
+import type { TranslationKey } from "@/lib/i18n";
+
+/** Maps the English rule messages of `passwordSchema` to translation keys. */
+const PASSWORD_RULE_KEYS: Record<string, TranslationKey> = {
+  "At least 8 characters": "pw_rule_length",
+  "At least one lowercase letter": "pw_rule_lower",
+  "At least one uppercase letter": "pw_rule_upper",
+  "At least one number": "pw_rule_number",
+  "At least one special character": "pw_rule_special",
+};
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -30,6 +41,7 @@ function isNextRedirectError(err: unknown): boolean {
 }
 
 export function LoginForm() {
+  const { t } = useLanguage();
   const formRef = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState<string | null>(null);
@@ -65,13 +77,13 @@ export function LoginForm() {
     if (mode === "signup") {
       if (passwordErrors.length > 0) {
         setPasswordTouched(true);
-        setError("Please meet all password requirements above.");
+        setError(t("auth_meet_requirements"));
         return;
       }
 
       const confirmPassword = formData.get("confirmPassword");
       if (password !== confirmPassword) {
-        setError("Passwords do not match.");
+        setError(t("auth_passwords_mismatch"));
         return;
       }
     }
@@ -102,7 +114,7 @@ export function LoginForm() {
           throw err;
         }
         console.error("Sign-in/up submit failed", err);
-        setError("Something went wrong. Please try again.");
+        setError(t("auth_something_wrong"));
       }
     });
   }
@@ -111,8 +123,7 @@ export function LoginForm() {
     setError(null);
     setIsPasskeyPending(true);
 
-    const noPasskeyMessage =
-      "No passkey found. Please log in with your email and password, then register a passkey in your dashboard.";
+    const noPasskeyMessage = t("auth_no_passkey");
 
     try {
       const supabase = createClient();
@@ -145,14 +156,14 @@ export function LoginForm() {
         <CheckCircle2 className="size-10 text-success" />
         <div className="space-y-1.5">
           <p className="font-medium text-foreground">
-            Account created successfully.
+            {t("auth_account_created")}
           </p>
           <p className="text-sm text-muted-foreground">
-            Please check your email to verify your account before logging in.
+            {t("auth_verify_email")}
           </p>
         </div>
         <Button type="button" variant="outline" onClick={() => resetFormState("login")}>
-          Back to Login
+          {t("auth_back_to_login")}
         </Button>
       </div>
     );
@@ -163,10 +174,9 @@ export function LoginForm() {
       <div className="flex flex-col items-center gap-4 py-4 text-center">
         <CheckCircle2 className="size-10 text-success" />
         <div className="space-y-1.5">
-          <p className="font-medium text-foreground">Check your email.</p>
+          <p className="font-medium text-foreground">{t("auth_check_your_email")}</p>
           <p className="text-sm text-muted-foreground">
-            If an account exists for that address, we&apos;ve sent a link to
-            reset your password.
+            {t("auth_reset_sent")}
           </p>
         </div>
         <Button
@@ -177,7 +187,7 @@ export function LoginForm() {
             resetFormState("login");
           }}
         >
-          Back to Login
+          {t("auth_back_to_login")}
         </Button>
       </div>
     );
@@ -187,12 +197,11 @@ export function LoginForm() {
     return (
       <div className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          Enter the email on your account and we&apos;ll send you a link to
-          reset your password.
+          {t("auth_forgot_intro")}
         </p>
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("auth_email")}</Label>
             <div className="relative">
               <Mail className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -214,7 +223,7 @@ export function LoginForm() {
           )}
 
           <Button type="submit" className="w-full" size="lg" disabled={isPending}>
-            {isPending ? "Sending…" : "Send Reset Link"}
+            {isPending ? t("auth_sending") : t("auth_send_reset")}
           </Button>
         </form>
 
@@ -224,7 +233,7 @@ export function LoginForm() {
             onClick={() => resetFormState("login")}
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
-            Back to Login
+            {t("auth_back_to_login")}
           </button>
         </p>
       </div>
@@ -242,12 +251,12 @@ export function LoginForm() {
         size="lg"
       >
         <Fingerprint className="size-5" />
-        {isPasskeyPending ? "Waiting for passkey…" : "Sign in with Passkey"}
+        {isPasskeyPending ? t("auth_waiting_passkey") : t("auth_signin_passkey")}
       </Button>
 
       <div className="relative text-center text-xs text-muted-foreground">
         <span className="relative bg-card px-2">
-          or continue with email
+          {t("auth_or_email")}
         </span>
         <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-border" />
       </div>
@@ -256,7 +265,7 @@ export function LoginForm() {
         {mode === "signup" && (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
+              <Label htmlFor="firstName">{t("auth_first_name")}</Label>
               <div className="relative">
                 <User className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -271,7 +280,7 @@ export function LoginForm() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
+              <Label htmlFor="lastName">{t("auth_last_name")}</Label>
               <Input
                 id="lastName"
                 name="lastName"
@@ -285,7 +294,7 @@ export function LoginForm() {
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("auth_email")}</Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -302,14 +311,14 @@ export function LoginForm() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth_password")}</Label>
             {mode === "login" && (
               <button
                 type="button"
                 onClick={() => resetFormState("forgot")}
                 className="text-xs font-medium text-primary underline-offset-4 hover:underline"
               >
-                Forgot password?
+                {t("auth_forgot_password")}
               </button>
             )}
           </div>
@@ -338,7 +347,7 @@ export function LoginForm() {
           {mode === "signup" && passwordTouched && passwordErrors.length > 0 && (
             <ul className="space-y-0.5 text-xs text-destructive" role="alert">
               {passwordErrors.map((message) => (
-                <li key={message}>{message}</li>
+                <li key={message}>{PASSWORD_RULE_KEYS[message] ? t(PASSWORD_RULE_KEYS[message]) : message}</li>
               ))}
             </ul>
           )}
@@ -346,7 +355,7 @@ export function LoginForm() {
 
         {mode === "signup" && (
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">{t("auth_confirm_password")}</Label>
             <div className="relative">
               <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -373,7 +382,7 @@ export function LoginForm() {
               htmlFor="rememberMe"
               className="cursor-pointer font-normal text-muted-foreground"
             >
-              Remember me
+              {t("auth_remember_me")}
             </Label>
           </div>
         )}
@@ -386,21 +395,21 @@ export function LoginForm() {
 
         <Button type="submit" className="w-full" size="lg" disabled={isPending || isPasskeyPending}>
           {isPending
-            ? "Please wait…"
+            ? t("auth_please_wait")
             : mode === "login"
-              ? "Login"
-              : "Create Account"}
+              ? t("auth_login")
+              : t("auth_create_account")}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground">
-        {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+        {mode === "login" ? t("auth_no_account") : t("auth_have_account")}{" "}
         <button
           type="button"
           onClick={() => resetFormState(mode === "login" ? "signup" : "login")}
           className="font-medium text-primary underline-offset-4 hover:underline"
         >
-          {mode === "login" ? "Sign Up" : "Login"}
+          {mode === "login" ? t("auth_sign_up") : t("auth_login")}
         </button>
       </p>
     </div>

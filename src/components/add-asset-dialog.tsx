@@ -607,6 +607,16 @@ export function AddAssetDialog({
                 onChange={(e) => setQuantityInput(Number(e.target.value))}
               />
             </div>
+            {isVehicle ? (
+              // A vehicle's value is changed only by its market-value / Blue Book buttons,
+              // never typed here: the purchase price below is the one cost figure.
+              <input
+                type="hidden"
+                name="current_value"
+                value={asset ? asset.current_value : (vehicleMetadata.purchase_price ?? 0)}
+                readOnly
+              />
+            ) : (
             <div className="min-w-0 space-y-2">
               <Label htmlFor="current_value">
                 {isRealEstate
@@ -653,6 +663,7 @@ export function AddAssetDialog({
                 </p>
               )}
             </div>
+            )}
             <div className="min-w-0 space-y-2">
               <Label htmlFor="currency">Currency</Label>
               <Select name="currency" value={currency} onValueChange={setCurrency}>

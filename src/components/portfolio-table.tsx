@@ -4,7 +4,9 @@ import Link from "next/link";
 import { CategoryIcon, categoryIconFor } from "@/components/category-icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { photoThumbUrl } from "@/lib/asset-photos";
+import { Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -55,6 +57,7 @@ export function PortfolioTable({
   selectedIds,
   onToggleAsset,
   onToggleAll,
+  sharedAssetIds,
 }: {
   assets: AssetRow[];
   categories: Category[];
@@ -65,9 +68,11 @@ export function PortfolioTable({
   selectedIds?: Set<string>;
   onToggleAsset?: (id: string, checked: boolean) => void;
   onToggleAll?: (ids: string[], checked: boolean) => void;
+  /** Assets owned in shares: shown here at the viewer's share, so they are edited on their own page, never from these scaled rows. */
+  sharedAssetIds?: string[];
 }) {
   const { maskValue } = usePrivacy();
-  const { intlLocale } = useLanguage();
+  const { t, intlLocale } = useLanguage();
 
   const currencyFormatter = new Intl.NumberFormat(intlLocale, {
     style: "currency",
@@ -370,7 +375,13 @@ export function PortfolioTable({
                   </TableCell>
                   <TableCell className="text-end">
                     <div className="flex justify-end gap-2">
-                      {asset.is_liability ? (
+                      {sharedAssetIds?.includes(asset.id) ? (
+                        <Button asChild variant="outline" size="icon-sm" aria-label={t("edit_on_asset_page")} title={t("edit_on_asset_page")}>
+                          <Link href={`/dashboard/assets/${asset.id}`}>
+                            <Pencil className="size-4" />
+                          </Link>
+                        </Button>
+                      ) : asset.is_liability ? (
                         <AddLiabilityDialog liability={assetForEdit} />
                       ) : (
                         <AddAssetDialog categories={categories} asset={assetForEdit} />

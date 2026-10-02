@@ -499,6 +499,7 @@ export default async function DashboardPage({
           displayCurrency={displayCurrency}
           rates={rates}
           performanceByAsset={performanceByAsset}
+          sharedAssetIds={[...factorById].filter(([, f]) => f !== 1).map(([id]) => id)}
         />
 
         <ExportReportsCard

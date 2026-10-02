@@ -164,7 +164,7 @@ function OwnerLine({
         ) : (
           <span className="text-primary">{t("ownership_invite_pending")}</span>
         )}
-        {needsInvite && (
+        {!owner.isCreator && (
           <>
             <span className={cn("flex items-center gap-1", mail.tone)}>
               <Mail className="size-3.5" aria-hidden="true" />
@@ -172,10 +172,10 @@ function OwnerLine({
             </span>
             {canResend && (
               <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => run(() => resendCoOwnerInvite(assetId, owner.email))}>
-                {t("ownership_resend_invite")}
+                {t(owner.joined ? "ownership_resend" : "ownership_resend_invite")}
               </Button>
             )}
-            {canResend && (
+            {canResend && needsInvite && (
               <Button
                 type="button"
                 variant="ghost"

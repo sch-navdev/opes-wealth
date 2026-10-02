@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
+import { T } from "@/components/translated-text";
 
 export default function Home() {
   return (
@@ -17,7 +18,7 @@ export default function Home() {
           <ThemeToggle />
           <ComfortModeToggle />
           <Button asChild variant="outline">
-            <Link href="/login">Sign In</Link>
+            <Link href="/login"><T k="landing_sign_in" /></Link>
           </Button>
         </div>
       </header>
@@ -33,19 +34,17 @@ export default function Home() {
             className="mx-auto mb-6"
           />
           <p className="text-sm font-medium uppercase tracking-widest text-primary">
-            Private Wealth, Clearly Seen
+            <T k="landing_tagline" />
           </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-            One view of everything you own.
+            <T k="landing_headline" />
           </h1>
           <p className="mt-6 text-lg text-muted-foreground">
-            Opes Wealth brings your real estate, holdings, and cash together
-            in a single, private dashboard — built for individuals who
-            expect precision.
+            <T k="landing_body" />
           </p>
           <div className="mt-10">
             <Button asChild size="lg">
-              <Link href="/login">Sign In to Your Dashboard</Link>
+              <Link href="/login"><T k="landing_cta" /></Link>
             </Button>
           </div>
         </div>

@@ -94,6 +94,7 @@ export function PortfolioGroups({
   displayCurrency,
   rates,
   performanceByAsset,
+  sharedAssetIds,
 }: {
   assets: AssetRow[];
   categories: Category[];
@@ -101,6 +102,8 @@ export function PortfolioGroups({
   rates: Record<string, number>;
   /** Gain/loss per asset (in the asset's own currency) for categories that have no cost basis in their metadata — currently Vehicles. */
   performanceByAsset?: Record<string, { amount: number; percent: number | null }>;
+  /** Assets owned in shares (edited on their own page). */
+  sharedAssetIds?: string[];
 }) {
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
@@ -326,6 +329,7 @@ export function PortfolioGroups({
                   displayCurrency={displayCurrency}
                   rates={rates}
                   performanceByAsset={performanceByAsset}
+                  sharedAssetIds={sharedAssetIds}
                   selectedIds={selectedIds}
                   onToggleAsset={toggleAsset}
                   onToggleAll={toggleAll}

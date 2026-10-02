@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { pdfToText } from "@/lib/pdf-text";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -763,9 +764,7 @@ export async function parsePropertyDocumentFile(
 
   let text: string;
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const pdfParse = (await import("pdf-parse")).default;
-    text = (await pdfParse(buffer)).text;
+    text = await pdfToText(await file.arrayBuffer());
   } catch {
     return { ok: false, error: "Could not read this PDF file." };
   }
@@ -2145,10 +2144,7 @@ export async function importTenancyContract(
 
   let text: string;
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const pdfParse = (await import("pdf-parse")).default;
-    const result = await pdfParse(buffer);
-    text = result.text;
+    text = await pdfToText(await file.arrayBuffer());
   } catch {
     return { ok: false, error: "Could not read this PDF file." };
   }

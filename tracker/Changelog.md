@@ -181,3 +181,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Future Projects: simulated assets (status column, migration 0031) kept out of net worth, planning page with a bankability engine, and a hideable dashboard widget — [[Future-Projects|Future Projects]]
 - 2026-10-02: Vehicle Blue Book values now have a currency and a dated log, and the vehicle chart compares market value, purchase price and Blue Book — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - 2026-10-02: Demo account gets Blue Book, depreciation and Future Projects seed data and a read-only mode (database deny policies, server write shim, Saved (Demo Mode) toast) — [[Demo-Mode|Demo Mode]]
+- 2026-10-02: Registered co-owners now get a "shared with you" email with sent date/time and a resend button; the dashboard no longer edits shared assets from their scaled figures — [[Co-Ownership|Co-Ownership]]
+- 2026-10-02: Vehicle form drops the Value field (value moves by button only) and every PDF import is fixed (pdf-parse failed on Buffers inside Next) — [[Portfolio-Dashboard|Portfolio Dashboard]]

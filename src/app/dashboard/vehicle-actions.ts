@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { pdfToText } from "@/lib/pdf-text";
 import { createClient } from "@/utils/supabase/server";
 import { syncAssetHistory } from "@/lib/asset-history-sync";
 import { parseBlueBookText, type ParsedBlueBook } from "@/lib/bluebook-parser";
@@ -33,8 +34,7 @@ export async function readBlueBookDocument(formData: FormData): Promise<ReadBlue
 
   let text: string;
   try {
-    const pdfParse = (await import("pdf-parse")).default;
-    text = (await pdfParse(Buffer.from(await file.arrayBuffer()))).text;
+    text = await pdfToText(await file.arrayBuffer());
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     console.error("readBlueBookDocument: pdf-parse failed:", detail);

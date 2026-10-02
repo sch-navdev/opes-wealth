@@ -2,7 +2,7 @@
 `
 `# Demo account: populated data and read-only mode
 `
-`**Status:** built, type-checked, linted and built (2026-10-02). **Migration `0032_demo_read_only.sql` must be applied by hand, and the seed re-run (`--yes`) to load the new data.** The shim was tested with a stand-in client (no write reached it); the RLS policies and the toast have not been exercised against the live database or in a browser.
+`**Status:** built, type-checked, linted and built (2026-10-02). **Migration `0032_demo_read_only.sql` is applied and verified (39 policies on all 13 public tables + 3 on storage, all restrictive, function holds the demo id). The seed still has to be re-run (`--yes`) to load the new data.** The shim was tested with a stand-in client (no write reached it); the RLS policies and the toast have not been exercised against the live database or in a browser.
 `
 `The demo login (`demo@opeswealth.com`, id `ddf92bf5-5beb-45c1-bf92-d3b696806d13`, password published on the sign-in page) is public, so it must read everything and change nothing.
 `

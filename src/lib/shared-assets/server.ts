@@ -27,7 +27,7 @@ import {
   type OwnerRow,
   type TimeLeft,
 } from "@/lib/ownership";
-import { sendApprovalEmail } from "@/lib/shared-assets/notify";
+import { sendApprovalEmail, sendSharedWithYouEmail } from "@/lib/shared-assets/notify";
 import { isDemoUser } from "@/lib/demo-mode";
 import type { Json } from "@/types/supabase";
 
@@ -169,6 +169,8 @@ export async function replaceOwners(opts: {
     invite_error: string | null;
   }[] = [];
   const toInvite: OwnerInput[] = [];
+  // New co-owners who already have a working account: they get a "shared with you" email instead of an invitation.
+  const toTellShared: OwnerInput[] = [];
 
   for (const o of opts.owners) {
     if (o.isCreator) {
@@ -189,7 +191,11 @@ export async function replaceOwners(opts: {
     const { data: existingId } = await service.rpc("profile_id_for_email", { p_email: email });
     const prior = (priorInvites ?? []).find((r) => r.email && normalizeEmail(r.email) === email);
     const isNew = !previousEmails.has(email);
-    if (isNew && !existingId && notify) toInvite.push(o);
+    if (isNew && notify) {
+      if (!existingId) toInvite.push(o);
+      else if (await hasJoined(service, existingId as string)) toTellShared.push(o);
+      else toInvite.push(o); // invited earlier but never accepted: send the invitation again
+    }
     rows.push({
       asset_id: opts.assetId,
       profile_id: (existingId as string | null) ?? null,
@@ -219,6 +225,18 @@ export async function replaceOwners(opts: {
     if (res.sent) invited.push(normalizeEmail(o.email));
     await recordInvite(service, opts.assetId, normalizeEmail(o.email), res);
   }
+  for (const o of toTellShared) {
+    const email = normalizeEmail(o.email);
+    const res = await sendSharedWithYouEmail(email, {
+      recipientName: o.name,
+      ownerName: inviterName,
+      assetName: opts.assetName,
+      percentage: o.percentage,
+      url: `${siteUrl()}/dashboard/assets/${opts.assetId}`,
+    });
+    if (res.sent) invited.push(email);
+    await recordInvite(service, opts.assetId, email, res.sent ? { sent: true } : { sent: false, reason: res.reason });
+  }
   return { ok: true, invited };
 }
 
@@ -242,17 +260,27 @@ export async function resendInvite(assetId: string, email: string): Promise<{ se
   if (!asset) return { sent: false, reason: "Asset not found." };
   const { data: owner } = await service
     .from("asset_owners")
-    .select("name")
+    .select("name, profile_id, ownership_percentage")
     .eq("asset_id", assetId)
     .eq("email", normalizeEmail(email))
     .single();
   if (!owner) return { sent: false, reason: "Co-owner not found." };
-  const res = await inviteCoOwner(service, {
-    email: normalizeEmail(email),
-    name: owner.name,
-    inviterName: await displayName(service, asset.profile_id),
-    assetName: asset.name,
-  });
+  const inviterName = await displayName(service, asset.profile_id);
+  const alreadyJoined = !!owner.profile_id && (await hasJoined(service, owner.profile_id));
+  const res = alreadyJoined
+    ? await sendSharedWithYouEmail(normalizeEmail(email), {
+        recipientName: owner.name,
+        ownerName: inviterName,
+        assetName: asset.name,
+        percentage: Number(owner.ownership_percentage),
+        url: `${siteUrl()}/dashboard/assets/${assetId}`,
+      })
+    : await inviteCoOwner(service, {
+        email: normalizeEmail(email),
+        name: owner.name,
+        inviterName,
+        assetName: asset.name,
+      });
   await recordInvite(service, assetId, normalizeEmail(email), res);
   return res;
 }

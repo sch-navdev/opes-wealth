@@ -15,6 +15,8 @@ const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
   : null;
 
 const nextConfig: NextConfig = {
+  // pdf-parse (pdf.js 1.x) breaks when bundled ("bad XRef entry" on valid PDFs): load it from node_modules at runtime.
+  serverExternalPackages: ["pdf-parse"],
   images: {
     remotePatterns: supabaseHost
       ? [{ protocol: "https", hostname: supabaseHost, pathname: "/storage/v1/object/public/asset-photos/**" }]
