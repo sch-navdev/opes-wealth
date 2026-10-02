@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Laptop, LogOut, ShieldCheck, Smartphone, Terminal } from "lucide-react";
+import { Laptop, LogOut, MapPin, ShieldCheck, Smartphone, Terminal } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,7 @@ import { useLanguage } from "@/context/language-context";
 import { parseDeviceInfo, type DeviceType } from "@/lib/device-info";
 import { revokeOtherSessions, revokeSession } from "@/app/dashboard/security/actions";
 import type { TranslationKey } from "@/lib/i18n";
+import { formatLocation } from "@/lib/session-location";
 
 export type SessionRow = {
   id: string;
@@ -28,6 +29,10 @@ export type SessionRow = {
   lastActiveAt: string;
   userAgent: string | null;
   ip: string | null;
+  city: string | null;
+  country: string | null;
+  /** The proxy has recorded this session's real location (otherwise IP/UA are the server's). */
+  located: boolean;
   isCurrent: boolean;
 };
 
@@ -222,6 +227,12 @@ export function SecuritySessions({
                             <Badge variant="secondary">{t("security_this_device")}</Badge>
                           )}
                         </div>
+                        <p className="text-xs text-foreground/80">
+                          <MapPin className="me-1 inline size-3.5 text-primary" aria-hidden="true" />
+                          {t("security_location")}:{" "}
+                          {formatLocation(session.city, session.country, intlLocale) ??
+                            t(session.located ? "security_location_unavailable" : "security_location_not_recorded")}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {t("security_ip")}: {session.ip ?? t("security_unknown_ip")}
                         </p>

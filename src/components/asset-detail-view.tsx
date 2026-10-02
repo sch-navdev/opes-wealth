@@ -154,9 +154,12 @@ import {
 import {
   calculateVehicleTotalCost,
   buildVehicleHistoryFromPurchase,
+  effectiveDepreciation,
+  estimateDepreciatedValue,
   parseVehicleMetadata,
   resolveVehicleValuation,
 } from "@/lib/vehicles";
+import { VehicleBlueBookDialog } from "@/components/vehicle-bluebook-dialog";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import {
   buildInvestedCapitalSeries,
@@ -3413,6 +3416,55 @@ export function AssetDetailView({
                         }, ${vehicleMetadata.last_valuation_date})`}
                       />
                     )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card">
+                  <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-foreground">{t("bluebook_title")}</CardTitle>
+                    {(!ownershipStatus || ownershipStatus.isCreator) && (
+                      <VehicleBlueBookDialog
+                        assetId={asset.id}
+                        currency={asset.currency}
+                        current={{
+                          value: vehicleMetadata.blue_book_value,
+                          source: vehicleMetadata.blue_book_source,
+                          date: vehicleMetadata.blue_book_date,
+                          document: vehicleMetadata.blue_book_document,
+                        }}
+                        estimate={estimateDepreciatedValue(vehicleMetadata, asset.purchase_date)}
+                      />
+                    )}
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <DetailField
+                      label={t("bluebook_value")}
+                      value={
+                        vehicleMetadata.blue_book_value != null
+                          ? maskValue(currencyFormatter.format(vehicleMetadata.blue_book_value))
+                          : t("bluebook_none")
+                      }
+                    />
+                    <DetailField label={t("bluebook_source")} value={vehicleMetadata.blue_book_source || null} />
+                    <DetailField label={t("bluebook_date")} value={vehicleMetadata.blue_book_date || null} />
+                    <DetailField label={t("bluebook_document")} value={vehicleMetadata.blue_book_document || null} />
+                    <DetailField
+                      label={t("depreciation_estimate_label")}
+                      value={(() => {
+                        const est = estimateDepreciatedValue(vehicleMetadata, asset.purchase_date);
+                        return est != null ? maskValue(currencyFormatter.format(est)) : null;
+                      })()}
+                    />
+                    <DetailField
+                      label={t("depreciation_title")}
+                      value={(() => {
+                        const r = effectiveDepreciation(vehicleMetadata, asset.purchase_date);
+                        const pct = (n: number) => (n > 0 ? "+" : "") + n + "%";
+                        return vehicleMetadata.second_hand
+                          ? t("depreciation_second_hand") + ": " + pct(r.annual) + " " + t("depreciation_per_year")
+                          : pct(r.first) + " / " + pct(r.annual) + " " + t("depreciation_per_year");
+                      })()}
+                    />
                   </CardContent>
                 </Card>
 

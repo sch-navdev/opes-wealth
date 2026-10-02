@@ -120,6 +120,12 @@
 - `docs/emails/` holds a branded HTML template for **every** Supabase Auth email: Confirm sign up, Invite user, Magic link / OTP, Change email address, Reset password, Reauthentication, and the seven security notifications (password, email, phone, sign-in method linked/removed, MFA added/removed), plus a README mapping each file to its Supabase screen, a suggested subject and the variables it uses. Same look as the invite email (navy and gold, serif headlines, Outlook-safe buttons, optimised logo from `/email-logo.png`), generated from one shared layout.
 - **Security notifications use only `{{ .SiteURL }}`** (and no detail such as the old/new address, provider or factor type): those variable names could not be verified and an unknown variable makes a template fail to render. They are also **off by default in Supabase** — each toggle must be switched on and saved. Not yet pasted into the dashboard or test-sent.
 
+## Session location on the Security page (2026-10-02, migration 0030)
+
+- **Problem:** the sessions list showed the IP and browser that Supabase Auth recorded, which are the **server's** (AWS addresses and "node"), because sign-in runs in server code on Vercel. Looking those up would have shown Virginia or Mumbai, not the user's computer.
+- **Fix:** `session_locations` (session id, user, real IP, country code, city, region, user agent; RLS: own rows readable, only the service role writes). The proxy (`utils/supabase/middleware.ts`) records it once per session, gated by an `ow_loc` cookie, from `x-forwarded-for` and Vercel's `x-vercel-ip-country / -city / -country-region` headers (`lib/session-location.ts`); failures are swallowed so a request is never blocked. The page (`dashboard/security/page.tsx`) joins the rows, prefers the recorded IP and user agent, shows **City, Country** (country name in the viewer's language via `Intl.DisplayNames`) and deletes rows of ended sessions.
+- **Limits:** only sessions that make a request after deploy are recorded; older ones show "not recorded" until that device is next used. City is Vercel's IP-geolocation estimate, often the ISP's city, and unavailable behind some VPNs or on local development. Stores the user's IP address: disclose in the privacy policy.
+
 ## Related
 - [[Database-Schema|Database Schema]] — `profiles` row auto-creation on signup (`0002_user_profile_trigger.sql`, extended by `0008`)
 - [[Profile-Settings|Profile & Settings]] — MFA management link now lives on `/dashboard/settings`

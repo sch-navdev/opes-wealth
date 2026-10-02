@@ -4,6 +4,15 @@
  * — no dedicated `vehicles` table). Consumed by `vehicle-fields.tsx` (add/edit
  * form) and the Specifications tab of `asset-detail-view.tsx` (read-only display).
  */
+import {
+  ageAtPurchase,
+  depreciatedValue,
+  suggestDepreciation,
+  yearsBetween,
+  type DepreciationGroup,
+  type DepreciationRates,
+} from "@/lib/vehicle-depreciation";
+
 /** Expense categories offered in the log. A stored value outside this list (e.g. from a future version) is shown as-is. */
 export const VEHICLE_EXPENSE_CATEGORIES = [
   "maintenance",
@@ -76,6 +85,20 @@ export type VehicleMetadata = {
   market_valuation: number | null;
   last_valuation_source: string;
   last_valuation_date: string;
+  /** Bought used? A used car skips the showroom drop (see `vehicle-depreciation.ts`). */
+  second_hand: boolean;
+  /** Annual value change in percent, signed: negative = depreciation, positive = appreciation. Ignored for the first year of a second-hand car. */
+  depreciation_first_year: number | null;
+  depreciation_annual: number | null;
+  /** The user typed the rates; otherwise they follow the brand-based suggestion. */
+  depreciation_manual: boolean;
+  /** Official price-guide valuation (Blue Book / Argus / Parkers…), kept apart from the market value. */
+  blue_book_value: number | null;
+  /** Which guide issued it, as the user or the PDF named it. */
+  blue_book_source: string;
+  blue_book_date: string;
+  /** File name of the uploaded valuation PDF (the file itself is not stored). */
+  blue_book_document: string;
   /** Dated expense ledger (see `VehicleExpense`); counts toward Total Cost of Ownership on top of the lump-sum cost fields above. */
   expenses: VehicleExpense[];
 };
@@ -94,6 +117,14 @@ export const EMPTY_VEHICLE_METADATA: VehicleMetadata = {
   market_valuation: null,
   last_valuation_source: "",
   last_valuation_date: "",
+  second_hand: false,
+  depreciation_first_year: null,
+  depreciation_annual: null,
+  depreciation_manual: false,
+  blue_book_value: null,
+  blue_book_source: "",
+  blue_book_date: "",
+  blue_book_document: "",
   expenses: [],
 };
 
@@ -274,4 +305,46 @@ export function resolveVehicleValuation(
       : null;
 
   return { baselineCost, baselineSource, baselineDate, currentMarketValue, change };
+}
+
+/**
+ * The depreciation rates in force for this vehicle: the user's own when they typed
+ * them (`depreciation_manual`), otherwise the brand-based suggestion for new vs
+ * second-hand (see `vehicle-depreciation.ts`).
+ */
+export function effectiveDepreciation(
+  metadata: VehicleMetadata,
+  purchaseDate: string | null | undefined,
+): DepreciationRates & { group: DepreciationGroup } {
+  const suggested = suggestDepreciation({
+    make: metadata.make,
+    model: metadata.model,
+    secondHand: metadata.second_hand,
+    ageAtPurchase: ageAtPurchase(metadata.year, purchaseDate),
+  });
+  if (metadata.depreciation_manual && metadata.depreciation_first_year != null && metadata.depreciation_annual != null) {
+    return { group: suggested.group, first: metadata.depreciation_first_year, annual: metadata.depreciation_annual };
+  }
+  return suggested;
+}
+
+/** Writes the rates in force into the metadata, so a saved vehicle keeps the figures it was valued with. */
+export function withEffectiveDepreciation(metadata: VehicleMetadata, purchaseDate: string | null | undefined): VehicleMetadata {
+  const { first, annual } = effectiveDepreciation(metadata, purchaseDate);
+  return { ...metadata, depreciation_first_year: first, depreciation_annual: annual };
+}
+
+/** Estimated value today from the purchase price and the rates in force; null without a price or purchase date. */
+export function estimateDepreciatedValue(
+  metadata: VehicleMetadata,
+  purchaseDate: string | null | undefined,
+  today: string = new Date().toISOString().slice(0, 10),
+): number | null {
+  if (!metadata.purchase_price || metadata.purchase_price <= 0 || !purchaseDate) return null;
+  return depreciatedValue(
+    metadata.purchase_price,
+    effectiveDepreciation(metadata, purchaseDate),
+    yearsBetween(purchaseDate, today),
+    metadata.second_hand,
+  );
 }

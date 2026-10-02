@@ -329,6 +329,42 @@ export type Database = {
         }
         Relationships: []
       }
+      session_locations: {
+        Row: {
+          session_id: string
+          user_id: string
+          ip: string | null
+          country: string | null
+          city: string | null
+          region: string | null
+          user_agent: string | null
+          first_seen_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          session_id: string
+          user_id: string
+          ip?: string | null
+          country?: string | null
+          city?: string | null
+          region?: string | null
+          user_agent?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Update: {
+          session_id?: string
+          user_id?: string
+          ip?: string | null
+          country?: string | null
+          city?: string | null
+          region?: string | null
+          user_agent?: string | null
+          first_seen_at?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
       client_knowledge_documents: {
         Row: {
           profile_id: string

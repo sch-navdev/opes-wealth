@@ -50,6 +50,7 @@ import {
   EMPTY_VEHICLE_METADATA,
   getVehicleMetadataErrors,
   parseVehicleMetadata,
+  withEffectiveDepreciation,
 } from "@/lib/vehicles";
 import {
   EMPTY_PRIVATE_EQUITY_METADATA,
@@ -168,6 +169,8 @@ export function AddAssetDialog({
   const [vehicleMetadata, setVehicleMetadata] = useState(() =>
     asset ? parseVehicleMetadata(asset.metadata) : EMPTY_VEHICLE_METADATA,
   );
+  // The purchase date drives the vehicle depreciation preview and the second-hand age.
+  const [purchaseDate, setPurchaseDate] = useState(asset?.purchase_date ?? todayIso);
   const [privateEquityMetadata, setPrivateEquityMetadata] = useState(() =>
     asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
   );
@@ -221,6 +224,7 @@ export function AddAssetDialog({
     setVehicleMetadata(
       asset ? parseVehicleMetadata(asset.metadata) : EMPTY_VEHICLE_METADATA,
     );
+    setPurchaseDate(asset?.purchase_date ?? todayIso);
     setPrivateEquityMetadata(
       asset ? parsePrivateEquityMetadata(asset.metadata) : EMPTY_PRIVATE_EQUITY_METADATA,
     );
@@ -333,7 +337,7 @@ export function AddAssetDialog({
         setError(t(errors[0] as TranslationKey));
         return;
       }
-      formData.set("metadata", JSON.stringify(vehicleMetadata));
+      formData.set("metadata", JSON.stringify(withEffectiveDepreciation(vehicleMetadata, purchaseDate)));
     } else if (isPrivateEquity) {
       const errors = getPrivateEquityMetadataErrors(privateEquityMetadata);
       if (errors.length > 0) {
@@ -558,6 +562,7 @@ export function AddAssetDialog({
               type="date"
               max={todayIso}
               defaultValue={asset?.purchase_date ?? todayIso}
+              onChange={(e) => setPurchaseDate(e.target.value)}
               required
             />
           </div>
@@ -674,6 +679,7 @@ export function AddAssetDialog({
               value={vehicleMetadata}
               onChange={setVehicleMetadata}
               currency={currency}
+              purchaseDate={purchaseDate}
             />
           )}
 

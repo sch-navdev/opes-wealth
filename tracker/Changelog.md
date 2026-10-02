@@ -176,3 +176,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Verified the live database after migrations 0022-0027 and added 0028 to revoke public API access to two co-ownership helper functions — [[Database-Schema|Database Schema]]
 - 2026-10-02: Co-owners can now be notified by email (checkbox, approval-request email via Resend, per-owner sent/failed status, approval status with days-then-hours countdown, resend buttons; migration 0029) — [[Co-Ownership|Co-Ownership]]
 - 2026-10-02: Co-owner shares now balance automatically (creator takes the remainder, with a manual-override tick box) and the dashboard's independent queries run in parallel — [[Co-Ownership|Co-Ownership]]
+- 2026-10-02: Vehicles get a Blue Book / Argus valuation (PDF upload, localised name) and a depreciation model (second-hand tick, signed editable rates) — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-02: Security page shows each session's real city and country (migration 0030) — [[Authentication-Security|Authentication & Security]]
