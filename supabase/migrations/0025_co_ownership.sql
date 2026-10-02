@@ -22,27 +22,6 @@
 -- Idempotent: safe to re-run.
 
 -- =========================================================================
--- Membership helper (security definer so policies on assets and asset_owners
--- can reference each other without infinite RLS recursion)
--- =========================================================================
-
-create or replace function public.is_asset_member(p_asset_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select exists (
-    select 1 from public.assets a
-    where a.id = p_asset_id and a.profile_id = auth.uid()
-  ) or exists (
-    select 1 from public.asset_owners o
-    where o.asset_id = p_asset_id and o.profile_id = auth.uid()
-  );
-$$;
-
--- =========================================================================
 -- asset_owners
 -- =========================================================================
 
@@ -67,6 +46,24 @@ create unique index if not exists asset_owners_asset_email_key
   on public.asset_owners (asset_id, lower(email)) where email is not null;
 create index if not exists asset_owners_profile_idx on public.asset_owners (profile_id);
 create index if not exists asset_owners_email_idx on public.asset_owners (lower(email));
+
+-- Membership helper. Created AFTER asset_owners on purpose: a `language sql` function
+-- body is validated at creation, so the table it reads must already exist.
+create or replace function public.is_asset_member(p_asset_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.assets a
+    where a.id = p_asset_id and a.profile_id = auth.uid()
+  ) or exists (
+    select 1 from public.asset_owners o
+    where o.asset_id = p_asset_id and o.profile_id = auth.uid()
+  );
+$$;
 
 alter table public.asset_owners enable row level security;
 
