@@ -1017,8 +1017,8 @@ const dictionary = {
     fr: "Complétez ce qu'Opes Wealth ne connaît pas. Tout est facultatif — les champs vides s'impriment comme des lignes vierges à compléter à la main.",
   },
   dcc_privacy_note: {
-    en: "The PDF is generated in your browser. What you type here is not saved and is never sent to a server.",
-    fr: "Le PDF est généré dans votre navigateur. Ce que vous saisissez ici n'est pas enregistré et n'est jamais envoyé à un serveur.",
+    en: "The PDF is generated in your browser. Your entries are saved to your own account (visible only to you) so the form is pre-filled next time; use \"Clear saved details\" to delete them. The wealth tables are never stored, and the PDF password never leaves your browser.",
+    fr: "Le PDF est généré dans votre navigateur. Vos saisies sont enregistrées sur votre compte (visibles de vous seul) pour pré-remplir le formulaire la prochaine fois ; utilisez « Effacer les données enregistrées » pour les supprimer. Les tableaux de patrimoine ne sont jamais stockés et le mot de passe du PDF ne quitte jamais votre navigateur.",
   },
   // Add bank account dialog + Liabilities group
   bank_account_dialog_title: { en: "Add a bank account", fr: "Ajouter un compte bancaire" },
@@ -2068,6 +2068,10 @@ const dictionary = {
   approvals_field_ticker: { en: "Ticker", fr: "Symbole" },
   approvals_field_details: { en: "Details", fr: "Détails" },
   approvals_field_owners: { en: "Ownership shares", fr: "Parts de détention" },
+
+  // OW9: transaction dedupe, exotic assets, broker directory, passive income
+  dcc_clear_saved: { en: "Clear saved details", fr: "Effacer les données enregistrées" },
+  dcc_cleared: { en: "Saved details deleted. They will no longer be pre-filled.", fr: "Données enregistrées supprimées. Elles ne seront plus pré-remplies." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

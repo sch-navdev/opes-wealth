@@ -29,6 +29,7 @@ import {
   DCC_TAX_INCOME_FIELDS,
   DCC_TAX_WEALTH_FIELDS,
   emptyDccData,
+  mergeSavedDcc,
   type DccAmountRow,
   type DccData,
   type DccPerson,
@@ -39,6 +40,8 @@ import {
 import { LOCALE_INFO, PDF_LOCALES, type Locale } from "@/lib/locales";
 
 const NONE = "__none__";
+
+import { clearClientKnowledge, saveClientKnowledge } from "@/app/dashboard/dcc-actions";
 
 export type DccProfilePrefill = {
   firstName: string;
@@ -183,9 +186,12 @@ function AmountRows({
 export function DccDialog({
   portfolio,
   profile,
+  saved,
 }: {
   portfolio: DccPortfolio;
   profile: DccProfilePrefill;
+  /** The user's last saved entries (migration 0026), laid over the defaults. */
+  saved?: unknown;
 }) {
   const { t, locale } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -195,19 +201,24 @@ export function DccDialog({
   const [isGenerating, setIsGenerating] = useState(false);
   const [data, setData] = useState<DccData>(() => {
     const base = emptyDccData(portfolio);
-    return {
-      ...base,
-      you: {
-        ...base.you,
-        fullName: [profile.lastName.toUpperCase(), profile.firstName].filter(Boolean).join(" "),
-        mobile: profile.phone,
-        address: profile.address,
-        postalCity: profile.postalCity,
-        country: profile.country,
-        email: profile.email,
+    // Profile prefill first, then the saved entries on top (saved values win).
+    return mergeSavedDcc(
+      {
+        ...base,
+        you: {
+          ...base.you,
+          fullName: [profile.lastName.toUpperCase(), profile.firstName].filter(Boolean).join(" "),
+          mobile: profile.phone,
+          address: profile.address,
+          postalCity: profile.postalCity,
+          country: profile.country,
+          email: profile.email,
+        },
       },
-    };
+      saved,
+    );
   });
+  const [notice, setNotice] = useState<string | null>(null);
 
   function set<K extends keyof DccData>(key: K, next: DccData[K]) {
     setData((prev) => ({ ...prev, [key]: next }));
@@ -229,12 +240,26 @@ export function DccDialog({
       link.download = `DCC-${new Date().toISOString().slice(0, 10)}-${docLocale}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
+      // Remember these entries for next time (never the wealth tables or the PDF password).
+      const { portfolio: _p, ...toSave } = { ...data, portfolio };
+      void _p;
+      await saveClientKnowledge(toSave);
       setOpen(false);
     } catch {
       setError(t("dcc_generate_error"));
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleClearSaved() {
+    setError(null);
+    const result = await clearClientKnowledge();
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setNotice(t("dcc_cleared"));
   }
 
   const setRelation = (i: number, patch: Partial<DccRelation>) =>
@@ -428,12 +453,20 @@ export function DccDialog({
           </section>
         </div>
 
+        {notice && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {notice}
+          </p>
+        )}
         {error && (
           <p className="text-sm text-destructive" role="alert">
             {error}
           </p>
         )}
         <div className="flex justify-end">
+          <Button type="button" variant="ghost" onClick={handleClearSaved} disabled={isGenerating}>
+            {t("dcc_clear_saved")}
+          </Button>
           <Button type="button" onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? t("dcc_generating") : t("dcc_generate")}
           </Button>

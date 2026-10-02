@@ -1,5 +1,5 @@
 {
-  "_readme": "Dummy, fully fictional Client Knowledge Document (DCC) data for the demo client Alexander Vance. The app deliberately NEVER stores DCC data (it is typed into the DCC dialog and the PDF is generated in the browser — see src/lib/dcc.ts), so this cannot be seeded into Supabase. It mirrors the DccData shape (minus `portfolio`, which the app derives from the demo assets) so every field can be copied into the dialog or loaded by a future demo-fill button. The profile fields the app DOES store (name, phone, address) are seeded by scripts/seed-demo.mts. All names, numbers and identifiers are invented.",
+  "_readme": "Dummy, fully fictional Client Knowledge Document (DCC) data for the demo client Alexander Vance, in the exact shape of DccData (minus `portfolio`, which the app derives from the assets). scripts/seed-demo.mts saves it to the demo user's client_knowledge_documents row (migration 0026) so the DCC dialog opens fully pre-filled. tax* keys are the dialog's field ids (see DCC_TAX_*_FIELDS in src/lib/dcc.ts). All names, numbers and identifiers are invented.",
   "advisorName": "Camille Rousseau",
   "advisorPhone": "+33 1 42 00 00 41",
   "advisorEmail": "camille.rousseau@example-wealth.test",
@@ -79,46 +79,185 @@
     "riskProfile": "Balanced"
   },
   "relations": [
-    { "name": "VANCE Oliver Henry", "relation": "Son", "birthDate": "2012-03-09", "phone": "+971 50 555 0190", "email": "" },
-    { "name": "VANCE Charlotte Rose", "relation": "Daughter", "birthDate": "2015-09-21", "phone": "", "email": "" },
-    { "name": "Martin Hale, Hale & Partners LLP", "relation": "Legal counsel", "birthDate": "", "phone": "+44 20 5550 0188", "email": "martin.hale@example-law.test" },
-    { "name": "Sofia Ghali, Ghali Audit & Tax", "relation": "Chartered accountant", "birthDate": "", "phone": "+971 4 555 0166", "email": "sofia.ghali@example-audit.test" },
-    { "name": "Camille Rousseau, Rousseau & Associés", "relation": "Wealth manager", "birthDate": "", "phone": "+33 1 42 00 00 41", "email": "camille.rousseau@example-wealth.test" }
+    {
+      "name": "VANCE Oliver Henry",
+      "relation": "Son",
+      "birthDate": "2012-03-09",
+      "phone": "+971 50 555 0190",
+      "email": ""
+    },
+    {
+      "name": "VANCE Charlotte Rose",
+      "relation": "Daughter",
+      "birthDate": "2015-09-21",
+      "phone": "",
+      "email": ""
+    },
+    {
+      "name": "Martin Hale, Hale & Partners LLP",
+      "relation": "Legal counsel",
+      "birthDate": "",
+      "phone": "+44 20 5550 0188",
+      "email": "martin.hale@example-law.test"
+    },
+    {
+      "name": "Sofia Ghali, Ghali Audit & Tax",
+      "relation": "Chartered accountant",
+      "birthDate": "",
+      "phone": "+971 4 555 0166",
+      "email": "sofia.ghali@example-audit.test"
+    },
+    {
+      "name": "Camille Rousseau, Rousseau & Associés",
+      "relation": "Wealth manager",
+      "birthDate": "",
+      "phone": "+33 1 42 00 00 41",
+      "email": "camille.rousseau@example-wealth.test"
+    }
   ],
   "extraIncome": [
-    { "label": "Director dividends, Vance Holding SAS", "nature": "Dividends", "amount": 96000, "holder": "Alexander" },
-    { "label": "Architecture practice net income", "nature": "Self-employed income", "amount": 78000, "holder": "Isabelle" }
+    {
+      "label": "Director dividends, Vance Holding SAS",
+      "nature": "Dividends",
+      "amount": 96000,
+      "holder": "Alexander"
+    },
+    {
+      "label": "Architecture practice net income",
+      "nature": "Self-employed income",
+      "amount": 78000,
+      "holder": "Isabelle"
+    }
   ],
   "extraCharges": [
-    { "label": "Children's international school fees", "nature": "Education", "amount": 41000, "holder": "Joint" },
-    { "label": "Private health insurance", "nature": "Insurance", "amount": 9800, "holder": "Joint" }
+    {
+      "label": "Children's international school fees",
+      "nature": "Education",
+      "amount": 41000,
+      "holder": "Joint"
+    },
+    {
+      "label": "Private health insurance",
+      "nature": "Insurance",
+      "amount": 9800,
+      "holder": "Joint"
+    }
   ],
   "objectives": {
-    "precaution": { "priority": "1", "horizon": "1" },
-    "build_wealth": { "priority": "2", "horizon": "10" },
-    "optimize": { "priority": "3", "horizon": "3" },
-    "help_children": { "priority": "4", "horizon": "12" },
-    "retirement": { "priority": "5", "horizon": "20" },
-    "protect_family": { "priority": "6", "horizon": "5" },
-    "transmission": { "priority": "7", "horizon": "25" },
-    "business_transmission": { "priority": "8", "horizon": "15" }
+    "precaution": {
+      "priority": "1",
+      "horizon": "1"
+    },
+    "build_wealth": {
+      "priority": "2",
+      "horizon": "10"
+    },
+    "optimize": {
+      "priority": "3",
+      "horizon": "3"
+    },
+    "protect_family": {
+      "priority": "4",
+      "horizon": "5"
+    },
+    "protect_spouse": {
+      "priority": "5",
+      "horizon": "5"
+    },
+    "help_children": {
+      "priority": "6",
+      "horizon": "12"
+    },
+    "retirement": {
+      "priority": "7",
+      "horizon": "20"
+    },
+    "transmission": {
+      "priority": "8",
+      "horizon": "25"
+    },
+    "business_transmission": {
+      "priority": "9",
+      "horizon": "15"
+    },
+    "extra_income": {
+      "priority": "10",
+      "horizon": "8"
+    },
+    "short_term": {
+      "priority": "11",
+      "horizon": "2"
+    },
+    "buy_property": {
+      "priority": "12",
+      "horizon": "6"
+    },
+    "mobility": {
+      "priority": "13",
+      "horizon": "4"
+    },
+    "life_accidents": {
+      "priority": "14",
+      "horizon": "3"
+    },
+    "reduce_wealth_tax": {
+      "priority": "15",
+      "horizon": "5"
+    },
+    "luxembourg": {
+      "priority": "16",
+      "horizon": "8"
+    },
+    "life_annuity": {
+      "priority": "17",
+      "horizon": "20"
+    }
   },
   "precautionAmount": "250000",
   "taxIncome": {
-    "Tax residence": "United Arab Emirates (since 2019)",
-    "Reference taxable income": "0 (no personal income tax in the UAE)",
-    "French-source income": "Property-free; none declared"
+    "dcc_tax_salaries": "0",
+    "dcc_tax_pensions": "0",
+    "dcc_tax_bic": "0",
+    "dcc_tax_bnc": "0",
+    "dcc_tax_ba": "0",
+    "dcc_tax_investment_income": "4 200 (French-source dividends)",
+    "dcc_tax_property_income": "0",
+    "dcc_tax_total_declared": "4 200",
+    "dcc_tax_gross_income": "4 200",
+    "dcc_tax_deductible": "0",
+    "dcc_tax_taxable": "4 200",
+    "dcc_tax_parts": "1",
+    "dcc_tax_tmi": "0% (non-resident, UAE tax resident)",
+    "dcc_tax_credits": "0",
+    "dcc_tax_net": "538 (12.8% withholding on French dividends)",
+    "dcc_tax_social": "0 (exempt as non-resident)"
   },
   "taxWealth": {
-    "French wealth tax (IFI)": "Not liable (no French real estate)",
-    "Taxable real estate assets": "0"
+    "dcc_ifi_built": "0",
+    "dcc_ifi_unbuilt": "0",
+    "dcc_ifi_rights": "0",
+    "dcc_ifi_liabilities": "0",
+    "dcc_ifi_base": "0",
+    "dcc_ifi_tmi": "0%",
+    "dcc_ifi_reductions": "0",
+    "dcc_ifi_net": "0 (no French real estate)"
   },
   "taxYear": "2025",
   "_additionalKycNotes": {
     "taxResidencies": [
-      { "country": "United Arab Emirates", "since": "2019", "taxResidenceCertificate": "Held (valid until 2027)" },
-      { "country": "France", "note": "Former resident until 2019; French-source rules reviewed annually with the accountant" },
-      { "country": "United Kingdom", "note": "Non-resident; UK company director, UK-source consultancy income taxed at company level" }
+      {
+        "country": "United Arab Emirates",
+        "since": "2019",
+        "taxResidenceCertificate": "Held (valid until 2027)"
+      },
+      {
+        "country": "France",
+        "note": "Former resident until 2019; French-source rules reviewed annually with the accountant"
+      },
+      {
+        "country": "United Kingdom",
+        "note": "Non-resident; UK company director, UK-source consultancy income taxed at company level"
+      }
     ],
     "addresses": {
       "primaryResidence": "Marina Promenade, Apartment 2104, Dubai Marina Residences, Dubai, UAE (P.O. Box 500123)",
@@ -126,7 +265,10 @@
       "correspondence": "Vance Holding SAS, 25 Avenue George V, 75008 Paris, France"
     },
     "familyStructure": "Married (separation of property) with two children, Oliver (2012) and Charlotte (2015); spouse is co-signatory on the Paris and Dubai household accounts.",
-    "preferredBrokers": ["Saxo Bank", "Interactive Brokers"],
+    "preferredBrokers": [
+      "Saxo Bank",
+      "Interactive Brokers"
+    ],
     "externalAdvisors": {
       "wealthManager": "Camille Rousseau, Rousseau & Associés Gestion Privée",
       "accountant": "Sofia Ghali, Ghali Audit & Tax (Dubai)",

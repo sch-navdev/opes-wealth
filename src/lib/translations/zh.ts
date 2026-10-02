@@ -558,7 +558,7 @@ export const zh: Record<string, string> = {
   "dcc_open_desc": "供您的财富顾问使用的 DCC，提供中文或英文版本，并已根据 Opes Wealth 中的资产、贷款和收入预先填写。",
   "dcc_dialog_title": "客户了解文件",
   "dcc_dialog_desc": "请补充 Opes Wealth 未掌握的信息。所有内容均为选填——空白字段将打印为空行，可手写补充。",
-  "dcc_privacy_note": "PDF 在您的浏览器中生成。您在此输入的内容不会被保存，也绝不会发送到服务器。",
+  "dcc_privacy_note": "PDF 在您的浏览器中生成。您填写的内容会保存在您自己的账户中（仅您可见），下次打开时自动填充；可用“清除已保存的信息”删除。财富表格不会被存储，PDF 密码也不会离开您的浏览器。",
   "dcc_language": "文件语言",
   "dcc_lang_fr": "Français",
   "dcc_lang_en": "English",
@@ -1289,4 +1289,6 @@ export const zh: Record<string, string> = {
   "approvals_field_ticker": "代码",
   "approvals_field_details": "详情",
   "approvals_field_owners": "所有权份额",
+  "dcc_clear_saved": "清除已保存的信息",
+  "dcc_cleared": "已删除保存的信息，之后不会再自动填充。",
 };

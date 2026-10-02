@@ -558,7 +558,7 @@ export const it: Record<string, string> = {
   "dcc_open_desc": "Un DCC per il tuo consulente patrimoniale, in francese o in inglese, precompilato con patrimonio, finanziamenti e redditi provenienti da Opes Wealth.",
   "dcc_dialog_title": "Documento di conoscenza del cliente",
   "dcc_dialog_desc": "Compila ciò che Opes Wealth non conosce. Tutto è facoltativo: i campi vuoti vengono stampati come righe bianche da completare a mano.",
-  "dcc_privacy_note": "Il PDF viene generato nel tuo browser. Ciò che digiti qui non viene salvato e non viene mai inviato a un server.",
+  "dcc_privacy_note": "Il PDF viene generato nel tuo browser. I dati inseriti sono salvati nel tuo account (visibili solo a te) per precompilare il modulo la volta successiva; usa «Cancella i dati salvati» per eliminarli. Le tabelle patrimoniali non vengono mai memorizzate e la password del PDF non lascia mai il tuo browser.",
   "dcc_language": "Lingua del documento",
   "dcc_lang_fr": "Français",
   "dcc_lang_en": "English",
@@ -1289,4 +1289,6 @@ export const it: Record<string, string> = {
   "approvals_field_ticker": "Simbolo",
   "approvals_field_details": "Dettagli",
   "approvals_field_owners": "Quote di proprietà",
+  "dcc_clear_saved": "Cancella i dati salvati",
+  "dcc_cleared": "Dati salvati eliminati. Non saranno più precompilati.",
 };

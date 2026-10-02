@@ -12,10 +12,13 @@ export function ExportReportsCard({
   baseCurrency,
   portfolio,
   profile,
+  savedDcc,
 }: {
   baseCurrency: string;
   portfolio: DccPortfolio;
   profile: DccProfilePrefill;
+  /** Last saved Client Knowledge Document entries, if any. */
+  savedDcc?: unknown;
 }) {
   const { t } = useLanguage();
   return (
@@ -36,7 +39,7 @@ export function ExportReportsCard({
           <p className="text-xs text-muted-foreground">{t("export_xlsx_desc")}</p>
         </div>
         <div className="space-y-2">
-          <DccDialog portfolio={portfolio} profile={profile} />
+          <DccDialog portfolio={portfolio} profile={profile} saved={savedDcc} />
           <p className="text-xs text-muted-foreground">{t("dcc_open_desc")}</p>
         </div>
       </CardContent>

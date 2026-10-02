@@ -558,7 +558,7 @@ export const de: Record<string, string> = {
   "dcc_open_desc": "Ein DCC für Ihren Vermögensberater, auf Französisch oder Englisch, vorausgefüllt mit Ihrem Vermögen, Ihren Krediten und Einkünften aus Opes Wealth.",
   "dcc_dialog_title": "Kundenkenntnis-Dokument",
   "dcc_dialog_desc": "Ergänzen Sie, was Opes Wealth nicht kennt. Alles ist optional — leere Felder werden als Leerzeilen zum handschriftlichen Ausfüllen gedruckt.",
-  "dcc_privacy_note": "Das PDF wird in Ihrem Browser erzeugt. Ihre Eingaben hier werden nicht gespeichert und nie an einen Server gesendet.",
+  "dcc_privacy_note": "Das PDF wird in Ihrem Browser erzeugt. Ihre Angaben werden in Ihrem eigenen Konto gespeichert (nur für Sie sichtbar), damit das Formular beim nächsten Mal vorausgefüllt ist; mit „Gespeicherte Angaben löschen“ entfernen Sie sie. Die Vermögenstabellen werden nie gespeichert, und das PDF-Passwort verlässt Ihren Browser nie.",
   "dcc_language": "Sprache des Dokuments",
   "dcc_lang_fr": "Français",
   "dcc_lang_en": "English",
@@ -1289,4 +1289,6 @@ export const de: Record<string, string> = {
   "approvals_field_ticker": "Kürzel",
   "approvals_field_details": "Details",
   "approvals_field_owners": "Eigentumsanteile",
+  "dcc_clear_saved": "Gespeicherte Angaben löschen",
+  "dcc_cleared": "Gespeicherte Angaben gelöscht. Sie werden nicht mehr vorausgefüllt.",
 };

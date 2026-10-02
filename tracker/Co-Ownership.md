@@ -44,6 +44,11 @@
 - Open Finance bank links and the vehicle/real-estate valuation refreshes still act on the creator's whole asset.
 - A shared-asset history point reflects the whole asset; scaling happens at read time.
 
+## Regression fixed: asset page 404 (2026-10-02)
+
+- After co-ownership shipped, **every asset page returned 404**. Cause: the page's access check reads `asset.profile_id`, but its query never selected that column, so the check always failed (`src/app/dashboard/assets/[id]/page.tsx`). The select now includes `profile_id`. I had type-checked but not exercised this page; the other loaders (dashboard, export, Companies) were checked and do select it.
+- With 0025 applied, the demo seed inserted its three shared assets (Palm Jumeirah villa 50% with Von, Vance Strategy Consulting 33% with Jamie Taylor, Mercedes G 63 20% with Sam Cousin — all unregistered). A server-side check against the live database confirmed the owner rows and that an edit by the creator of such an asset is routed **direct** with no change request created. The **registered co-owner approval path is still untested** (needs a second account).
+
 ## Related
 - [[Database-Schema|Database Schema]] — migration 0025
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — the pro-rata totals, the header bell, the Passive Income card

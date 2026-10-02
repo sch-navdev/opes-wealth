@@ -76,6 +76,10 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - **`0025_co_ownership.sql`** — `asset_owners`, `asset_change_requests`, `change_approvals`, the `is_asset_member` helper, co-owner read policies on `assets`/`asset_history`, the signup linking trigger and `profile_id_for_email`. Full description in [[Co-Ownership|Co-Ownership]]. **Not applied.**
 
+## Migration 0026 — client knowledge (2026-10-02)
+
+- **`0026_client_knowledge.sql`** — `client_knowledge_documents` (`profile_id` primary key, `data` jsonb, `updated_at`) with own-row select/insert/update/delete RLS. See [[Profile-Settings|Profile & Settings]] for the privacy caveat. **Not applied** at the time of writing.
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

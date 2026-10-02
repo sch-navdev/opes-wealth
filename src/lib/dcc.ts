@@ -470,6 +470,56 @@ export function emptyDccData(portfolio: DccPortfolio): DccData {
   };
 }
 
+/**
+ * Starts from `base` (empty defaults + the profile prefill) and lays the saved
+ * entries over it: a saved non-empty value wins, an empty/missing one leaves the
+ * default. Unknown keys and the wealth tables are ignored, so an older or
+ * hand-edited save can never break the dialog.
+ */
+export function mergeSavedDcc(base: DccData, saved: unknown): DccData {
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return base;
+  const s = saved as Record<string, unknown>;
+  const text = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() !== "" ? v : fallback);
+  const person = (basePerson: DccPerson, raw: unknown): DccPerson => {
+    const out = { ...basePerson };
+    if (raw && typeof raw === "object") {
+      for (const key of Object.keys(basePerson) as (keyof DccPerson)[]) {
+        const v = (raw as Record<string, unknown>)[key];
+        if (typeof v === "string" && v.trim() !== "") (out as Record<string, string>)[key] = v;
+      }
+    }
+    return out;
+  };
+  const strings = (raw: unknown): Record<string, string> =>
+    raw && typeof raw === "object"
+      ? Object.fromEntries(Object.entries(raw).filter(([, v]) => typeof v === "string")) as Record<string, string>
+      : {};
+  const list = <T,>(raw: unknown, fallback: T[]): T[] => (Array.isArray(raw) ? (raw as T[]) : fallback);
+
+  return {
+    ...base,
+    advisorName: text(s.advisorName, base.advisorName),
+    advisorPhone: text(s.advisorPhone, base.advisorPhone),
+    advisorEmail: text(s.advisorEmail, base.advisorEmail),
+    advisorFirm: text(s.advisorFirm, base.advisorFirm),
+    clientTitle: text(s.clientTitle, base.clientTitle),
+    you: person(base.you, s.you),
+    includeSpouse: typeof s.includeSpouse === "boolean" ? s.includeSpouse : base.includeSpouse,
+    spouse: person(base.spouse, s.spouse),
+    relations: list(s.relations, base.relations),
+    extraIncome: list(s.extraIncome, base.extraIncome),
+    extraCharges: list(s.extraCharges, base.extraCharges),
+    objectives:
+      s.objectives && typeof s.objectives === "object" && !Array.isArray(s.objectives)
+        ? (s.objectives as DccData["objectives"])
+        : base.objectives,
+    precautionAmount: text(s.precautionAmount, base.precautionAmount),
+    taxIncome: { ...base.taxIncome, ...strings(s.taxIncome) },
+    taxWealth: { ...base.taxWealth, ...strings(s.taxWealth) },
+    taxYear: text(s.taxYear, base.taxYear),
+  };
+}
+
 export const DCC_TAX_INCOME_FIELDS: TranslationKey[] = [
   "dcc_tax_salaries",
   "dcc_tax_pensions",

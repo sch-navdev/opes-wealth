@@ -558,7 +558,7 @@ export const ar: Record<string, string> = {
   "dcc_open_desc": "مستند DCC لمستشارك المالي، بالفرنسية أو الإنجليزية، معبأ مسبقًا بثروتك وقروضك ودخلك من Opes Wealth.",
   "dcc_dialog_title": "مستند معرفة العميل",
   "dcc_dialog_desc": "أكمل ما لا يعرفه Opes Wealth. كل شيء اختياري — تُطبع الحقول الفارغة كأسطر فارغة لتعبئتها يدويًا.",
-  "dcc_privacy_note": "يُنشأ ملف PDF داخل متصفحك. ما تكتبه هنا لا يُحفظ ولا يُرسل أبدًا إلى أي خادم.",
+  "dcc_privacy_note": "يُنشأ ملف PDF في متصفحك. تُحفظ مدخلاتك في حسابك الخاص (ولا يراها غيرك) ليُملأ النموذج مسبقًا في المرة القادمة؛ استخدم «مسح البيانات المحفوظة» لحذفها. لا تُخزَّن جداول الثروة أبدًا، ولا تغادر كلمة مرور PDF متصفحك.",
   "dcc_language": "لغة المستند",
   "dcc_lang_fr": "Français",
   "dcc_lang_en": "English",
@@ -1289,4 +1289,6 @@ export const ar: Record<string, string> = {
   "approvals_field_ticker": "الرمز",
   "approvals_field_details": "التفاصيل",
   "approvals_field_owners": "حصص الملكية",
+  "dcc_clear_saved": "مسح البيانات المحفوظة",
+  "dcc_cleared": "تم حذف البيانات المحفوظة ولن تُملأ مسبقًا بعد الآن.",
 };

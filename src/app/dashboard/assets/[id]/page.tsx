@@ -40,7 +40,7 @@ export default async function AssetDetailsPage({
       supabase
         .from("assets")
         .select(
-          "id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)",
+          "id, profile_id, name, category_id, quantity, current_value, currency, is_liability, metadata, images, ticker_symbol, purchase_date, asset_categories(name)",
         )
         .eq("id", id)
         .single<AssetDetail & { profile_id: string }>(),

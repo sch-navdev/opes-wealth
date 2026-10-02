@@ -127,6 +127,12 @@ export default async function DashboardPage({
   const factorById = await loadOwnershipFactors(supabase, user.id, unscaledAssets);
   const assets: AssetRow[] = applyOwnershipFactors(unscaledAssets, factorById);
   const pendingApprovals = await loadPendingApprovals(user.id);
+  // Last Client Knowledge Document entries (migration 0026); null until saved or if the table doesn't exist yet.
+  const { data: savedDccRow } = await supabase
+    .from("client_knowledge_documents")
+    .select("data")
+    .eq("profile_id", user.id)
+    .maybeSingle();
 
   const { currency: currencyParam } = await searchParams;
   // The dashboard's Base Currency: every asset's native `currency` is
@@ -480,6 +486,7 @@ export default async function DashboardPage({
         />
 
         <ExportReportsCard
+          savedDcc={savedDccRow?.data ?? null}
           baseCurrency={displayCurrency}
           portfolio={buildDccPortfolio(assets ?? [], displayCurrency, rates, today)}
           profile={{

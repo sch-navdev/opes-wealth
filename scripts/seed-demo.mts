@@ -25,6 +25,7 @@
  * data), not market data.
  */
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 // Same fingerprint the app's import uses (src/lib/transactions.ts: node:crypto only, no @/ imports).
 import { fingerprintTransactions } from "../src/lib/transactions.ts";
@@ -1304,6 +1305,23 @@ async function seed() {
     if (error) throw error;
   }
   console.log(`Inserted ${assets.length} assets, ${historyRows.length} history rows and ${txRows.length} transactions.`);
+
+  // Client Knowledge Document: the DCC dialog opens pre-filled from this row (migration 0026).
+  const dccPath = new URL("./demo-client-knowledge.json", import.meta.url);
+  const dcc = JSON.parse(readFileSync(dccPath, "utf8")) as Record<string, unknown>;
+  for (const key of Object.keys(dcc)) if (key.startsWith("_")) delete dcc[key]; // notes, not form fields
+  const { error: dccError } = await db
+    .from("client_knowledge_documents")
+    .upsert({ profile_id: userId, data: dcc, updated_at: new Date().toISOString() });
+  if (dccError) {
+    if (dccError.code === "42P01" || /client_knowledge_documents/.test(dccError.message)) {
+      console.log("Client Knowledge Document skipped: apply migration 0026_client_knowledge.sql first.");
+    } else {
+      throw dccError;
+    }
+  } else {
+    console.log("Saved the demo Client Knowledge Document.");
+  }
 
   const ownerRows = sharedOwnerRows(userId as string);
   const { error: ownersError } = await db.from("asset_owners").insert(ownerRows);

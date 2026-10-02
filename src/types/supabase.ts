@@ -314,6 +314,24 @@ export type Database = {
         }
         Relationships: []
       }
+      client_knowledge_documents: {
+        Row: {
+          profile_id: string
+          data: Json
+          updated_at: string
+        }
+        Insert: {
+          profile_id: string
+          data?: Json
+          updated_at?: string
+        }
+        Update: {
+          profile_id?: string
+          data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           id: string
