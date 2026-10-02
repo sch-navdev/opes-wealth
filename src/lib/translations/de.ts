@@ -1417,4 +1417,10 @@ export const de: Record<string, string> = {
   "planning_widget_total_cash": "Bargeld gesamt",
   "planning_widget_total_borrow": "Darlehen gesamt",
   "planning_widget_own_cash": "Eigenkapital",
+  "bluebook_add": "Bewertung hinzufügen",
+  "bluebook_currency": "Währung",
+  "bluebook_log_title": "Erfasste Bewertungen (jede ist ein Punkt im Diagramm)",
+  "bluebook_delete": "Diese Bewertung entfernen",
+  "bluebook_error_currency": "Wähle eine unterstützte Währung.",
+  "demo_saved": "Gespeichert (Demo-Modus)",
 };

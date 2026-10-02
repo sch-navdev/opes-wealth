@@ -153,13 +153,15 @@ import {
 } from "@/lib/real-estate-analytics";
 import {
   calculateVehicleTotalCost,
-  buildVehicleHistoryFromPurchase,
+  buildVehicleComparisonSeries,
   effectiveDepreciation,
   estimateDepreciatedValue,
+  latestBlueBook,
   parseVehicleMetadata,
   resolveVehicleValuation,
 } from "@/lib/vehicles";
 import { VehicleBlueBookDialog } from "@/components/vehicle-bluebook-dialog";
+import { VehicleBlueBookLog } from "@/components/vehicle-bluebook-log";
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import {
   buildInvestedCapitalSeries,
@@ -630,18 +632,22 @@ export function AssetDetailView({
     // the purchase price when known) and runs to today — never at "today"
     // just because that is the only row, nor before the purchase. Equity is
     // the value itself (no loan netting for vehicles).
-    displayHistory = buildVehicleHistoryFromPurchase(
-      sortedHistory,
-      asset.purchase_date,
-      vehicleMetadata.purchase_price,
-      today,
-      (date, value): AssetHistoryPoint => ({
-        id: `vehicle-purchase-${date}`,
-        recorded_date: date,
-        value,
-        net_equity: value,
-        source: "manual",
-      }),
+    // The market curve is the recorded valuations ONLY. The purchase price is a separate
+    // flat curve and the Blue Book another (see `buildVehicleComparisonSeries`), so a
+    // market value entered on the purchase date no longer overwrites the purchase price.
+    const marketOnly = sortedHistory.filter((h) => !asset.purchase_date || h.recorded_date >= asset.purchase_date);
+    displayHistory = (
+      marketOnly.length > 0
+        ? marketOnly
+        : [
+            {
+              id: "vehicle-now",
+              recorded_date: today,
+              value: asset.current_value,
+              net_equity: asset.current_value,
+              source: "manual",
+            } as AssetHistoryPoint,
+          ]
     ).map((h) => ({ ...h, net_equity: h.value }));
   } else if (purchaseAnchorDate) {
     displayHistory = sortedHistory.filter(
@@ -845,9 +851,22 @@ export function AssetDetailView({
             : undefined,
       })
     : chartData;
+  const vehicleRows =
+    isVehicle && vehicleMetadata
+      ? buildVehicleComparisonSeries({
+          market: displayHistory,
+          purchaseDate: asset.purchase_date,
+          purchasePrice: vehicleMetadata.purchase_price,
+          guide: vehicleMetadata.blue_book_log.map((e) => ({
+            date: e.date,
+            value: convertAmount(e.amount, e.currency || asset.currency, asset.currency, ratesFromUsd),
+          })),
+          today,
+        })
+      : null;
   const combinedChartData = [
     ...(showHistory
-      ? historySeries.map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      ? ((vehicleRows ?? historySeries) as { date: string }[]).map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
       : []),
     ...(showForward
       ? [...projectionBridge, ...projection].map((p) => ({
@@ -1874,7 +1893,7 @@ export function AssetDetailView({
                             maskValue(currencyFormatter.format(Number(value)))
                           }
                         />
-                        {(isRealEstate || isEquity) && <Legend wrapperStyle={{ fontSize: 12 }} />}
+                        {(isRealEstate || isEquity || isVehicle) && <Legend wrapperStyle={{ fontSize: 12 }} />}
                         {showHistory && (
                           <>
                             <Area
@@ -1884,15 +1903,41 @@ export function AssetDetailView({
                               stroke="var(--color-primary)"
                               fill="url(#valueGradient)"
                               strokeWidth={2}
+                              connectNulls
                             />
-                            <Area
-                              type="monotone"
-                              dataKey="netEquity"
-                              name={t("equity")}
-                              stroke="var(--color-success)"
-                              fill="transparent"
-                              strokeWidth={2}
-                            />
+                            {isVehicle ? (
+                              <>
+                                <Area
+                                  type="monotone"
+                                  dataKey="purchase"
+                                  name={t("purchase_price")}
+                                  stroke="var(--color-muted-foreground)"
+                                  fill="transparent"
+                                  strokeWidth={2}
+                                  strokeDasharray="6 4"
+                                  connectNulls
+                                />
+                                <Area
+                                  type="monotone"
+                                  dataKey="blueBook"
+                                  name={t("bluebook_title")}
+                                  stroke="var(--color-chart-4)"
+                                  fill="transparent"
+                                  strokeWidth={2}
+                                  connectNulls
+                                  dot
+                                />
+                              </>
+                            ) : (
+                              <Area
+                                type="monotone"
+                                dataKey="netEquity"
+                                name={t("equity")}
+                                stroke="var(--color-success)"
+                                fill="transparent"
+                                strokeWidth={2}
+                              />
+                            )}
                             {isRealEstate && (
                               <Area
                                 type="monotone"
@@ -3425,13 +3470,7 @@ export function AssetDetailView({
                     {(!ownershipStatus || ownershipStatus.isCreator) && (
                       <VehicleBlueBookDialog
                         assetId={asset.id}
-                        currency={asset.currency}
-                        current={{
-                          value: vehicleMetadata.blue_book_value,
-                          source: vehicleMetadata.blue_book_source,
-                          date: vehicleMetadata.blue_book_date,
-                          document: vehicleMetadata.blue_book_document,
-                        }}
+                        assetCurrency={asset.currency}
                         estimate={estimateDepreciatedValue(vehicleMetadata, asset.purchase_date)}
                       />
                     )}
@@ -3439,15 +3478,15 @@ export function AssetDetailView({
                   <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <DetailField
                       label={t("bluebook_value")}
-                      value={
-                        vehicleMetadata.blue_book_value != null
-                          ? maskValue(currencyFormatter.format(vehicleMetadata.blue_book_value))
-                          : t("bluebook_none")
-                      }
+                      value={(() => {
+                        const latest = latestBlueBook(vehicleMetadata);
+                        return latest
+                          ? maskValue(currencyFormatter.format(convertAmount(latest.amount, latest.currency || asset.currency, asset.currency, ratesFromUsd)))
+                          : t("bluebook_none");
+                      })()}
                     />
-                    <DetailField label={t("bluebook_source")} value={vehicleMetadata.blue_book_source || null} />
-                    <DetailField label={t("bluebook_date")} value={vehicleMetadata.blue_book_date || null} />
-                    <DetailField label={t("bluebook_document")} value={vehicleMetadata.blue_book_document || null} />
+                    <DetailField label={t("bluebook_source")} value={latestBlueBook(vehicleMetadata)?.source || null} />
+                    <DetailField label={t("bluebook_date")} value={latestBlueBook(vehicleMetadata)?.date || null} />
                     <DetailField
                       label={t("depreciation_estimate_label")}
                       value={(() => {
@@ -3465,6 +3504,22 @@ export function AssetDetailView({
                           : pct(r.first) + " / " + pct(r.annual) + " " + t("depreciation_per_year");
                       })()}
                     />
+                    <div className="sm:col-span-2 xl:col-span-4">
+                      <VehicleBlueBookLog
+                        assetId={asset.id}
+                        assetCurrency={asset.currency}
+                        editable={!ownershipStatus || ownershipStatus.isCreator}
+                        rows={vehicleMetadata.blue_book_log.map((e) => ({
+                          id: e.id,
+                          date: e.date,
+                          amount: e.amount,
+                          currency: e.currency || asset.currency,
+                          source: e.source,
+                          document: e.document,
+                          converted: convertAmount(e.amount, e.currency || asset.currency, asset.currency, ratesFromUsd),
+                        }))}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 

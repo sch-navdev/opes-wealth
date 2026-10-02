@@ -16,27 +16,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
+import { currencies } from "@/lib/currencies";
 import type { TranslationKey } from "@/lib/i18n";
 import type { BlueBookCandidate } from "@/lib/bluebook-parser";
 import { readBlueBookDocument, saveBlueBookValuation } from "@/app/dashboard/vehicle-actions";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
+const knownCurrency = (code: string | null | undefined, fallback: string) =>
+  code && currencies.some((c) => c.code === code) ? code : fallback;
 
 /**
- * The official price-guide valuation of a vehicle (Blue Book / Argus / Parkers…),
- * kept apart from its market value. Upload the guide's PDF to read it, type it, or
- * start from the depreciation estimate; the user always confirms before saving.
+ * Adds an official price-guide valuation of a vehicle (Blue Book / Argus / Parkers…)
+ * to its Blue Book curve, kept apart from the market value and the purchase price.
+ * Upload the guide's PDF to read it, or type it in, in any supported currency; the
+ * user always confirms before saving.
  */
 export function VehicleBlueBookDialog({
   assetId,
-  currency,
-  current,
+  assetCurrency,
   estimate,
 }: {
   assetId: string;
-  currency: string;
-  current: { value: number | null; source: string; date: string; document: string };
-  /** Value from the depreciation model, offered as a starting point (clearly an estimate). */
+  assetCurrency: string;
+  /** Value from the depreciation model, in the asset's currency; a clearly labelled starting point. */
   estimate: number | null;
 }) {
   const { t } = useLanguage();
@@ -45,10 +47,11 @@ export function VehicleBlueBookDialog({
   const [isPending, startTransition] = useTransition();
 
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(current.value != null ? String(current.value) : "");
-  const [source, setSource] = useState(current.source);
-  const [date, setDate] = useState(current.date || todayIso());
-  const [documentName, setDocumentName] = useState(current.document);
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState(assetCurrency);
+  const [source, setSource] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [documentName, setDocumentName] = useState("");
   const [applyAsCurrent, setApplyAsCurrent] = useState(false);
   const [candidates, setCandidates] = useState<BlueBookCandidate[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +68,12 @@ export function VehicleBlueBookDialog({
     startTransition(async () => {
       const res = await readBlueBookDocument(formData);
       if (!res.ok) {
-        setError(text(res.error));
+        setError(text(res.error) + (res.detail ? ` (${res.detail})` : ""));
         return;
       }
       const p = res.parsed;
-      if (p.value != null) setValue(String(p.value));
+      if (p.value != null) setAmount(String(p.value));
+      setCurrency(knownCurrency(p.currency, assetCurrency));
       if (p.source) setSource(p.source);
       if (p.date) setDate(p.date);
       setDocumentName(res.fileName);
@@ -80,14 +84,18 @@ export function VehicleBlueBookDialog({
 
   function save() {
     setError(null);
-    const n = Number(value);
     startTransition(async () => {
-      const res = await saveBlueBookValuation(assetId, { value: n, source, date, documentName, applyAsCurrent });
+      const res = await saveBlueBookValuation(assetId, { amount: Number(amount), currency, source, date, documentName, applyAsCurrent });
       if (!res.ok) {
         setError(text(res.error));
         return;
       }
       setOpen(false);
+      setAmount("");
+      setSource("");
+      setDocumentName("");
+      setCandidates([]);
+      setInfo(null);
       router.refresh();
     });
   }
@@ -97,7 +105,7 @@ export function VehicleBlueBookDialog({
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm">
           <BookOpen className="size-4" />
-          {t("bluebook_title")}
+          {t("bluebook_add")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-card sm:max-w-lg">
@@ -156,7 +164,17 @@ export function VehicleBlueBookDialog({
               <p className="text-xs text-muted-foreground">{t("bluebook_other_amounts")}</p>
               <div className="flex flex-wrap gap-2">
                 {candidates.map((c) => (
-                  <Button key={c.value} type="button" variant="outline" size="sm" title={c.line} onClick={() => setValue(String(c.value))}>
+                  <Button
+                    key={c.value + c.line}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    title={c.line}
+                    onClick={() => {
+                      setAmount(String(c.value));
+                      if (c.currency) setCurrency(knownCurrency(c.currency, currency));
+                    }}
+                  >
                     {c.value.toLocaleString()} {c.currency ?? ""}
                   </Button>
                 ))}
@@ -164,10 +182,25 @@ export function VehicleBlueBookDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="bb_value">{t("bluebook_value")}</Label>
+              <Input id="bb_value" type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="bb_value">{t("bluebook_value")} ({currency})</Label>
-              <Input id="bb_value" type="number" step="any" min="0" value={value} onChange={(e) => setValue(e.target.value)} />
+              <Label htmlFor="bb_currency">{t("bluebook_currency")}</Label>
+              <select
+                id="bb_currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="h-9 w-full border border-input bg-background px-3 text-sm text-foreground"
+              >
+                {currencies.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="bb_date">{t("bluebook_date")}</Label>
@@ -185,7 +218,8 @@ export function VehicleBlueBookDialog({
               variant="ghost"
               size="sm"
               onClick={() => {
-                setValue(String(Math.round(estimate)));
+                setAmount(String(Math.round(estimate)));
+                setCurrency(assetCurrency);
                 setSource(t("bluebook_source_estimate"));
                 setDate(todayIso());
                 setDocumentName("");
@@ -214,7 +248,7 @@ export function VehicleBlueBookDialog({
             </p>
           )}
           <div className="flex justify-end">
-            <Button type="button" disabled={isPending || !value} onClick={save}>
+            <Button type="button" disabled={isPending || !amount} onClick={save}>
               {t("bluebook_save")}
             </Button>
           </div>

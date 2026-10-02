@@ -1417,4 +1417,10 @@ export const it: Record<string, string> = {
   "planning_widget_total_cash": "Liquidità totale necessaria",
   "planning_widget_total_borrow": "Finanziamento totale",
   "planning_widget_own_cash": "Apporto proprio",
+  "bluebook_add": "Aggiungi una quotazione",
+  "bluebook_currency": "Valuta",
+  "bluebook_log_title": "Quotazioni registrate (ognuna è un punto del grafico)",
+  "bluebook_delete": "Rimuovi questa quotazione",
+  "bluebook_error_currency": "Scegli una valuta supportata.",
+  "demo_saved": "Salvato (modalità demo)",
 };

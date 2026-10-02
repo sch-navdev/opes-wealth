@@ -70,6 +70,27 @@ export function vehicleExpensesByCategory(
     .sort((a, b) => b.total - a.total);
 }
 
+/**
+ * One official price-guide valuation (Blue Book / Argus / Parkers…), in the currency
+ * of the document. `currency` "" = the asset's own currency. A log, not one field:
+ * every valuation becomes a point on the Blue Book curve, separate from the market
+ * value and from the purchase price.
+ */
+export type BlueBookEntry = {
+  id: string;
+  /** ISO YYYY-MM-DD the guide valued the car on. */
+  date: string;
+  amount: number;
+  currency: string;
+  source: string;
+  /** File name of the uploaded PDF (the file itself is not stored). */
+  document: string;
+};
+
+export function nextBlueBookId(): string {
+  return `bb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export type VehicleMetadata = {
   vin: string;
   make: string;
@@ -99,6 +120,8 @@ export type VehicleMetadata = {
   blue_book_date: string;
   /** File name of the uploaded valuation PDF (the file itself is not stored). */
   blue_book_document: string;
+  /** Every official valuation, newest data of truth (the four fields above are the pre-log single value, migrated on read). */
+  blue_book_log: BlueBookEntry[];
   /** Dated expense ledger (see `VehicleExpense`); counts toward Total Cost of Ownership on top of the lump-sum cost fields above. */
   expenses: VehicleExpense[];
 };
@@ -125,6 +148,7 @@ export const EMPTY_VEHICLE_METADATA: VehicleMetadata = {
   blue_book_source: "",
   blue_book_date: "",
   blue_book_document: "",
+  blue_book_log: [],
   expenses: [],
 };
 
@@ -138,9 +162,23 @@ export function parseVehicleMetadata(raw: unknown): VehicleMetadata {
   }
 
   const r = raw as Partial<VehicleMetadata>;
+  let blueBookLog: BlueBookEntry[] = Array.isArray(r.blue_book_log) ? r.blue_book_log : [];
+  if (blueBookLog.length === 0 && typeof r.blue_book_value === "number" && r.blue_book_value > 0 && r.blue_book_date) {
+    blueBookLog = [
+      {
+        id: "bb-legacy",
+        date: r.blue_book_date,
+        amount: r.blue_book_value,
+        currency: "",
+        source: r.blue_book_source ?? "",
+        document: r.blue_book_document ?? "",
+      },
+    ];
+  }
   return {
     ...EMPTY_VEHICLE_METADATA,
     ...r,
+    blue_book_log: [...blueBookLog].sort((a, b) => a.date.localeCompare(b.date)),
     expenses: Array.isArray(r.expenses) ? r.expenses : [],
   };
 }
@@ -347,4 +385,65 @@ export function estimateDepreciatedValue(
     yearsBetween(purchaseDate, today),
     metadata.second_hand,
   );
+}
+
+/** The most recent official valuation, or null. */
+export function latestBlueBook(metadata: VehicleMetadata): BlueBookEntry | null {
+  const log = metadata.blue_book_log;
+  return log.length > 0 ? log[log.length - 1] : null;
+}
+
+export type VehicleComparisonRow = {
+  date: string;
+  /** Market value (the valuation log); null where none was recorded that day. */
+  value: number | null;
+  /** The purchase price, a flat line from the purchase date; never altered by a market value. */
+  purchase: number | null;
+  /** Official guide valuation, converted to the asset's currency. */
+  blueBook: number | null;
+};
+
+/**
+ * The three curves of a vehicle side by side: market value (recorded valuations only),
+ * purchase price (flat from the purchase date) and Blue Book (official valuations).
+ * They share one date axis; a curve is null on days it has no point and the chart
+ * connects its points. Entering a market value never changes the purchase price line
+ * (an earlier version overwrote the market point that fell on the purchase date).
+ */
+export function buildVehicleComparisonSeries(opts: {
+  market: { recorded_date: string; value: number }[];
+  purchaseDate: string | null | undefined;
+  purchasePrice: number | null | undefined;
+  guide: { date: string; value: number }[];
+  today: string;
+}): VehicleComparisonRow[] {
+  const from = opts.purchaseDate && opts.purchaseDate <= opts.today ? opts.purchaseDate : null;
+  const rows = new Map<string, VehicleComparisonRow>();
+  const row = (date: string) => {
+    let r = rows.get(date);
+    if (!r) {
+      r = { date, value: null, purchase: null, blueBook: null };
+      rows.set(date, r);
+    }
+    return r;
+  };
+
+  const market = [...opts.market]
+    .filter((h) => !from || h.recorded_date >= from)
+    .sort((a, b) => a.recorded_date.localeCompare(b.recorded_date));
+  for (const h of market) row(h.recorded_date).value = h.value;
+  // Carry the latest market value to today so the curve spans to now.
+  const lastMarket = market[market.length - 1];
+  if (lastMarket && lastMarket.recorded_date < opts.today) row(opts.today).value = lastMarket.value;
+
+  for (const g of opts.guide) row(g.date).blueBook = g.value;
+
+  const price = opts.purchasePrice != null && opts.purchasePrice > 0 ? opts.purchasePrice : null;
+  if (price != null) {
+    if (from) row(from);
+    row(opts.today);
+    for (const r of rows.values()) if (!from || r.date >= from) r.purchase = price;
+  }
+
+  return [...rows.values()].sort((a, b) => a.date.localeCompare(b.date));
 }

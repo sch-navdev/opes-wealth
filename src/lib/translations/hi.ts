@@ -1417,4 +1417,10 @@ export const hi: Record<string, string> = {
   "planning_widget_total_cash": "कुल आवश्यक नकदी",
   "planning_widget_total_borrow": "कुल उधार",
   "planning_widget_own_cash": "अपनी नकदी",
+  "bluebook_add": "मूल्यांकन जोड़ें",
+  "bluebook_currency": "मुद्रा",
+  "bluebook_log_title": "दर्ज मूल्यांकन (हर एक चार्ट पर एक बिंदु है)",
+  "bluebook_delete": "यह मूल्यांकन हटाएँ",
+  "bluebook_error_currency": "समर्थित मुद्रा चुनें।",
+  "demo_saved": "सहेजा गया (डेमो मोड)",
 };

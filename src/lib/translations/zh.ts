@@ -1417,4 +1417,10 @@ export const zh: Record<string, string> = {
   "planning_widget_total_cash": "所需现金合计",
   "planning_widget_total_borrow": "借款合计",
   "planning_widget_own_cash": "自有资金",
+  "bluebook_add": "添加估值",
+  "bluebook_currency": "货币",
+  "bluebook_log_title": "已记录的估值（每条为图表上的一个点）",
+  "bluebook_delete": "删除此估值",
+  "bluebook_error_currency": "请选择受支持的货币。",
+  "demo_saved": "已保存（演示模式）",
 };

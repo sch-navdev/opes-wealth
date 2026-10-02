@@ -1417,4 +1417,10 @@ export const es: Record<string, string> = {
   "planning_widget_total_cash": "Efectivo total necesario",
   "planning_widget_total_borrow": "Préstamo total",
   "planning_widget_own_cash": "Aportación propia",
+  "bluebook_add": "Añadir una valoración",
+  "bluebook_currency": "Moneda",
+  "bluebook_log_title": "Valoraciones registradas (cada una es un punto del gráfico)",
+  "bluebook_delete": "Quitar esta valoración",
+  "bluebook_error_currency": "Elige una moneda admitida.",
+  "demo_saved": "Guardado (modo demo)",
 };

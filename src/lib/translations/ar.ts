@@ -1417,4 +1417,10 @@ export const ar: Record<string, string> = {
   "planning_widget_total_cash": "إجمالي النقد المطلوب",
   "planning_widget_total_borrow": "إجمالي الاقتراض",
   "planning_widget_own_cash": "مساهمة ذاتية",
+  "bluebook_add": "إضافة تقييم",
+  "bluebook_currency": "العملة",
+  "bluebook_log_title": "التقييمات المسجّلة (كل منها نقطة في الرسم)",
+  "bluebook_delete": "إزالة هذا التقييم",
+  "bluebook_error_currency": "اختر عملة مدعومة.",
+  "demo_saved": "تم الحفظ (وضع العرض التجريبي)",
 };

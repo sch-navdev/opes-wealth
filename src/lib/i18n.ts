@@ -2214,6 +2214,16 @@ const dictionary = {
   planning_widget_total_cash: { en: "Cash needed in total", fr: "Cash total nécessaire" },
   planning_widget_total_borrow: { en: "Borrowing in total", fr: "Emprunt total" },
   planning_widget_own_cash: { en: "Own cash", fr: "Apport personnel" },
+
+  // Blue Book log
+  bluebook_add: { en: "Add a valuation", fr: "Ajouter une cote" },
+  bluebook_currency: { en: "Currency", fr: "Devise" },
+  bluebook_log_title: { en: "Valuations on record (each is a point on the chart)", fr: "Cotes enregistrées (chacune est un point du graphique)" },
+  bluebook_delete: { en: "Remove this valuation", fr: "Supprimer cette cote" },
+  bluebook_error_currency: { en: "Choose a supported currency.", fr: "Choisissez une devise prise en charge." },
+
+  // Demo mode
+  demo_saved: { en: "Saved (Demo Mode)", fr: "Enregistré (mode démo)" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

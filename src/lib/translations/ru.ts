@@ -1417,4 +1417,10 @@ export const ru: Record<string, string> = {
   "planning_widget_total_cash": "Всего наличных",
   "planning_widget_total_borrow": "Всего кредитов",
   "planning_widget_own_cash": "Свои средства",
+  "bluebook_add": "Добавить оценку",
+  "bluebook_currency": "Валюта",
+  "bluebook_log_title": "Записанные оценки (каждая — точка на графике)",
+  "bluebook_delete": "Удалить эту оценку",
+  "bluebook_error_currency": "Выберите поддерживаемую валюту.",
+  "demo_saved": "Сохранено (демо-режим)",
 };
