@@ -63,6 +63,7 @@ export default async function BankingPage({
         .from("assets")
         .select("id, name, currency, current_value, metadata")
         .eq("profile_id", user.id)
+        .eq("status", "active")
         .eq("category_id", cashCategory.id)
         .eq("is_liability", false)
         .order("name")

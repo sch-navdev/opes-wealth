@@ -128,6 +128,7 @@ export function AddAssetDialog({
   defaultCategoryName,
   companies = [],
   owners: initialOwners,
+  simulation = false,
 }: {
   categories: Category[];
   asset?: AssetForEdit;
@@ -139,6 +140,8 @@ export function AddAssetDialog({
   trigger?: React.ReactNode;
   /** Existing owners of a shared asset (edit mode). Empty/absent = a single owner. */
   owners?: OwnerFormRow[];
+  /** Future Projects: save with status 'simulation' (outside net worth) and hide the co-owner section. */
+  simulation?: boolean;
 }) {
   const isEditMode = !!asset;
   const { t } = useLanguage();
@@ -291,6 +294,7 @@ export function AddAssetDialog({
 
     const formData = new FormData(form);
     formData.set("images", JSON.stringify(images));
+    if (simulation) formData.set("status", "simulation");
 
     // Ownership & co-owners: sent only for a shared asset (or one that WAS shared,
     // so removing every co-owner is saved). Must total exactly 100%.
@@ -732,7 +736,7 @@ export function AddAssetDialog({
 
           {isExotic && <ExoticAssetsFields value={exoticMetadata} onChange={setExoticMetadata} />}
 
-          <OwnershipFields value={ownerRows} onChange={setOwnerRows} notify={notifyCoOwners} onNotifyChange={setNotifyCoOwners} />
+          {!simulation && <OwnershipFields value={ownerRows} onChange={setOwnerRows} notify={notifyCoOwners} onNotifyChange={setNotifyCoOwners} />}
 
           {notice && (
             <p className="border border-primary bg-primary/5 p-3 text-sm text-foreground" role="status">

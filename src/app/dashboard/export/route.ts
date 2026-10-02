@@ -46,6 +46,7 @@ export async function GET(request: Request) {
       .from("assets")
       .select(EXPORT_COLUMNS)
       .eq("profile_id", user.id)
+      .eq("status", "active")
       .order("name")
       .returns<OwnedExportAsset[]>(),
     supabase

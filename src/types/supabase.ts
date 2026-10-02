@@ -95,6 +95,8 @@ export type Database = {
           purchase_date: string
           quantity: number
           ticker_symbol: string | null
+          status: string
+          plan: Json
           updated_at: string
         }
         Insert: {
@@ -111,6 +113,8 @@ export type Database = {
           purchase_date?: string
           quantity?: number
           ticker_symbol?: string | null
+          status?: string
+          plan?: Json
           updated_at?: string
         }
         Update: {
@@ -127,6 +131,8 @@ export type Database = {
           purchase_date?: string
           quantity?: number
           ticker_symbol?: string | null
+          status?: string
+          plan?: Json
           updated_at?: string
         }
         Relationships: [

@@ -88,6 +88,10 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - **`0028_harden_function_access.sql`** — after a read-only check of the live project (all of 0022–0027 present, RLS on every table, `asset-photos` bucket and its three own-folder policies in place) the security advisor flagged two of the co-ownership helpers as callable through `/rest/v1/rpc`. `is_asset_member` is now revoked from signed-out visitors but kept for signed-in users (RLS policies need it); `link_pending_co_owners` (a trigger function) is revoked from everyone. Other advisor items left as they are: `bug_reports` has RLS and no policy by design (server only); leaked-password protection is off (an Auth toggle, possibly Pro-only); older functions (`handle_new_user`, `rls_auto_enable`) are outside this change. **Not applied** at the time of writing.
 
+## assets.status and assets.plan (migration 0031, 2026-10-02)
+
+`status` (`active` default / `simulation`) separates live assets from Future Projects simulations; all portfolio queries filter on `active`. `plan` (jsonb) holds a simulation's financing inputs. Index `(profile_id, status)`. See [[Future-Projects|Future Projects]].
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

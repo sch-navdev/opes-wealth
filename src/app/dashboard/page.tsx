@@ -38,6 +38,8 @@ import {
   scaleHistoryRows,
 } from "@/lib/shared-assets/load";
 import { loadPendingApprovals } from "@/lib/shared-assets/server";
+import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
+import { FutureProjectsCard } from "@/components/future-projects-card";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import {
   buildVehicleHistoryFromPurchase,
@@ -107,12 +109,14 @@ export default async function DashboardPage({
     sharedWithMe,
     pendingApprovals,
     { data: savedDccRow },
+    simulationRows,
   ] = await Promise.all([
       supabase.from("asset_categories").select("id, name").order("name"),
       supabase
         .from("assets")
         .select(ASSET_COLUMNS)
         .eq("profile_id", user.id)
+        .eq("status", "active")
         .order("created_at", { ascending: false })
         .returns<AssetRow[]>(),
       supabase
@@ -127,6 +131,8 @@ export default async function DashboardPage({
       loadPendingApprovals(user.id),
       // Last Client Knowledge Document entries (migration 0026); null until saved or if the table doesn't exist yet.
       supabase.from("client_knowledge_documents").select("data").eq("profile_id", user.id).maybeSingle(),
+      // Future Projects: simulations, shown only in their own widget (never in the totals above).
+      loadSimulations(supabase, user.id),
     ]);
 
   // Co-ownership (migration 0025): assets shared WITH me are added and every asset
@@ -451,6 +457,12 @@ export default async function DashboardPage({
           accounts={cashAccounts}
           baseCurrency={displayCurrency}
           bankSyncMode={getBankSyncMode()}
+        />
+
+        <FutureProjectsCard
+          baseCurrency={displayCurrency}
+          projects={simulationRows.map((row) => toProjectInput(row, displayCurrency, rates))}
+          {...summariseHoldings(assets ?? [], displayCurrency, rates)}
         />
 
         <DashboardAnalytics

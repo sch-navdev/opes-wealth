@@ -125,7 +125,9 @@ export async function addAsset(formData: FormData) {
   }
 
   // Co-ownership: a shared asset needs owners totalling exactly 100%.
-  const ownersInput = parseOwnersField(formData);
+  // Future Projects (/dashboard/planning) save with status 'simulation': never shared, never in net worth.
+  const status = formData.get("status") === "simulation" ? "simulation" : "active";
+  const ownersInput = status === "simulation" ? null : parseOwnersField(formData);
   const shared = !!ownersInput && ownersInput.length > 1;
   if (shared) {
     const ownerErrors = validateOwners(ownersInput);
@@ -136,6 +138,7 @@ export async function addAsset(formData: FormData) {
     .from("assets")
     .insert({
       profile_id: user.id,
+      status,
       category_id: categoryId,
       name,
       quantity: quantity ? Number(quantity) : 1,
@@ -1404,6 +1407,7 @@ export async function refreshBrokerageQuotes(
     .from("assets")
     .select("id, quantity, currency, ticker_symbol, metadata")
     .eq("profile_id", user.id)
+    .eq("status", "active")
     .eq("category_id", category.id);
   if (assetIds && assetIds.length > 0) query = query.in("id", assetIds);
 
@@ -1733,6 +1737,7 @@ export async function importBrokerTrades(
       .from("assets")
       .select("id, name, quantity, metadata")
       .eq("profile_id", user.id)
+      .eq("status", "active")
       .eq("category_id", equitiesCategory.id)
       .ilike("ticker_symbol", holding.ticker)
       .maybeSingle<{ id: string; name: string; quantity: number; metadata: Json | null }>();

@@ -59,6 +59,7 @@ export default async function CompaniesPage({
         .from("assets")
         .select("id, name, currency, current_value, metadata")
         .eq("profile_id", user.id)
+        .eq("status", "active")
         .eq("category_id", companyCategory.id)
         .order("name")
         .returns<CompanyRow[]>()

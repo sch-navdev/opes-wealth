@@ -36,7 +36,8 @@ export async function loadCoOwnedAssets<T extends { id: string }>(
   const { data: mine } = await supabase.from("asset_owners").select("asset_id").eq("profile_id", userId);
   const ids = (mine ?? []).map((r: { asset_id: string }) => r.asset_id).filter((id: string) => !ownIds.has(id));
   if (ids.length === 0) return [];
-  let query = supabase.from("assets").select(columns).in("id", ids);
+  // Simulations (status = 'simulation') never count toward the user's real portfolio.
+  let query = supabase.from("assets").select(columns).in("id", ids).eq("status", "active");
   if (opts.categoryId) query = query.eq("category_id", opts.categoryId);
   const { data } = await query;
   return (data ?? []) as unknown as T[];
