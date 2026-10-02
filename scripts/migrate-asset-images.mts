@@ -9,16 +9,19 @@
  *
  * Safe to re-run: only `data:image/...` entries are converted (URLs are left
  * alone), and a row is updated only AFTER all its photos uploaded. Files go to
- * `<asset owner id>/<uuid>.<ext>` with the image's original bytes (no
- * re-encoding, so nothing is lost). Needs NEXT_PUBLIC_SUPABASE_URL and
+ * `<asset owner id>/<uuid>.<ext>` with the image's original bytes (WEBP/JPEG are
+ * not re-encoded, so nothing is lost; a PNG is converted to WEBP because the bucket
+ * only accepts WEBP/JPEG), plus a `<uuid>-thumb.<ext>` thumbnail (≤192px) made with
+ * `sharp`, matching what the browser uploader produces. Needs NEXT_PUBLIC_SUPABASE_URL and
  * SUPABASE_SERVICE_ROLE_KEY (the service role bypasses RLS and storage policies).
  * Uses Node's built-in TypeScript support, so only erasable syntax is allowed.
  */
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 const BUCKET = "asset-photos";
-const EXT: Record<string, string> = { "image/webp": "webp", "image/jpeg": "jpg", "image/png": "png" };
+const EXT: Record<string, "webp" | "jpg"> = { "image/webp": "webp", "image/jpeg": "jpg", "image/png": "webp" };
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -68,16 +71,27 @@ if (!apply) {
         next.push(src);
         continue;
       }
-      const path = `${row.profile_id}/${randomUUID()}.${EXT[mime]}`;
-      const { error: upError } = await db.storage
-        .from(BUCKET)
-        .upload(path, Buffer.from(match[2], "base64"), { contentType: mime, cacheControl: "31536000", upsert: false });
-      if (upError) {
-        console.log(`  ! ${row.name}: upload failed (${upError.message})`);
+      const ext = EXT[mime];
+      const base = `${row.profile_id}/${randomUUID()}`;
+      const path = `${base}.${ext}`;
+      const thumbPath = `${base}-thumb.${ext}`;
+      const original = Buffer.from(match[2], "base64");
+      // WEBP/JPEG keep their original bytes; a PNG becomes WEBP (the bucket's allowed types).
+      const full = mime === "image/png" ? await sharp(original).webp({ quality: 90 }).toBuffer() : original;
+      const thumbPipe = sharp(original).resize({ width: 192, height: 192, fit: "inside", withoutEnlargement: true });
+      const thumb = ext === "webp" ? await thumbPipe.webp({ quality: 80 }).toBuffer() : await thumbPipe.jpeg({ quality: 80 }).toBuffer();
+      const contentType = ext === "webp" ? "image/webp" : "image/jpeg";
+      const opts = { contentType, cacheControl: "31536000", upsert: false };
+      const { error: upError } = await db.storage.from(BUCKET).upload(path, full, opts);
+      const { error: thumbError } = upError ? { error: null } : await db.storage.from(BUCKET).upload(thumbPath, thumb, opts);
+      if (upError || thumbError) {
+        console.log(`  ! ${row.name}: upload failed (${(upError ?? thumbError)?.message})`);
+        if (!upError) await db.storage.from(BUCKET).remove([path]);
         ok = false;
         break;
       }
-      uploadedPaths.push(path);
+      uploadedPaths.push(path, thumbPath);
+      next.push(db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl);
       next.push(db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl);
     }
 
@@ -95,7 +109,7 @@ if (!apply) {
       continue;
     }
     moved += 1;
-    console.log(`  ✓ ${row.name}: ${uploadedPaths.length} photo(s) moved`);
+    console.log(`  ✓ ${row.name}: ${uploadedPaths.length / 2} photo(s) moved`);
   }
   console.log(`Done: ${moved} asset(s) migrated, ${failed} failed.`);
 }

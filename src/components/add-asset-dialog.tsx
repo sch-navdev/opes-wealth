@@ -39,6 +39,7 @@ import {
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { discardUploadedPhoto, uploadAssetPhoto } from "@/lib/asset-photos-client";
+import { photoThumbUrl } from "@/lib/asset-photos";
 import {
   EMPTY_REAL_ESTATE_METADATA,
   MAX_ASSET_IMAGES,
@@ -468,7 +469,7 @@ export function AddAssetDialog({
               {images.map((src, index) => (
                 <div key={index} className="relative">
                   <Avatar size="lg" className="rounded-md">
-                    <AvatarImage src={src} alt="" className="object-contain" />
+                    <AvatarImage src={photoThumbUrl(src)} alt="" className="object-contain" loading="lazy" decoding="async" />
                     <AvatarFallback className="rounded-md">?</AvatarFallback>
                   </Avatar>
                   <Button

@@ -115,6 +115,11 @@
 - **Caveat (inherent to JWTs)**: a revoked device cannot refresh, but an access token it already holds stays valid until it expires (Supabase default 1 hour). The UI states this.
 - **Verified**: `tsc --noEmit`, `eslint`, `next build` clean; the component rendered correctly (Computer/Mobile/App rows, current-device badge, revoke buttons) with sample props in the browser. **Not verified against a real session**: the page needs a real login (no mock-auth path, like Settings/MFA) and migration `0016` has **not been applied** to the live project — see [[Database-Schema|Database Schema]].
 
+## Branded auth email templates (2026-10-02)
+
+- `docs/emails/` holds a branded HTML template for **every** Supabase Auth email: Confirm sign up, Invite user, Magic link / OTP, Change email address, Reset password, Reauthentication, and the seven security notifications (password, email, phone, sign-in method linked/removed, MFA added/removed), plus a README mapping each file to its Supabase screen, a suggested subject and the variables it uses. Same look as the invite email (navy and gold, serif headlines, Outlook-safe buttons, optimised logo from `/email-logo.png`), generated from one shared layout.
+- **Security notifications use only `{{ .SiteURL }}`** (and no detail such as the old/new address, provider or factor type): those variable names could not be verified and an unknown variable makes a template fail to render. They are also **off by default in Supabase** — each toggle must be switched on and saved. Not yet pasted into the dashboard or test-sent.
+
 ## Related
 - [[Database-Schema|Database Schema]] — `profiles` row auto-creation on signup (`0002_user_profile_trigger.sql`, extended by `0008`)
 - [[Profile-Settings|Profile & Settings]] — MFA management link now lives on `/dashboard/settings`

@@ -8,6 +8,10 @@
 --                    anyone who has a URL can open it, URLs are unguessable UUIDs
 --                    and are only ever shown to the asset's owners);
 --   * 3 MB limit   — the app resizes to ≤1440px WEBP/JPEG (typically 0.2–0.7 MB);
+--                    each photo is stored with a ≈10 KB thumbnail next to it
+--                    (`<uuid>.webp` + `<uuid>-thumb.webp`) because Supabase's image
+--                    transformation is a paid feature — no extra policy is needed,
+--                    both files live in the owner's folder;
 --   * webp / jpeg  — the only types the app produces.
 -- Write access is limited to a user's OWN folder: the first path segment must be
 -- their auth.uid(). There is no select policy, so nobody can LIST the bucket

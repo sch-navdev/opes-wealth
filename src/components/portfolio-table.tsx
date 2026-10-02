@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CategoryIcon, categoryIconFor } from "@/components/category-icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { photoThumbUrl } from "@/lib/asset-photos";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -266,9 +267,11 @@ export function PortfolioTable({
                     >
                       <Avatar size="sm" className="rounded-md">
                         <AvatarImage
-                          src={asset.images?.[0] || undefined}
+                          src={photoThumbUrl(asset.images?.[0])}
                           alt=""
                           className="object-contain"
+                          loading="lazy"
+                          decoding="async"
                         />
                         <AvatarFallback className="rounded-md">
                           {categoryIconFor(asset.asset_categories?.name) ? (

@@ -51,6 +51,9 @@ export async function getCroppedImage(
 /** Asset photos: long edge, and JPEG quality (was 400px / 0.8, which blurred photos). */
 export const ASSET_IMAGE_MAX_SIZE = 1440;
 export const ASSET_IMAGE_QUALITY = 0.9;
+/** Thumbnails for lists and avatars (≈ 5–15 KB): long edge, and quality. */
+export const ASSET_THUMB_MAX_SIZE = 192;
+export const ASSET_THUMB_QUALITY = 0.8;
 
 /**
  * LEGACY: encodes a photo as a base64 data URL. Asset photos are now uploaded as

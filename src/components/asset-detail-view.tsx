@@ -171,6 +171,7 @@ import {
 import { METAL_FORM_LABEL_KEYS, METAL_LABEL_KEYS } from "@/components/precious-metals-fields";
 import { ExoticAssetCard } from "@/components/exotic-asset-card";
 import { StartupCard } from "@/components/startup-card";
+import { photoThumbUrl } from "@/lib/asset-photos";
 import { OwnershipSummary, type OwnerFormRow } from "@/components/ownership-fields";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
@@ -1208,7 +1209,7 @@ export function AssetDetailView({
                     aria-label="View images"
                   >
                     <Avatar size="lg" className="rounded-md">
-                      <AvatarImage src={images[0] || undefined} alt="" className="object-contain" />
+                      <AvatarImage src={photoThumbUrl(images[0])} alt="" className="object-contain" />
                       <AvatarFallback className="rounded-md">
                         {isRealEstate ? (
                           <Building2 className="size-5" />
