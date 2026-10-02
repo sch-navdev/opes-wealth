@@ -1,12 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/types/supabase";
+import { isDemoUser, userIdFromAccessToken } from "@/lib/demo-mode";
+import { withDemoReadOnly } from "@/utils/supabase/demo-shim";
 
 export async function createClient(options?: { rememberMe?: boolean }) {
   const rememberMe = options?.rememberMe ?? true;
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(
+  const client = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -35,4 +37,12 @@ export async function createClient(options?: { rememberMe?: boolean }) {
       },
     },
   );
+
+  // The public demo login is read-only: its writes are swallowed and reported as saved
+  // (see lib/demo-mode.ts). The identity comes from the session cookie and can only ever
+  // make a session MORE restricted.
+  const {
+    data: { session },
+  } = await client.auth.getSession();
+  return isDemoUser(userIdFromAccessToken(session?.access_token)) ? withDemoReadOnly(client) : client;
 }

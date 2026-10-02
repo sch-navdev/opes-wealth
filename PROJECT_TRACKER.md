@@ -84,6 +84,7 @@ High-net-worth individuals
 ### OW11 — Co-ownership
 - [x] Co-ownership schema, pro-rata valuation, invites, approval workflow, ownership form, approvals bell, daily auto-apply — type-checked and unit-checked; **migration 0025 not applied, DB path untested** — [[Co-Ownership|Co-Ownership]]
 - [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; **migration 0031 must be applied before deploying** — [[Future-Projects|Future Projects]]
+- [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — **migration 0032 and a seed re-run are manual** — [[Demo-Mode|Demo Mode]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
@@ -96,6 +97,7 @@ High-net-worth individuals
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — Step 8, complete (backend + upload UI)
 - [[Co-Ownership|Co-Ownership]] — shared assets, pro-rata valuation, invites, change approvals
 - [[Future-Projects|Future Projects]] — simulations outside net worth, bankability engine, dashboard widget
+- [[Demo-Mode|Demo Mode]] — populated demo account and read-only enforcement
 - [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
 - [[Deployment|Deployment]] — Step 10, pre-deployment hardening done (clean lint/typecheck/build); actual Vercel deployment still pending
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet

@@ -29,6 +29,8 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 // Same fingerprint the app's import uses (src/lib/transactions.ts: node:crypto only, no @/ imports).
 import { fingerprintTransactions } from "../src/lib/transactions.ts";
+// Same depreciation model the app uses (src/lib/vehicle-depreciation.ts: pure, no @/ imports).
+import { ageAtPurchase, suggestDepreciation } from "../src/lib/vehicle-depreciation.ts";
 
 const DEMO_EMAIL = process.env.DEMO_EMAIL ?? "demo@opeswealth.com";
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "DemoPassword2026!";
@@ -48,6 +50,10 @@ type SeedAsset = {
   purchaseDate: string;
   metadata: Json;
   history: Point[];
+  /** 'simulation' = a Future Project (outside net worth); default 'active'. */
+  status?: "active" | "simulation";
+  /** Financing inputs of a simulation (src/lib/planning.ts PlanInputs). */
+  plan?: Json;
 };
 
 // ---------------------------------------------------------------------------
@@ -827,15 +833,36 @@ equities.forEach((e, idx) => {
 
 // ---- Vehicles --------------------------------------------------------------
 
-type VehicleDef = { name: string; make: string; model: string; year: string; plate: string; vin: string; currency: string; price: number; market: number; date: string; km: number; seed: number };
+type VehicleDef = {
+  name: string; make: string; model: string; year: string; plate: string; vin: string; currency: string;
+  price: number; market: number; date: string; km: number; seed: number;
+  /** Bought used (skips the showroom drop). */
+  secondHand?: boolean;
+  /** Official price-guide valuations: months after purchase, share of today's market value, document currency. */
+  blueBook: { months: number; factor: number; currency: string; source: string }[];
+};
 
 const vehicles: VehicleDef[] = [
-  { name: "Porsche 911 Carrera S (992)", make: "Porsche", model: "911 Carrera S", year: "2023", plate: "DXB A 4471", vin: "WP0ZZZ992PS000101", currency: "AED", price: 640000, market: 575000, date: "2023-02-10", km: 21500, seed: 81 },
-  { name: "Mercedes-Benz G 63 AMG", make: "Mercedes-Benz", model: "G 63 AMG", year: "2022", plate: "DXB B 9020", vin: "W1NYC7HJ5NX000202", currency: "AED", price: 720000, market: 690000, date: "2022-08-18", km: 38200, seed: 83 },
-  { name: "Tesla Model Y Long Range", make: "Tesla", model: "Model Y Long Range", year: "2024", plate: "GH-482-KL", vin: "7SAYGDEE5RA000303", currency: "EUR", price: 52000, market: 38500, date: "2024-03-05", km: 27800, seed: 85 },
+  { name: "Porsche 911 Carrera S (992)", make: "Porsche", model: "911 Carrera S", year: "2023", plate: "DXB A 4471", vin: "WP0ZZZ992PS000101", currency: "AED", price: 640000, market: 575000, date: "2023-02-10", km: 21500, seed: 81,
+    blueBook: [{ months: 12, factor: 1.12, currency: "AED", source: "Kelley Blue Book" }, { months: 30, factor: 1.03, currency: "AED", source: "Kelley Blue Book" }] },
+  { name: "Mercedes-Benz G 63 AMG", make: "Mercedes-Benz", model: "G 63 AMG", year: "2022", plate: "DXB B 9020", vin: "W1NYC7HJ5NX000202", currency: "AED", price: 720000, market: 690000, date: "2022-08-18", km: 38200, seed: 83, secondHand: true,
+    blueBook: [{ months: 18, factor: 1.06, currency: "AED", source: "Kelley Blue Book" }] },
+  { name: "Tesla Model Y Long Range", make: "Tesla", model: "Model Y Long Range", year: "2024", plate: "GH-482-KL", vin: "7SAYGDEE5RA000303", currency: "EUR", price: 52000, market: 38500, date: "2024-03-05", km: 27800, seed: 85,
+    blueBook: [{ months: 14, factor: 1.04, currency: "EUR", source: "Cote Argus" }, { months: 24, factor: 0.97, currency: "EUR", source: "Cote Argus" }] },
 ];
 
 vehicles.forEach((v) => {
+  const dep = suggestDepreciation({ make: v.make, model: v.model, secondHand: !!v.secondHand, ageAtPurchase: ageAtPurchase(v.year, v.date) });
+  const blueBookLog = v.blueBook
+    .map((b, i) => ({
+      id: `bb-demo-${v.seed}-${i + 1}`,
+      date: addMonths(v.date, b.months),
+      amount: Math.round(v.market * b.factor),
+      currency: b.currency,
+      source: b.source,
+      document: "",
+    }))
+    .filter((e) => e.date <= TODAY);
   // A dated expense ledger (metadata.expenses): a few entries a year since purchase.
   const plan: [number, string, string, number][] = [
     [4, "maintenance", "Annual service", 0.006],
@@ -875,10 +902,66 @@ vehicles.forEach((v) => {
       market_valuation: v.market,
       last_valuation_source: "manual",
       last_valuation_date: TODAY,
+      second_hand: !!v.secondHand,
+      depreciation_first_year: dep.first,
+      depreciation_annual: dep.annual,
+      depreciation_manual: false,
+      blue_book_log: blueBookLog,
       expenses,
     },
     history: path(v.date, TODAY, v.price, v.market, 0.004, v.seed),
   });
+});
+
+// ---- Future Projects (simulations: status 'simulation', never in net worth) -----------------
+//
+// Planned purchases for /dashboard/planning and the dashboard widget. The plan holds the
+// financing inputs; the asset itself carries the price and fees like any other asset.
+
+addAsset({
+  category: "Real Estate",
+  name: "Dubai Hills 2-bed apartment (planned)",
+  currentValue: 2450000,
+  currency: "AED",
+  purchaseDate: addMonths(TODAY, 6),
+  status: "simulation",
+  plan: { day_d: addMonths(TODAY, 6), ltv_pct: 75, rate_pct: 4.6, term_years: 25, own_cash: null },
+  metadata: {
+    property_type: "apartment",
+    country: "United Arab Emirates",
+    emirate: "dubai",
+    purchasePrice: 2400000,
+    agencyFees: 48000,
+    renovationFees: 60000,
+    furnishingFees: 45000,
+    market_valuation: 2450000,
+  },
+  history: [],
+});
+
+addAsset({
+  category: "Vehicles",
+  name: "Aston Martin DB12 (planned)",
+  currentValue: 790000,
+  currency: "AED",
+  purchaseDate: addMonths(TODAY, 9),
+  status: "simulation",
+  plan: { day_d: addMonths(TODAY, 9), ltv_pct: 80, rate_pct: 5.2, term_years: 5, own_cash: 250000 },
+  metadata: {
+    vin: "SCFRMFAW0RGL00012",
+    make: "Aston Martin",
+    model: "DB12",
+    year: "2026",
+    license_plate: "",
+    purchase_price: 790000,
+    mileage: 0,
+    maintenance_costs: null,
+    modifications: null,
+    insurance_registration: 28000,
+    second_hand: false,
+    expenses: [],
+  },
+  history: [],
 });
 
 // ---- Companies (src/lib/companies.ts) ----------------------------------------
@@ -1162,7 +1245,9 @@ function summarize() {
   let gross = 0;
   let debt = 0;
   const byCategory = new Map<string, number>();
-  for (const a of assets) {
+  const simulations = assets.filter((x) => x.status === "simulation").length;
+  // Future Projects (simulations) are outside net worth, so they are left out of this summary too.
+  for (const a of assets.filter((x) => x.status !== "simulation")) {
     if (a.isLiability) {
       debt += usd(a.currentValue, a.currency);
       continue;
@@ -1185,7 +1270,7 @@ function summarize() {
     byCategory.set(a.category, (byCategory.get(a.category) ?? 0) + usd(a.currentValue, a.currency));
   }
   const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
-  console.log(`Assets: ${assets.length}  History rows: ${assets.reduce((s, a) => s + a.history.length, 0)}`);
+  console.log(`Assets: ${assets.length - simulations} + ${simulations} simulation(s)  History rows: ${assets.reduce((s, a) => s + a.history.length, 0)}`);
   for (const [cat, v] of byCategory) console.log(`  ${cat.padEnd(16)} ~USD ${fmt(v)}`);
   console.log(`Gross assets ~USD ${fmt(gross)}  Liabilities ~USD ${fmt(debt)}  Net worth ~USD ${fmt(gross - debt)}`);
 }
@@ -1269,6 +1354,8 @@ async function seed() {
       purchase_date: a.purchaseDate,
       metadata: a.metadata,
       images: [],
+      status: a.status ?? "active",
+      plan: a.plan ?? {},
     })),
   );
   if (assetError) throw assetError;

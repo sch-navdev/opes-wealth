@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isDemoUser } from "@/lib/demo-mode";
 import { createClient } from "@/utils/supabase/server";
 
 export async function updateProfile(formData: FormData) {
@@ -70,6 +71,11 @@ export async function updateEmail(newEmail: string) {
   // user's email immediately. It sends a confirmation link to the new
   // address (and, depending on project settings, to the old one too) and
   // only applies the change once the link is followed.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (isDemoUser(user?.id)) return { success: true }; // the demo login must stay as published
+
   const { error } = await supabase.auth.updateUser({ email: newEmail });
 
   if (error) {

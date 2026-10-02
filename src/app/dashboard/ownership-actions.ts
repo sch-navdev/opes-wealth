@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
+import { isDemoUser } from "@/lib/demo-mode";
 import { notifyApprovers, resendInvite, respondToApproval, revokeCoOwner } from "@/lib/shared-assets/server";
 
 export type RespondResult =
@@ -37,6 +38,7 @@ export async function resendApprovalEmail(requestId: string, profileId: string):
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You must be signed in." };
 
+  if (isDemoUser(user.id)) return { ok: true };
   const service = createServiceClient();
   const { data: request } = await service
     .from("asset_change_requests")
@@ -59,6 +61,7 @@ export async function resendCoOwnerInvite(assetId: string, email: string): Promi
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "You must be signed in." };
 
+  if (isDemoUser(user.id)) return { ok: true };
   const { data: asset } = await createServiceClient().from("assets").select("profile_id").eq("id", assetId).single();
   if (!asset || asset.profile_id !== user.id) return { ok: false, error: "Only the asset's creator can do this." };
 

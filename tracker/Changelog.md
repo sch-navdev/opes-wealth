@@ -179,3 +179,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Vehicles get a Blue Book / Argus valuation (PDF upload, localised name) and a depreciation model (second-hand tick, signed editable rates) — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - 2026-10-02: Security page shows each session's real city and country (migration 0030) — [[Authentication-Security|Authentication & Security]]
 - 2026-10-02: Future Projects: simulated assets (status column, migration 0031) kept out of net worth, planning page with a bankability engine, and a hideable dashboard widget — [[Future-Projects|Future Projects]]
+- 2026-10-02: Vehicle Blue Book values now have a currency and a dated log, and the vehicle chart compares market value, purchase price and Blue Book — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-02: Demo account gets Blue Book, depreciation and Future Projects seed data and a read-only mode (database deny policies, server write shim, Saved (Demo Mode) toast) — [[Demo-Mode|Demo Mode]]

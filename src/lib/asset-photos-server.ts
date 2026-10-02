@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/utils/supabase/service";
 import { ASSET_PHOTO_BUCKET, assetPhotoPaths } from "@/lib/asset-photos";
+import { DEMO_USER_ID } from "@/lib/demo-mode";
 
 /**
  * Deletes photo files from the bucket after they stop being referenced (a photo
@@ -10,7 +11,8 @@ import { ASSET_PHOTO_BUCKET, assetPhotoPaths } from "@/lib/asset-photos";
  * co-owner uploaded into another user's folder).
  */
 export async function removeAssetPhotos(urls: string[]): Promise<void> {
-  const paths = urls.flatMap((u) => assetPhotoPaths(u));
+  // The read-only demo account's photos are never deleted (files live in <user id>/…).
+  const paths = urls.flatMap((u) => assetPhotoPaths(u)).filter((p) => !p.startsWith(`${DEMO_USER_ID}/`));
   if (paths.length === 0) return;
   try {
     await createServiceClient().storage.from(ASSET_PHOTO_BUCKET).remove(paths);

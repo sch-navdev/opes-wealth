@@ -20,11 +20,12 @@ import {
 } from "@/lib/banking/altareq";
 import { decryptSecret, encryptSecret, isTokenCryptoConfigured } from "@/lib/banking/token-crypto";
 import type { AssetHistorySource } from "@/lib/asset-history";
+import { isDemoUser } from "@/lib/demo-mode";
 
 type Fail = { ok: false; code: AltareqErrorCode | "unauthenticated" | "invalid" | "db_error" | "crypto_not_configured"; error: string };
 
 /** Every banking action needs a signed-in session that has completed MFA step-up. */
-async function requireUser(): Promise<{ ok: true; userId: string; userClient: Awaited<ReturnType<typeof createClient>> } | Fail> {
+async function requireUser(write = false): Promise<{ ok: true; userId: string; userClient: Awaited<ReturnType<typeof createClient>> } | Fail> {
   const userClient = await createClient();
   const {
     data: { user },
@@ -32,6 +33,9 @@ async function requireUser(): Promise<{ ok: true; userId: string; userClient: Aw
   if (!user) return { ok: false, code: "unauthenticated", error: "You must be signed in." };
   if (await needsMfaStepUp(userClient)) {
     return { ok: false, code: "unauthenticated", error: "Complete two-factor verification first." };
+  }
+  if (write && isDemoUser(user.id)) {
+    return { ok: false, code: "unauthenticated", error: "Bank connections are switched off in the demo account." };
   }
   return { ok: true, userId: user.id, userClient };
 }
@@ -63,7 +67,7 @@ export async function startBankConnection(institutionId: string): Promise<
   | { ok: true; kind: "connected"; connectionId: string; isSandbox: boolean; accounts: BankAccount[]; autoLinked: boolean }
   | Fail
 > {
-  const auth = await requireUser();
+  const auth = await requireUser(true);
   if (!auth.ok) return auth;
   const mode = getBankSyncMode();
   if (mode === "unconfigured") {
@@ -161,7 +165,7 @@ export async function linkBankAccounts(
   connectionId: string,
   mappings: AccountMapping[],
 ): Promise<{ ok: true; linked: number } | Fail> {
-  const auth = await requireUser();
+  const auth = await requireUser(true);
   if (!auth.ok) return auth;
   const service = createServiceClient();
 
@@ -276,7 +280,7 @@ async function writeBalanceToAsset(
 export async function syncBankConnection(connectionId: string): Promise<
   { ok: true; synced: number; isSandbox: boolean } | Fail
 > {
-  const auth = await requireUser();
+  const auth = await requireUser(true);
   if (!auth.ok) return auth;
   const service = createServiceClient();
   const now = new Date().toISOString();
@@ -410,7 +414,7 @@ export async function syncBankConnection(connectionId: string): Promise<
  * the live API; until then, also revoke it in the bank's own app.
  */
 export async function disconnectBank(connectionId: string): Promise<{ ok: true } | Fail> {
-  const auth = await requireUser();
+  const auth = await requireUser(true);
   if (!auth.ok) return auth;
   const { error } = await auth.userClient
     .from("bank_connections")
@@ -433,7 +437,7 @@ export async function rememberCashAccountBank(
   bankProfile: string,
   accountRef: string,
 ): Promise<{ ok: true } | Fail> {
-  const auth = await requireUser();
+  const auth = await requireUser(true);
   if (!auth.ok) return auth;
 
   const { data: asset } = await auth.userClient

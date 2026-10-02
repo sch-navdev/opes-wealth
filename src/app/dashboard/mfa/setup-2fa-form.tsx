@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/language-context";
 import { createClient } from "@/utils/supabase/client";
+import { useDemoMode } from "@/components/demo-mode";
 
 type EnrollState = {
   factorId: string;
@@ -99,6 +100,7 @@ function RemoveFactorButton({
 
 export function Setup2faForm() {
   const { intlLocale } = useLanguage();
+  const { isDemo, notifySaved } = useDemoMode();
   const supabase = createClient();
 
   const [totpFactors, setTotpFactors] = useState<LinkedFactor[]>([]);
@@ -267,6 +269,7 @@ export function Setup2faForm() {
   }, []);
 
   async function handleSetup() {
+    if (isDemo) return notifySaved(); // demo login must keep working for everyone
     setError(null);
     setIsLoading(true);
 
@@ -318,6 +321,7 @@ export function Setup2faForm() {
   }
 
   async function handleRemoveTotp(factorId: string): Promise<boolean> {
+    if (isDemo) return notifySaved(), false;
     const stepUpOk = await ensureAal2();
     if (!stepUpOk) return false;
 
@@ -338,6 +342,7 @@ export function Setup2faForm() {
   }
 
   async function handleRemovePasskey(passkeyId: string): Promise<boolean> {
+    if (isDemo) return notifySaved(), false;
     const stepUpOk = await ensureAal2();
     if (!stepUpOk) return false;
 
@@ -358,6 +363,7 @@ export function Setup2faForm() {
   }
 
   async function handleRegisterPasskey() {
+    if (isDemo) return notifySaved();
     setPasskeyError(null);
 
     const stepUpOk = await ensureAal2();

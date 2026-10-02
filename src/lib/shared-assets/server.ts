@@ -28,6 +28,7 @@ import {
   type TimeLeft,
 } from "@/lib/ownership";
 import { sendApprovalEmail } from "@/lib/shared-assets/notify";
+import { isDemoUser } from "@/lib/demo-mode";
 import type { Json } from "@/types/supabase";
 
 type Service = ReturnType<typeof createServiceClient>;
@@ -140,6 +141,8 @@ export async function replaceOwners(opts: {
   /** Email the invitation to new co-owners without an account (default true). */
   notify?: boolean;
 }): Promise<{ ok: true; invited: string[] } | { ok: false; error: string }> {
+  // Demo account: read-only; these writes use the service role, which bypasses RLS.
+  if (isDemoUser(opts.creatorProfileId)) return { ok: true, invited: [] };
   const errors = validateOwners(opts.owners);
   if (errors.length > 0) return { ok: false, error: errors[0] };
 
@@ -265,6 +268,7 @@ export async function revokeCoOwner(
   creatorId: string,
   email: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (isDemoUser(creatorId)) return { ok: true };
   const service = createServiceClient();
   const { data: asset } = await service.from("assets").select("profile_id").eq("id", assetId).single();
   if (!asset || asset.profile_id !== creatorId) return { ok: false, error: "Only the asset's creator can do this." };
@@ -391,6 +395,7 @@ export async function routeAssetEdit(opts: {
   /** Email the approvers (default true). */
   notify?: boolean;
 }): Promise<RouteResult> {
+  if (isDemoUser(opts.userId)) return { mode: "direct" }; // the demo user's own (shimmed) update follows
   const service = createServiceClient();
   const { data: asset } = await service.from("assets").select("id, profile_id, name").eq("id", opts.assetId).single();
   if (!asset) return { mode: "error", error: "Asset not found." };
@@ -506,6 +511,7 @@ export async function respondToApproval(opts: {
   requestId: string;
   approve: boolean;
 }): Promise<{ ok: true; outcome: "approved" | "rejected" | "waiting" } | { ok: false; error: string }> {
+  if (isDemoUser(opts.userId)) return { ok: true, outcome: "approved" };
   const service = createServiceClient();
   const { data: approval } = await service
     .from("change_approvals")

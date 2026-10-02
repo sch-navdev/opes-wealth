@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isDemoUser } from "@/lib/demo-mode";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 
@@ -53,6 +54,10 @@ export async function revokeSession(sessionId: string): Promise<ActionResult> {
 export async function revokeOtherSessions(): Promise<ActionResult> {
   const guard = await requireStrongSession();
   if (!guard.ok) return { ok: false, error: guard.error };
+
+  // Signing others out would also end other visitors' demo sessions.
+  const { data: claims } = await guard.supabase.auth.getClaims();
+  if (isDemoUser(claims?.claims.sub)) return { ok: true };
 
   const { error } = await guard.supabase.auth.signOut({ scope: "others" });
   if (error) return { ok: false, error: error.message };
