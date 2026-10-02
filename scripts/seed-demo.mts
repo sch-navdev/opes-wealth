@@ -2,7 +2,8 @@
  * Demo-account seeder: creates (or resets) demo@opeswealth.com and fills it
  * with a rich, clearly fictional portfolio — multi-currency bank accounts,
  * real estate with amortizing loans (plus an off-plan unit), private equity
- * with capital calls, a brokerage account, vehicles and standalone
+ * with capital calls, a brokerage account, vehicles, a startup holding with
+ * funding rounds, exotic assets (watch, fine wine, art) and standalone
  * liabilities — each with a monthly value history.
  *
  * It is a SCRIPT, not a migration, on purpose: a migration would create a
@@ -667,6 +668,135 @@ vehicles.forEach((v) => {
     },
     history: path(v.date, TODAY, v.price, v.market, 0.004, v.seed),
   });
+});
+
+// ---- Startups & unlisted (src/lib/startups.ts) -----------------------------
+//
+// Shares live in `quantity`; value = shares × the latest round's price. The
+// funding rounds are metadata (no table), and the history steps at each round
+// date, exactly as `startup-actions.ts` writes it.
+
+{
+  const shares = 25000;
+  const avgCost = 0.8;
+  const rounds = [
+    { id: "round-demo-seed", date: "2023-03-15", name: "Seed", price_per_share: 1.2, post_money_valuation: 8000000 },
+    { id: "round-demo-series-a", date: "2024-11-20", name: "Series A", price_per_share: 3.5, post_money_valuation: 42000000 },
+  ];
+  const purchaseDate = "2022-09-01";
+  const latest = rounds[rounds.length - 1];
+  const value = round2(shares * latest.price_per_share);
+  addAsset({
+    category: "Startups",
+    name: "Lumen AI",
+    quantity: shares,
+    currentValue: value,
+    currency: "USD",
+    purchaseDate,
+    metadata: {
+      company_name: "Lumen AI (fictional)",
+      sector: "Artificial intelligence / SaaS",
+      investment_type: "direct_equity",
+      avg_cost_per_share: avgCost,
+      funding_rounds: rounds,
+    },
+    history: [
+      { date: purchaseDate, value: round2(shares * avgCost) },
+      ...rounds.map((r) => ({ date: r.date, value: round2(shares * r.price_per_share) })),
+      { date: TODAY, value },
+    ],
+  });
+}
+
+// ---- Exotic assets (src/lib/exotic-assets.ts) ------------------------------
+//
+// One flat metadata shape with a `kind`; `purchase_price` is PER UNIT, and
+// `current_value` is the total (units × unit value). Values are illustrative.
+
+const exoticMetadata = (m: Json): Json => ({
+  kind: "watch",
+  brand: "",
+  model: "",
+  reference_number: "",
+  year: null,
+  condition: "very_good",
+  box_papers: "full_set",
+  serial_number: "",
+  storage_location: "",
+  producer: "",
+  vintage: null,
+  region: "",
+  artist: "",
+  title: "",
+  art_year: null,
+  medium: "",
+  purchase_price: null,
+  // Left empty on purpose so "Refresh market value" (live API) can be demoed.
+  last_market_value: null,
+  last_priced_at: null,
+  last_price_source: null,
+  ...m,
+});
+
+// a) Watch: a real reference (Rolex Submariner Date 126610LN) so the live
+//    valuation fallback has something to look up; the serial number is invented.
+addAsset({
+  category: "Exotic Assets",
+  name: "Rolex Submariner Date 126610LN",
+  currentValue: 14200,
+  currency: "USD",
+  purchaseDate: "2022-06-10",
+  metadata: exoticMetadata({
+    kind: "watch",
+    brand: "Rolex",
+    model: "Submariner Date",
+    reference_number: "126610LN",
+    year: 2022,
+    condition: "very_good",
+    box_papers: "full_set",
+    serial_number: "DEMO-0000-126610",
+    storage_location: "Home safe, Dubai",
+    purchase_price: 10250,
+  }),
+  history: path("2022-06-10", TODAY, 10250, 14200, 0.015, 91),
+});
+
+// b) Fine wine: 24 bottles of a Bordeaux first growth (quantity = bottles).
+addAsset({
+  category: "Exotic Assets",
+  name: "Château Margaux 2015 (case collection)",
+  quantity: 24,
+  currentValue: 18720,
+  currency: "EUR",
+  purchaseDate: "2020-11-05",
+  metadata: exoticMetadata({
+    kind: "wine",
+    producer: "Château Margaux",
+    vintage: 2015,
+    region: "Margaux, Bordeaux",
+    storage_location: "Bonded wine storage, Bordeaux",
+    purchase_price: 520,
+  }),
+  history: path("2020-11-05", TODAY, 24 * 520, 18720, 0.01, 93),
+});
+
+// c) Art: an invented artist and work.
+addAsset({
+  category: "Exotic Assets",
+  name: "Horizon Bleu (Élise Marchand)",
+  currentValue: 15500,
+  currency: "EUR",
+  purchaseDate: "2021-04-22",
+  metadata: exoticMetadata({
+    kind: "art",
+    artist: "Élise Marchand (fictional)",
+    title: "Horizon Bleu",
+    art_year: 2019,
+    medium: "Oil on canvas",
+    storage_location: "Living room, Paris",
+    purchase_price: 12000,
+  }),
+  history: path("2021-04-22", TODAY, 12000, 15500, 0.01, 97),
 });
 
 // ---- Standalone liabilities (balance owed is stored positive) ---------------
