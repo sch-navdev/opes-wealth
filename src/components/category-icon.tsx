@@ -1,5 +1,7 @@
 import {
   Banknote,
+  Gem,
+  Rocket,
   Bitcoin,
   Briefcase,
   Building2,
@@ -27,6 +29,8 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Equities: LineChart,
   Crypto: Bitcoin,
   "Precious Metals": Coins,
+  "Exotic Assets": Gem,
+  Startups: Rocket,
   Companies: Factory,
   Cash: Banknote,
   Liabilities: CreditCard,

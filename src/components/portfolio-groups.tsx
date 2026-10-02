@@ -55,11 +55,37 @@ export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   Equities: "category_equities",
   Crypto: "category_crypto",
   "Precious Metals": "category_precious_metals",
+  "Exotic Assets": "category_exotic_assets",
+  Startups: "category_startups",
   Companies: "category_companies",
   Cash: "category_cash",
   Liabilities: "category_liabilities",
   Vehicles: "category_vehicles",
   "Private Equity": "category_private_equity",
+};
+
+/**
+ * Folder order: financial and real assets first, then the "passion" block
+ * (Precious Metals, Exotic Assets, Vehicles) side by side, then unlisted
+ * holdings (Startups, Private Equity, Companies), then cash. Anything not
+ * listed sorts after, by name.
+ */
+const FOLDER_ORDER = [
+  "Real Estate",
+  "SCPI",
+  "Equities",
+  "Crypto",
+  "Precious Metals",
+  "Exotic Assets",
+  "Vehicles",
+  "Startups",
+  "Private Equity",
+  "Companies",
+  "Cash",
+];
+const folderRank = (name: string) => {
+  const i = FOLDER_ORDER.indexOf(name);
+  return i < 0 ? FOLDER_ORDER.length : i;
 };
 
 export function PortfolioGroups({
@@ -152,7 +178,10 @@ export function PortfolioGroups({
   // then append any group whose category_id wasn't in that list (shouldn't
   // normally happen, but a group must never silently disappear).
   const orderedIds = [
-    ...categories.map((c) => c.id).filter((id) => groups.has(id)),
+    ...[...categories]
+      .sort((a, b) => folderRank(a.name) - folderRank(b.name) || a.name.localeCompare(b.name))
+      .map((c) => c.id)
+      .filter((id) => groups.has(id)),
     ...Array.from(groups.keys()).filter(
       (id) => !categories.some((c) => c.id === id),
     ),

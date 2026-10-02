@@ -13,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import { InstitutionLogo } from "@/components/institution-logo";
+import { SHARESIGHT_ONLY_BROKERS } from "@/lib/brokers/directory";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -462,6 +463,21 @@ export function AddInvestmentsDialog() {
                   <span className="text-sm font-medium text-foreground">{broker.name}</span>
                 </button>
               ))}
+            </div>
+            <div className="space-y-2 border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground">{t("broker_via_sharesight_title")}</p>
+              <p className="text-xs text-muted-foreground">{t("broker_via_sharesight_desc")}</p>
+              <ul className="flex flex-wrap gap-2">
+                {SHARESIGHT_ONLY_BROKERS.map((broker) => (
+                  <li
+                    key={broker.id}
+                    className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 py-1 pe-2 ps-1 text-xs text-foreground"
+                  >
+                    <InstitutionLogo kind="broker" id={broker.id} name={broker.name} size="sm" />
+                    {broker.name}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         )}

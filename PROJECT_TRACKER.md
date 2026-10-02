@@ -68,6 +68,19 @@ High-net-worth individuals
 - [x] Portfolio Performance stacked area chart (grouped by Equities exchange, forward-filled per-asset history) on the main dashboard, new `--chart-1`..`--chart-5` design tokens — [[Broker-Trade-Import|Broker Trade Import]]
 - [x] Migration `0011_broker_import_source.sql` (adds `'broker_import'` to `asset_history_source_check`) — applied to the live project 2026-09-28 — [[Broker-Trade-Import|Broker Trade Import]]
 
+
+### OW9 — Imports, exotic assets, passive income
+- [x] Transaction fingerprinting + `(profile_id, fingerprint)` upsert on import — migration 0022 **not yet applied** — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Exotic Assets (watches) + Chrono24 valuation service — migration 0023 **not yet applied**, Chrono24 credentials not available — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Market-Data-Integration|Market Data Integration]]
+- [x] Broker directory (25 brokers) aligned with Sharesight, logos — [[Broker-Trade-Import|Broker Trade Import]]
+- [x] Global bank expansion (UK, US, ES, DE, IT), 9 languages — [[Localization|Localization]]
+- [x] Passive Income card + modal and dynamic income projections — [[Portfolio-Dashboard|Portfolio Dashboard]]
+
+- [x] Accessibility Comfort display mode (toggle, localStorage, bigger type/contrast/targets/icon labels) — [[Design-System|Design System]]
+### OW10 — Startups, exotic expansion, metals API
+- [x] Startups & unlisted: funding rounds, automatic valuation, options/BSPCE, detail page + chart — migration 0024 **not yet applied**, UI not exercised against a database — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- [x] Exotic Assets: wine and art kinds alongside watches; ordered portfolio folders; category picker with icons — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- [x] Live metals spot waterfall (GoldAPI → Metals-API → Yahoo → manual) — API keys not set, never called live — [[Market-Data-Integration|Market Data Integration]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth

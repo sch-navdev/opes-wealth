@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBank } from "@/lib/banking/institutions";
 import { BROKER_REGISTRY, type BrokerId } from "@/lib/parsers/broker-registry";
+import { getDirectoryBroker } from "@/lib/brokers/directory";
 
 /**
  * Same-origin logo proxy for banks and brokers. The browser asks for a registry
@@ -21,7 +22,9 @@ export async function GET(
 
   let domain: string | undefined;
   if (kind === "bank") domain = getBank(key)?.domain;
-  else if (kind === "broker") domain = BROKER_REGISTRY[key as BrokerId]?.domain;
+  else if (kind === "broker") {
+    domain = BROKER_REGISTRY[key as BrokerId]?.domain ?? getDirectoryBroker(key)?.domain;
+  }
   if (!domain) return new NextResponse(null, { status: 404 });
 
   const upstream = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=${encodeURIComponent(`https://${domain}`)}`;

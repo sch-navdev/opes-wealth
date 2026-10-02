@@ -62,6 +62,16 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 - `scripts/seed-demo.mts` (not a migration) writes a demo user's `profiles`, `assets` and `asset_history` rows through the service role; it needs migrations up to 0019 for the categories. See [[Deployment|Deployment]] (Demo Account & Seed Script).
 
+## Migrations 0022 and 0023 (2026-10-02, OW9)
+
+- **`0022_transactions.sql`** — new `transactions` table (per-transaction ledger for CSV/statement imports) with `unique (profile_id, fingerprint)`, an `(asset_id, booked_date desc)` index and owner-only RLS. Details in [[CSV-Bank-Uploads|CSV Bank Uploads]]. Hand-typed in `src/types/supabase.ts` too (that file is maintained by hand here).
+- **`0023_exotic_assets_category.sql`** — seeds the `Exotic Assets` category (`on conflict (slug) do nothing`). No columns: watch fields live in `assets.metadata` (`src/lib/exotic-assets.ts`). Chrono24 valuations are written to `asset_history` with `source = 'manual'` (provenance is in `metadata.last_price_source`) so no CHECK-constraint change is needed.
+- **Both are unapplied** at the time of writing — apply with `supabase db push` or the SQL editor.
+
+## Migration 0024 (2026-10-02, OW10)
+
+- **`0024_startups_category.sql`** — seeds the `Startups` category (`on conflict (slug) do nothing`). No columns: startup fields and funding rounds live in `assets.metadata`, shares in `assets.quantity` — see [[Portfolio-Dashboard|Portfolio Dashboard]]. **Unapplied** at the time of writing (together with 0022/0023).
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

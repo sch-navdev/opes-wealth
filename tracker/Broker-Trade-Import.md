@@ -105,6 +105,12 @@ Built and verified against a **real Saxo export** (`Transactions_10164571_2020-0
 - **Chart**: equity asset charts keep "Market Value"/"Equity" (now true market value) and add a dashed step line **"Invested (cost basis)"** with a legend, so the gap between them is the unrealized gain/loss. The dashboard's net-worth/category charts pick up market values automatically.
 - **Verified on the real workbook + live Yahoo data** (logic run directly; the import UI/DB write is behind the mock-auth wall): Ubisoft market value 2,369 (Dec 2021) → 1,453 → 1,271 → 1,176 (Jun 2024) against a flat 3,435 cost; IVV market 1,153 → 5,732 → 8,702 vs cost 1,229 → 5,238 → 7,367; closed AAPL 168 daily rows ending at 0 on 2021-04-30. The delisted `FXLV` has no Yahoo data and stays at cost. **To take effect**: redeploy `refresh-market-price` (`supabase functions deploy refresh-market-price`), then re-upload the Saxo file — until then the database still holds the cost-basis rows (the equity chart shows them and only a few points). Volume: roughly 1,000–1,500 daily rows per held-for-years holding.
 
+## Broker directory & Sharesight alignment (2026-10-02, OW9)
+
+- `src/lib/brokers/directory.ts`: 25 brokers (Saxo, Sharesight, Interactive Brokers, Schwab, Fidelity, Vanguard, E*TRADE, Robinhood, DEGIRO, Trading 212, Freetrade, Hargreaves Lansdown, AJ Bell, interactive investor, IG, eToro, Trade Republic, Scalable, Boursorama, Revolut, CommSec, Stake, Swissquote, Questrade, Wealthsimple) with a logo domain, home regions and flags `ownParser` / `viaSharesight`. The logo proxy (`/api/logo/broker/[key]`) falls back to this directory after the parser registry, so every entry gets a logo (initials if the favicon fails). Saxo keeps its dedicated parser.
+- The Add Investments broker grid now shows an **"Other brokers, via Sharesight"** strip: connect the broker in Sharesight, export its report, import it with the existing Sharesight parser.
+- **Honest caveat:** Sharesight publishes no machine-readable broker directory, so this list is a curated selection of brokers it is generally known to cover, **not a verified copy** of its directory — check each before promising support.
+
 ## Related
 - [[Live-Pricing|Live Pricing]] — `refreshMarketPrice`, ticker-symbol handling, the migration-blocking precedent this follows
 - [[CSV-Bank-Uploads|CSV Bank Uploads]] — the column-mapping UI pattern and re-import-dedupe principle this reuses

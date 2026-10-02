@@ -2483,7 +2483,7 @@ export async function refreshMetalPrice(
       recorded_date: spot.asOf.slice(0, 10),
       value: totalValue,
       net_equity: totalValue,
-      source: spot.source,
+      source: spot.source === "yahoo" ? "yahoo" : "manual",
     },
   ]);
   if (historyError) return { ok: false, code: "db_error", error: historyError.message };

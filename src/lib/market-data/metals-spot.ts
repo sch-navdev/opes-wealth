@@ -1,7 +1,8 @@
+import { fetchLiveMetalSpot, MetalSpotError } from "@/lib/assets/metals-valuation";
 import { METAL_YAHOO_SYMBOL, type MetalType } from "@/lib/precious-metals";
 
 export type MetalSpotResult =
-  | { ok: true; usdPerTroyOunce: number; asOf: string; source: "yahoo" }
+  | { ok: true; usdPerTroyOunce: number; asOf: string; source: "yahoo" | "goldapi" | "metals-api" }
   | { ok: false; code: "rate_limited" | "no_data" | "network_error"; error: string };
 
 /**
@@ -13,6 +14,23 @@ export type MetalSpotResult =
  * libraries get 429s).
  */
 export async function fetchMetalSpotUsd(metal: MetalType): Promise<MetalSpotResult> {
+  // Keyed providers first (GoldAPI → Metals-API, see `lib/assets/metals-valuation.ts`);
+  // with no key, or if they all fail, fall back to the key-less Yahoo proxy below.
+  try {
+    const live = await fetchLiveMetalSpot(metal);
+    return {
+      ok: true,
+      usdPerTroyOunce: live.usdPerTroyOunce,
+      asOf: live.asOf,
+      source: live.provider as "goldapi" | "metals-api",
+    };
+  } catch (err) {
+    if (!(err instanceof MetalSpotError)) throw err;
+  }
+  return fetchYahooMetalSpotUsd(metal);
+}
+
+async function fetchYahooMetalSpotUsd(metal: MetalType): Promise<MetalSpotResult> {
   const symbol = encodeURIComponent(METAL_YAHOO_SYMBOL[metal]);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1d`;
 

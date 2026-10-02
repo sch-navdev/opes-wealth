@@ -56,6 +56,18 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 
 - Real Estate valuation chart (off-plan and ready-built share it): the Forward Looking series now **starts with the last known historical point** (`projectionBridge` in `asset-detail-view.tsx`, mapped onto the `p*` keys), so the dashed projection leaves exactly where the solid history ends — even if the newest manual valuation is deleted or history stops before today (the projection itself still starts from today's market valuation, so there may be a short straight segment between the two). Verified in the browser on Ellington House 1 - 713 in "Both": history curves end at x=101px and the projection curves begin at exactly x=101px. See [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] for the projection model.
 
+## Comfort (accessibility) display mode (2026-10-02)
+
+- **Toggle:** `components/comfort-mode-toggle.tsx` — a labelled `Switch` ("Comfort mode", `comfort_mode`/`comfort_mode_desc` in all 9 languages) in the dashboard header controls, the login page and the home page.
+- **Persistence:** `lib/comfort-mode.ts` stores the key `opes-comfort-mode` (`on`/`off`) in `localStorage` and mirrors it to `<html data-comfort="on">`. A tiny inline script in `app/layout.tsx`'s `<head>` applies it before first paint (no flash); the toggle reads it through `useSyncExternalStore` (so it also follows other tabs). Storage access is wrapped in try/catch.
+- **What changes** (all CSS at the end of `app/globals.css`, keyed off the attribute, so every page and dialog is covered without touching components):
+  - **Type:** root font size 130% — Tailwind is rem-based, so text, spacing and controls all scale; line-height 1.6.
+  - **Contrast:** light = pure white background, black text, `--muted-foreground` #2B2B2B (no light grey), darker gold/green/red; dark = pure black, white text, `--muted-foreground` #EDEDED, brighter accents; borders/inputs/ring strengthened; placeholders solid; 3px focus outline.
+  - **Touch targets:** buttons, `role=button/tab/menuitem/option`, selects, inputs and standalone links get `min-height/min-width: 48px` plus a 2px margin; small switches/checkboxes get a 48px hit area (pseudo-element; native checkboxes are enlarged instead).
+  - **Icons:** icon-only buttons (a lone SVG child) show their `aria-label` — else `title` — as visible text via `::after` and widen to fit.
+- **Verified (dev server, browser pane, login page, dark theme):** toggling set `data-comfort="on"`, root font 16px → 20.8px, background pure black, `localStorage` = on, every visible control ≥48px tall except the native "remember me" checkbox, which this pass then enlarged (re-check not done), icon buttons showed their text. **Not verified:** the dashboard and dialogs with real data (auth wall), light-theme contrast by measurement, a reload (persistence logic is simple but not re-run), and screen-reader behaviour.
+- **Known limits:** the `::after` label relies on `:has()` (all current browsers); inline links inside paragraphs keep their text size (exempt from the 48px rule); the sidebar's collapsed icon-only mode and any very wide table may need a manual look at 130%; `text-foreground/60`-style opacity utilities, if any, are not overridden.
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components

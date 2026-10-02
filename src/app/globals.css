@@ -116,3 +116,125 @@
 .help-capture-mask .tabular-nums {
   filter: blur(6px);
 }
+
+/* ==========================================================================
+   Comfort (accessibility) display mode — <html data-comfort="on">.
+   Toggled by components/comfort-mode-toggle.tsx, persisted in localStorage
+   (lib/comfort-mode.ts). Four things change:
+   1. type: the root font size goes to 130%, and since Tailwind sizes in rem
+      every text size, spacing and control scales with it;
+   2. contrast: pure backgrounds, near-black / pure-white text, no light grey;
+   3. touch targets: every control is at least 48x48px with breathing room;
+   4. icons: icon-only buttons show their accessible name as visible text.
+   ========================================================================== */
+:root[data-comfort="on"] {
+  font-size: 130%;
+  --background: #FFFFFF;
+  --foreground: #000000;
+  --card: #FFFFFF;
+  --card-foreground: #000000;
+  --popover: #FFFFFF;
+  --popover-foreground: #000000;
+  --primary: #6B4A00;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EDEDED;
+  --secondary-foreground: #000000;
+  --muted: #EDEDED;
+  --muted-foreground: #2B2B2B;
+  --accent: #E2E2E2;
+  --accent-foreground: #000000;
+  --destructive: #8F0A1E;
+  --destructive-foreground: #FFFFFF;
+  --success: #075F44;
+  --success-foreground: #FFFFFF;
+  --border: #4A4A4A;
+  --input: #4A4A4A;
+  --ring: #000000;
+}
+
+:root[data-comfort="on"].dark {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --card: #000000;
+  --card-foreground: #FFFFFF;
+  --popover: #000000;
+  --popover-foreground: #FFFFFF;
+  --primary: #FFD66B;
+  --primary-foreground: #000000;
+  --secondary: #1A1A1A;
+  --secondary-foreground: #FFFFFF;
+  --muted: #1A1A1A;
+  --muted-foreground: #EDEDED;
+  --accent: #262626;
+  --accent-foreground: #FFFFFF;
+  --destructive: #FF8A99;
+  --destructive-foreground: #000000;
+  --success: #5BE3B0;
+  --success-foreground: #000000;
+  --border: #BDBDBD;
+  --input: #BDBDBD;
+  --ring: #FFFFFF;
+}
+
+/* Text never fades: opacity-modified text/placeholders become solid. */
+[data-comfort="on"] body {
+  line-height: 1.6;
+}
+[data-comfort="on"] ::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+[data-comfort="on"] :focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* 48x48 touch targets (and a little space between neighbours). */
+[data-comfort="on"] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], select, summary, input:not([type="hidden"], [type="checkbox"], [type="radio"], [type="file"])) {
+  min-height: 48px;
+  min-width: 48px;
+}
+[data-comfort="on"] a[href]:not(p a, li > a:only-child, td a, span a) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  min-width: 48px;
+}
+[data-comfort="on"] :is(button, [role="button"], [role="tab"], a[href]) {
+  margin: 2px;
+}
+/* Tiny switches/checkboxes keep their look but get a 48px hit area. */
+[data-comfort="on"] :is([role="switch"], [role="checkbox"], input[type="checkbox"], input[type="radio"]) {
+  position: relative;
+}
+[data-comfort="on"] :is([role="switch"], [role="checkbox"], input[type="checkbox"], input[type="radio"])::after {
+  content: "";
+  position: absolute;
+  inset-block: calc((100% - 48px) / 2);
+  inset-inline: calc((100% - 48px) / 2);
+}
+
+/* Icon-only buttons gain a visible text label (their aria-label, else title). */
+[data-comfort="on"] button:has(> svg:only-child)[aria-label],
+[data-comfort="on"] button:has(> svg:only-child)[title]:not([aria-label]) {
+  width: auto;
+  gap: 0.4rem;
+  padding-inline: 0.75rem;
+  white-space: nowrap;
+}
+[data-comfort="on"] button:has(> svg:only-child)[aria-label]::after {
+  content: attr(aria-label);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+[data-comfort="on"] button:has(> svg:only-child)[title]:not([aria-label])::after {
+  content: attr(title);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+/* Native checkboxes/radios can't take a pseudo-element hit area: enlarge them and add margin so the footprint is 48px. */
+[data-comfort="on"] :is(input[type="checkbox"], input[type="radio"]) {
+  width: 2rem;
+  height: 2rem;
+  margin: 8px;
+}

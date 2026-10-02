@@ -1,5 +1,6 @@
 "use client";
 
+import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
@@ -35,6 +36,7 @@ export function DashboardHeaderControls({
       <PrivacyToggleButton />
       <LanguageSwitcher />
       <ThemeToggle />
+      <ComfortModeToggle />
     </div>
   );
 }

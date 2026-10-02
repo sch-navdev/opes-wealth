@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
           <ThemeToggle />
+          <ComfortModeToggle />
           <Button asChild variant="outline">
             <Link href="/login">Sign In</Link>
           </Button>

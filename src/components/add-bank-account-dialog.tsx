@@ -26,7 +26,7 @@ import { InstitutionLogo } from "@/components/institution-logo";
 import { addBankAccount } from "@/app/dashboard/actions";
 import { useLanguage } from "@/context/language-context";
 import { BANK_ACCOUNT_TYPES, OTHER_BANK, type BankAccountType } from "@/lib/bank-account";
-import { banksByCountry, getBank } from "@/lib/banking/institutions";
+import { BANK_COUNTRIES, banksByCountry, getBank } from "@/lib/banking/institutions";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -138,10 +138,7 @@ export function AddBankAccountDialog({ trigger }: { trigger?: React.ReactNode })
     });
   }
 
-  const countryGroups = [
-    { code: "AE", banks: banksByCountry("AE") },
-    { code: "FR", banks: banksByCountry("FR") },
-  ];
+  const countryGroups = BANK_COUNTRIES.map((code) => ({ code, banks: banksByCountry(code) }));
   const groupLabel = (code: string) =>
     new Intl.DisplayNames([intlLocale], { type: "region" }).of(code) ?? code;
 

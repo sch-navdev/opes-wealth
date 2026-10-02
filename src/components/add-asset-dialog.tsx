@@ -30,6 +30,12 @@ import { CryptoFields } from "@/components/crypto-fields";
 import { CompanyFields } from "@/components/company-fields";
 import { ScpiFields } from "@/components/scpi-fields";
 import { PreciousMetalsFields } from "@/components/precious-metals-fields";
+import { ExoticAssetsFields } from "@/components/exotic-assets-fields";
+import {
+  EMPTY_EXOTIC_METADATA,
+  getExoticMetadataErrors,
+  parseExoticMetadata,
+} from "@/lib/exotic-assets";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { resizeImageToBase64 } from "@/lib/crop-image";
@@ -74,6 +80,15 @@ import {
   scpiCurrentValue,
 } from "@/lib/scpi";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
+import { StartupFields } from "@/components/startup-fields";
+import { CategoryIcon } from "@/components/category-icon";
+import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
+import {
+  EMPTY_STARTUP_METADATA,
+  getStartupMetadataErrors,
+  parseStartupMetadata,
+  startupValuation,
+} from "@/lib/startups";
 import type { TranslationKey } from "@/lib/i18n";
 
 const todayIso = new Date().toISOString().slice(0, 10);
@@ -147,6 +162,12 @@ export function AddAssetDialog({
       ? parsePreciousMetalMetadata(asset.metadata)
       : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
   );
+  const [exoticMetadata, setExoticMetadata] = useState(() =>
+    asset ? parseExoticMetadata(asset.metadata) : EMPTY_EXOTIC_METADATA,
+  );
+  const [startupMetadata, setStartupMetadata] = useState(() =>
+    asset ? parseStartupMetadata(asset.metadata) : EMPTY_STARTUP_METADATA,
+  );
   const [quantityInput, setQuantityInput] = useState(asset?.quantity ?? 1);
   const [scpiMetadata, setScpiMetadata] = useState(() =>
     asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA,
@@ -162,6 +183,8 @@ export function AddAssetDialog({
   const isEquity = selectedCategory?.name === "Equities";
   const isCrypto = selectedCategory?.name === "Crypto";
   const isPreciousMetal = selectedCategory?.name === "Precious Metals";
+  const isExotic = selectedCategory?.name === "Exotic Assets";
+  const isStartup = selectedCategory?.name === "Startups";
   const isCompany = selectedCategory?.name === "Companies";
   const isScpi = selectedCategory?.name === "SCPI";
 
@@ -193,6 +216,8 @@ export function AddAssetDialog({
         : { ...EMPTY_PRECIOUS_METAL_METADATA, purity: DEFAULT_PURITY.gold },
     );
     setQuantityInput(asset?.quantity ?? 1);
+    setExoticMetadata(asset ? parseExoticMetadata(asset.metadata) : EMPTY_EXOTIC_METADATA);
+    setStartupMetadata(asset ? parseStartupMetadata(asset.metadata) : EMPTY_STARTUP_METADATA);
     setCompanyMetadata(asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA);
     setScpiMetadata(asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA);
   }
@@ -305,6 +330,23 @@ export function AddAssetDialog({
         return;
       }
       formData.set("metadata", JSON.stringify(metalMetadata));
+    } else if (isStartup) {
+      const shares = Number(formData.get("quantity"));
+      const errors = getStartupMetadataErrors(startupMetadata, shares);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      // Value = shares × latest funding-round price (or cost with no rounds yet).
+      formData.set("current_value", String(startupValuation(startupMetadata, shares)));
+      formData.set("metadata", JSON.stringify(startupMetadata));
+    } else if (isExotic) {
+      const errors = getExoticMetadataErrors(exoticMetadata);
+      if (errors.length > 0) {
+        setError(t(errors[0] as TranslationKey));
+        return;
+      }
+      formData.set("metadata", JSON.stringify(exoticMetadata));
     }
 
     startTransition(async () => {
@@ -435,7 +477,8 @@ export function AddAssetDialog({
                   .filter((category) => category.name !== "Liabilities" || category.id === asset?.category_id)
                   .map((category) => (
                   <SelectItem key={category.id} value={category.id}>
-                    {category.name}
+                    <CategoryIcon name={category.name} />
+                    {CATEGORY_NAME_KEYS[category.name] ? t(CATEGORY_NAME_KEYS[category.name]) : category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -471,7 +514,15 @@ export function AddAssetDialog({
 
           <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="min-w-0 space-y-2">
-              <Label htmlFor="quantity">{isScpi ? t("scpi_shares") : "Quantity"}</Label>
+              <Label htmlFor="quantity">
+                {isScpi
+                  ? t("scpi_shares")
+                  : isStartup
+                    ? t("startup_shares")
+                    : isExotic && exoticMetadata.kind === "wine"
+                      ? t("exotic_bottles")
+                      : "Quantity"}
+              </Label>
               <Input
                 id="quantity"
                 name="quantity"
@@ -492,7 +543,9 @@ export function AddAssetDialog({
                       ? t("pe_nav_label")
                       : isScpi
                         ? t("scpi_value_label")
-                        : "Value"}
+                        : isStartup
+                          ? t("startup_value_label")
+                          : "Value"}
               </Label>
               <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -513,7 +566,7 @@ export function AddAssetDialog({
                         ? companyMetadata.company_value ?? asset.current_value
                         : asset?.current_value ?? ""
                   }
-                  required={!isScpi}
+                  required={!isScpi && !isStartup}
                 />
               </div>
               {isRealEstate && (
@@ -603,6 +656,10 @@ export function AddAssetDialog({
               quantity={quantityInput}
             />
           )}
+
+          {isStartup && <StartupFields value={startupMetadata} onChange={setStartupMetadata} />}
+
+          {isExotic && <ExoticAssetsFields value={exoticMetadata} onChange={setExoticMetadata} />}
 
           {error && (
             <p className="text-sm text-destructive" role="alert">

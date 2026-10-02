@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/card";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { LoginForm } from "./login-form";
 
 export default function LoginPage() {
@@ -16,6 +17,7 @@ export default function LoginPage() {
       <div className="absolute end-4 top-4 z-10 flex items-center gap-2">
         <LanguageSwitcher />
         <ThemeToggle />
+        <ComfortModeToggle />
       </div>
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-e border-border bg-card p-10 lg:flex">
         <div

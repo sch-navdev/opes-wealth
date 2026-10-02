@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { useLanguage } from "@/context/language-context";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
+import { importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import { rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import {
   BANK_PROFILES,
@@ -169,7 +170,23 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         if (state.remember && profileId) {
           await rememberCashAccountBank(account.id, profileId, group.accountRef);
         }
-        out.push({ label, ok: true, text: t("stmt_imported", { n: rows.length, account: account.name }) });
+        const tx = await importBankTransactions(
+          account.id,
+          group.rows.map((r) => ({ date: r.date, amount: r.amount, description: r.description })),
+        );
+        out.push({
+          label,
+          ok: true,
+          text:
+            "success" in tx
+              ? t("stmt_imported_tx", {
+                  n: rows.length,
+                  account: account.name,
+                  added: tx.inserted,
+                  dup: tx.duplicates,
+                })
+              : t("stmt_imported", { n: rows.length, account: account.name }),
+        });
       }
       setResults(out);
     });

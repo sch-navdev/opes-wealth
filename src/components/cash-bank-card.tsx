@@ -8,7 +8,7 @@ import { BankLogoByName } from "@/components/institution-logo";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { disconnectBank, syncBankConnection } from "@/app/dashboard/banking/actions";
-import { bankByName, type BankSyncMode } from "@/lib/banking/institutions";
+import { BANK_COUNTRIES, bankByName, type BankSyncMode } from "@/lib/banking/institutions";
 import { isBankAccountType, type BankAccountType } from "@/lib/bank-account";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -67,7 +67,7 @@ function formatSyncTime(iso: string | null, locale: string): string | null {
 }
 
 /** Jurisdiction an account is grouped under: the bank's country when it is a known bank, otherwise "OTHER". */
-const COUNTRY_ORDER = ["AE", "FR", "OTHER"] as const;
+const COUNTRY_ORDER = [...BANK_COUNTRIES, "OTHER"] as const;
 
 function accountCountry(account: CashAccount): string {
   const bank = bankByName(account.institutionName ?? "") ?? bankByName(account.bank?.institutionName ?? "");

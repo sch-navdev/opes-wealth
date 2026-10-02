@@ -252,6 +252,8 @@ const DEFAULT_ANNUAL_GROWTH: Record<string, number> = {
   Equities: 0.07,
   Crypto: 0.08,
   "Precious Metals": 0.04,
+  "Exotic Assets": 0.03,
+  Startups: 0.08,
   Cash: 0.02,
   Vehicles: -0.1,
   "Private Equity": 0.08,

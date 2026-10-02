@@ -30,6 +30,7 @@ import {
   type ParsedBankCsvRow,
 } from "@/lib/bank-csv";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
+import { importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import type { ParsedCsvFile } from "@/components/csv-dropzone";
 
 type Mode = "balance" | "transactions";
@@ -241,6 +242,19 @@ export function CsvColumnMapper({
       if (result?.error) {
         setImportError(result.error);
         return;
+      }
+      // Transactions-only files carry per-transaction amounts: keep them too,
+      // fingerprinted so a re-import adds only the new ones. Best-effort: the
+      // balance history above already succeeded.
+      if (mode === "transactions" && transactionResult) {
+        await importBankTransactions(
+          assetId,
+          transactionResult.validRows.map((r) => ({
+            date: r.recorded_date,
+            amount: r.amount,
+            description: r.description,
+          })),
+        );
       }
       onSuccess(result?.imported ?? importResult.validRows.length);
     });

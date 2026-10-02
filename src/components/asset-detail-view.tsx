@@ -169,6 +169,8 @@ import {
   parsePreciousMetalMetadata,
 } from "@/lib/precious-metals";
 import { METAL_FORM_LABEL_KEYS, METAL_LABEL_KEYS } from "@/components/precious-metals-fields";
+import { ExoticAssetCard } from "@/components/exotic-asset-card";
+import { StartupCard } from "@/components/startup-card";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { convertAmount } from "@/lib/fx";
 import { fetchMarketPrice } from "@/lib/market-data/market-price";
@@ -355,6 +357,8 @@ export function AssetDetailView({
   const isEquity = categoryName === "Equities";
   const isCrypto = categoryName === "Crypto";
   const isPreciousMetal = categoryName === "Precious Metals";
+  const isExotic = categoryName === "Exotic Assets";
+  const isStartup = categoryName === "Startups";
   const metadata = parseRealEstateMetadata(asset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
   // Baseline = purchase price, else the earliest valuation entry; current =
@@ -3879,6 +3883,25 @@ export function AssetDetailView({
                   />
                 </CardContent>
               </Card>
+            )}
+
+            {isStartup && (
+              <StartupCard
+                assetId={asset.id}
+                metadata={asset.metadata}
+                shares={asset.quantity}
+                currency={asset.currency}
+              />
+            )}
+
+            {isExotic && (
+              <ExoticAssetCard
+                assetId={asset.id}
+                metadata={asset.metadata}
+                quantity={asset.quantity}
+                currentValue={asset.current_value}
+                currency={asset.currency}
+              />
             )}
 
             {isPreciousMetal && metalMetadata && (

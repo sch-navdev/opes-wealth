@@ -125,6 +125,15 @@
 - **Caveats**: the internal category name in the database stays `SCPI` (it is the lookup key; only the displayed label changed) and so do code identifiers (`scpi_*` keys). An SCPI is **not legally identical to a REIT** (unlisted, French civil-partnership regime, own fee/withdrawal mechanics), so the SCPI-specific field labels (jouissance date, withdrawal value, TDVM, nue-propriété/usufruct) were left as they were. SOCIMI and SIIQ are the closest local equivalents, not exact legal matches — have the terminology confirmed by a local professional.
 - New key `pdf_page_of` ("Page {n} / {total}") in all nine languages.
 
+## OW9 keys and the global bank list (2026-10-02)
+
+- **52 new keys in all nine languages** (en/fr in `lib/i18n.ts`, the other seven in `lib/translations/*.ts`): `stmt_imported_tx`, `broker_via_sharesight_*`, `category_exotic_assets`, `exotic_*` (details, fields, condition/box-papers options, refresh/status/validation) and `passive_*` (card, modal, four sources, seven projection methods, disclaimer). Same caveat as before: AI-made, not native-reviewed; REIT/SCPI naming follows each language's existing convention (SOCIMI/SCPI in Spanish, REIT/SCPI elsewhere).
+- **Global bank expansion** (`lib/banking/institutions.ts`): `BankCountry` is now AE, FR, **GB, US, ES, DE, IT**; 7 UK banks + Revolut UK, 7 US, 8 Spanish, 4 German and 2 Italian banks added (`BANK_COUNTRIES` fixes the display order). They are `provider: "psd2"` (the DB CHECK on `bank_connections.provider` stays `altareq|psd2`; US aggregators are the equivalent route), `hasCsvProfile: false`, `dedicated: false` — selectable in Add bank account and in the sandbox connect picker, with logos, but **no CSV statement profile and no live connection** (needs a real export / an aggregator). Country group headings come from `Intl.DisplayNames`, so they are translated in every language with no new keys; bank names are proper nouns and are not translated. Cash & Bank card grouping uses the same list.
+
+## OW10 keys (2026-10-02)
+
+- **51 new keys in all nine languages:** `category_startups`, `startup_*` (form, card, round ledger, option/strike wording, validation) and the exotic wine/art additions (`exotic_kind*`, `exotic_producer/vintage/region/bottles/artist/title/medium`, hints and validation). Same caveat: AI-made, not native-reviewed. "SAFE" is kept as the English acronym everywhere; BSPCE is French-specific and kept as is.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

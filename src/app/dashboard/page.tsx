@@ -29,6 +29,8 @@ import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { buildAssetInvested } from "@/lib/invested-capital";
 import { buildDccPortfolio } from "@/lib/dcc";
 import { ExportReportsCard } from "@/components/export-reports-card";
+import { PassiveIncomeCard } from "@/components/passive-income-card";
+import { buildPassiveIncome } from "@/lib/passive-income";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import {
   buildVehicleHistoryFromPurchase,
@@ -364,6 +366,13 @@ export default async function DashboardPage({
       })(),
     }));
 
+  const passiveIncome = buildPassiveIncome(
+    assets ?? [],
+    today,
+    (amount, currency) => convertToBaseCurrency(amount, currency, displayCurrency, rates),
+    (asset) => convertToBaseCurrency(grossAssetValue(asset), asset.currency, displayCurrency, rates),
+  );
+
   return (
     <>
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -402,6 +411,8 @@ export default async function DashboardPage({
           baseCurrency={displayCurrency}
           breakdowns={breakdowns}
         />
+
+        <PassiveIncomeCard summary={passiveIncome} baseCurrency={displayCurrency} />
 
         <CashBankCard
           accounts={cashAccounts}

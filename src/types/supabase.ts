@@ -215,6 +215,45 @@ export type Database = {
         }
         Relationships: []
       }
+      transactions: {
+        Row: {
+          id: string
+          profile_id: string
+          asset_id: string
+          fingerprint: string
+          booked_date: string
+          amount: number
+          currency: string
+          description: string
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          asset_id: string
+          fingerprint: string
+          booked_date: string
+          amount: number
+          currency: string
+          description?: string
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          asset_id?: string
+          fingerprint?: string
+          booked_date?: string
+          amount?: number
+          currency?: string
+          description?: string
+          source?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       bank_account_links: {
         Row: {
           id: string
