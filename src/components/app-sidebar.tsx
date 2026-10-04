@@ -10,15 +10,34 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
 import { logout } from "@/app/auth/actions";
 import type { TranslationKey } from "@/lib/i18n";
+import {
+  EXPERTISE_LEVELS,
+  tierRank,
+  useUiTierStore,
+  type ExpertiseLevel,
+} from "@/stores/useUiTierStore";
 
-const NAV_ITEMS: { href: string; labelKey: TranslationKey; icon: typeof LayoutDashboard }[] = [
-  { href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark },
-  { href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory },
-  { href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope },
-  { href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings },
-  { href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck },
+/** `minTier` is the lowest expertise level that shows the link; higher levels keep it. */
+const NAV_ITEMS: {
+  href: string;
+  labelKey: TranslationKey;
+  icon: typeof LayoutDashboard;
+  minTier: ExpertiseLevel;
+}[] = [
+  { href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard, minTier: "basic" },
+  { href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark, minTier: "standard" },
+  { href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory, minTier: "professional" },
+  { href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope, minTier: "expert" },
+  { href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings, minTier: "basic" },
+  { href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck, minTier: "basic" },
 ];
+
+const TIER_LABEL_KEYS: Record<ExpertiseLevel, TranslationKey> = {
+  basic: "tier_basic",
+  standard: "tier_standard",
+  professional: "tier_professional",
+  expert: "tier_expert",
+};
 
 function isActiveHref(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
@@ -56,11 +75,14 @@ function NavList({
 }) {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const level = useUiTierStore((s) => s.user_expertise_level);
+  const setLevel = useUiTierStore((s) => s.setExpertiseLevel);
+  const visibleItems = NAV_ITEMS.filter((item) => tierRank(item.minTier) <= tierRank(level));
 
   return (
     <>
       <nav className="flex-1 space-y-1 px-2 py-4" aria-label="Main">
-        {NAV_ITEMS.map(({ href, labelKey, icon: Icon }) => {
+        {visibleItems.map(({ href, labelKey, icon: Icon }) => {
           const active = isActiveHref(pathname, href);
           return (
             <Link
@@ -84,6 +106,24 @@ function NavList({
           );
         })}
       </nav>
+
+      <div className={cn("border-t border-border px-3 py-2", collapsible && "hidden lg:block")}>
+        <label className="mb-1 block text-xs text-muted-foreground" htmlFor={`tier-${collapsible ? "rail" : "drawer"}`}>
+          {t("tier_label")}
+        </label>
+        <select
+          id={`tier-${collapsible ? "rail" : "drawer"}`}
+          value={level}
+          onChange={(e) => setLevel(e.target.value as ExpertiseLevel)}
+          className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground"
+        >
+          {EXPERTISE_LEVELS.map((l) => (
+            <option key={l} value={l}>
+              {t(TIER_LABEL_KEYS[l])}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <form action={logout} className="border-t border-border p-2">
         <Button
@@ -112,6 +152,10 @@ function NavList({
 export function AppSidebar() {
   const { t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    void useUiTierStore.persist.rehydrate();
+  }, []);
 
   useEffect(() => {
     if (!drawerOpen) return;

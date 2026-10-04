@@ -68,6 +68,14 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 - **Verified (dev server, browser pane, login page, dark theme):** toggling set `data-comfort="on"`, root font 16px → 20.8px, background pure black, `localStorage` = on, every visible control ≥48px tall except the native "remember me" checkbox, which this pass then enlarged (re-check not done), icon buttons showed their text. **Not verified:** the dashboard and dialogs with real data (auth wall), light-theme contrast by measurement, a reload (persistence logic is simple but not re-run), and screen-reader behaviour.
 - **Known limits:** the `::after` label relies on `:has()` (all current browsers); inline links inside paragraphs keep their text size (exempt from the 48px rule); the sidebar's collapsed icon-only mode and any very wide table may need a manual look at 130%; `text-foreground/60`-style opacity utilities, if any, are not overridden.
 
+## Progressive UI tiers (expertise-level navigation)
+- **Store:** `src/stores/useUiTierStore.ts` — Zustand + `persist` (localStorage key `opes-ui-tier`). State `user_expertise_level` ∈ `basic | standard | professional | expert` (default `standard`), action `setExpertiseLevel`, helper `tierRank`. `skipHydration: true` keeps the first client render equal to the server's; `AppSidebar` calls `persist.rehydrate()` once after mount. `merge` ignores unknown stored values.
+- **Nav mapping** (`components/app-sidebar.tsx`, `minTier` per link; a higher tier keeps everything a lower one shows): Dashboard, Settings, Security → basic; Banking → standard; Companies → professional; Planning → expert. A tier selector sits above Sign out (rail + drawer); labels are `tier_*` keys in `lib/i18n.ts` (EN/FR).
+- **Not access control:** routes stay reachable by URL; passkey logic, AAL2 guards and Supabase schemas were not touched — see [[Authentication-Security|Authentication & Security]].
+- **21st.dev:** MCP search found "Animated Sidebar", but it needs `motion` plus two helper files the MCP did not return, and the CLI install needs `API_KEY_21ST` (unset). The existing responsive sidebar (full `lg+`, rail `md`, drawer below) was kept instead.
+- **Cleanup:** removed unused `components/ui/slider.tsx`. A scan found no other orphaned components and no unused locals/imports (`tsc --noUnusedLocals`).
+- **Not verified:** `eslint` and a full `tsc` can't run here (`node_modules` is missing `zod/v4/index.cjs` and `lucide-react` types); no browser check of the tier selector.
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components

@@ -51,6 +51,7 @@ High-net-worth individuals
   - [x] Vehicles/Private Equity Settings-tab detail views, verified live (dark + light) — [[Portfolio-Dashboard|Portfolio Dashboard]]
   - [x] Zod password complexity + email verification UI + `/auth/callback` route, verified locally (Vercel `NEXT_PUBLIC_SITE_URL` env var still needs manual setup) — [[Authentication-Security|Authentication & Security]]
   - [x] Global app shell: responsive collapsible sidebar (full at `lg+`, icon-only at `md`, hamburger below `md`) + full-width layout, replacing the narrow centered-column pages and per-page duplicated nav — [[Design-System|Design System]]
+  - [x] Progressive UI tiers: Zustand `user_expertise_level` store + tier-gated sidebar links, unused slider removed — [[Design-System|Design System]]
 - [x] Step 8: CSV bank uploads — backend (parser, validation, `importBankCsvHistory`) + dropzone/column-mapping upload UI, verified light/dark + EN/FR — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]

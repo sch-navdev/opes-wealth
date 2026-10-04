@@ -1713,6 +1713,11 @@ const dictionary = {
 
   // Security dashboard (/dashboard/security)
   nav_security: { en: "Security", fr: "Sécurité" },
+  tier_label: { en: "Experience level", fr: "Niveau d'expérience" },
+  tier_basic: { en: "Basic", fr: "Débutant" },
+  tier_standard: { en: "Standard", fr: "Standard" },
+  tier_professional: { en: "Professional", fr: "Professionnel" },
+  tier_expert: { en: "Expert", fr: "Expert" },
   security_title: { en: "Security", fr: "Sécurité" },
   security_subtitle: {
     en: "See where your account is signed in and sign out any device you don't recognise.",
