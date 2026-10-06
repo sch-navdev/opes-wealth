@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 14:47 (Gulf Standard Time, UTC+4).** Everything up to `645b317` is pushed to `origin/master`; Vercel started the production build of `645b317` at 14:47 GST (the first deploy with `"regions": ["bom1"]`). See "Push status" at the bottom.
+**Last updated: 2026-10-06 14:49 (Gulf Standard Time, UTC+4).** Everything up to `645b317` is pushed to `origin/master` and deployed to production (READY). **Verified live: functions now run in Mumbai** (`X-Vercel-Id: bom1::bom1::…`). See "Push status" at the bottom.
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -44,4 +44,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 14:47 GST: pushed `0a212df..645b317` (7 commits: `41b6ba0`, `da6c4dc` Next 16.3.8, `c39b93b` Vercel bom1, `99482c9` Porsche note, `f3766b4` tier setting, `2a05800`, `645b317` handoff updates) to `origin/master`. Vercel (project `opes-wealth`, production) began building `645b317` at 14:47 GST; the previous production deploy was `0a212df` (READY). The only thing newer than `origin` is this status edit, committed locally and not pushed until Steve confirms. Still to verify after the build is READY: the `x-vercel-id` response header of https://www.opeswealth.app contains `bom1`.
+At 2026-10-06 14:49 GST: pushed `0a212df..645b317` (7 commits: `41b6ba0`, `da6c4dc` Next 16.3.8, `c39b93b` Vercel bom1, `99482c9` Porsche note, `f3766b4` tier setting, `2a05800`, `645b317` handoff updates) to `origin/master`. Vercel production build of `645b317` finished READY; `https://www.opeswealth.app/login` and `/dashboard` return `X-Vercel-Id: bom1::bom1::…` (Mumbai), so the `vercel.json` region change is live (latency not timed). Newer than `origin` and NOT pushed until Steve confirms: `cd6624d` (earlier status edit) and this verification note.
