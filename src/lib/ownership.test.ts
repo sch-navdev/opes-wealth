@@ -280,6 +280,27 @@ describe("scaleAssetForOwner", () => {
     expect(md.expenses[0].amount).toBe(75);
   });
 
+  it("Vehicles: scales the Blue Book log amounts and the legacy single value; keeps dates, sources, currency; does not mutate", () => {
+    const input = asset({
+      category: "Vehicles",
+      metadata: {
+        blue_book_value: 338_000,
+        blue_book_log: [
+          { id: "b1", date: "2025-01-01", amount: 338_031.52, currency: "AED", source: "Argus", document: "a.pdf" },
+          { id: "b2", date: "2026-01-01", amount: 300_000, currency: "EUR", source: "Parkers", document: "" },
+        ],
+      },
+    });
+    const out = scaleAssetForOwner(input, 0.5);
+    const md = out.metadata as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(md.blue_book_value).toBe(169_000);
+    expect(md.blue_book_log.map((e: { amount: number }) => e.amount)).toEqual([169_015.76, 150_000]);
+    expect(md.blue_book_log[0]).toMatchObject({ id: "b1", date: "2025-01-01", currency: "AED", source: "Argus", document: "a.pdf" });
+    const raw = input.metadata as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(raw.blue_book_log[0].amount).toBe(338_031.52);
+    expect(raw.blue_book_value).toBe(338_000);
+  });
+
   it("Private Equity: scales commitment, called capital, distributions, calls and projections; keeps the ownership %", () => {
     const out = scaleAssetForOwner(
       asset({

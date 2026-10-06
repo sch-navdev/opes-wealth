@@ -166,8 +166,13 @@ export function scaleAssetForOwner<T extends Scalable>(asset: T, f: number): T {
       break;
     }
     case "Vehicles": {
-      next = scaleKeys(md, ["purchase_price", "maintenance_costs", "modifications", "insurance_registration", "market_valuation"], f);
+      next = scaleKeys(md, ["purchase_price", "maintenance_costs", "modifications", "insurance_registration", "market_valuation", "blue_book_value"], f);
       next.expenses = scaleList(md.expenses, ["amount"], f);
+      // Official valuation log (Blue Book / Argus / ...): read only by the asset detail page,
+      // which shows the viewer's share. Writes (`vehicle-actions.ts`) read the raw row from the
+      // database, never a scaled copy. `blue_book_value` is the pre-log single value that
+      // `parseVehicleMetadata` migrates into the log when the log is empty.
+      next.blue_book_log = scaleList(md.blue_book_log, ["amount"], f);
       break;
     }
     case "Private Equity": {

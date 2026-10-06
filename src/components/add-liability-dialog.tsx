@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OwnerShareNote } from "@/components/owner-share-note";
 import { useLanguage } from "@/context/language-context";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import {
@@ -66,7 +67,10 @@ function toNumberOrNull(raw: string): number | null {
 export function AddLiabilityDialog({
   liability,
   trigger,
+  ownerShareFactor = 1,
 }: {
+  /** Viewer's 0-1 share of a co-owned asset: adds a hint that the form holds whole-asset values. */
+  ownerShareFactor?: number;
   liability?: LiabilityForEdit;
   trigger?: React.ReactNode;
 }) {
@@ -160,6 +164,7 @@ export function AddLiabilityDialog({
           <DialogDescription className="text-muted-foreground">
             {t("liability_dialog_desc")}
           </DialogDescription>
+          {isEdit && <OwnerShareNote factor={ownerShareFactor} variant="edit" />}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

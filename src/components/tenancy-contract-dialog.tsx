@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { OwnerShareNote } from "@/components/owner-share-note";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
 import { importTenancyContract } from "@/app/dashboard/actions";
@@ -24,7 +25,7 @@ type Stage = "drop" | "success";
  * dropzone pattern, mounted in the asset detail page's Tenancy tab since the
  * action is scoped to one asset.
  */
-export function TenancyContractDialog({ assetId }: { assetId: string }) {
+export function TenancyContractDialog({ assetId, ownerShareFactor = 1 }: { assetId: string; ownerShareFactor?: number }) {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -95,6 +96,7 @@ export function TenancyContractDialog({ assetId }: { assetId: string }) {
           <DialogDescription className="text-muted-foreground">
             {t("import_tenancy_contract_desc")}
           </DialogDescription>
+          <OwnerShareNote factor={ownerShareFactor} variant="edit" />
         </DialogHeader>
 
         {stage === "drop" && (

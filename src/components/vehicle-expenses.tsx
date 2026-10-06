@@ -22,6 +22,8 @@ import {
 } from "@/app/dashboard/vehicle-expense-actions";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
+import { OwnerShareNote } from "@/components/owner-share-note";
+import { scaleHistoryValue } from "@/lib/ownership";
 import type { TranslationKey } from "@/lib/i18n";
 import {
   isVehicleExpenseCategory,
@@ -55,10 +57,14 @@ export function VehicleExpenses({
   assetId,
   currency,
   expenses,
+  shareFactor = 1,
 }: {
   assetId: string;
   currency: string;
+  /** The RAW whole-vehicle ledger: the edit form prefills from it, so it must never be pre-scaled. */
   expenses: VehicleExpense[];
+  /** Viewer's 0-1 share of a co-owned vehicle: totals, breakdown and amounts are displayed scaled; writes stay whole-asset. */
+  shareFactor?: number;
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
@@ -76,10 +82,13 @@ export function VehicleExpenses({
     isVehicleExpenseCategory(value) ? t(CATEGORY_KEYS[value]) : value;
 
   const sorted = [...expenses].sort((a, b) => b.date.localeCompare(a.date));
-  const total = sumVehicleExpenses(expenses);
+  // Read-only figures use the viewer's share; `expenses` itself (edit prefill) stays raw.
+  const shown = (n: number) => scaleHistoryValue(n, shareFactor);
+  const sharedExpenses = expenses.map((e) => ({ ...e, amount: shown(e.amount) }));
+  const total = sumVehicleExpenses(sharedExpenses);
   const thisYear = String(new Date().getFullYear());
-  const totalThisYear = sumVehicleExpenses(expenses.filter((e) => e.date.startsWith(thisYear)));
-  const breakdown = vehicleExpensesByCategory(expenses);
+  const totalThisYear = sumVehicleExpenses(sharedExpenses.filter((e) => e.date.startsWith(thisYear)));
+  const breakdown = vehicleExpensesByCategory(sharedExpenses);
 
   function resetForm() {
     setEditingId(null);
@@ -211,7 +220,7 @@ export function VehicleExpenses({
                       </TableCell>
                       <TableCell className="text-foreground">{expense.description || "—"}</TableCell>
                       <TableCell className="text-end tabular-nums text-foreground">
-                        {maskValue(money.format(expense.amount))}
+                        {maskValue(money.format(shown(expense.amount)))}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
@@ -248,6 +257,7 @@ export function VehicleExpenses({
             onSubmit={handleSubmit}
             className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-4 sm:items-end"
           >
+            <OwnerShareNote factor={shareFactor} variant="edit" className="sm:col-span-4" />
             <div className="min-w-0 space-y-1">
               <Label className="text-xs" htmlFor="vexp_date">
                 {t("date")}

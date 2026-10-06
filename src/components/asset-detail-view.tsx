@@ -186,6 +186,8 @@ import { fetchMarketPrice } from "@/lib/market-data/market-price";
 import { refreshMarketPrice } from "@/app/dashboard/actions";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/lib/i18n";
+import { buildDetailDisplay, realEstateShareFigures, toEditPayload } from "@/lib/asset-detail-scaling";
+import { OwnerShareNote } from "@/components/owner-share-note";
 
 export type AssetDetail = {
   id: string;
@@ -310,9 +312,13 @@ export function AssetDetailView({
   ratesFromUsd,
   owners = [],
   ownershipStatus = null,
+  ownerFactor = 1,
 }: {
+  /** The RAW whole-asset record (100% values). Forms, dialogs and server actions use this one. */
   asset: AssetDetail;
   history: AssetHistoryPoint[];
+  /** The viewer's 0-1 share of a co-owned asset (1 = sole owner). Only read-only display is scaled. */
+  ownerFactor?: number;
   categories: Category[];
   ratesFromUsd: Record<string, number>;
   /** Owner rows when the asset is shared (empty = a single owner). */
@@ -363,6 +369,14 @@ export function AssetDetailView({
   const [certError, setCertError] = useState<string | null>(null);
   const [isCertPending, startCertTransition] = useTransition();
 
+  // asset detail: owner share. `asset` / `history` stay RAW (whole asset) for every form,
+  // dialog and server action; everything below that merely DISPLAYS reads the viewer's share.
+  const { displayAsset, displayHistory: shareHistory } = buildDetailDisplay({
+    asset,
+    history,
+    factor: ownerFactor,
+  });
+
   const categoryName = asset.asset_categories?.name ?? "—";
   const isRealEstate = categoryName === "Real Estate";
   const isVehicle = categoryName === "Vehicles";
@@ -374,30 +388,30 @@ export function AssetDetailView({
   const isPreciousMetal = categoryName === "Precious Metals";
   const isExotic = categoryName === "Exotic Assets";
   const isStartup = categoryName === "Startups";
-  const metadata = parseRealEstateMetadata(asset.metadata);
-  const vehicleMetadata = isVehicle ? parseVehicleMetadata(asset.metadata) : null;
+  const metadata = parseRealEstateMetadata(displayAsset.metadata);
+  const vehicleMetadata = isVehicle ? parseVehicleMetadata(displayAsset.metadata) : null;
   // Baseline = purchase price, else the earliest valuation entry; current =
   // the latest valuation entry (see `resolveVehicleValuation`).
   const vehicleValuation = vehicleMetadata
     ? resolveVehicleValuation(
         vehicleMetadata,
-        history.filter((h) => !asset.purchase_date || h.recorded_date >= asset.purchase_date),
-        asset.current_value,
+        shareHistory.filter((h) => !asset.purchase_date || h.recorded_date >= asset.purchase_date),
+        displayAsset.current_value,
       )
     : null;
   const vehicleTotalCost = vehicleMetadata
     ? calculateVehicleTotalCost(
         vehicleMetadata,
-        vehicleValuation?.baselineCost ?? asset.current_value,
+        vehicleValuation?.baselineCost ?? displayAsset.current_value,
       )
     : null;
   const vehicleChange = vehicleValuation?.change ?? null;
   const privateEquityMetadata = isPrivateEquity
-    ? parsePrivateEquityMetadata(asset.metadata)
+    ? parsePrivateEquityMetadata(displayAsset.metadata)
     : null;
-  const equityMetadata = isEquity ? parseEquityMetadata(asset.metadata) : null;
-  const cryptoMetadata = isCrypto ? parseCryptoMetadata(asset.metadata) : null;
-  const metalMetadata = isPreciousMetal ? parsePreciousMetalMetadata(asset.metadata) : null;
+  const equityMetadata = isEquity ? parseEquityMetadata(displayAsset.metadata) : null;
+  const cryptoMetadata = isCrypto ? parseCryptoMetadata(displayAsset.metadata) : null;
+  const metalMetadata = isPreciousMetal ? parsePreciousMetalMetadata(displayAsset.metadata) : null;
   const isWalletHolding = cryptoMetadata?.holding_source === "wallet";
   const avgCostBasis = equityMetadata
     ? estimateCostBasisUnitPrice(equityMetadata.trades)
@@ -414,8 +428,8 @@ export function AssetDetailView({
   const loanIsAmortizable = isRealEstate && canAmortize(loan);
 
   const marketValuation = isRealEstate
-    ? metadata.market_valuation ?? asset.current_value
-    : asset.current_value;
+    ? metadata.market_valuation ?? displayAsset.current_value
+    : displayAsset.current_value;
 
   // Equity = current market value − outstanding loan balance. The loan
   // balance prefers the amortization engine's exact point-in-time figure
@@ -428,7 +442,7 @@ export function AssetDetailView({
     : 0;
   const netEquity = isRealEstate
     ? calculateEquity(marketValuation, outstandingLoanBalance)
-    : asset.current_value;
+    : displayAsset.current_value;
 
   const totalCost = isRealEstate
     ? calculateTotalCost(metadata, marketValuation)
@@ -441,10 +455,6 @@ export function AssetDetailView({
     isRealEstate && totalCost != null
       ? calculateUnrealizedGain(marketValuation, totalCost)
       : null;
-  const valuePerSqm =
-    isRealEstate && metadata.surfaceArea
-      ? marketValuation / metadata.surfaceArea
-      : null;
 
   const confidenceLevel = metadata.automaticEstimation
     ? t("confidence_high")
@@ -455,9 +465,16 @@ export function AssetDetailView({
       : null;
   const primaryOwnership =
     metadata.ownership.find((o) => o.name) ?? metadata.ownership[0];
-  const ownershipPercent = primaryOwnership?.percentage ?? 100;
-  const grossShare = (ownershipPercent / 100) * marketValuation;
-  const netShare = (ownershipPercent / 100) * netEquity;
+  // Co-owned: the share comes from the viewer's factor and the amounts are already scaled (no
+  // second multiplication by the legacy per-property percentage); price per m2 is whole-property.
+  const { ownershipPercent, grossShare, netShare, valuePerSqm: sqmValue } = realEstateShareFigures({
+    factor: ownerFactor,
+    legacyPercent: primaryOwnership?.percentage ?? 100,
+    marketValuation,
+    netEquity,
+    surfaceArea: metadata.surfaceArea,
+  });
+  const valuePerSqm = isRealEstate ? sqmValue : null;
   const equityRatio = marketValuation !== 0 ? (netEquity / marketValuation) * 100 : 0;
   const hasLoan = !!(loan.amount || loan.outstanding_principal);
   const amortizationSummary = loanIsAmortizable ? summarizeAmortization(loan, today) : null;
@@ -561,7 +578,7 @@ export function AssetDetailView({
 
   const initials = categoryName !== "—" ? categoryName[0].toUpperCase() : "?";
 
-  const sortedHistoryRaw = [...history].sort((a, b) =>
+  const sortedHistoryRaw = [...shareHistory].sort((a, b) =>
     a.recorded_date.localeCompare(b.recorded_date),
   );
 
@@ -643,8 +660,8 @@ export function AssetDetailView({
             {
               id: "vehicle-now",
               recorded_date: today,
-              value: asset.current_value,
-              net_equity: asset.current_value,
+              value: displayAsset.current_value,
+              net_equity: displayAsset.current_value,
               source: "manual",
             } as AssetHistoryPoint,
           ]
@@ -1311,6 +1328,7 @@ export function AssetDetailView({
                   {asset.is_liability ? "-" : ""}
                   {maskValue(currencyFormatter.format(netEquity))}
                 </p>
+                <OwnerShareNote factor={ownerFactor} className="mt-0.5" />
               </div>
               <PrivacyToggleButton />
               {isRealEstate && metadata.emirate === "abu_dhabi" && (
@@ -1489,6 +1507,7 @@ export function AssetDetailView({
                     <DialogDescription className="text-muted-foreground">
                       {t("refresh_valuation_desc")}
                     </DialogDescription>
+                    <OwnerShareNote factor={ownerFactor} variant="edit" />
                   </DialogHeader>
                   <form onSubmit={handleRefreshSubmit} className="space-y-4">
                     <div className="space-y-2">
@@ -2417,18 +2436,8 @@ export function AssetDetailView({
                         <AddAssetDialog
                           categories={categories}
                           owners={owners}
-                          asset={{
-                            id: asset.id,
-                            name: asset.name,
-                            category_id: asset.category_id,
-                            quantity: asset.quantity,
-                            current_value: asset.current_value,
-                            currency: asset.currency,
-                            metadata: asset.metadata,
-                            images: asset.images,
-                            ticker_symbol: asset.ticker_symbol,
-                            purchase_date: asset.purchase_date,
-                          }}
+                          asset={toEditPayload(asset)}
+                          ownerShareFactor={ownerFactor}
                           trigger={
                             <Button type="button" variant="outline" size="sm">
                               {t("add_loan")}
@@ -2680,7 +2689,7 @@ export function AssetDetailView({
                       ))}
                     </div>
                   )}
-                  <TenancyContractDialog assetId={asset.id} />
+                  <TenancyContractDialog assetId={asset.id} ownerShareFactor={ownerFactor} />
                 </CardContent>
               </Card>
 
@@ -2745,6 +2754,7 @@ export function AssetDetailView({
                     onSubmit={handleAddPropertyExpense}
                     className="grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-4 sm:items-end"
                   >
+                    <OwnerShareNote factor={ownerFactor} variant="edit" className="sm:col-span-4" />
                     <div className="min-w-0 space-y-1 sm:col-span-2">
                       <Label className="text-xs">{t("description")}</Label>
                       <Input
@@ -2821,7 +2831,8 @@ export function AssetDetailView({
               <VehicleExpenses
                 assetId={asset.id}
                 currency={asset.currency}
-                expenses={vehicleMetadata.expenses}
+                expenses={parseVehicleMetadata(asset.metadata).expenses}
+                shareFactor={ownerFactor}
               />
             </TabsContent>
           )}
@@ -2836,6 +2847,7 @@ export function AssetDetailView({
               <CardContent className="flex items-center gap-3">
                 {asset.is_liability ? (
                   <AddLiabilityDialog
+                    ownerShareFactor={ownerFactor}
                     liability={{
                       id: asset.id,
                       name: asset.name,
@@ -2849,18 +2861,8 @@ export function AssetDetailView({
                   <AddAssetDialog
                     categories={categories}
                     owners={owners}
-                    asset={{
-                      id: asset.id,
-                      name: asset.name,
-                      category_id: asset.category_id,
-                      quantity: asset.quantity,
-                      current_value: asset.current_value,
-                      currency: asset.currency,
-                      metadata: asset.metadata,
-                      images: asset.images,
-                      ticker_symbol: asset.ticker_symbol,
-                      purchase_date: asset.purchase_date,
-                    }}
+                    asset={toEditPayload(asset)}
+                    ownerShareFactor={ownerFactor}
                   />
                 )}
                 {isRealEstate && <PropertyDocumentDialog assetId={asset.id} />}
@@ -3471,7 +3473,7 @@ export function AssetDetailView({
                       <VehicleBlueBookDialog
                         assetId={asset.id}
                         assetCurrency={asset.currency}
-                        estimate={estimateDepreciatedValue(vehicleMetadata, asset.purchase_date)}
+                        estimate={estimateDepreciatedValue(parseVehicleMetadata(asset.metadata), asset.purchase_date)}
                       />
                     )}
                   </CardHeader>
@@ -3592,11 +3594,11 @@ export function AssetDetailView({
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {(() => {
-                    const scpi = parseScpiMetadata(asset.metadata);
-                    const invested = scpiInvested(scpi, asset.quantity);
-                    const fees = scpiEntryFees(scpi, asset.quantity);
+                    const scpi = parseScpiMetadata(displayAsset.metadata);
+                    const invested = scpiInvested(scpi, displayAsset.quantity);
+                    const fees = scpiEntryFees(scpi, displayAsset.quantity);
                     const unit = scpiWithdrawalValue(scpi);
-                    const trailing = scpiTrailingYield(scpi, asset.quantity, today);
+                    const trailing = scpiTrailingYield(scpi, displayAsset.quantity, today);
                     const average = scpiAverageYield(scpi);
                     const dividends = [...scpi.dividends].sort((a, b) => b.date.localeCompare(a.date));
                     const money = (n: number) => maskValue(currencyFormatter.format(n));
@@ -3610,7 +3612,7 @@ export function AssetDetailView({
                             label={t("scpi_holding_mode")}
                             value={t(SCPI_MODE_LABEL_KEYS[scpi.holding_mode])}
                           />
-                          <DetailField label={t("scpi_shares")} value={String(asset.quantity)} />
+                          <DetailField label={t("scpi_shares")} value={String(displayAsset.quantity)} />
                           <DetailField
                             label={t("scpi_subscription_price")}
                             value={scpi.subscription_price != null ? money(scpi.subscription_price) : null}
@@ -3974,7 +3976,7 @@ export function AssetDetailView({
                   <DetailField label={t("exchange")} value={equityMetadata.exchange} />
                   <DetailField
                     label={t("shares_owned")}
-                    value={maskValue(asset.quantity.toLocaleString(intlLocale))}
+                    value={maskValue(displayAsset.quantity.toLocaleString(intlLocale))}
                   />
                   <DetailField
                     label={t("average_cost_basis")}
@@ -3994,7 +3996,7 @@ export function AssetDetailView({
                   />
                   <DetailField
                     label={t("total_value")}
-                    value={maskValue(currencyFormatter.format(asset.current_value))}
+                    value={maskValue(currencyFormatter.format(displayAsset.current_value))}
                   />
                   <DetailField
                     label={t("last_updated")}
@@ -4011,7 +4013,7 @@ export function AssetDetailView({
               <StartupCard
                 assetId={asset.id}
                 metadata={asset.metadata}
-                shares={asset.quantity}
+                shares={displayAsset.quantity}
                 currency={asset.currency}
               />
             )}
@@ -4034,7 +4036,7 @@ export function AssetDetailView({
                 <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailField label={t("metal_type")} value={t(METAL_LABEL_KEYS[metalMetadata.metal])} />
                   <DetailField label={t("metal_form")} value={t(METAL_FORM_LABEL_KEYS[metalMetadata.form])} />
-                  <DetailField label={t("quantity_pieces")} value={String(asset.quantity)} />
+                  <DetailField label={t("quantity_pieces")} value={String(displayAsset.quantity)} />
                   <DetailField
                     label={t("metal_weight_per_unit")}
                     value={
@@ -4046,7 +4048,7 @@ export function AssetDetailView({
                   <DetailField label={t("metal_purity")} value={String(metalMetadata.purity)} />
                   <DetailField
                     label={t("metal_fine_weight_label")}
-                    value={`${fineTroyOunces(metalMetadata, asset.quantity).toFixed(4)} oz t`}
+                    value={`${fineTroyOunces(metalMetadata, displayAsset.quantity).toFixed(4)} oz t`}
                   />
                   <DetailField
                     label={t("metal_premium")}

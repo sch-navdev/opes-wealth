@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OwnerShareNote } from "@/components/owner-share-note";
 import { RealEstateFields } from "@/components/real-estate-fields";
 import { VehicleFields } from "@/components/vehicle-fields";
 import { PrivateEquityFields } from "@/components/private-equity-fields";
@@ -129,7 +130,10 @@ export function AddAssetDialog({
   companies = [],
   owners: initialOwners,
   simulation = false,
+  ownerShareFactor = 1,
 }: {
+  /** Viewer's 0-1 share when editing a co-owned asset: adds a hint that the form holds whole-asset values (they are never scaled). */
+  ownerShareFactor?: number;
   categories: Category[];
   asset?: AssetForEdit;
   /** Preselects a category when creating (e.g. "Cash" from the dashboard's Cash & Bank card). */
@@ -471,6 +475,7 @@ export function AddAssetDialog({
               ? "Update the details for this asset."
               : "Track a new asset or liability in your portfolio."}
           </DialogDescription>
+          {isEditMode && <OwnerShareNote factor={ownerShareFactor} variant="edit" />}
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">

@@ -10,6 +10,8 @@ import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/com
 import { getExchangeRatesFromUsd } from "@/lib/fx";
 import type { OwnerFormRow } from "@/components/ownership-fields";
 import { loadOwnershipStatus } from "@/lib/shared-assets/server";
+import { ownershipFactor } from "@/lib/ownership";
+import { viewerShareFactor } from "@/lib/asset-detail-scaling";
 
 export default async function AssetDetailsPage({
   params,
@@ -77,6 +79,15 @@ export default async function AssetDetailsPage({
     isYou: r.profile_id === user.id,
   }));
 
+  // The viewer's share (0-1) for read-only display (same factors the dashboard applies, also under mock auth).
+  const ownerFactor = viewerShareFactor({
+    factor: ownershipFactor(
+      asset.profile_id,
+      (ownerRows ?? []).map((r) => ({ profile_id: r.profile_id, ownership_percentage: Number(r.ownership_percentage) })),
+      user.id,
+    ),
+  });
+
   const ownershipStatus = owners.length > 1 && !mockUserId ? await loadOwnershipStatus(id, user.id) : null;
 
   return (
@@ -87,6 +98,7 @@ export default async function AssetDetailsPage({
       ratesFromUsd={rates}
       owners={owners}
       ownershipStatus={ownershipStatus}
+      ownerFactor={ownerFactor}
     />
   );
 }
