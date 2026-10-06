@@ -2,7 +2,7 @@
 
 # Testing
 
-**Status (2026-10-06):** automated tests for the core pure logic plus the first React component tests. 43 test files, **1161 tests, all passing, no `it.fails` left** (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
+**Status (2026-10-06):** automated tests for the core pure logic, the co-owner approval flow (mocked two-user simulation) and the first React component tests. 48 test files, **1243 tests passing plus 1 deliberate `it.fails`** (the requester is never notified when a co-owner approves or rejects; remove the marker when that is built) (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
 
 ## Setup
 - **Runner:** Vitest `^5` (upgraded from 3 on 2026-10-06 together with `@types/node` `^22.0.0`; Node 24 locally). Config in `vitest.config.mts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`; `.mts` avoids a Vite native-config-loader warning).
