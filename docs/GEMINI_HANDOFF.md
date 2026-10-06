@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 16:18 (Gulf Standard Time, UTC+4).** `origin/master` is at `4cafb3e`; the Supabase/Porsche updates since are committed locally and NOT pushed until Steve confirms. Production runs in Mumbai (`bom1`, verified). **Supabase matches all 33 migrations and the Porsche data fix is applied (both verified live).**
+**Last updated: 2026-10-06 16:23 (Gulf Standard Time, UTC+4).** Everything up to `ada63a6` is pushed to `origin/master`. Production runs in Mumbai (`bom1`, verified). **Supabase matches all 33 migrations and the Porsche data fix is applied (both verified live).** See "Push status".
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -59,4 +59,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 16:18 GST: `origin/master` is at `4cafb3e` (documentation-only since `18108e3`, which was verified READY in Mumbai). **Local only, not pushed until Steve confirms:** `aa11db5` (Supabase 0028 verified) and the commit that adds migration 0033 and records the applied Porsche fix. Gates at the last code change: 1243 tests (+1 deliberate `it.fails`), `tsc`, `eslint`, `npm run build` all pass (the newest commits are SQL/documentation only).
+At 2026-10-06 16:23 GST: `origin/master` is at `ada63a6` (pushed 16:22 after Steve's confirmation: `4cafb3e..ada63a6`, containing `aa11db5` and `ada63a6`: Supabase 0028 verified, migration 0033 added, Porsche fix recorded). Vercel redeploys on push (SQL/documentation-only since `18108e3`, which was verified READY in Mumbai). The only thing newer than `origin` is this status edit, committed locally and not pushed until Steve confirms. Gates at the last code change: 1243 tests (+1 deliberate `it.fails`), `tsc`, `eslint`, `npm run build` all pass.
