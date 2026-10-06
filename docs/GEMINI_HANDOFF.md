@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 15:29 (Gulf Standard Time, UTC+4).** Everything up to `eff7818` is pushed to `origin/master` (the latest push, 15:2x GST, included the email audit, the 98 translations and the component tests). Production runs in Mumbai (`bom1`, verified). Only the Porsche SQL commit is local: see "Push status".
+**Last updated: 2026-10-06 15:30 (Gulf Standard Time, UTC+4).** Everything up to `780fa72` (the Porsche SQL commit) is pushed to `origin/master`. Production runs in Mumbai (`bom1`, verified). See "Push status".
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -50,4 +50,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 15:29 GST: `origin/master` is at `eff7818` (pushed after Steve's confirmation; Vercel redeploys on push). **Local only, not pushed (waiting for Steve to confirm):** the Porsche SQL + notes commit and this handoff update. Gates at the last code change: 1161 tests, `tsc`, `eslint`, `npm run build` all pass (this session's last commits are documentation and a SQL file only).
+At 2026-10-06 15:30 GST: `origin/master` is at `780fa72` (pushed after Steve's confirmation; Vercel redeploys on push). The only thing newer is this status edit, committed locally and not pushed until Steve confirms. The Porsche SQL file is in the repo but has NOT been run (Steve runs it). Gates at the last code change: 1161 tests, `tsc`, `eslint`, `npm run build` all pass (the latest commits are documentation and a SQL file only).
