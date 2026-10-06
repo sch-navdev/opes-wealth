@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Loader2, Upload } from "lucide-react";
+import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv-parser";
@@ -13,7 +13,13 @@ export type ParsedCsvFile = {
 };
 
 /**
- * Drag-and-drop / click-to-browse `.csv` picker. Reads the file client-side,
+ * Drag-and-drop / click-to-browse `.csv` picker, styled after the 21st.dev
+ * "File Upload Multi-File Dropzone" (ephraimduncan/file-upload-03, id 18111):
+ * dashed zone that tints with a ring while dragging, a "Drag and drop or
+ * <choose file>" line and a constraints note. Kept hand-rolled (no
+ * `react-dropzone` dependency) and single-file, as the import is one CSV.
+ *
+ * Reads the file client-side. Reads the file client-side,
  * parses its headers and rows (`lib/csv-parser.ts`) and hands them to
  * `onParsed` so the parent can move on to column mapping. The `.csv`
  * extension is checked on both the drop and picker paths (the `accept`
@@ -83,20 +89,31 @@ export function CsvDropzone({
           if (file && !busy) void handleFile(file);
         }}
         className={cn(
-          "flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border bg-muted px-6 py-10 text-center transition-colors",
-          busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-foreground/40",
-          isDragging && "border-foreground",
+          "flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-6 py-12 text-center transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-primary/60 hover:bg-muted/60",
+          isDragging ? "border-primary bg-primary/10 ring-2 ring-primary/20" : "border-border bg-muted/40",
         )}
       >
         {isParsing ? (
-          <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <Loader2 className="size-10 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
         ) : (
-          <Upload className="size-8 text-muted-foreground" />
+          <FileSpreadsheet className="size-10 text-muted-foreground/80" aria-hidden />
         )}
-        <p className="text-sm font-medium text-foreground">
-          {isParsing ? t("csv_parsing") : t("csv_dropzone_cta")}
+        <p className="text-sm text-muted-foreground">
+          {isParsing ? (
+            t("csv_parsing")
+          ) : (
+            <>
+              {t("csv_drag_or")}{" "}
+              <span className="font-medium text-primary underline-offset-4 hover:underline">
+                {t("csv_choose_file")}
+              </span>
+            </>
+          )}
         </p>
-        <p className="text-xs text-muted-foreground">{t("csv_dropzone_subtext")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("csv_dropzone_subtext")} · {t("csv_only_note")}
+        </p>
       </div>
       <input
         ref={inputRef}

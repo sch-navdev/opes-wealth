@@ -16,6 +16,7 @@ import {
   DashboardMetricCards,
   type DashboardBreakdowns,
 } from "@/components/dashboard-metric-cards";
+import { DashboardBento, type BentoTile } from "@/components/dashboard-bento";
 import { DashboardAnalytics } from "@/components/dashboard-analytics";
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { T } from "@/components/translated-text";
@@ -412,6 +413,19 @@ export default async function DashboardPage({
     (asset) => convertToBaseCurrency(grossAssetValue(asset), asset.currency, displayCurrency, rates),
   );
 
+  // Bento header: net contribution + holding count for the three headline
+  // classes (same netWorth breakdown rows the metric cards use, so they agree),
+  // plus a thinned Total series for the hero sparkline.
+  const bentoTiles: BentoTile[] = ["Real Estate", "Vehicles", "Private Equity"].map((category) => ({
+    category,
+    total: breakdowns.netWorth.filter((r) => r.category === category).reduce((sum, r) => sum + r.amount, 0),
+    count: (assets ?? []).filter((a) => !a.is_liability && a.asset_categories?.name === category).length,
+  }));
+  const sparkStep = Math.max(1, Math.ceil(performanceSeries.points.length / 60));
+  const bentoSpark = performanceSeries.points
+    .filter((_, i, all) => i % sparkStep === 0 || i === all.length - 1)
+    .map((p) => ({ date: p.date, value: p.total ?? 0 }));
+
   return (
     <>
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -439,6 +453,13 @@ export default async function DashboardPage({
       </header>
 
       <main className="w-full space-y-6 px-4 py-10 sm:px-6 lg:px-8">
+        <DashboardBento
+          netWorth={totalNetWorth}
+          baseCurrency={displayCurrency}
+          tiles={bentoTiles}
+          spark={bentoSpark}
+        />
+
         <DashboardMetricCards
           netWorth={totalNetWorth}
           assets={totalAssetsValue}

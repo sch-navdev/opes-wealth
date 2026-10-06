@@ -283,11 +283,11 @@ export function CsvColumnMapper({
       </div>
 
       <Tabs value={mode} onValueChange={(next) => setMode(next as Mode)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="balance" className="flex-1" disabled={isPending}>
+        <TabsList className="h-auto w-full">
+          <TabsTrigger value="balance" className="min-w-0 flex-1 whitespace-normal" disabled={isPending}>
             {t("csv_mode_balance")}
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="flex-1" disabled={isPending}>
+          <TabsTrigger value="transactions" className="min-w-0 flex-1 whitespace-normal" disabled={isPending}>
             {t("csv_mode_transactions")}
           </TabsTrigger>
         </TabsList>
@@ -322,11 +322,11 @@ export function CsvColumnMapper({
         ) : (
           <>
             <Tabs value={amountMode} onValueChange={(next) => setAmountMode(next as AmountMode)}>
-              <TabsList className="w-full">
-                <TabsTrigger value="single" className="flex-1" disabled={isPending}>
+              <TabsList className="h-auto w-full">
+                <TabsTrigger value="single" className="min-w-0 flex-1 whitespace-normal" disabled={isPending}>
                   {t("csv_amount_mode_single")}
                 </TabsTrigger>
-                <TabsTrigger value="creditDebit" className="flex-1" disabled={isPending}>
+                <TabsTrigger value="creditDebit" className="min-w-0 flex-1 whitespace-normal" disabled={isPending}>
                   {t("csv_amount_mode_credit_debit")}
                 </TabsTrigger>
               </TabsList>

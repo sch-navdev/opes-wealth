@@ -76,6 +76,12 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 - **Cleanup:** removed unused `components/ui/slider.tsx`. A scan found no other orphaned components and no unused locals/imports (`tsc --noUnusedLocals`).
 - **Not verified:** `eslint` and a full `tsc` can't run here (`node_modules` is missing `zod/v4/index.cjs` and `lucide-react` types); no browser check of the tier selector.
 
+## Collapsible Sidebar & Dark-Mode Audit (2026-10-04, 21st.dev upgrade)
+
+- `app-sidebar.tsx`: the desktop rail now has a user toggle (bottom "Collapse/Expand sidebar" button, `ChevronsRight` that flips with state and RTL, `aria-expanded`), adapted from 21st.dev **Dashboard with Collapsible Sidebar** (`uniquesonu`, id 5556; fetched — only its width-toggle + bottom toggle pattern was used; its hardcoded gray/blue palette, fake nav and demo dashboard were discarded). Preference is stored in `localStorage` (`opes-sidebar-collapsed`); with no saved choice the old responsive default holds (full at `lg+`, icon-only at `md`). Tier gating (`NAV_ITEMS`/`minTier`, tier selector hidden on the icon rail), the sub-`md` hamburger drawer and sign-out are unchanged. Width transition respects `prefers-reduced-motion`.
+- **Dark-mode audit** of the new/edited files (`dashboard-bento`, `csv-*`, `portfolio-table`, `app-sidebar`, `dashboard/page`): grep found no hex/rgb/hsl and no non-semantic palette classes; everything uses `bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-primary`, `--chart-1`. Repo-wide, the only literal hex left is non-themeable by design: `#ffffff` canvas fills in `lib/asset-photos-client.ts` / `lib/crop-image.ts` (JPEG flattening) and the inline-styled co-owner email HTML in `lib/shared-assets/notify.ts` (email clients ignore CSS variables). Light/dark rendering was checked in a headless browser on 2026-10-06 (dashboard bento, assets table, collapsed sidebar, privacy mask, 390px mobile — all fine, zero console errors); the CSV dialog was not reachable with the available data, see `PROGRAMMER_REPORT.md`.
+- Related: [[Portfolio-Dashboard|Portfolio Dashboard]] (bento + table), [[CSV-Bank-Uploads|CSV Bank Uploads]] (upload card), [[Localization|Localization]] (`sidebar_*` keys).
+
 ## Related
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components

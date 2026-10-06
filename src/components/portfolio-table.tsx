@@ -1,10 +1,11 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CategoryIcon, categoryIconFor } from "@/components/category-icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { photoThumbUrl } from "@/lib/asset-photos";
-import { Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,6 +33,49 @@ import {
 } from "@/lib/real-estate";
 
 type Category = { id: string; name: string };
+
+type SortKey = "name" | "category" | "quantity" | "value";
+type SortState = { key: SortKey; dir: "asc" | "desc" } | null;
+
+/** One sortable column header: a real <button> inside the <th>, with `aria-sort` on the th. */
+function SortHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = "start",
+  sortLabel,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+  align?: "start" | "end";
+  sortLabel: string;
+}) {
+  const active = sort?.key === sortKey ? sort.dir : null;
+  const Icon = active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ChevronsUpDown;
+  return (
+    <TableHead
+      aria-sort={active === "asc" ? "ascending" : active === "desc" ? "descending" : "none"}
+      className={cn(align === "end" && "text-end")}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        title={sortLabel}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-sm uppercase tracking-wide outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+          align === "end" && "flex-row-reverse",
+          active ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+        <Icon className="size-3.5 shrink-0" aria-hidden />
+      </button>
+    </TableHead>
+  );
+}
 
 type AssetRow = {
   id: string;
@@ -79,6 +123,39 @@ export function PortfolioTable({
     currency: displayCurrency,
   });
 
+  const [sort, setSort] = useState<SortState>(null);
+  // Click cycles asc → desc → original (server) order.
+  const onSort = (key: SortKey) =>
+    setSort((prev) =>
+      prev?.key !== key ? { key, dir: "asc" } : prev.dir === "asc" ? { key, dir: "desc" } : null,
+    );
+
+  const sortedAssets = useMemo(() => {
+    if (!sort) return assets;
+    // Value sorts by what the row headlines (net equity for mortgaged property), in the display currency.
+    const valueOf = (a: AssetRow) => {
+      const owed =
+        a.asset_categories?.name === "Real Estate" || a.asset_categories?.name === "Private Equity"
+          ? assetLiability(a)
+          : 0;
+      const raw = owed > 0 ? grossAssetValue(a) - owed : a.current_value;
+      return convertAmount(raw, a.currency, displayCurrency, rates) * (a.is_liability ? -1 : 1);
+    };
+    const factor = sort.dir === "asc" ? 1 : -1;
+    return [...assets].sort((a, b) => {
+      switch (sort.key) {
+        case "name":
+          return factor * a.name.localeCompare(b.name, intlLocale);
+        case "category":
+          return factor * (a.asset_categories?.name ?? "").localeCompare(b.asset_categories?.name ?? "", intlLocale);
+        case "quantity":
+          return factor * (a.quantity - b.quantity);
+        case "value":
+          return factor * (valueOf(a) - valueOf(b));
+      }
+    });
+  }, [assets, sort, displayCurrency, rates, intlLocale]);
+
   const visibleIds = assets.map((asset) => asset.id);
   const selectedVisibleCount = selectedIds
     ? visibleIds.filter((id) => selectedIds.has(id)).length
@@ -93,15 +170,15 @@ export function PortfolioTable({
       role="region"
       aria-label="Portfolio holdings table"
       tabIndex={0}
-      className="border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      className="overflow-hidden rounded-md border border-border bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
     >
       <Table>
         <TableCaption className="sr-only">
           Your portfolio holdings, with category, quantity, value and
           performance. Each row links to that asset&apos;s detail page.
         </TableCaption>
-        <TableHeader>
-          <TableRow>
+        <TableHeader className="bg-muted/40 text-xs">
+          <TableRow className="hover:bg-transparent">
             {onToggleAll && (
               <TableHead className="w-10">
                 <Checkbox
@@ -120,14 +197,12 @@ export function PortfolioTable({
                 />
               </TableHead>
             )}
-            <TableHead>Name</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead className="text-end">Quantity</TableHead>
-            <TableHead className="text-end">
-              Value ({displayCurrency})
-            </TableHead>
-            <TableHead className="text-end">Performance</TableHead>
-            <TableHead className="text-end">Actions</TableHead>
+            <SortHead label={t("grid_col_name")} sortKey="name" sort={sort} onSort={onSort} sortLabel={t("grid_sort_by", { col: t("grid_col_name") })} />
+            <SortHead label={t("grid_col_category")} sortKey="category" sort={sort} onSort={onSort} sortLabel={t("grid_sort_by", { col: t("grid_col_category") })} />
+            <SortHead label={t("grid_col_quantity")} sortKey="quantity" sort={sort} onSort={onSort} align="end" sortLabel={t("grid_sort_by", { col: t("grid_col_quantity") })} />
+            <SortHead label={t("grid_col_value", { currency: displayCurrency })} sortKey="value" sort={sort} onSort={onSort} align="end" sortLabel={t("grid_sort_by", { col: t("grid_col_value", { currency: displayCurrency }) })} />
+            <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t("grid_col_performance")}</TableHead>
+            <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t("grid_col_actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -137,11 +212,11 @@ export function PortfolioTable({
                 colSpan={onToggleAll ? 7 : 6}
                 className="text-center text-muted-foreground"
               >
-                No assets yet. Add your first one to get started.
+                {t("grid_empty")}
               </TableCell>
             </TableRow>
           ) : (
-            assets.map((asset, index) => {
+            sortedAssets.map((asset, index) => {
               // Cap the stagger so a long portfolio doesn't take seconds to
               // finish animating in — every row past the first 8 mounts
               // together instead of queuing further and further behind.

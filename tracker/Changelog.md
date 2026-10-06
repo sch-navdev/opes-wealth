@@ -186,3 +186,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Email links now point to opeswealth.app/auth/confirm (button-press confirmation) instead of the Supabase address, to reduce junk placement; sign-in page shows link errors — [[Authentication-Security|Authentication & Security]]
 - 2026-10-02: Stale approval requests for removed co-owners are cleaned up and the two resend buttons are labelled distinctly — [[Co-Ownership|Co-Ownership]]
 - 2026-10-04: Added Zustand expertise-tier store (basic/standard/professional/expert) with tier-gated sidebar links and removed the unused slider component. See [[Design-System|Design System]].
+- 2026-10-04: 21st.dev-informed UI upgrade — bento dashboard header, CSV upload Card, sortable data-grid assets table and a user-collapsible sidebar, all on semantic theme tokens. See [[Portfolio-Dashboard|Portfolio Dashboard]].

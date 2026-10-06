@@ -2283,6 +2283,35 @@ const dictionary = {
 
   // Approval resend label
   ownership_resend_approval: { en: "Resend approval request", fr: "Renvoyer la demande d'approbation" },
+
+  // Dashboard bento header
+  bento_holdings: { en: "{n} holdings", fr: "{n} actifs" },
+  bento_holdings_one: { en: "1 holding", fr: "1 actif" },
+  bento_empty: { en: "No holdings yet", fr: "Aucun actif pour l'instant" },
+  bento_share: { en: "{pct}% of net worth", fr: "{pct} % du patrimoine net" },
+  bento_hero_caption: { en: "Total across all categories", fr: "Total toutes catégories confondues" },
+  bento_aria: { en: "Wealth summary", fr: "Résumé du patrimoine" },
+
+  // Collapsible sidebar
+  sidebar_collapse: { en: "Collapse sidebar", fr: "Réduire le menu" },
+  sidebar_expand: { en: "Expand sidebar", fr: "Développer le menu" },
+
+  // CSV upload card
+  csv_step_upload: { en: "Step 1 of 2 · Upload", fr: "Étape 1 sur 2 · Téléversement" },
+  csv_step_map: { en: "Step 2 of 2 · Map columns", fr: "Étape 2 sur 2 · Correspondance des colonnes" },
+  csv_drag_or: { en: "Drag and drop or", fr: "Glissez-déposez ou" },
+  csv_choose_file: { en: "choose a CSV file", fr: "choisissez un fichier CSV" },
+  csv_only_note: { en: "CSV files only", fr: "Fichiers CSV uniquement" },
+
+  // Portfolio data grid
+  grid_col_name: { en: "Name", fr: "Nom" },
+  grid_col_category: { en: "Category", fr: "Catégorie" },
+  grid_col_quantity: { en: "Quantity", fr: "Quantité" },
+  grid_col_value: { en: "Value ({currency})", fr: "Valeur ({currency})" },
+  grid_col_performance: { en: "Performance", fr: "Performance" },
+  grid_col_actions: { en: "Actions", fr: "Actions" },
+  grid_sort_by: { en: "Sort by {col}", fr: "Trier par {col}" },
+  grid_empty: { en: "No assets yet. Add your first one to get started.", fr: "Aucun actif pour l'instant. Ajoutez le premier pour commencer." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

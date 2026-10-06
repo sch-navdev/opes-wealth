@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload } from "lucide-react";
+import { FileSpreadsheet, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/context/language-context";
 import { CsvDropzone, type ParsedCsvFile } from "@/components/csv-dropzone";
 import { CsvColumnMapper } from "@/components/csv-column-mapper";
@@ -59,7 +60,7 @@ export function CsvImportDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-background sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto border-border bg-background sm:max-w-lg [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle className="text-foreground">{t("import_bank_history")}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
@@ -67,29 +68,42 @@ export function CsvImportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {importedCount !== null ? (
-          <div className="space-y-4">
-            <p className="text-sm text-foreground">
-              {t("csv_import_success", { n: importedCount })}
-            </p>
-            <DialogFooter>
-              <Button type="button" onClick={() => handleOpenChange(false)}>
-                {t("csv_done")}
-              </Button>
-            </DialogFooter>
-          </div>
-        ) : file ? (
-          <CsvColumnMapper
-            assetId={assetId}
-            currentValue={currentValue}
-            currency={currency}
-            file={file}
-            onReset={reset}
-            onSuccess={setImportedCount}
-          />
-        ) : (
-          <CsvDropzone onParsed={setFile} />
-        )}
+        <Card className="gap-4 border-border bg-card py-5 shadow-sm">
+          <CardHeader className="gap-1 px-5">
+            <CardTitle className="flex items-center gap-2 text-sm text-foreground">
+              <FileSpreadsheet className="size-4 text-primary" aria-hidden />
+              <span className="truncate">{file ? file.fileName : t("import_bank_history")}</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {importedCount !== null ? t("csv_done") : file ? t("csv_step_map") : t("csv_step_upload")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-5">
+            {importedCount !== null ? (
+              <div className="space-y-4">
+                <p className="text-sm text-foreground">
+                  {t("csv_import_success", { n: importedCount })}
+                </p>
+                <DialogFooter>
+                  <Button type="button" onClick={() => handleOpenChange(false)}>
+                    {t("csv_done")}
+                  </Button>
+                </DialogFooter>
+              </div>
+            ) : file ? (
+              <CsvColumnMapper
+                assetId={assetId}
+                currentValue={currentValue}
+                currency={currency}
+                file={file}
+                onReset={reset}
+                onSuccess={setImportedCount}
+              />
+            ) : (
+              <CsvDropzone onParsed={setFile} />
+            )}
+          </CardContent>
+        </Card>
       </DialogContent>
     </Dialog>
   );

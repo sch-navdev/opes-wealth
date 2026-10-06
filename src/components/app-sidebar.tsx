@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Factory, Landmark, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Telescope, X } from "lucide-react";
+import { ChevronsRight, Factory, Landmark, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Telescope, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -39,6 +39,31 @@ const TIER_LABEL_KEYS: Record<ExpertiseLevel, TranslationKey> = {
   expert: "tier_expert",
 };
 
+/**
+ * Desktop collapse preference. `null` = no explicit choice yet: the rail is
+ * expanded at `lg+` and icon-only at `md` (pure CSS). Once the user presses the
+ * toggle it is pinned to `true` (icon rail) or `false` (full) and remembered.
+ */
+type CollapsePref = boolean | null;
+const COLLAPSE_STORAGE_KEY = "opes-sidebar-collapsed";
+
+/** Classes that show a label only when the rail is expanded. */
+function labelClass(pref: CollapsePref, collapsible: boolean) {
+  if (!collapsible) return "";
+  return pref === null ? "hidden lg:inline" : pref ? "hidden" : "";
+}
+
+const LG_QUERY = "(min-width: 1024px)";
+function subscribeLg(onChange: () => void) {
+  const mq = window.matchMedia(LG_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+/** True at `lg+`; assumed true on the server so the first paint matches the desktop default. */
+function useIsLg() {
+  return useSyncExternalStore(subscribeLg, () => window.matchMedia(LG_QUERY).matches, () => true);
+}
+
 function isActiveHref(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href);
 }
@@ -69,10 +94,13 @@ function Brand({ labelClassName }: { labelClassName?: string }) {
 function NavList({
   collapsible,
   onNavigate,
+  pref = null,
 }: {
   collapsible: boolean;
   onNavigate?: () => void;
+  pref?: CollapsePref;
 }) {
+  const label = labelClass(pref, collapsible);
   const { t } = useLanguage();
   const pathname = usePathname();
   const level = useUiTierStore((s) => s.user_expertise_level);
@@ -99,7 +127,7 @@ function NavList({
               )}
             >
               <Icon className="size-5 shrink-0" />
-              <span className={cn("truncate", collapsible && "hidden lg:inline")}>
+              <span className={cn("truncate", label)}>
                 {t(labelKey)}
               </span>
             </Link>
@@ -107,7 +135,12 @@ function NavList({
         })}
       </nav>
 
-      <div className={cn("border-t border-border px-3 py-2", collapsible && "hidden lg:block")}>
+      <div
+        className={cn(
+          "border-t border-border px-3 py-2",
+          collapsible && (pref === null ? "hidden lg:block" : pref ? "hidden" : ""),
+        )}
+      >
         <label className="mb-1 block text-xs text-muted-foreground" htmlFor={`tier-${collapsible ? "rail" : "drawer"}`}>
           {t("tier_label")}
         </label>
@@ -133,7 +166,7 @@ function NavList({
           title={t("sign_out")}
         >
           <LogOut className="size-5 shrink-0" />
-          <span className={cn("truncate", collapsible && "hidden lg:inline")}>
+          <span className={cn("truncate", label)}>
             {t("sign_out")}
           </span>
         </Button>
@@ -152,6 +185,31 @@ function NavList({
 export function AppSidebar() {
   const { t } = useLanguage();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pref, setPref] = useState<CollapsePref>(null);
+  const isLg = useIsLg();
+  // Effective state: the explicit choice, else the CSS default (icon rail below lg).
+  const collapsed = pref ?? !isLg;
+
+  // Restore a saved collapse choice after mount (SSR + first paint use the CSS breakpoint default).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading browser-only storage after hydration
+      if (saved === "1" || saved === "0") setPref(saved === "1");
+    } catch {
+      /* storage unavailable: keep the responsive default */
+    }
+  }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setPref(next);
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     void useUiTierStore.persist.rehydrate();
@@ -173,11 +231,36 @@ export function AppSidebar() {
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-screen w-16 shrink-0 flex-col border-e border-border bg-background transition-[width] duration-300 md:flex lg:w-64">
+      <aside
+        className={cn(
+          "sticky top-0 hidden h-screen shrink-0 flex-col border-e border-border bg-background transition-[width] duration-300 motion-reduce:transition-none md:flex",
+          pref === null ? "w-16 lg:w-64" : pref ? "w-16" : "w-64",
+        )}
+      >
         <div className="flex h-16 items-center gap-3 border-b border-border px-4 lg:px-5">
-          <Brand labelClassName="hidden lg:inline" />
+          <Brand labelClassName={labelClass(pref, true)} />
         </div>
-        <NavList collapsible />
+        <NavList collapsible pref={pref} />
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
+          aria-expanded={!collapsed}
+          title={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
+          className="flex items-center gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        >
+          <ChevronsRight
+            className={cn(
+              "size-5 shrink-0 transition-transform duration-300 motion-reduce:transition-none",
+              // Points toward the collapsed side while expanded; flipped for RTL.
+              collapsed ? "rtl:rotate-180" : "rotate-180 rtl:rotate-0",
+            )}
+            aria-hidden
+          />
+          <span className={cn("truncate", labelClass(pref, true))}>
+            {collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
+          </span>
+        </button>
       </aside>
 
       <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:hidden">
