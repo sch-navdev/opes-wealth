@@ -82,7 +82,9 @@
 - **Former gap (closed in code, see "Requester notifications" below):** the requester (A) used to be told nothing when B approved or rejected. The deliberate `it.fails` is now a normal test asserting the in-app notification. Still NOT e-mailed.
 - **Still manual:** the real two-account run through Supabase Auth (invite, sign-up, session, RLS visibility of `change_approvals`), the profile trigger that links invitations, real Resend delivery/DKIM, and the Vercel cron firing with `CRON_SECRET`.
 
-## Requester notifications (written, migration 0034 NOT applied)
+## Requester notifications (migration 0034 applied 2026-10-06)
+
+- **Status 2026-10-06 ~16:53 GST:** migration 0034 was applied by Steve and verified read-only (see [[Database-Schema|Database Schema]]); the table is empty, so no notification has been produced by a real approval yet. The first end-to-end check (a real co-owner approving or rejecting) is still to be done.
 
 **Gap closed:** the person who proposes a change to a co-owned asset was never told when a co-owner approved or rejected it (and the approvals bell only shows requests while they are pending). Now an **in-app notification** is created for the requester.
 

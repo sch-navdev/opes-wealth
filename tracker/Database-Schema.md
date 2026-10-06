@@ -118,7 +118,9 @@ where n.nspname = 'public' and p.proname in ('is_asset_member', 'link_pending_co
 
 `status` (`active` default / `simulation`) separates live assets from Future Projects simulations; all portfolio queries filter on `active`. `plan` (jsonb) holds a simulation's financing inputs. Index `(profile_id, status)`. See [[Future-Projects|Future Projects]].
 
-## Migration 0034 — notifications (written, NOT applied)
+## Migration 0034 — notifications (applied by Steve, verified 2026-10-06)
+
+**APPLIED by Steve in the Supabase SQL editor and verified read-only (2026-10-06 ~16:53 GST):** `public.notifications` exists with RLS on and 0 rows; columns and the `kind` check match the file; foreign keys `profile_id -> profiles ON DELETE CASCADE` and `asset_id -> assets ON DELETE SET NULL`; indexes `notifications_pkey`, `notifications_profile_created_idx`, `notifications_profile_unread_idx`; policies `notifications_select_own`, `notifications_update_own`, `notifications_delete_own` (authenticated, own rows) plus restrictive `demo_readonly_insert/update/delete`; `authenticated` may UPDATE only the `read_at` column (column grant) and has no insert policy; `service_role` has full table privileges (the server writes). The default Supabase table-level privileges (INSERT, TRUNCATE, ...) for anon/authenticated also exist here as on every table; RLS blocks anon entirely and non-owner access, TRUNCATE is not exposed by the API. The security advisor shows no new finding. Not yet exercised with a real approval (0 rows).
 
 `supabase/migrations/0034_notifications.sql` creates `public.notifications` (profile_id, kind in change_approved / change_rejected / change_auto_applied, asset_id, request_id, structured `data` jsonb, read_at) with owner-only SELECT/UPDATE(read_at)/DELETE RLS, no insert policy (service role writes) and the restrictive demo-mode deny policies. **It has not been applied or run**; Steve applies it in the Supabase SQL editor. The app tolerates the missing table meanwhile. See [[Co-Ownership|Co-Ownership]] ("Requester notifications").
 
