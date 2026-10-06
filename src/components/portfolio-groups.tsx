@@ -95,6 +95,7 @@ export function PortfolioGroups({
   rates,
   performanceByAsset,
   sharedAssetIds,
+  sparklines,
 }: {
   assets: AssetRow[];
   categories: Category[];
@@ -104,6 +105,8 @@ export function PortfolioGroups({
   performanceByAsset?: Record<string, { amount: number; percent: number | null }>;
   /** Assets owned in shares (edited on their own page). */
   sharedAssetIds?: string[];
+  /** Per-asset trend values for the Trend column. */
+  sparklines?: Record<string, number[]>;
 }) {
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
@@ -330,6 +333,7 @@ export function PortfolioGroups({
                   rates={rates}
                   performanceByAsset={performanceByAsset}
                   sharedAssetIds={sharedAssetIds}
+                  sparklines={sparklines}
                   selectedIds={selectedIds}
                   onToggleAsset={toggleAsset}
                   onToggleAll={toggleAll}

@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { MicroSparkline } from "@/components/micro-sparkline";
 import { AddAssetDialog, type AssetForEdit } from "@/components/add-asset-dialog";
 import { AddLiabilityDialog } from "@/components/add-liability-dialog";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
@@ -102,6 +103,7 @@ export function PortfolioTable({
   onToggleAsset,
   onToggleAll,
   sharedAssetIds,
+  sparklines,
 }: {
   assets: AssetRow[];
   categories: Category[];
@@ -114,6 +116,8 @@ export function PortfolioTable({
   onToggleAll?: (ids: string[], checked: boolean) => void;
   /** Assets owned in shares: shown here at the viewer's share, so they are edited on their own page, never from these scaled rows. */
   sharedAssetIds?: string[];
+  /** Per-asset trend values (asset id -> ~24 points). Absent = Trend column hidden. */
+  sparklines?: Record<string, number[]>;
 }) {
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
@@ -201,6 +205,9 @@ export function PortfolioTable({
             <SortHead label={t("grid_col_category")} sortKey="category" sort={sort} onSort={onSort} sortLabel={t("grid_sort_by", { col: t("grid_col_category") })} />
             <SortHead label={t("grid_col_quantity")} sortKey="quantity" sort={sort} onSort={onSort} align="end" sortLabel={t("grid_sort_by", { col: t("grid_col_quantity") })} />
             <SortHead label={t("grid_col_value", { currency: displayCurrency })} sortKey="value" sort={sort} onSort={onSort} align="end" sortLabel={t("grid_sort_by", { col: t("grid_col_value", { currency: displayCurrency }) })} />
+            {sparklines && (
+              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">{t("grid_col_trend")}</TableHead>
+            )}
             <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t("grid_col_performance")}</TableHead>
             <TableHead className="text-end text-xs uppercase tracking-wide text-muted-foreground">{t("grid_col_actions")}</TableHead>
           </TableRow>
@@ -209,7 +216,7 @@ export function PortfolioTable({
           {assets.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={onToggleAll ? 7 : 6}
+                colSpan={(onToggleAll ? 7 : 6) + (sparklines ? 1 : 0)}
                 className="text-center text-muted-foreground"
               >
                 {t("grid_empty")}
@@ -430,6 +437,11 @@ export function PortfolioTable({
                       </p>
                     )}
                   </TableCell>
+                  {sparklines && (
+                    <TableCell>
+                      <MicroSparkline values={sparklines[asset.id] ?? []} label />
+                    </TableCell>
+                  )}
                   <TableCell className="text-end tabular-nums">
                     {convertedGain == null || gainPercent == null ? (
                       <span className="text-muted-foreground">—</span>

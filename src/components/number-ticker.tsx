@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "@/components/use-reduced-motion";
+import { springProgress } from "@/lib/spring";
 
 /**
  * Animated number: tweens from a starting value to the target and re-tweens
@@ -13,7 +15,9 @@ import { useEffect, useRef, useState } from "react";
  *  - values are FORMATTED on every frame (`format`), so currencies keep their
  *    symbol, grouping and decimals instead of being rounded to integers;
  *  - Privacy Mode keeps working because `format` is where the caller masks;
- *  - `prefers-reduced-motion` jumps straight to the final value;
+ *  - `prefers-reduced-motion` jumps straight to the final value (read live);
+ *  - easing is a closed-form critically damped spring by default (no overshoot,
+ *    so a money figure never briefly exceeds its real value); `cubic` is kept.
  *  - the server renders the final value, so without JavaScript (and on first
  *    paint, before the first animation frame) the real figure is shown and
  *    nothing mismatches on hydration.
@@ -23,6 +27,7 @@ export function NumberTicker({
   format,
   from = 0,
   durationMs = 900,
+  easing = "spring",
   className,
 }: {
   value: number;
@@ -30,14 +35,15 @@ export function NumberTicker({
   /** Where the very first animation starts (default 0). */
   from?: number;
   durationMs?: number;
+  easing?: "spring" | "cubic";
   className?: string;
 }) {
   const [display, setDisplay] = useState(value);
   const shown = useRef(value);
   const firstRun = useRef(true);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // First run counts up from `from`; later runs continue from wherever the number is now.
     // (Marked done only once a frame has actually run, so React Strict Mode's
     // double-invoked effect in development doesn't swallow the first animation.)
@@ -49,7 +55,7 @@ export function NumberTicker({
     const tick = (now: number) => {
       firstRun.current = false;
       const t = duration === 0 ? 1 : Math.min(1, (now - t0) / duration);
-      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const eased = easing === "spring" ? springProgress(t) : 1 - Math.pow(1 - t, 3); // else easeOutCubic
       const current = start + (value - start) * eased;
       shown.current = current;
       setDisplay(current);
@@ -57,7 +63,7 @@ export function NumberTicker({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [value, from, durationMs]);
+  }, [value, from, durationMs, easing, reduced]);
 
   return <span className={className}>{format(display)}</span>;
 }

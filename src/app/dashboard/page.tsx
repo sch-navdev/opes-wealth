@@ -18,6 +18,7 @@ import {
 } from "@/components/dashboard-metric-cards";
 import { DashboardBento, type BentoTile } from "@/components/dashboard-bento";
 import { DashboardAnalytics } from "@/components/dashboard-analytics";
+import { buildSparkline } from "@/lib/sparkline";
 import { PortfolioGroups } from "@/components/portfolio-groups";
 import { DashboardBasicOverview } from "@/components/dashboard-basic-overview";
 import { DashboardCsvCard } from "@/components/dashboard-csv-card";
@@ -327,6 +328,15 @@ export default async function DashboardPage({
   const keepDailyFrom = new Date(new Date(`${today}T00:00:00Z`).getTime() - 430 * 24 * 3600 * 1000)
     .toISOString()
     .slice(0, 10);
+  // Micro-sparklines: <=24 rounded points per asset (base currency, net equity like assetLines).
+  const sparkByAsset: Record<string, number[]> = {};
+  for (const asset of assets ?? []) {
+    const pts = buildSparkline(
+      baseHistory(asset).map((h): [string, number] => [h.recorded_date, h.net_equity ?? h.value]),
+      24,
+    );
+    if (pts.length >= 2) sparkByAsset[asset.id] = pts.map((n) => Math.round(n * 100) / 100);
+  }
   const assetLines: AssetLineInput[] = (assets ?? []).map((asset) => ({
     id: asset.id,
     name: asset.name,
@@ -485,6 +495,7 @@ export default async function DashboardPage({
             baseCurrency={displayCurrency}
             allocation={basicAllocation}
             top={basicTopAssets}
+            sparklines={sparkByAsset}
             addAction={
               <AddAssetDialog
                 categories={categories ?? []}
@@ -579,6 +590,7 @@ export default async function DashboardPage({
             displayCurrency={displayCurrency}
             rates={rates}
             performanceByAsset={performanceByAsset}
+            sparklines={sparkByAsset}
             sharedAssetIds={[...factorById].filter(([, f]) => f !== 1).map(([id]) => id)}
           />
         </TierGate>

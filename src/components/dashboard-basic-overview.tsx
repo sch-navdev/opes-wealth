@@ -6,6 +6,7 @@ import { CategoryIcon } from "@/components/category-icon";
 import { NumberTicker } from "@/components/number-ticker";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import { useTierMotion } from "@/components/tier-gate";
+import { MicroSparkline } from "@/components/micro-sparkline";
 import { Card } from "@/components/ui/card";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -33,12 +34,15 @@ export function DashboardBasicOverview({
   allocation,
   top,
   addAction,
+  sparklines,
 }: {
   netWorth: number;
   baseCurrency: string;
   allocation: AllocationSlice[];
   top: AmountRow[];
   addAction?: ReactNode;
+  /** Per-asset trend values (asset id -> ~24 points). Absent or short = no sparkline. */
+  sparklines?: Record<string, number[]>;
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
@@ -146,6 +150,7 @@ export function DashboardBasicOverview({
                       <p className="truncate text-xs text-muted-foreground">{categoryLabel(asset.category)}</p>
                     </div>
                   </div>
+                  <MicroSparkline values={sparklines?.[asset.id] ?? []} className="ms-auto hidden min-[360px]:block" />
                   <span className="shrink-0 text-sm font-medium tabular-nums text-foreground">
                     {maskValue(formatter.format(asset.amount))}
                   </span>

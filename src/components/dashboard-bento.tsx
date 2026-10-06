@@ -121,7 +121,7 @@ export function DashboardBento({
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                  {maskValue(formatter.format(tile.total))}
+                  <NumberTicker value={tile.total} format={(v) => maskValue(formatter.format(v))} />
                 </p>
               </div>
               <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">

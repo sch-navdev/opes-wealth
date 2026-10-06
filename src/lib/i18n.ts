@@ -2376,6 +2376,12 @@ const dictionary = {
   expert_fx_empty: { en: "No assets to show exposure for.", fr: "Aucun actif pour lequel afficher l'exposition." },
   expert_fx_total: { en: "Total", fr: "Total" },
   expert_fx_cell_label: { en: "{currency}, {category}: {pct}% of gross assets", fr: "{currency}, {category} : {pct} % des actifs bruts" },
+  // micro-sparklines
+  spark_up: { en: "Trending up over the period", fr: "En hausse sur la période" },
+  spark_down: { en: "Trending down over the period", fr: "En baisse sur la période" },
+  spark_flat: { en: "Flat over the period", fr: "Stable sur la période" },
+  grid_col_trend: { en: "Trend", fr: "Tendance" },
+  // dashboard tiers: motion
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

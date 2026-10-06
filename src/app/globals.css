@@ -238,3 +238,15 @@
   height: 2rem;
   margin: 8px;
 }
+
+/* Micro-sparkline draw-in; only runs when the user has not asked for reduced motion. */
+@keyframes spark-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spark-draw {
+    stroke-dasharray: 1;
+    animation: spark-draw 700ms ease-out both;
+  }
+}
