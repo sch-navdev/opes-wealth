@@ -57,10 +57,10 @@ High-net-worth individuals
 - [x] Step 9: Live pricing integration
   - [x] Real Estate valuation refresh via ADREC/DARI — real pipeline (Edge Function, adapter, confirmation UI, DB persistence) deployed and verified live, but the provider call itself is a clearly-marked stub pending confirmed ADREC/DARI API access — [[Market-Data-Integration|Market Data Integration]]
   - [x] Live market pricing for equities/crypto — Crypto (CoinGecko) is fully real and verified live; Equities (Finnhub) `FINNHUB_API_KEY` is now set and the upgraded `refresh-market-price` function is deployed (2026-09-30; free tier = US tickers only). The required schema migration has been applied to the live project — [[Live-Pricing|Live Pricing]]
-- [ ] Step 10: Deployment (Vercel)
+- [x] Step 10: Deployment (Vercel)
   - [x] Environment & backend deployment (2026-09-30): Supabase CLI installed and linked, `FINNHUB_API_KEY` secret set, `refresh-market-price` + `adrec-pricing` Edge Functions deployed and active, mock DLD data purged from the live DB and mock DLD/ADREC results made read-only — [[Market-Data-Integration|Market Data Integration]], [[Deployment|Deployment]]
   - [x] Pre-deployment hardening — `tsc --noEmit` and `eslint .` fully clean (zero errors/warnings project-wide), `npm run build` succeeds with zero errors across all 11 routes — [[Deployment|Deployment]]
-  - [ ] Actual deployment to Vercel — not done this session (no deploy credentials used; this is a shared-infrastructure action needing Steve's explicit go-ahead) — [[Deployment|Deployment]]
+  - [x] Actual deployment to Vercel — production is live at www.opeswealth.app (Vercel project `opes-wealth`, Supabase project `lpaollycwokxejrihrap`); remaining manual items (function region, junk-folder delivery) are listed in [[Deployment|Deployment]]
 
 ### Phase 2 — Broker Trade Import & Portfolio Analytics
 - [x] Add Investments UI (broker/file/manual selector, Saxo Bank broker grid, dropzone) — [[Broker-Trade-Import|Broker Trade Import]]
@@ -72,21 +72,21 @@ High-net-worth individuals
 
 
 ### OW9 — Imports, exotic assets, passive income
-- [x] Transaction fingerprinting + `(profile_id, fingerprint)` upsert on import — migration 0022 **not yet applied** — [[CSV-Bank-Uploads|CSV Bank Uploads]]
-- [x] Exotic Assets (watches) + Chrono24 valuation service — migration 0023 **not yet applied**, Chrono24 credentials not available — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Market-Data-Integration|Market Data Integration]]
+- [x] Transaction fingerprinting + `(profile_id, fingerprint)` upsert on import — migration 0022 applied (verified live 2026-10-06) — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Exotic Assets (watches) + Chrono24 valuation service — migration 0023 applied (verified live 2026-10-06), Chrono24 credentials not available — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Market-Data-Integration|Market Data Integration]]
 - [x] Broker directory (25 brokers) aligned with Sharesight, logos — [[Broker-Trade-Import|Broker Trade Import]]
 - [x] Global bank expansion (UK, US, ES, DE, IT), 9 languages — [[Localization|Localization]]
 - [x] Passive Income card + modal and dynamic income projections — [[Portfolio-Dashboard|Portfolio Dashboard]]
 
 - [x] Accessibility Comfort display mode (toggle, localStorage, bigger type/contrast/targets/icon labels) — [[Design-System|Design System]]
 ### OW10 — Startups, exotic expansion, metals API
-- [x] Startups & unlisted: funding rounds, automatic valuation, options/BSPCE, detail page + chart — migration 0024 **not yet applied**, UI not exercised against a database — [[Portfolio-Dashboard|Portfolio Dashboard]]
+- [x] Startups & unlisted: funding rounds, automatic valuation, options/BSPCE, detail page + chart — migration 0024 applied (verified live 2026-10-06); the Startups category exists, but the UI has not been confirmed against live data — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - [x] Exotic Assets: wine and art kinds alongside watches; ordered portfolio folders; category picker with icons — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - [x] Live metals spot waterfall (GoldAPI → Metals-API → Yahoo → manual) — API keys not set, never called live — [[Market-Data-Integration|Market Data Integration]]
 ### OW11 — Co-ownership
-- [x] Co-ownership schema, pro-rata valuation, invites, approval workflow, ownership form, approvals bell, daily auto-apply — type-checked and unit-checked; **migration 0025 not applied, DB path untested** — [[Co-Ownership|Co-Ownership]]
-- [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; **migration 0031 must be applied before deploying** — [[Future-Projects|Future Projects]]
-- [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — **migration 0032 and a seed re-run are manual** — [[Demo-Mode|Demo Mode]]
+- [x] Co-ownership schema, pro-rata valuation, invites, approval workflow, ownership form, approvals bell, daily auto-apply — type-checked and unit-checked; migration 0025 applied (verified live 2026-10-06); the registered co-owner approval path with two real accounts is still untested — [[Co-Ownership|Co-Ownership]]
+- [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; migration 0031 applied (verified live 2026-10-06: `assets.status`/`plan` present) — [[Future-Projects|Future Projects]]
+- [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — migration 0032 applied (verified live 2026-10-06: 39 restrictive policies); a `seed-demo.mts --yes` re-run is still a manual step — [[Demo-Mode|Demo Mode]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth

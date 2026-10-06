@@ -30,7 +30,11 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 - The live `asset_history_source_check` was found to allow only `manual, file_import, dld, adrec, dubailand, yahoo, finnhub, saxo` — not the values in `src/lib/asset-history.ts` (`broker_import`, `csv_import`, `coingecko`, `dari`, `vehicle_valuation`), so Saxo/CSV/crypto/ADREC/vehicle history writes were being rejected. How it drifted is unknown (it doesn't match migrations 0010/0011/0013 or my 0014). **Migration `0015_asset_history_source_superset.sql`** replaces it with the union of the app's values and the live ones; it is **not applied yet**. Until it is, history writes that hit a CHECK violation are retried as `manual` (see [[Portfolio-Dashboard|Portfolio Dashboard]]). Worth re-checking the other tables' constraints against the migrations directory for similar drift.
 
 
-## OW7 Migrations — Not Yet Applied (2026-10-01)
+## Migration status — verified live 2026-10-06
+
+Checked read-only against the live project (`lpaollycwokxejrihrap`): **every migration from 0015 to 0032 is applied.** Evidence: `asset_history_source_check` is the superset incl. `broker_import`/`open_finance` (0015, 0020); `list_my_sessions`/`revoke_my_session` exist (0016); categories Precious Metals, Companies, SCPI, Exotic Assets, Startups exist (0017–0019, 0023, 0024); tables `bank_connections`, `bank_account_links`, `bug_reports`, `transactions` (with `fingerprint`), `asset_owners`, `asset_change_requests`, `change_approvals`, `client_knowledge_documents`, `session_locations` exist (0020–0022, 0025, 0026, 0030); bucket `asset-photos` (0027); `invite_status`/`notify_status` columns (0029); `assets.status`/`plan` (0031); 39 restrictive policies and `is_demo_user()` (0032). The Supabase MCP `list_migrations` only shows seven entries because later migrations were applied through the SQL editor, so it is not a reliable status source. "Not applied" / "unapplied" wording in the sections below is **historical** (written at the time of each change).
+
+## OW7 Migrations — Not Yet Applied (2026-10-01, since applied)
 
 - `0016_security_sessions.sql` — `list_my_sessions()` / `revoke_my_session(uuid)` SECURITY DEFINER functions for the Security page; see [[Authentication-Security|Authentication & Security]].
 - `0017_precious_metals_category.sql` — seeds the `Precious Metals` row in `asset_categories`; see [[Live-Pricing|Live Pricing]].

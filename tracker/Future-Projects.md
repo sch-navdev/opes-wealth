@@ -2,7 +2,7 @@
 
 # Future Projects (simulations) & Bankability
 
-**Status:** built, type-checked, linted and built (2026-10-02). **Migration `0031_future_projects.sql` must be applied BEFORE the matching app version is deployed** (the app now filters every portfolio query on `status = 'active'`; without the column the dashboard would come back empty). The page itself has not been clicked through in a browser.
+**Status:** built, type-checked, linted and built (2026-10-02). **Migration `0031_future_projects.sql` is applied (verified live 2026-10-06). It had to be applied BEFORE the matching app version was deployed** (the app now filters every portfolio query on `status = 'active'`; without the column the dashboard would come back empty). The page itself has not been clicked through in a browser.
 
 ## What it does
 - `/dashboard/planning` ("Future Projects" in the sidebar): plan an investment as an ordinary asset saved with `status = 'simulation'`. The existing Add/Edit asset dialog is reused with a `simulation` prop (it saves `status = simulation`, hides the co-owner section; `addAsset` only accepts `simulation` or `active`).

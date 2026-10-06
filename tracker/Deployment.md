@@ -2,7 +2,9 @@
 
 # Deployment
 
-**Status:** Pre-deployment hardening complete — Phase 1, Step 10. The actual Vercel deployment has **not** happened yet; this session did the local-only groundwork for it, not the deployment itself.
+**Status (updated 2026-10-06):** Step 10 is complete — production is live at www.opeswealth.app (Vercel project `opes-wealth`, Supabase project `lpaollycwokxejrihrap`). The sections below that describe the deployment as "not done" are the original 2026-09-30 notes and are kept as history.
+
+**Re-verified 2026-10-06 after the EC2 sessions (HEAD `017fe21`, local machine):** `npm install` was needed first (`zustand`, added on EC2, was missing from local `node_modules`; the lockfile did not change). Then `tsc --noEmit` exit 0, `eslint .` exit 0, `npm run build` exit 0 (Next.js 16.3.5 Turbopack, 21 routes). The build warns that `NEXT_PUBLIC_SITE_URL` is not set in the local environment (expected locally; confirm it in Vercel). Open manual items carried from 2026-10-02: Vercel Function Region should be Mumbai (bom1), invite emails landing in Hotmail junk (DMARC `p=none` without `rua`, no MX on the root domain), demo re-seed.
 
 Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key locally (gitignored) — production env vars, the Supabase project's production credentials, and any still-unapplied migrations under `supabase/migrations/` (see [[Database-Schema|Database Schema]]) all need to be sorted before/at this step.
 
@@ -19,7 +21,7 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 - **`npm run build` (production build, Turbopack) succeeds with zero errors** — all 11 routes compile, typecheck, and generate cleanly (`/`, `/login`, `/login/mfa`, `/dashboard`, `/dashboard/assets/[id]`, `/dashboard/settings`, `/dashboard/mfa`, `/reset-password`, `/auth/callback`, plus `/_not-found` and the root proxy/middleware).
 
 ## What's still actually needed before/at deployment (not done this session)
-- **The Vercel deployment itself.** Nothing was pushed or deployed to Vercel this session — no deploy credentials/access were used, and doing so is a shared-infrastructure action that needs Steve's explicit go-ahead regardless of tooling.
+- ~~**The Vercel deployment itself.**~~ — **Done** (production is live; see the status note at the top). Original 2026-09-30 note: nothing was deployed that session because it needed Steve's explicit go-ahead.
 - **`NEXT_PUBLIC_SITE_URL`** must be set manually in the Vercel dashboard before the first production deploy — flagged repeatedly since the auth-email-links work (see [[Authentication-Security|Authentication & Security]]); `src/app/auth/actions.ts`'s `getSiteURL()` falls back to the real production domain when this is unset and `VERCEL_URL` is present, but setting it explicitly is still the intended final state.
 - ~~**`FINNHUB_API_KEY`** Supabase secret~~ — **Complete (2026-09-30)**: set via the Supabase CLI (now installed and linked to the project); `refresh-market-price` (v5) and `adrec-pricing` (v2) are deployed and ACTIVE. See [[Live-Pricing|Live Pricing]] and [[Market-Data-Integration|Market Data Integration]].
 - Production Supabase credentials/env vars in Vercel, and confirming every migration under `supabase/migrations/` (through `0010`) is applied to whichever Supabase project the production deployment points at.
@@ -54,7 +56,7 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 
 ## Co-ownership deploy checklist (2026-10-02)
 
-- Apply `0025_co_ownership.sql`. Set `CRON_SECRET` on Vercel (the new `/api/cron/expire-changes` job, 06:30 UTC, uses it like the bug-report cron). Add `<site>/auth/callback` to Supabase's allowed redirect URLs and review the project's invite email template. `CO_OWNER_INVITE_EMAILS=off` suppresses invite emails (useful on preview deployments). See [[Co-Ownership|Co-Ownership]].
+- (`0025_co_ownership.sql` is applied, verified live 2026-10-06; `CRON_SECRET` is set on Vercel per the 2026-10-02 session.) Set `CRON_SECRET` on Vercel (the new `/api/cron/expire-changes` job, 06:30 UTC, uses it like the bug-report cron). Add `<site>/auth/callback` to Supabase's allowed redirect URLs and review the project's invite email template. `CO_OWNER_INVITE_EMAILS=off` suppresses invite emails (useful on preview deployments). See [[Co-Ownership|Co-Ownership]].
 
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database

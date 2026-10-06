@@ -187,3 +187,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-02: Stale approval requests for removed co-owners are cleaned up and the two resend buttons are labelled distinctly — [[Co-Ownership|Co-Ownership]]
 - 2026-10-04: Added Zustand expertise-tier store (basic/standard/professional/expert) with tier-gated sidebar links and removed the unused slider component. See [[Design-System|Design System]].
 - 2026-10-04: 21st.dev-informed UI upgrade — bento dashboard header, CSV upload Card, sortable data-grid assets table and a user-collapsible sidebar, all on semantic theme tokens. See [[Portfolio-Dashboard|Portfolio Dashboard]].
+
+- 2026-10-06: Re-verified after the EC2 sessions (HEAD 017fe21): `tsc --noEmit`, `eslint .` and `npm run build` all pass (needed `npm install` for `zustand`); confirmed against the live database that migrations 0015-0032 are all applied and corrected the stale not-applied/not-deployed status lines in the hub and module notes - [[Database-Schema|Database Schema]], [[Deployment|Deployment]]

@@ -2,7 +2,7 @@
 
 # Co-Ownership & Approval Workflow
 
-**Status:** built and type-checked (2026-10-02, OW11); **migration `0025_co_ownership.sql` is NOT applied and the database side has not been exercised** — see "Verification" for exactly what was and was not tested.
+**Status:** built and type-checked (2026-10-02, OW11); **migrations 0025 and 0029 are applied (verified live 2026-10-06); at the time of writing the database side had not been exercised, and the registered co-owner approval path with two real accounts is still untested** — see "Verification" for exactly what was and was not tested.
 
 ## What it does
 - An asset can have several owners with percentages totalling exactly 100%. The creator (`assets.profile_id`) stays the owner of record; co-owners are registered users (linked by email) or just a name + email until they sign up.
