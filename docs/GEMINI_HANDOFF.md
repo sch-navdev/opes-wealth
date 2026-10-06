@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 15:59 (Gulf Standard Time, UTC+4).** `origin/master` is at `780fa72`; a batch of newer work (sidebar/tier sync, co-owner approval tests, Expert ratios, detail-page co-owner scaling, braces assessment, corrected Porsche SQL) is committed locally and NOT pushed: see "Push status". Production runs in Mumbai (`bom1`, verified).
+**Last updated: 2026-10-06 16:02 (Gulf Standard Time, UTC+4).** Everything up to `18108e3` is pushed to `origin/master` and deployed (Vercel production build READY; functions in Mumbai, `bom1`). The Porsche SQL on GitHub now has the corrected figure (AED 423,256). See "Push status".
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -46,7 +46,7 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 - Components: only `TierGate`, `useUiTier`/`useTierMotion` and the Preferences tier selector have component (jsdom) tests; the other components are untested except through their pure logic. No end-to-end tests.
 
 ## Open items (not done)
-- **Needs Steve:** run the Porsche SQL (item 24; it is a local-file/GitHub copy, make sure you use the one with 423,256); in Vercel: set Function Region = bom1 in the dashboard, confirm `NEXT_PUBLIC_SITE_URL`, re-paste a working `SUPABASE_SERVICE_ROLE_KEY` and redeploy (item 11).
+- **Needs Steve:** run the Porsche SQL (item 24; the GitHub copy is now the corrected 423,256 AED one); in Vercel: set Function Region = bom1 in the dashboard, confirm `NEXT_PUBLIC_SITE_URL`, re-paste a working `SUPABASE_SERVICE_ROLE_KEY` and redeploy (item 11).
 - 5 high `npm audit` findings remain (one dev-only `braces` lint chain; no patched release exists; production tree is clean, see item 23).
 - **Needs Steve (email):** add the DNS records from `tracker/Deployment.md` > "Email deliverability audit" (DMARC with `rua`, root SPF, root MX), confirm the Supabase SMTP sender, then warm up the domain (mark the Hotmail invite Not junk, add to Safe senders). Test with a real invite and check the `Authentication-Results` header for dkim/spf/dmarc=pass.
 - Co-owner approval path: covered only by a mocked two-user simulation; a real two-account run (Supabase Auth, RLS, real e-mail, the profile trigger that links invitations, the Vercel cron) is still manual. Missing feature: notify the requester of the outcome (item 22).
@@ -57,4 +57,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 15:59 GST: `origin/master` is at `780fa72` (pushed after Steve's confirmation; Vercel redeploys on push). **Local only, NOT pushed (waiting for Steve to confirm):** `800fefd`, `4df1d81` (corrected Porsche SQL 423,256), `b0a7b52`, `9001d77`, `c323405`, `eb36bdf`, `4b4ff99` and this handoff/notes update. NOTE: the Porsche SQL on GitHub still has the OLD figure 413,890 until these are pushed. Gates at the last code change: 1243 tests (+1 deliberate `it.fails`), `tsc`, `eslint`, `npm run build` all pass.
+At 2026-10-06 16:02 GST: `origin/master` is at `18108e3` (pushed 16:01 after Steve's confirmation: `780fa72..18108e3`, 8 commits: `800fefd`, `4df1d81`, `b0a7b52`, `9001d77`, `c323405`, `eb36bdf`, `4b4ff99`, `18108e3`). Vercel production build of `18108e3` finished READY and `https://www.opeswealth.app/login` returns `X-Vercel-Id: bom1::bom1::…`. The Porsche SQL in the repo has the corrected 423,256 AED figure and has NOT been run (Steve runs it). The only thing newer than `origin` is this status edit, committed locally and not pushed until Steve confirms. Gates at the last code change: 1243 tests (+1 deliberate `it.fails`), `tsc`, `eslint`, `npm run build` all pass.
