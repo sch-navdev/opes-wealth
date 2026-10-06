@@ -88,7 +88,7 @@ High-net-worth individuals
 - [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; migration 0031 applied (verified live 2026-10-06: `assets.status`/`plan` present) — [[Future-Projects|Future Projects]]
 - [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — migration 0032 applied (verified live 2026-10-06: 39 restrictive policies); a `seed-demo.mts --yes` re-run is still a manual step — [[Demo-Mode|Demo Mode]]
 ### Quality
-- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 48 files / 1243 tests passing (+1 deliberate `it.fails`); the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
+- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 54 files / 1308 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth

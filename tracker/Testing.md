@@ -2,7 +2,7 @@
 
 # Testing
 
-**Status (2026-10-06):** automated tests for the core pure logic, the co-owner approval flow (mocked two-user simulation) and the first React component tests. 54 test files, **1308 tests passing, no `it.fails` left** (the deliberate one about the requester never being notified of a co-owner decision was flipped to a normal test when in-app requester notifications were built, see [[Co-Ownership|Co-Ownership]]) (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
+**Status (2026-10-06):** automated tests for the core pure logic, the co-owner approval flow and requester notifications (mocked two-user simulation) and React component tests. 54 test files, **1308 tests, all passing, no `it.fails` left** (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
 
 ## Setup
 - **Runner:** Vitest `^5` (upgraded from 3 on 2026-10-06 together with `@types/node` `^22.0.0`; Node 24 locally). Config in `vitest.config.mts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`; `.mts` avoids a Vite native-config-loader warning).
