@@ -5,7 +5,9 @@ import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { CategoryIcon } from "@/components/category-icon";
 import { NumberTicker } from "@/components/number-ticker";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
+import { useTierMotion } from "@/components/tier-gate";
 import { Card } from "@/components/ui/card";
+import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { cn } from "@/lib/utils";
@@ -45,6 +47,7 @@ export function DashboardBento({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
+  const motion = useTierMotion();
   const gradientId = useId();
   const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
   const dateFormatter = new Intl.DateTimeFormat(intlLocale, { month: "short", year: "2-digit" });
@@ -53,7 +56,8 @@ export function DashboardBento({
   return (
     <section aria-label={t("bento_aria")} className="grid grid-cols-1 gap-4 lg:grid-cols-4">
       <Card
-        className="animate-in fade-in slide-in-from-bottom-2 gap-4 overflow-hidden border-border bg-card py-5 duration-300 motion-reduce:animate-none sm:col-span-1 lg:col-span-2 lg:row-span-2"
+        className="animate-in fade-in slide-in-from-bottom-2 gap-4 overflow-hidden border-border bg-card py-5 motion-reduce:animate-none sm:col-span-1 lg:col-span-2 lg:row-span-2"
+        style={tileEntranceStyle(motion, 0)}
       >
         <div className="px-5">
           <p className="text-xs font-medium text-muted-foreground">
@@ -107,11 +111,11 @@ export function DashboardBento({
           <Card
             key={tile.category}
             className={cn(
-              "animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 transition-shadow duration-300 hover:shadow-md motion-reduce:animate-none",
+              "animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 transition-shadow hover:shadow-md motion-reduce:animate-none",
               // Third tile spans the full row width beside the hero on lg.
               index === 2 && "lg:col-span-2",
             )}
-            style={{ animationDelay: `${(index + 1) * 75}ms`, animationFillMode: "backwards" }}
+            style={tileEntranceStyle(motion, index + 1)}
           >
             <div className="flex items-start justify-between gap-3 px-5">
               <div className="min-w-0">

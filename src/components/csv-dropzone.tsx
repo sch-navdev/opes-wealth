@@ -69,6 +69,7 @@ export function CsvDropzone({
         role="button"
         tabIndex={busy ? -1 : 0}
         aria-disabled={busy}
+        aria-label={`${t("csv_drag_or")} ${t("csv_choose_file")}`}
         onClick={() => !busy && inputRef.current?.click()}
         onKeyDown={(e) => {
           if (busy) return;
@@ -99,7 +100,7 @@ export function CsvDropzone({
         ) : (
           <FileSpreadsheet className="size-10 text-muted-foreground/80" aria-hidden />
         )}
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground" aria-live="polite">
           {isParsing ? (
             t("csv_parsing")
           ) : (
