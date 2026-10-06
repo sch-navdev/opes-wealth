@@ -34,6 +34,26 @@ Defined in `supabase/migrations/0001_initial_schema.sql` (not yet applied to the
 
 Checked read-only against the live project (`lpaollycwokxejrihrap`): **every migration from 0015 to 0032 is applied.** Evidence: `asset_history_source_check` is the superset incl. `broker_import`/`open_finance` (0015, 0020); `list_my_sessions`/`revoke_my_session` exist (0016); categories Precious Metals, Companies, SCPI, Exotic Assets, Startups exist (0017–0019, 0023, 0024); tables `bank_connections`, `bank_account_links`, `bug_reports`, `transactions` (with `fingerprint`), `asset_owners`, `asset_change_requests`, `change_approvals`, `client_knowledge_documents`, `session_locations` exist (0020–0022, 0025, 0026, 0030); bucket `asset-photos` (0027); `invite_status`/`notify_status` columns (0029); `assets.status`/`plan` (0031); 39 restrictive policies and `is_demo_user()` (0032). The Supabase MCP `list_migrations` only shows seven entries because later migrations were applied through the SQL editor, so it is not a reliable status source. "Not applied" / "unapplied" wording in the sections below is **historical** (written at the time of each change).
 
+### Re-check 2026-10-06 16:09 GST: one migration is NOT fully applied (0028), correcting the statement above
+The line above ("every migration from 0015 to 0032 is applied") was based on checking objects only. A full re-check that also compares **privileges** found that **`0028_harden_function_access.sql` has not been applied**: its two `REVOKE`s are missing live.
+- **Method (read-only):** every table, added column, function, trigger, policy, index and `GRANT/REVOKE EXECUTE` was extracted automatically from all 32 files in `supabase/migrations/` and compared with the live catalog: 13 tables, 22 added columns, 8 functions, 3 triggers, 17 policies, 17 indexes, the grants of 0016/0025/0028/0032. Everything matches **except 0028's revokes**. (`assets.image_base64` is expected to be absent: 0006 drops it.) No public table is missing RLS, there are no tables outside the migrations, 39 restrictive demo-mode policies exist (0032), the `asset-photos` bucket exists and is public (0027), `is_demo_user()` and `profile_id_for_email()` have the intended grants.
+- **Drift:** live `is_asset_member(uuid)` and `link_pending_co_owners()` are still executable by **PUBLIC/anon** (ACL `=X/postgres`), and `link_pending_co_owners()` by `authenticated`. The Supabase security advisor flags both. Not exploitable for data (RLS and row ownership still apply) but it exposes two SECURITY DEFINER functions on `/rest/v1/rpc/`.
+- **Not applied by Claude** (it is a security-privilege change on production). **Steve to run in the Supabase SQL editor** (idempotent, same as the migration file):
+```sql
+revoke execute on function public.is_asset_member(uuid) from public, anon;
+grant  execute on function public.is_asset_member(uuid) to authenticated, service_role;
+revoke execute on function public.link_pending_co_owners() from public, anon, authenticated;
+```
+Verify afterwards (expect `anon_can=false` for both, `authenticated_can=true` only for `is_asset_member`):
+```sql
+select p.proname, has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can, has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_can
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname in ('is_asset_member', 'link_pending_co_owners');
+```
+- **Other advisor findings (not from the migrations, deliberately untouched by 0028):** `handle_new_user()` and `rls_auto_enable()` are SECURITY DEFINER functions executable by anon and authenticated (both are trigger/event-trigger helpers that need no direct EXECUTE grant, so `revoke execute ... from public, anon, authenticated` would be safe; offered as an optional follow-up, not applied); `list_my_sessions()` / `revoke_my_session()` are meant for signed-in users. **Leaked password protection is disabled** (Supabase dashboard -> Authentication -> password security; it may require a paid plan).
+- **Edge Functions:** `refresh-market-price` (v13, updated 2026-10-01) and `adrec-pricing` (v3, 2026-09-30) are ACTIVE with `verify_jwt` on; the deployed sources contain everything the repo's last change added (Yahoo fallback, daily history with split adjustment, `no_data` handling; ADREC mock-mode contract) and were deployed after the repo's last edit to them. Compared by features and timestamps, not byte for byte.
+- `supabase` MCP `list_migrations` still shows only 7 entries (later migrations were applied through the SQL editor), so the migration-history table is not a source of truth; the catalog comparison above is.
+
 ## OW7 Migrations — Not Yet Applied (2026-10-01, since applied)
 
 - `0016_security_sessions.sql` — `list_my_sessions()` / `revoke_my_session(uuid)` SECURITY DEFINER functions for the Security page; see [[Authentication-Security|Authentication & Security]].
