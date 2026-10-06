@@ -43,6 +43,29 @@ export function isSectionVisible(section: DashboardSection, tier: ExpertiseLevel
   return rank >= tierRank(min) && (max === undefined || rank <= tierRank(max));
 }
 
+/**
+ * Sidebar links. Single source of truth for which link shows at which UI tier:
+ * a link either follows a dashboard section (so the link and the card it leads
+ * to always appear together) or has its own plain minimum tier.
+ */
+export type NavLinkId = "dashboard" | "banking" | "companies" | "planning" | "settings" | "security";
+
+type NavLinkRule = { section: DashboardSection } | { min: ExpertiseLevel };
+
+export const NAV_LINK_TIERS: Record<NavLinkId, NavLinkRule> = {
+  dashboard: { min: "basic" },
+  banking: { section: "cashFlow" },
+  companies: { min: "professional" },
+  planning: { section: "futureProjects" },
+  settings: { min: "basic" },
+  security: { min: "basic" },
+};
+
+export function isNavLinkVisible(id: NavLinkId, tier: ExpertiseLevel): boolean {
+  const rule = NAV_LINK_TIERS[id];
+  return "section" in rule ? isSectionVisible(rule.section, tier) : tierRank(tier) >= tierRank(rule.min);
+}
+
 /** Entrance-animation settings for the dashboard tiles at a given tier. */
 export type TierMotion = {
   /** Delay added per tile index, in ms (0 = all tiles enter together). */

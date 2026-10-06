@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EXPERTISE_LEVELS } from "@/stores/useUiTierStore";
 import {
+  NAV_LINK_TIERS,
   SECTION_TIERS,
   buildAllocation,
   buildCurrencyExposure,
+  isNavLinkVisible,
   isSectionVisible,
+  type NavLinkId,
   tierMotion,
   tileEntranceStyle,
   topAssets,
@@ -12,6 +15,44 @@ import {
 } from "./dashboard-tiers";
 
 const sections = Object.keys(SECTION_TIERS) as DashboardSection[];
+
+const navLinks = Object.keys(NAV_LINK_TIERS) as NavLinkId[];
+
+describe("isNavLinkVisible", () => {
+  const expected: Record<NavLinkId, boolean[]> = {
+    // [basic, standard, professional, expert]
+    dashboard: [true, true, true, true],
+    settings: [true, true, true, true],
+    security: [true, true, true, true],
+    banking: [false, true, true, true],
+    companies: [false, false, true, true],
+    planning: [false, false, true, true],
+  };
+
+  it("covers every link", () => {
+    expect(navLinks.sort()).toEqual(Object.keys(expected).sort());
+  });
+
+  it.each(Object.entries(expected) as [NavLinkId, boolean[]][])("%s across tiers", (id, shown) => {
+    expect(EXPERTISE_LEVELS.map((tier) => isNavLinkVisible(id, tier))).toEqual(shown);
+  });
+
+  it("shows Future Projects from professional, not standard", () => {
+    expect(isNavLinkVisible("planning", "standard")).toBe(false);
+    expect(isNavLinkVisible("planning", "professional")).toBe(true);
+  });
+
+  const sectionLinks = navLinks.flatMap((id) => {
+    const rule = NAV_LINK_TIERS[id];
+    return "section" in rule ? [[id, rule.section] as const] : [];
+  });
+
+  it.each(sectionLinks)("%s link mirrors the %s section at every tier", (id, section) => {
+    for (const tier of EXPERTISE_LEVELS) {
+      expect(isNavLinkVisible(id, tier)).toBe(isSectionVisible(section, tier));
+    }
+  });
+});
 
 describe("isSectionVisible", () => {
   it("shows only the simplified overview at basic", () => {

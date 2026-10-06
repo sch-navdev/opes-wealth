@@ -11,26 +11,26 @@ import { useUiTier } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { logout } from "@/app/auth/actions";
 import type { TranslationKey } from "@/lib/i18n";
+import { isNavLinkVisible, type NavLinkId } from "@/lib/dashboard-tiers";
 import {
   EXPERTISE_LEVELS,
-  tierRank,
   useUiTierStore,
   type ExpertiseLevel,
 } from "@/stores/useUiTierStore";
 
-/** `minTier` is the lowest expertise level that shows the link; higher levels keep it. */
+/** Link data; which tier shows each link lives in `lib/dashboard-tiers.ts` (`isNavLinkVisible`). */
 const NAV_ITEMS: {
+  id: NavLinkId;
   href: string;
   labelKey: TranslationKey;
   icon: typeof LayoutDashboard;
-  minTier: ExpertiseLevel;
 }[] = [
-  { href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard, minTier: "basic" },
-  { href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark, minTier: "standard" },
-  { href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory, minTier: "professional" },
-  { href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope, minTier: "expert" },
-  { href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings, minTier: "basic" },
-  { href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck, minTier: "basic" },
+  { id: "dashboard", href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard },
+  { id: "banking", href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark },
+  { id: "companies", href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory },
+  { id: "planning", href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope },
+  { id: "settings", href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings },
+  { id: "security", href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck },
 ];
 
 const TIER_LABEL_KEYS: Record<ExpertiseLevel, TranslationKey> = {
@@ -92,7 +92,7 @@ function Brand({ labelClassName }: { labelClassName?: string }) {
  * labels below `lg` (tablet icon-only rail, with `title=` as the tooltip);
  * the drawer always shows labels.
  */
-function NavList({
+export function NavList({
   collapsible,
   onNavigate,
   pref = null,
@@ -106,7 +106,7 @@ function NavList({
   const pathname = usePathname();
   const level = useUiTier();
   const setLevel = useUiTierStore((s) => s.setExpertiseLevel);
-  const visibleItems = NAV_ITEMS.filter((item) => tierRank(item.minTier) <= tierRank(level));
+  const visibleItems = NAV_ITEMS.filter((item) => isNavLinkVisible(item.id, level));
 
   return (
     <>
