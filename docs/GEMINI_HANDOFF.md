@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated:** 2026-10-06, after pushing commit `410d4ff` to `master` (`origin/master` is identical).
+**Last updated: 2026-10-06 12:06 (Gulf Standard Time, UTC+4).** Git state at that moment: see the "Repo hygiene" line below; work up to commit `2204b21` is on `origin/master`.
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -25,7 +25,8 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
    - **Expert:** `dashboard-expert-panels.tsx` fed by pure `lib/dashboard-expert.ts`: raw data table, private equity valuations (DPI, TVPI, projected IRR), tax & depreciation toggles, currency x category exposure heatmap.
 9. **Step 4, polish (`3bb60f2`):** bento tiles use a per-tier staggered entrance (basic fade only; standard 75 ms/300 ms/8 px; professional 60/350/8; expert 35/200/4; `motion-reduce` respected). `dashboard-csv-card.tsx` is a standalone CSV upload tile (reuses the existing dropzone and column mapper; needs at least one Cash account); dropzone got an aria-label and polite live status. Its component file landed in the Step 3 commit because `page.tsx` imports it.
 10. **Docs:** `tracker/Testing.md`, `tracker/Portfolio-Dashboard.md` (new "Dashboard by UI tier" section), `tracker/Design-System.md`, `tracker/Changelog.md`, hub test counts (`410d4ff`).
-11. **Pushed:** `ee9a06d..410d4ff` to `origin/master`.
+11. **Pushed:** `ee9a06d..410d4ff` to `origin/master`, then the handoff file itself (`2204b21`).
+12. **Repo hygiene (2026-10-06 12:06):** `.obsidian/workspace.json` (Obsidian per-window UI state that changed on every open) is no longer tracked and is in `.gitignore`, so the working tree stays clean. The other `.obsidian` config files (`app.json`, `appearance.json`, `core-plugins.json`, `graph.json`) stay tracked. This and the timestamp change are committed locally and pushed only when Steve confirms.
 
 ## Caveats on the new dashboard work
 - Tax estimate is illustrative only: a user-typed rate (default 0) on per-asset positive unrealised gains, no loss offsetting, not saved, not tax advice.
@@ -45,4 +46,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 - `npm audit` reports 6 vulnerabilities (5 high, 1 critical); not looked at.
 
 ## Working rules Steve set
-Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work.
+Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.

@@ -43,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Obsidian per-window UI state (changes on every open)
+.obsidian/workspace.json
+.obsidian/workspaces.json
