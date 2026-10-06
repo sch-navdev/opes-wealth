@@ -77,6 +77,69 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 5. **Not set in Vercel (optional features, so those features are off):** `ANTHROPIC_API_KEY` (+ `ASSISTANT_MODEL`) for the AI help chat, `BANK_TOKEN_ENCRYPTION_KEY` and `ALTAREQ_*` for Open Finance, `RESEND_FROM` (custom sender), `CO_OWNER_INVITE_EMAILS`, and the market-data keys (`GOLDAPI_KEY`, `METALS_API_KEY`, `CHRONO24_API_KEY`, `WATCHCHARTS_API_KEY`, `THEWATCHAPI_KEY`). Never set `NEXT_PUBLIC_MOCK_AUTH` / `MOCK_AUTH_USER_ID` in Vercel (dev-only; already absent).
 - **Verified live (2026-10-06 14:49 GST):** the production deployment of `645b317` went READY and `curl -I https://www.opeswealth.app/login` returned `X-Vercel-Id: bom1::bom1::...` (same for `/dashboard`), so functions now run in Mumbai. Page-load latency was not timed before/after. Steps 1-3 above (dashboard region setting, `NEXT_PUBLIC_SITE_URL` value, a working `SUPABASE_SERVICE_ROLE_KEY`) are still Steve's to do or confirm.
 
+## Email deliverability audit & DNS records (2026-10-06)
+**Problem:** invite emails land in the Hotmail/Outlook junk folder. **Audited read-only:** live DNS (`nslookup` against 8.8.8.8), the Resend domain record and Resend's sent-mail log, and the app's mail code. No mail was sent and nothing was changed.
+
+### What exists today
+| Item | State | Verdict |
+|---|---|---|
+| DNS host | Vercel DNS (`ns1/ns2.vercel-dns.com`) | records are added in the Vercel dashboard |
+| Resend domain `opeswealth.app` | **verified**, sending enabled, region **ap-northeast-1 (Tokyo)**, open and click tracking **off**, receiving disabled | good (tracking off helps) |
+| DKIM `resend._domainkey` TXT | present, verified, `d=opeswealth.app` | passes and is **aligned** with the From domain |
+| SPF at `send.opeswealth.app` TXT | `v=spf1 include:amazonses.com ~all`, verified | passes; aligned (relaxed) because `send.` is a subdomain of the From domain |
+| Return-path MX at `send.opeswealth.app` | `10 feedback-smtp.ap-northeast-1.amazonses.com`, verified | fine (bounces/complaints go to Resend) |
+| `_dmarc` TXT | `v=DMARC1; p=none` | **no `rua`: you receive no reports and Microsoft/Google see an unmonitored policy** |
+| Root `opeswealth.app` TXT (SPF) | **none** | gap |
+| Root `opeswealth.app` MX | **none** | **gap: the From domain cannot receive mail** |
+| App From address | `Opes Wealth <noreply@opeswealth.app>` (`src/lib/email.ts`, env `RESEND_FROM` unset in Vercel) | works, but a `noreply@` sender that cannot receive replies scores worse |
+| Mail path of the invites | Supabase Auth `inviteUserByEmail` goes out through **Resend** (the 2026-10-02 invite shows an `ap-northeast-1.amazonses.com` message id), i.e. Supabase SMTP is already pointed at Resend | good |
+| Links and logo in the templates | on `https://www.opeswealth.app` (not `supabase.co`) since 2026-10-02 | good |
+| Resend log | only **3 emails ever sent** from this domain (created 2026-10-02), all **delivered**, including the invite to a Hotmail address on 2026-10-02 08:34 UTC | see diagnosis |
+
+### Diagnosis
+Authentication is **not broken**: DKIM and SPF pass and align, so DMARC passes. Hotmail *accepted* the invite ("delivered") and then filed it as junk. The causes are reputation and signals, not a hard failure:
+1. **Brand-new domain with almost no sending history** (3 emails in 4 days). Outlook gives new senders no trust until recipients interact with the mail. DNS alone cannot buy that.
+2. **The From domain cannot receive mail** (no MX) and has no root SPF: Outlook treats "can't reply to this domain" as a spam signal.
+3. **DMARC `p=none` with no `rua`**: no reporting, and a monitoring-only policy.
+4. A `noreply@` sender (engagement-based filters like replies and "not junk").
+Expect the DNS fixes below to help and to be required hygiene, but be realistic: inbox placement at Hotmail improves mainly as the domain builds a clean history (see "Reputation steps").
+
+### Records to add (Vercel dashboard -> Domains -> `opeswealth.app` -> DNS Records -> Add)
+Add each one with TTL 60 (or the default). The `send.` and `resend._domainkey` records already exist and must **not** be touched.
+
+**1. DMARC with reporting: replace the existing `_dmarc` record (only one DMARC record may exist, so edit or delete the old `v=DMARC1; p=none` first).**
+- Type `TXT`, Name `_dmarc`, Value:
+  `v=DMARC1; p=none; rua=mailto:dmarc@opeswealth.app; adkim=r; aspf=r; pct=100`
+- `dmarc@opeswealth.app` can only receive reports once record 3 (root MX) exists and that mailbox or alias exists. **Alternative that works today:** use a mailbox on a domain you already run, e.g. `rua=mailto:steve.haro@navtech.me`, and add this authorization record in the **navtech.me** DNS: Type `TXT`, Name `opeswealth.app._report._dmarc`, Value `v=DMARC1`. (Without that authorization record most receivers will not send the reports.) A free DMARC-report service that gives you its own `rua` address is a third option.
+- Keep `p=none` for 2 to 4 weeks, read the aggregate reports (they list every source sending as `opeswealth.app`), then tighten to `p=quarantine` and later `p=reject` once only Resend (and your mailbox provider, if any) appear and pass.
+
+**2. Root SPF (so the bare domain also publishes who may send).** Type `TXT`, Name `@` (blank), Value:
+- if you will **not** send from a mailbox at the root: `v=spf1 -all` (declares no host sends as the bare domain; Resend uses `send.` so it is unaffected);
+- if you add a mailbox provider (record 3): use that provider's SPF instead, for example Google Workspace `v=spf1 include:_spf.google.com ~all`. Only **one** SPF record per name.
+
+**3. Root MX handling (so `opeswealth.app` can receive mail, e.g. `hello@` and `dmarc@`).** Pick one provider and copy the exact values from its domain-setup screen (the values below are the usual ones, confirm them there):
+- Google Workspace: Type `MX`, Name `@`, Priority `1`, Value `smtp.google.com`; SPF as in record 2.
+- Microsoft 365: the MX value is tenant specific (`<tenant>-opeswealth-app.mail.protection.outlook.com`, priority 0); SPF `v=spf1 include:spf.protection.outlook.com ~all`.
+- Free forwarding service (for example ImprovMX): `MX @ 10 mx1.improvmx.com` and `MX @ 20 mx2.improvmx.com`; SPF `v=spf1 include:spf.improvmx.com ~all`; then forward `hello@` and `dmarc@` to your own inbox.
+Do **not** put the root MX on `send.` (that one belongs to Resend). Resend inbound ("Receiving") is currently off; do not enable it on the root.
+
+### Sender settings to change (no DNS)
+- Use a replyable sender, for example `Opes Wealth <hello@opeswealth.app>`, once record 3 exists. App emails: set `RESEND_FROM` in Vercel (Production) and redeploy. Supabase Auth emails (invites, sign-up, reset): Supabase dashboard -> Authentication -> Emails -> **SMTP Settings**: host `smtp.resend.com`, port `465`, username `resend`, password = a Resend API key with sending access, sender email on `opeswealth.app`, sender name `Opes Wealth`. (The evidence shows SMTP already runs through Resend; this step is to confirm the sender matches the verified domain, since the setting itself could not be read from here.)
+
+### Reputation steps (what actually moves Hotmail)
+1. In the junk folder of the test Hotmail account: open the invite, **Not junk**, and **add the sender to Contacts / Safe senders**. Reply to one message. Microsoft weighs these signals heavily for new senders.
+2. Send steadily at low volume at first; do not blast. Keep Resend open/click tracking **off** (it is), keep links on `opeswealth.app`, keep a plain, short subject.
+3. Watch the Resend dashboard for bounces and complaints; a single complaint on a young domain matters.
+4. If it still junks after 2 to 3 weeks of clean sending and passing DMARC, use Microsoft's Outlook.com sender-support/mitigation form and ask Resend support. (Microsoft SNDS/JMRP are for dedicated sending IPs; Resend's shared IPs are not enrolled by you.)
+
+### Verify (after each DNS change; DNS can take minutes to an hour)
+```
+nslookup -type=TXT _dmarc.opeswealth.app 8.8.8.8
+nslookup -type=TXT opeswealth.app 8.8.8.8
+nslookup -type=MX opeswealth.app 8.8.8.8
+```
+Then have a real invite sent to the Hotmail address, open **View message source** (Outlook web: ... -> View -> View message source) and look for `Authentication-Results:` containing `dkim=pass header.d=opeswealth.app`, `spf=pass` and `dmarc=pass`. A free tester such as mail-tester.com (send one message to its generated address) gives a score and lists any remaining issue. Not done here: no test message was sent, and nothing was verified in a mailbox.
+
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)
