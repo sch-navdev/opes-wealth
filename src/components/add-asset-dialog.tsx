@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { onQuickAction } from "@/lib/command-menu-events";
 import { Edit, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,12 @@ export function AddAssetDialog({
   const { t } = useLanguage();
 
   const [open, setOpen] = useState(false);
+  // Command palette "Add asset": only the plain dashboard instance reacts (not edit / simulation / preset / custom-trigger ones).
+  const isPlainAdd = !asset && !simulation && !defaultCategoryName && !trigger;
+  useEffect(() => {
+    if (!isPlainAdd) return;
+    return onQuickAction("add-asset", () => setOpen(true));
+  }, [isPlainAdd]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);

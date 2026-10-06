@@ -1,5 +1,6 @@
 "use client";
 
+import { CommandMenuTrigger } from "@/components/command-menu";
 import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { ApprovalsBell } from "@/components/approvals-bell";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -34,6 +35,7 @@ export function DashboardHeaderControls({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
+      <CommandMenuTrigger />
       <div className="text-end">
         <p className="text-xs text-muted-foreground">
           {t("net_worth")} · {baseCurrency}

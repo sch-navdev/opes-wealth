@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { onQuickAction } from "@/lib/command-menu-events";
 import { CheckCircle2, FileSpreadsheet } from "lucide-react";
 import { CsvColumnMapper } from "@/components/csv-column-mapper";
 import { CsvDropzone, type ParsedCsvFile } from "@/components/csv-dropzone";
@@ -21,7 +22,7 @@ export type CsvTargetAccount = {
 
 /**
  * Standalone dashboard tile for the bank-history CSV import: pick a cash
- * account, drop a `.csv`, map columns, import. Reuses `CsvDropzone` and
+ * account, drop a `.csv` or `.pdf` statement, map columns, import. Reuses `CsvDropzone` and
  * `CsvColumnMapper` (same flow as `CsvImportDialog`), inline instead of in a
  * dialog. Card chrome matches the other dashboard cards; the entrance follows
  * the active UI tier. `tileIndex` is its position in the dashboard's stagger.
@@ -42,6 +43,18 @@ export function DashboardCsvCard({
 
   const account = accounts.find((a) => a.id === accountId) ?? accounts[0];
 
+  // Command palette "Upload statement": bring this card into view and focus it.
+  useEffect(
+    () =>
+      onQuickAction("upload-statement", () => {
+        const el = document.getElementById("statement-import");
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+        el?.focus({ preventScroll: true });
+      }),
+    [],
+  );
+
   function reset() {
     setFile(null);
     setImportedCount(null);
@@ -56,7 +69,9 @@ export function DashboardCsvCard({
 
   return (
     <Card
-      className="animate-in fade-in slide-in-from-bottom-2 gap-4 border-border bg-card py-5 shadow-sm motion-reduce:animate-none"
+      id="statement-import"
+      tabIndex={-1}
+      className="outline-none animate-in fade-in slide-in-from-bottom-2 gap-4 border-border bg-card py-5 shadow-sm motion-reduce:animate-none"
       style={tileEntranceStyle(motion, tileIndex)}
     >
       <CardHeader className="gap-1 px-5">
@@ -115,7 +130,7 @@ export function DashboardCsvCard({
                 onSuccess={setImportedCount}
               />
             ) : (
-              <CsvDropzone onParsed={setFile} />
+              <CsvDropzone onParsed={setFile} currency={account.currency} />
             )}
           </>
         )}

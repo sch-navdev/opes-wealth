@@ -28,6 +28,8 @@ import { batchDeleteAssets } from "@/app/dashboard/actions";
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import { convertAmount } from "@/lib/fx";
+import { useTierMotion } from "@/components/tier-gate";
+import { ALL_CATEGORIES, buildCategoryPills, filterByCategory } from "@/lib/portfolio-table-filters";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -113,6 +115,10 @@ export function PortfolioGroups({
   // Folders start closed — that's the whole point of grouping: a glance at
   // the category/count/subtotal without the full row list until asked for.
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // Dashboard-level category pills: show one folder (opened) or all. The per-table pills only
+  // matter where a single table mixes categories; here each folder is one category.
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES);
+  const motion = useTierMotion();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleteError, setBatchDeleteError] = useState<string | null>(null);
@@ -193,8 +199,42 @@ export function PortfolioGroups({
     ),
   ];
 
+  // Liabilities have their own consolidated card, so they are not a pill.
+  const pills = buildCategoryPills(assets.filter((a) => a.asset_categories?.name !== "Liabilities"));
+  const activeFilter = pills.some((p) => p.value === categoryFilter) ? categoryFilter : ALL_CATEGORIES;
+  const pillTotal = pills.reduce((n, p) => n + p.count, 0);
+  const visibleIds = new Set(
+    filterByCategory(assets, activeFilter).map((a) => a.category_id),
+  );
+
   return (
     <div className="space-y-3">
+      {pills.length >= 2 && (
+        <div role="group" aria-label={t("ptable_filter_label")} className="flex flex-wrap items-center gap-1.5">
+          {[{ value: ALL_CATEGORIES, count: pillTotal, labelKey: "ptable_filter_all" as const }, ...pills].map((pill) => {
+            const active = activeFilter === pill.value;
+            const label = pill.labelKey ? t(pill.labelKey) : pill.value;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setCategoryFilter(pill.value)}
+                style={{ transitionDuration: `${motion.durationMs}ms` }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium outline-none transition-[background-color,color,border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {label}
+                <span className="tabular-nums opacity-80">{pill.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between border border-border bg-muted/30 px-4 py-2">
           <span className="text-sm text-foreground">
@@ -246,7 +286,9 @@ export function PortfolioGroups({
         const group = groups.get(categoryId)!;
         // Liabilities get their own consolidated card below (standalone debts + debts inside other assets).
         if (group.name === "Liabilities") return null;
-        const isOpen = expanded[categoryId] ?? false;
+        if (activeFilter !== ALL_CATEGORIES && !visibleIds.has(categoryId)) return null;
+        // Choosing a category opens its folder so the filtered rows are right there.
+        const isOpen = activeFilter !== ALL_CATEGORIES ? true : (expanded[categoryId] ?? false);
         const translationKey = CATEGORY_NAME_KEYS[group.name];
         const label = translationKey ? t(translationKey) : group.name;
 
