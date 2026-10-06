@@ -18,8 +18,8 @@ import { zh } from "@/lib/translations/zh";
  * object (each entry is { en, fr }). The other seven languages live in src/lib/translations/*.ts and
  * are OPTIONAL overlays: `translate()` falls back to the English text for a key a language lacks.
  * Therefore:
- *   - parity (every base key present) is NOT required for the seven languages — missing counts are
- *     reported, not failed;
+ *   - parity IS enforced since 2026-10-06 (all seven languages cover every base key, see the
+ *     "translates every base key" test); `translate()` still falls back to English as a safety net;
  *   - a translation key that does not exist in the base dictionary IS an error (dead / typo'd key);
  *   - en and fr must be complete for every key.
  * `dictionary` is not exported, so it is evaluated from the source text of i18n.ts (it is a plain
@@ -134,6 +134,12 @@ describe.each(extraLocales)("%s translations", (code) => {
     console.info(`[i18n] ${code}: ${keys.length} keys, ${missing.length} of ${baseKeys.length} base keys missing (${pct.toFixed(1)}% covered)`);
     expect(keys.length).toBeGreaterThan(0);
     expect(missing.length).toBeLessThanOrEqual(baseKeys.length);
+  });
+
+  // Since 2026-10-06 every overlay language is at 100%, and this keeps it there: a new
+  // dictionary key must be translated into all seven languages (or this fails and names it).
+  it("translates every base key (100% coverage)", () => {
+    expect(baseKeys.filter((k) => !(k in t))).toEqual([]);
   });
 
   it("has no key that is absent from the base dictionary", () => {

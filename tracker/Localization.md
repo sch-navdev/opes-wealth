@@ -138,6 +138,13 @@
 
 - **34 new keys in all nine languages** for co-ownership: `owners_*` (form, summary, seven validation messages), `change_pending_*` and `approvals_*` (header panel and field names). Same caveat: AI-made, not native-reviewed. The server returns validation errors as keys (`owners_*`, `change_pending_exists`), which the modal translates.
 
+
+## Full coverage for the seven overlay languages (2026-10-06)
+- **Gap closed:** the base dictionary (`src/lib/i18n.ts`, `{en, fr}` per key) had **98 keys** missing from **each** of ar, de, es, hi, it, ru and zh, all added since the last coverage fill: the UI tier selector and Preferences card, the bento header, the CSV upload card and grid columns, the Basic overview, the Expert panels (raw data, private equity, tax/depreciation, currency heatmap) and the sparkline labels. They were translated into all seven languages and appended to `src/lib/translations/*.ts` under the comment `// 2026-10-06 coverage fill: ...`. Placeholders (`{name}`, `{n}`, `{pct}`, `{tier}`) were checked programmatically against the English text.
+- **Guard:** `translations.test.ts` now **fails** if any overlay language lacks a base key (`translates every base key (100% coverage)`, which lists the missing keys), so every new dictionary key must be translated into all seven languages when it is added. `translate()` still falls back to English as a safety net. To relax this, change that one test back to reporting only.
+- **Terminology** reused from each overlay file (Net Worth, Private Equity, Real Estate, Vehicles, Commitment/Called/Distributions). Tier names (Basic/Standard/Professional/Expert) and "Base Currency" had no earlier entries, so wording is new: de Basis/Standard/Professional/Experte, es Básico/Estándar/Profesional/Experto, it Base/Standard/Professionale/Esperto, ar أساسي/قياسي/احترافي/خبير, hi बेसिक/स्टैंडर्ड/प्रोफ़ेशनल/एक्सपर्ट, zh 基础/标准/专业/专家, ru Базовый/Стандартный/Профессиональный/Эксперт. NAV, DPI, TVPI and IRR stay Latin (es uses VL and TIR where the file already did).
+- **Caveats:** the translations are machine-written, not reviewed by native speakers; a native check of ar, hi and ru in particular is worthwhile before relying on them with clients. Existing es and it files address the user informally (tú / tu) in places while de is formal (Sie); the new strings follow each file's existing mix. RTL layout of the new Arabic strings was not checked in a browser.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from
