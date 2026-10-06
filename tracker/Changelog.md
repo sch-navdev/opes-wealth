@@ -189,3 +189,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-04: 21st.dev-informed UI upgrade — bento dashboard header, CSV upload Card, sortable data-grid assets table and a user-collapsible sidebar, all on semantic theme tokens. See [[Portfolio-Dashboard|Portfolio Dashboard]].
 
 - 2026-10-06: Re-verified after the EC2 sessions (HEAD 017fe21): `tsc --noEmit`, `eslint .` and `npm run build` all pass (needed `npm install` for `zustand`); confirmed against the live database that migrations 0015-0032 are all applied and corrected the stale not-applied/not-deployed status lines in the hub and module notes - [[Database-Schema|Database Schema]], [[Deployment|Deployment]]
+- 2026-10-06: Added Vitest and 35 colocated unit-test files (1039 tests) for money/valuation, import/parsing, portfolio, real-estate, vehicle and translation logic; 13 suspected source bugs are recorded as `it.fails` and left unfixed - [[Testing|Testing]]
