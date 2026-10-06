@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useUiTierStore, type ExpertiseLevel } from "@/stores/useUiTierStore";
+import { useSyncExternalStore, type ReactNode } from "react";
+import { useInitialTier } from "@/components/tier-provider";
+import { DEFAULT_EXPERTISE_LEVEL, useUiTierStore, type ExpertiseLevel } from "@/stores/useUiTierStore";
 import {
   isSectionVisible,
   tierMotion,
@@ -9,9 +10,21 @@ import {
   type TierMotion,
 } from "@/lib/dashboard-tiers";
 
-/** The active UI tier (default `standard` until the persisted choice rehydrates). */
+const subscribeHydration = (cb: () => void) => useUiTierStore.persist.onFinishHydration(cb);
+const getHydrated = () => useUiTierStore.persist.hasHydrated();
+const getServerHydrated = () => false;
+
+/**
+ * The active UI tier. Until the persisted store has rehydrated this returns the
+ * tier the server read from the cookie (via TierProvider, else the default), which
+ * matches the server render, so there is no hydration mismatch or flash; afterwards
+ * it is the store value.
+ */
 export function useUiTier(): ExpertiseLevel {
-  return useUiTierStore((s) => s.user_expertise_level);
+  const initial = useInitialTier() ?? DEFAULT_EXPERTISE_LEVEL;
+  const hydrated = useSyncExternalStore(subscribeHydration, getHydrated, getServerHydrated);
+  const stored = useUiTierStore((s) => s.user_expertise_level);
+  return hydrated ? stored : initial;
 }
 
 /** Entrance-animation settings for the active tier. */

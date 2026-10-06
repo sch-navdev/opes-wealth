@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { ChevronsRight, Factory, Landmark, LayoutDashboard, LogOut, Menu, Settings, ShieldCheck, Telescope, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useUiTier } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { logout } from "@/app/auth/actions";
 import type { TranslationKey } from "@/lib/i18n";
@@ -103,7 +104,7 @@ function NavList({
   const label = labelClass(pref, collapsible);
   const { t } = useLanguage();
   const pathname = usePathname();
-  const level = useUiTierStore((s) => s.user_expertise_level);
+  const level = useUiTier();
   const setLevel = useUiTierStore((s) => s.setExpertiseLevel);
   const visibleItems = NAV_ITEMS.filter((item) => tierRank(item.minTier) <= tierRank(level));
 

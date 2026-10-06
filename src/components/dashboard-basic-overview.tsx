@@ -84,7 +84,7 @@ export function DashboardBasicOverview({
             <div
               role="group"
               aria-label={t("dash_basic_alloc_aria")}
-              className="flex flex-col items-center gap-4 px-5 sm:flex-row"
+              className="flex flex-col items-center gap-4 px-5 min-[520px]:flex-row lg:flex-col xl:flex-row"
             >
               <div className="h-40 w-40 shrink-0" aria-hidden="true">
                 <ResponsiveContainer width="100%" height="100%">
@@ -109,16 +109,21 @@ export function DashboardBasicOverview({
               </div>
               <ul className="w-full min-w-0 flex-1 space-y-2">
                 {allocation.map((slice, i) => (
-                  <li key={slice.category} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="flex min-w-0 items-center gap-2">
+                  <li key={slice.category} className="flex items-start justify-between gap-3 text-sm">
+                    <span className="flex min-w-0 items-start gap-2">
                       <span
-                        className="size-2.5 shrink-0 rounded-full"
+                        className="mt-1 size-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: SLICE_COLORS[i % SLICE_COLORS.length] }}
                         aria-hidden="true"
                       />
-                      <span className="truncate text-foreground">{categoryLabel(slice.category)}</span>
+                      <span
+                        className="line-clamp-2 min-w-0 break-words text-foreground"
+                        title={categoryLabel(slice.category)}
+                      >
+                        {categoryLabel(slice.category)}
+                      </span>
                     </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-right tabular-nums text-muted-foreground">
                       {percent.format(slice.share)}%
                     </span>
                   </li>

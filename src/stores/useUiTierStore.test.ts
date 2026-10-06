@@ -3,6 +3,10 @@ import {
   DEFAULT_EXPERTISE_LEVEL,
   EXPERTISE_LEVELS,
   tierRank,
+  UI_TIER_COOKIE,
+  buildTierCookie,
+  parseExpertiseLevel,
+  readTierFromCookieString,
   type ExpertiseLevel,
 } from "@/stores/useUiTierStore";
 
@@ -46,5 +50,26 @@ describe("tierRank", () => {
 
   it("returns -1 for an unknown level (so it never satisfies a gate)", () => {
     expect(tierRank("godmode" as ExpertiseLevel)).toBe(-1);
+  });
+});
+
+describe("tier cookie helpers", () => {
+  it("builds a cookie string, Secure only on https", () => {
+    expect(buildTierCookie("expert", false)).toBe(`${UI_TIER_COOKIE}=expert; Path=/; Max-Age=31536000; SameSite=Lax`);
+    expect(buildTierCookie("basic", true)).toMatch(/; Secure$/);
+  });
+
+  it("validates values", () => {
+    expect(parseExpertiseLevel("professional")).toBe("professional");
+    expect(parseExpertiseLevel("admin")).toBeUndefined();
+    expect(parseExpertiseLevel("")).toBeUndefined();
+    expect(parseExpertiseLevel(undefined)).toBeUndefined();
+  });
+
+  it("reads the tier out of a cookie header", () => {
+    expect(readTierFromCookieString("a=1; opes-ui-tier=basic; b=2")).toBe("basic");
+    expect(readTierFromCookieString("opes-ui-tier=bogus")).toBeUndefined();
+    expect(readTierFromCookieString("x=opes-ui-tier=basic")).toBeUndefined();
+    expect(readTierFromCookieString("")).toBeUndefined();
   });
 });
