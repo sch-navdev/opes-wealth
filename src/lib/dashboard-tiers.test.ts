@@ -73,6 +73,10 @@ describe("isSectionVisible", () => {
   it("adds future projects and exports at professional, expert panels only at expert", () => {
     expect(isSectionVisible("futureProjects", "standard")).toBe(false);
     expect(isSectionVisible("futureProjects", "professional")).toBe(true);
+    expect(isSectionVisible("incomeCalendar", "basic")).toBe(false);
+    expect(isSectionVisible("incomeCalendar", "standard")).toBe(false);
+    expect(isSectionVisible("incomeCalendar", "professional")).toBe(true);
+    expect(isSectionVisible("incomeCalendar", "expert")).toBe(true);
     expect(isSectionVisible("export", "standard")).toBe(false);
     expect(isSectionVisible("expertPanels", "professional")).toBe(false);
     expect(isSectionVisible("expertPanels", "expert")).toBe(true);

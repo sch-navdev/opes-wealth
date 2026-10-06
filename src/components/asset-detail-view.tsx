@@ -188,6 +188,10 @@ import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/lib/i18n";
 import { buildDetailDisplay, realEstateShareFigures, toEditPayload } from "@/lib/asset-detail-scaling";
 import { OwnerShareNote } from "@/components/owner-share-note";
+import { TransactionsList } from "@/components/transactions-list";
+import { AttributionCard } from "@/components/attribution-card";
+import type { AssetAttributionView } from "@/lib/asset-attribution-view";
+import type { StoredTransactionRow } from "@/lib/transaction-detail";
 
 export type AssetDetail = {
   id: string;
@@ -313,6 +317,8 @@ export function AssetDetailView({
   owners = [],
   ownershipStatus = null,
   ownerFactor = 1,
+  transactions = [],
+  attribution = null,
 }: {
   /** The RAW whole-asset record (100% values). Forms, dialogs and server actions use this one. */
   asset: AssetDetail;
@@ -325,6 +331,10 @@ export function AssetDetailView({
   owners?: OwnerFormRow[];
   /** Who was emailed and what awaits approval (shared assets only). */
   ownershipStatus?: OwnershipStatus | null;
+  /** Stored bank transactions of this asset (newest first); only rendered for Cash accounts. */
+  transactions?: StoredTransactionRow[];
+  /** FX-vs-capital attribution (multi-currency holdings only), already scaled to the viewer's share. */
+  attribution?: AssetAttributionView | null;
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
@@ -388,6 +398,7 @@ export function AssetDetailView({
   const isPreciousMetal = categoryName === "Precious Metals";
   const isExotic = categoryName === "Exotic Assets";
   const isStartup = categoryName === "Startups";
+  const isCash = categoryName === "Cash";
   const metadata = parseRealEstateMetadata(displayAsset.metadata);
   const vehicleMetadata = isVehicle ? parseVehicleMetadata(displayAsset.metadata) : null;
   // Baseline = purchase price, else the earliest valuation entry; current =
@@ -2159,6 +2170,8 @@ export function AssetDetailView({
                 )}
               </CardContent>
             </Card>
+
+            <AttributionCard attribution={attribution} />
 
             {isRealEstate && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -4073,6 +4086,10 @@ export function AssetDetailView({
                   />
                 </CardContent>
               </Card>
+            )}
+
+            {isCash && !asset.is_liability && (
+              <TransactionsList transactions={transactions} currency={asset.currency} />
             )}
 
             {isCrypto && cryptoMetadata && (

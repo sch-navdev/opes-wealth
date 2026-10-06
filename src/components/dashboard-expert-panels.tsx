@@ -9,6 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { InfoTooltip } from "@/components/ui/tooltip";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { useTierMotion } from "@/components/tier-gate";
+import { DashboardAttributionPanel } from "@/components/dashboard-attribution-panel";
+import type { AttributionPanelData } from "@/lib/dashboard-attribution";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { formatMultiple, formatPercent } from "@/lib/format-ratio";
@@ -107,9 +109,9 @@ const numCell = "text-end tabular-nums whitespace-nowrap";
 
 /* ---------- panels ---------- */
 
-type Props = { data: ExpertPanelsData; baseCurrency: string };
+type Props = { data: ExpertPanelsData; baseCurrency: string; attribution?: AttributionPanelData | null };
 
-export function DashboardExpertPanels({ data, baseCurrency }: Props) {
+export function DashboardExpertPanels({ data, baseCurrency, attribution }: Props) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const motion = useTierMotion();
@@ -172,6 +174,14 @@ export function DashboardExpertPanels({ data, baseCurrency }: Props) {
         baseCurrency={baseCurrency}
         fmtMoney={fmtMoney}
       />
+      {attribution ? (
+        <DashboardAttributionPanel
+          data={attribution}
+          baseCurrency={baseCurrency}
+          className={cn(card, "xl:col-span-2")}
+          style={tileEntranceStyle(motion, 5)}
+        />
+      ) : null}
     </section>
   );
 }

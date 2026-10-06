@@ -26,6 +26,10 @@ import { DashboardExpertPanels } from "@/components/dashboard-expert-panels";
 import { TierGate } from "@/components/tier-gate";
 import { buildAllocation, topAssets } from "@/lib/dashboard-tiers";
 import { buildExpertPanelsData } from "@/lib/dashboard-expert";
+import { cookies } from "next/headers";
+import { UI_TIER_COOKIE, parseExpertiseLevel } from "@/stores/useUiTierStore";
+import { buildAttributionPanelData, collectAttributionCandidates } from "@/lib/dashboard-attribution";
+import { fetchAttributionFx } from "@/lib/dashboard-attribution-fetch";
 import { T } from "@/components/translated-text";
 import {
   DEFAULT_BASE_CURRENCY,
@@ -39,6 +43,8 @@ import { buildDccPortfolio } from "@/lib/dcc";
 import { ExportReportsCard } from "@/components/export-reports-card";
 import { PassiveIncomeCard } from "@/components/passive-income-card";
 import { buildPassiveIncome } from "@/lib/passive-income";
+import { IncomeCalendar } from "@/components/income-calendar";
+import { buildIncomeCalendar } from "@/lib/income-calendar";
 import {
   applyOwnershipFactors,
   loadCoOwnedAssets,
@@ -432,6 +438,15 @@ export default async function DashboardPage({
     (asset) => convertToBaseCurrency(grossAssetValue(asset), asset.currency, displayCurrency, rates),
   );
 
+  // Forward 12-month income calendar (Professional/Expert): same share-scaled
+  // `assets` the passive-income card uses, spread over the real payment schedule.
+  const incomeCalendar = buildIncomeCalendar({
+    assets: assets ?? [],
+    rates,
+    baseCurrency: displayCurrency,
+    startDate: today,
+  });
+
   // Bento header: net contribution + holding count for the three headline
   // classes (same netWorth breakdown rows the metric cards use, so they agree),
   // plus a thinned Total series for the hero sparkline.
@@ -451,6 +466,21 @@ export default async function DashboardPage({
   const basicAllocation = buildAllocation(breakdowns.assets);
   const basicTopAssets = topAssets(breakdowns.netWorth, 5);
   const expertData = buildExpertPanelsData(assets ?? [], displayCurrency, rates, today);
+  // Currency vs capital attribution (Expert panel): foreign-currency holdings with a cost basis.
+  // Historical FX is fetched once, in parallel per currency, and never throws: a provider failure
+  // only lowers the panel's coverage. Skipped entirely when there is nothing foreign to attribute.
+  // Only the Expert view shows it, so the network fetch is skipped for other tiers (cookie = UI preference mirror).
+  const showsExpertPanels = parseExpertiseLevel((await cookies()).get(UI_TIER_COOKIE)?.value) === "expert";
+  const attributionCandidates = showsExpertPanels ? collectAttributionCandidates(assets ?? [], displayCurrency) : [];
+  const attributionData =
+    attributionCandidates.length === 0
+      ? null
+      : buildAttributionPanelData({
+          candidates: attributionCandidates,
+          baseCurrency: displayCurrency,
+          rates,
+          fxHistory: await fetchAttributionFx(attributionCandidates, displayCurrency),
+        });
 
   const addDialogs = (
     <>
@@ -549,6 +579,10 @@ export default async function DashboardPage({
           />
         </TierGate>
 
+        <TierGate section="incomeCalendar">
+          <IncomeCalendar calendar={incomeCalendar} baseCurrency={displayCurrency} />
+        </TierGate>
+
         <TierGate section="csvUpload">
           <DashboardCsvCard
             accounts={cashAccounts.map(({ id, name, currency, nativeValue }) => ({
@@ -600,7 +634,7 @@ export default async function DashboardPage({
         </TierGate>
 
         <TierGate section="expertPanels">
-          <DashboardExpertPanels data={expertData} baseCurrency={displayCurrency} />
+          <DashboardExpertPanels data={expertData} baseCurrency={displayCurrency} attribution={attributionData} />
         </TierGate>
 
         <TierGate section="export">

@@ -7,11 +7,14 @@ import {
   isMockAuthEnabled,
 } from "@/utils/supabase/mock-auth";
 import { AssetDetailView, type AssetDetail, type AssetHistoryPoint } from "@/components/asset-detail-view";
-import { getExchangeRatesFromUsd } from "@/lib/fx";
+import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
+import { getHistoricalRatesBatch, type HistoricalRateResult } from "@/lib/services/fx-history-client";
+import { attributionDates, buildAttributionView, type AssetAttributionView } from "@/lib/asset-attribution-view";
 import type { OwnerFormRow } from "@/components/ownership-fields";
 import { loadOwnershipStatus } from "@/lib/shared-assets/server";
 import { ownershipFactor } from "@/lib/ownership";
 import { viewerShareFactor } from "@/lib/asset-detail-scaling";
+import type { StoredTransactionRow } from "@/lib/transaction-detail";
 
 export default async function AssetDetailsPage({
   params,
@@ -88,7 +91,60 @@ export default async function AssetDetailsPage({
     ),
   });
 
+  // Stored bank transactions (Cash accounts only). The table may not exist in every environment, and
+  // RLS decides which rows a co-owner sees: any error simply means "no transactions".
+  let transactions: StoredTransactionRow[] = [];
+  if (asset.asset_categories?.name === "Cash") {
+    try {
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("booked_date, amount, currency, description, source, fingerprint, created_at")
+        .eq("asset_id", id)
+        .order("booked_date", { ascending: false })
+        .limit(200)
+        .returns<StoredTransactionRow[]>();
+      if (!error && data) transactions = data;
+    } catch {
+      transactions = [];
+    }
+  }
+
   const ownershipStatus = owners.length > 1 && !mockUserId ? await loadOwnershipStatus(id, user.id) : null;
+
+  // FX-vs-capital attribution (multi-currency holdings only). Base = the user's default currency, the
+  // same preference the dashboard falls back to. Never lets a failure break the page.
+  let attribution: AssetAttributionView | null = null;
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("default_currency")
+      .eq("id", user.id)
+      .single();
+    const attrArgs = {
+      category: asset.asset_categories?.name ?? null,
+      currency: asset.currency,
+      base: profile?.default_currency || DEFAULT_BASE_CURRENCY,
+      currentValue: asset.current_value,
+      quantity: asset.quantity,
+      purchaseDate: asset.purchase_date,
+      metadata: asset.metadata,
+      factor: ownerFactor,
+    };
+    const dates = attributionDates(attrArgs);
+    if (dates) {
+      let historical: Record<string, HistoricalRateResult> | null = null;
+      if (dates.length > 0) {
+        try {
+          historical = await getHistoricalRatesBatch(dates, asset.currency, attrArgs.base);
+        } catch {
+          historical = null;
+        }
+      }
+      attribution = buildAttributionView({ ...attrArgs, ratesFromUsd: rates, historical });
+    }
+  } catch {
+    attribution = null;
+  }
 
   return (
     <AssetDetailView
@@ -99,6 +155,8 @@ export default async function AssetDetailsPage({
       owners={owners}
       ownershipStatus={ownershipStatus}
       ownerFactor={ownerFactor}
+      transactions={transactions}
+      attribution={attribution}
     />
   );
 }

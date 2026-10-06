@@ -18,6 +18,7 @@ export type DashboardSection =
   | "csvUpload"
   | "portfolio"
   | "futureProjects"
+  | "incomeCalendar"
   | "export"
   | "expertPanels";
 
@@ -33,6 +34,7 @@ export const SECTION_TIERS: Record<DashboardSection, TierRange> = {
   csvUpload: { min: "standard" },
   portfolio: { min: "standard" },
   futureProjects: { min: "professional" },
+  incomeCalendar: { min: "professional" },
   export: { min: "professional" },
   expertPanels: { min: "expert" },
 };
