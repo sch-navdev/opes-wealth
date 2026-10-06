@@ -2,7 +2,7 @@
 
 # Testing
 
-**Status (2026-10-06):** automated tests for the core pure logic, the co-owner approval flow and requester notifications (mocked two-user simulation) and React component tests. 54 test files, **1308 tests, all passing, no `it.fails` left** (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
+**Status (2026-10-06):** automated tests for the core pure logic, the co-owner approval flow and requester notifications (mocked two-user simulation) and React component tests. 80 test files, **1546 tests, all passing, no `it.fails` left** (`npm test` runs both Vitest projects); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
 
 ## Setup
 - **Runner:** Vitest `^5` (upgraded from 3 on 2026-10-06 together with `@types/node` `^22.0.0`; Node 24 locally). Config in `vitest.config.mts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`; `.mts` avoids a Vite native-config-loader warning).
@@ -37,6 +37,10 @@
 - Expert panels and co-ownership: `buildExpertPanelsData` receives already pro-rata assets (`applyOwnershipFactors` -> `scaleAssetForOwner`), so it must not scale again; regression tests in `dashboard-expert.test.ts` pin half-share money and identical DPI/TVPI.
 - `fx.ts` static fallback table is USD-anchored even for a non-USD base (conversions unaffected).
 - ~~26 base translation keys missing from the seven overlay languages~~ **Fixed 2026-10-06:** the gap had grown to 98 keys per language (tier selector, preferences, bento, CSV card, grid columns, Basic overview, Expert panels, sparklines); all 98 were translated into ar, de, es, hi, it, ru and zh and every overlay language is now at 100%. The new `translates every base key (100% coverage)` test in `translations.test.ts` keeps it there. See [[Localization|Localization]].
+
+## Additions 2026-10-06 (now 80 files / 1546 tests)
+- New areas: bank-PDF parsers per bank (FAB, Wio, Banque Populaire) on synthetic fixtures plus `classify`/`index`/`bridge`, `csv-dropzone`, `command-menu`, `portfolio-table` and `portfolio-groups`, transaction sheet and list, income calendar, attribution (lib, card, panel) and `fx-history`.
+- The **real-statement validation** (280 real bank statements) was run locally and is **not part of the repo suite**: no real statements or personal data are committed. Gate at 18:53 GST: `tsc`, `eslint`, `npm run build` clean.
 
 ## Related
 - [[Deployment|Deployment]] — pre-deployment checks (`tsc`, `eslint`, build) now sit alongside `npm test`

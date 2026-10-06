@@ -91,6 +91,23 @@ Two export shapes, chosen via a mode toggle in the dialog (see "Transactions-Onl
 - `csv-dropzone.tsx` restyled after 21st.dev **File Upload Multi-File Dropzone** (`ephraimduncan/file-upload-03`, id 18111; fetched): dashed zone that tints with a primary ring while dragging, spreadsheet icon, "Drag and drop or choose a CSV file" line, constraints note. Kept hand-rolled and single-file (the reference uses `react-dropzone` — not installed); keyboard activation, `.csv` check and error `role="alert"` preserved. No separate premium Card component was fetched — the app's existing shadcn `Card` primitive is used.
 - New keys `csv_step_*`, `csv_drag_or`, `csv_choose_file`, `csv_only_note` (EN/FR; others fall back to English). Not verified visually.
 
+## Bank Statement PDF Import (2026-10-06)
+The import now takes **PDF as well as CSV** (dropzone, dashboard card, asset-detail dialog and the multi-account statement dialog; copy reads "Bank Statement Import (CSV & PDF)").
+- **Flow:** PDF -> server action `readBankStatementPdf` (`app/dashboard/bank-pdf-actions.ts`: auth, 10 MB cap, `%PDF` magic bytes, `pdfToTextWithPages`; nothing stored) -> `lib/parsers/bank-pdf/` -> same Date/Description/Debit/Credit/Balance table (`bridge.ts`) that the existing column mapper and importers consume, or `StatementParseResult` for the multi-account dialog. A PDF with several accounts (Wio) or totals that do not reconcile asks the user to pick/confirm.
+- **Architecture** (mirrors `banking/csv-profiles.ts`): `types.ts` (`TransactionFingerprint`: date, valueDate, description, rawDescription, signed amount, debit/credit, balance, reference), `shared.ts` (`reconcile`: opening + movements = closing to the cent, plus every printed running balance), `classify.ts` (scanned/empty detection), `index.ts` (fingerprinting `detectBankPdf`, `parseBankStatementPdfText`, failure -> i18n key map), `bridge.ts`, one file per bank.
+- **Banks (verified against real statements in Steve's archive, read-only, no personal data committed; fixtures are synthetic):** FAB (168/168 text statements reconcile; sign inferred from balance deltas because the single amount column is not split), Wio (27/27 monthly statements, 200 accounts; the amount and balance are glued together and split by balance continuity), Banque Populaire "Extrait de compte" (85/85; year inferred, older layout has no signs so they are recovered by exact subset-sum between printed balances, 9 files carry a "row signs may be swapped" warning).
+- **Not parseable, with specific messages:** HSBC UAE (statement pages are images, only legal boilerplate is text: `image_only`), CBD (password protected: `encrypted`), CBI 2013 (scan, 2 characters of text: `scanned`), non-statement documents (`unsupported`). No OCR. Emirates NBD, ADCB, BNP Paribas and Revolut PDFs were not among the samples, so there is no profile for them.
+- **Caveats:** the real-data check proves opening + movements = closing, not row-by-row equality with the source; FAB 2018 statements have a garbled font layer (not detected); descriptions of wrapped FAB lines can lose/gain a space.
+- Tests: per-bank unit tests on synthetic fixtures (every date/amount/balance asserted to the cent, tamper -> mismatch), `classify`, `index`, `bridge`, and `csv-dropzone.test.tsx` (jsdom).
+
+## Transaction details drawer and stored-transaction list (2026-10-06)
+Previously the UI had **no transaction list at all**, only the import preview.
+- `components/ui/sheet.tsx`: Radix Dialog slide-over (end side, RTL-aware, `motion-reduce`). `transaction-details-sheet.tsx` is the drawer; `transactions-list.tsx` the list. `lib/transaction-detail.ts` builds the view-models from a DB row, a `TransactionFingerprint` or a `NormalizedTx`.
+- **Asset detail page** now lists the stored `transactions` (latest 200, Cash accounts only); a missing table or a query error gives an empty list rather than an error.
+- **Statement import preview** shows 8 rows with "view all", and every row opens the drawer; PDF imports carry value date, original label, reference and balance.
+- `importBankTransactions` gained an optional `source` (`"csv_import" | "pdf_import"`) so PDF imports are labelled correctly.
+- 30 `txd_*` keys. Caveat: `txd_desc` is unused. Related: [[Portfolio-Dashboard|Portfolio Dashboard]].
+
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — where imported history now surfaces (asset's valuation chart/table)

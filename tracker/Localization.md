@@ -145,6 +145,10 @@
 - **Terminology** reused from each overlay file (Net Worth, Private Equity, Real Estate, Vehicles, Commitment/Called/Distributions). Tier names (Basic/Standard/Professional/Expert) and "Base Currency" had no earlier entries, so wording is new: de Basis/Standard/Professional/Experte, es Básico/Estándar/Profesional/Experto, it Base/Standard/Professionale/Esperto, ar أساسي/قياسي/احترافي/خبير, hi बेसिक/स्टैंडर्ड/प्रोफ़ेशनल/एक्सपर्ट, zh 基础/标准/专业/专家, ru Базовый/Стандартный/Профессиональный/Эксперт. NAV, DPI, TVPI and IRR stay Latin (es uses VL and TIR where the file already did).
 - **Caveats:** the translations are machine-written, not reviewed by native speakers; a native check of ar, hi and ru in particular is worthwhile before relying on them with clients. Existing es and it files address the user informally (tú / tu) in places while de is formal (Sie); the new strings follow each file's existing mix. RTL layout of the new Arabic strings was not checked in a browser.
 
+## Keys added 2026-10-06 (statement import, palette, tables, drawer, calendar, attribution)
+- New families, each in all nine languages: `bank_pdf_*` (14, PDF statement import; the CSV import copy was also changed to "CSV & PDF"), `cmdk_*` (17, command palette), `ptable_*` (6, table density and category pills), `txd_*` (30, transaction drawer; `txd_desc` unused), `ical_*` (18, income calendar), `attr_*` (25, asset attribution card) and `xattr_*` (14, Expert attribution panel).
+- **Caveat:** all machine-translated, no native review (ar, hi, ru in particular). `translations.test.ts` still enforces full coverage. See [[CSV-Bank-Uploads|CSV Bank Uploads]], [[Design-System|Design System]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]].
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

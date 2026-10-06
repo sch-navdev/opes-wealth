@@ -88,7 +88,10 @@ High-net-worth individuals
 - [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; migration 0031 applied (verified live 2026-10-06: `assets.status`/`plan` present) — [[Future-Projects|Future Projects]]
 - [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — migration 0032 applied (verified live 2026-10-06: 39 restrictive policies); a `seed-demo.mts --yes` re-run is still a manual step — [[Demo-Mode|Demo Mode]]
 ### Quality
-- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 54 files / 1308 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
+- [x] Bank statement PDF import (FAB, Wio, Banque Populaire), transaction details drawer and stored-transaction list — [[CSV-Bank-Uploads|CSV Bank Uploads]]; not committed yet (2026-10-06)
+- [x] Income calendar, table density and category pills, Ctrl/Cmd+K command palette — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Design-System|Design System]]
+- [x] FX vs capital performance attribution (asset page + Expert panel) — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
+- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 80 files / 1546 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
@@ -105,7 +108,7 @@ High-net-worth individuals
 - [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
 - [[Deployment|Deployment]] — Step 10, pre-deployment hardening done (clean lint/typecheck/build); actual Vercel deployment still pending
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
-- [[Testing|Testing]] — Vitest unit tests for core pure logic (35 files, 1039 tests) and the record of the 13 bugs they found and that were fixed
+- [[Testing|Testing]] — Vitest unit tests for core pure logic (80 files, 1546 tests) and the record of the 13 bugs they found and that were fixed
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Localization|Localization]] — English/French toggle (partial coverage)
