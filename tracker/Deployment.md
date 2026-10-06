@@ -58,6 +58,11 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 
 - (`0025_co_ownership.sql` is applied, verified live 2026-10-06; `CRON_SECRET` is set on Vercel per the 2026-10-02 session.) Set `CRON_SECRET` on Vercel (the new `/api/cron/expire-changes` job, 06:30 UTC, uses it like the bug-report cron). Add `<site>/auth/callback` to Supabase's allowed redirect URLs and review the project's invite email template. `CO_OWNER_INVITE_EMAILS=off` suppresses invite emails (useful on preview deployments). See [[Co-Ownership|Co-Ownership]].
 
+
+## Dependency security audit (2026-10-06)
+- `npm audit` reported 6 vulnerabilities (5 high, 1 critical). **Critical (fixed):** Next.js 16.2.0-16.3.5, remote code execution in `next/og` `ImageResponse` (GHSA-vcvr-r3jv-pc5j). The app does not import `next/og`, so it was not reachable, but `next` and `eslint-config-next` are now pinned to **16.3.8** (patch bump, exact pins kept). Tests (1125), `tsc`, `eslint` and `npm run build` pass on it.
+- **High x5 (not fixable, accepted):** one chain, `eslint-config-next` -> `@next/eslint-plugin-next` -> `fast-glob` -> `micromatch` -> `braces` (stack-exhaustion DoS on deeply nested glob patterns, GHSA-vfj7-8cjw-p6xm). `braces` 3.0.3 is already the newest release and the advisory flags every version, so there is no patched version to move to; the only `npm audit fix --force` suggestion downgrades to `eslint-config-next@14`, which would break the Next 16 lint setup, so it was **not** applied. Exposure is development tooling only (the linter globbing the repo's own files); none of it ships in the production bundle. Re-check with `npm audit` after future `eslint-config-next` releases.
+
 ## Related
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)
