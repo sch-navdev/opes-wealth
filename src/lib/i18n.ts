@@ -2096,6 +2096,17 @@ const dictionary = {
   approvals_field_purchase_date: { en: "Purchase date", fr: "Date d'achat" },
   approvals_field_ticker: { en: "Ticker", fr: "Symbole" },
   approvals_field_details: { en: "Details", fr: "Détails" },
+  // co-owner notifications
+  notif_title: { en: "Notifications", fr: "Notifications" },
+  notif_bell_label: { en: "Notifications, {n} unread", fr: "Notifications, {n} non lue(s)" },
+  notif_empty: { en: "No notifications yet.", fr: "Aucune notification pour le moment." },
+  notif_mark_all: { en: "Mark all as read", fr: "Tout marquer comme lu" },
+  notif_unread: { en: "Unread", fr: "Non lu" },
+  notif_someone: { en: "A co-owner", fr: "Un co-propriétaire" },
+  notif_asset_fallback: { en: "a shared asset", fr: "un actif partagé" },
+  notif_change_approved: { en: "{name} approved your change to {asset}", fr: "{name} a approuvé votre modification de {asset}" },
+  notif_change_rejected: { en: "{name} rejected your change to {asset}", fr: "{name} a refusé votre modification de {asset}" },
+  notif_change_auto_applied: { en: "Your change to {asset} was applied automatically after 7 days", fr: "Votre modification de {asset} a été appliquée automatiquement au bout de 7 jours" },
   approvals_field_owners: { en: "Ownership shares", fr: "Parts de détention" },
 
   // OW9: transaction dedupe, exotic assets, broker directory, passive income
@@ -2425,6 +2436,14 @@ const dictionary = {
   expert_ratios_other_liabilities: { en: "Other liabilities", fr: "Autres passifs" },
   expert_ratios_invested: { en: "Invested capital", fr: "Capital investi" },
   expert_ratios_note: { en: "Annual yield is the expected passive income over the next 12 months. Other liabilities are all debts except bank loans and mortgages (off-plan balances, capital calls, credit cards, other debts). ROIC follows this simplified formula, not the textbook NOPAT definition.", fr: "Le rendement annuel correspond aux revenus passifs attendus sur les 12 prochains mois. Les autres passifs regroupent toutes les dettes hors prêts bancaires et hypothèques (soldes sur plan, appels de fonds, cartes de crédit, autres dettes). Le ROIC suit cette formule simplifiée, et non la définition classique fondée sur le NOPAT." },
+  // ratios polish
+  expert_ratios_info: { en: "How {name} is calculated", fr: "Comment {name} est calculé" },
+  expert_ratios_formula_label: { en: "Formula", fr: "Formule" },
+  expert_ratios_scale: { en: "The bar is drawn on a scale from 0 to {max}.", fr: "La barre est tracée sur une échelle de 0 à {max}." },
+  expert_ratios_de_hint: { en: "A lower multiple means a smaller share of your assets is financed by debt.", fr: "Un multiple plus faible signifie qu'une part plus petite de vos actifs est financée par la dette." },
+  expert_ratios_de_band_low: { en: "Under 0.5x", fr: "Moins de 0,5x" },
+  expert_ratios_de_band_mid: { en: "0.5x to 1.5x", fr: "0,5x à 1,5x" },
+  expert_ratios_de_band_high: { en: "Over 1.5x", fr: "Plus de 1,5x" },
   // micro-sparklines
   spark_up: { en: "Trending up over the period", fr: "En hausse sur la période" },
   spark_down: { en: "Trending down over the period", fr: "En baisse sur la période" },

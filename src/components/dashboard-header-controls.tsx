@@ -2,6 +2,8 @@
 
 import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { ApprovalsBell } from "@/components/approvals-bell";
+import { NotificationsBell } from "@/components/notifications-bell";
+import type { NotificationItem } from "@/lib/notifications";
 import type { PendingApproval } from "@/lib/shared-assets/server";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
@@ -14,11 +16,14 @@ export function DashboardHeaderControls({
   totalNetWorth,
   baseCurrency,
   pendingApprovals = [],
+  notifications = [],
 }: {
   totalNetWorth: number;
   baseCurrency: string;
   /** Edits to shared assets waiting for the signed-in user (see `approvals-bell.tsx`). */
   pendingApprovals?: PendingApproval[];
+  /** Outcomes of changes the signed-in user proposed (see `notifications-bell.tsx`). */
+  notifications?: NotificationItem[];
 }) {
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
@@ -39,6 +44,7 @@ export function DashboardHeaderControls({
       </div>
       <CurrencySwitcher value={baseCurrency} className="w-32" />
       <ApprovalsBell items={pendingApprovals} />
+      <NotificationsBell items={notifications} />
       <PrivacyToggleButton />
       <LanguageSwitcher />
       <ThemeToggle />

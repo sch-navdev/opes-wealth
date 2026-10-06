@@ -29,6 +29,8 @@ import {
 } from "@/lib/ownership";
 import { sendApprovalEmail, sendSharedWithYouEmail } from "@/lib/shared-assets/notify";
 import { isDemoUser } from "@/lib/demo-mode";
+import { createNotification } from "@/lib/shared-assets/notifications-server";
+import type { NotificationKind } from "@/lib/notifications";
 import type { Json } from "@/types/supabase";
 
 type Service = ReturnType<typeof createServiceClient>;
@@ -91,6 +93,42 @@ async function displayName(service: Service, profileId: string): Promise<string>
   const { data } = await service.from("profiles").select("first_name, last_name").eq("id", profileId).single();
   const name = [data?.first_name, data?.last_name].filter(Boolean).join(" ").trim();
   return name || "A co-owner";
+}
+
+// co-owner notifications
+/**
+ * Tells the requester of a change request how it ended (in-app notification, migration 0034).
+ * Best-effort: never throws, and a missing table is ignored so approvals work before the migration.
+ * Nobody is notified about their own action (`actorId` === requester).
+ */
+async function notifyRequester(
+  service: Service,
+  requestId: string,
+  kind: NotificationKind,
+  actorId?: string,
+): Promise<void> {
+  try {
+    const { data: request } = await service
+      .from("asset_change_requests")
+      .select("asset_id, requested_by")
+      .eq("id", requestId)
+      .single();
+    if (!request || request.requested_by === actorId) return;
+    const { data: asset } = await service.from("assets").select("name").eq("id", request.asset_id).single();
+    await createNotification(service, {
+      profileId: request.requested_by,
+      kind,
+      assetId: request.asset_id,
+      requestId,
+      actorId,
+      data: {
+        assetName: asset?.name ?? undefined,
+        ...(actorId ? { responderId: actorId, responderName: await displayName(service, actorId) } : {}),
+      },
+    });
+  } catch {
+    // never let a notification break the approval flow
+  }
 }
 
 /**
@@ -590,6 +628,7 @@ export async function respondToApproval(opts: {
       .from("asset_change_requests")
       .update({ status: "rejected", resolved_at: new Date().toISOString() })
       .eq("id", opts.requestId);
+    await notifyRequester(service, opts.requestId, "change_rejected", opts.userId);
     return { ok: true, outcome: "rejected" };
   }
 
@@ -602,6 +641,7 @@ export async function respondToApproval(opts: {
 
   const applied = await applyChangeRequest(opts.requestId, { auto: false, service });
   if (!applied.ok) return { ok: false, error: applied.error };
+  await notifyRequester(service, opts.requestId, "change_approved", opts.userId);
   return { ok: true, outcome: "approved" };
 }
 
@@ -617,8 +657,10 @@ export async function expirePendingRequests(): Promise<{ applied: number; failed
   let applied = 0;
   for (const r of due ?? []) {
     const res = await applyChangeRequest(r.id, { auto: true, service });
-    if (res.ok) applied += 1;
-    else failed.push({ id: r.id, error: res.error });
+    if (res.ok) {
+      applied += 1;
+      await notifyRequester(service, r.id, "change_auto_applied");
+    } else failed.push({ id: r.id, error: res.error });
   }
   return { applied, failed };
 }

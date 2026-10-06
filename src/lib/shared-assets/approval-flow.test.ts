@@ -14,7 +14,7 @@
  * What this cannot prove: RLS policies, DB constraints, the profile trigger that links
  * invitations, Supabase Auth sessions, real e-mail delivery, the Vercel cron wiring.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeDb } from "@/test/fake-supabase";
 
 const h = vi.hoisted(() => ({
@@ -41,6 +41,7 @@ import {
   routeAssetEdit,
   type AssetFields,
 } from "@/lib/shared-assets/server";
+import { resetNotificationWarning } from "@/lib/shared-assets/notifications-server";
 import { applyOwnershipFactors, loadOwnershipFactors } from "@/lib/shared-assets/load";
 
 const A = "aaaaaaaa-0000-4000-8000-00000000000a";
@@ -106,6 +107,7 @@ const fields = (over: Partial<AssetFields> = {}): AssetFields => ({
 const asset = () => db.table("assets").find((r) => r.id === ASSET)!;
 const requests = () => db.table("asset_change_requests");
 const approvals = () => db.table("change_approvals");
+const notifs = () => db.table("notifications");
 
 async function propose(userId: string, over: Partial<AssetFields> = {}, notify?: boolean) {
   const res = await routeAssetEdit({ userId, assetId: ASSET, fields: fields(over), owners: null, notify });
@@ -218,14 +220,12 @@ describe("B approves", () => {
     expect(asset().current_value).toBe(1_000_000);
   });
 
-  // KNOWN GAP (not a data bug): the spec/handoff expects the requester to be told the outcome, but
-  // respondToApproval never e-mails (or otherwise notifies) the requester; A only sees it by
-  // looking at the asset. `it.fails` = this documents the missing behaviour and flips to red when added.
-  it.fails("GAP: notifies the requester (A) once B has decided", async () => {
+  // The requester is told the outcome with an in-app notification (migration 0034, see the
+  // "requester notifications" block below), not by e-mail.
+  it("notifies the requester (A) in-app once B has approved", async () => {
     const id = await propose(A);
-    h.sendEmail.mockClear();
     await respondToApproval({ userId: B, requestId: id, approve: true });
-    expect(h.sendEmail.mock.calls.map((c) => c[0].to)).toContain(EMAIL.A);
+    expect(notifs().map((n) => n.profile_id)).toEqual([A]);
   });
 });
 
@@ -249,6 +249,139 @@ describe("B rejects", () => {
     expect(await expirePendingRequests()).toEqual({ applied: 0, failed: [] });
     expect(asset().current_value).toBe(1_000_000);
     await expect(propose(A, { name: "Retry" })).resolves.toBeTruthy();
+  });
+});
+
+describe("requester notifications (in-app, migration 0034)", () => {
+  it("approve: exactly one change_approved row for the REQUESTER, responder and asset in data, none for the responder", async () => {
+    const id = await propose(A);
+    expect(notifs()).toHaveLength(0); // proposing notifies nobody in-app
+    await respondToApproval({ userId: B, requestId: id, approve: true });
+    expect(notifs()).toHaveLength(1);
+    expect(notifs()[0]).toMatchObject({
+      profile_id: A,
+      kind: "change_approved",
+      asset_id: ASSET,
+      request_id: id,
+      read_at: null,
+      data: { assetName: "Marina flat", responderName: "Bob Brown", responderId: B },
+    });
+    expect(notifs().some((n) => n.profile_id === B)).toBe(false);
+  });
+
+  it("reject: exactly one change_rejected row for the requester, none for the responder", async () => {
+    const id = await propose(A);
+    await respondToApproval({ userId: B, requestId: id, approve: false });
+    expect(notifs()).toHaveLength(1);
+    expect(notifs()[0]).toMatchObject({
+      profile_id: A,
+      kind: "change_rejected",
+      asset_id: ASSET,
+      request_id: id,
+      data: { assetName: "Marina flat", responderName: "Bob Brown", responderId: B },
+    });
+  });
+
+  it("works through the server action too (session user = responder)", async () => {
+    const id = await propose(A);
+    h.sessionUser = { id: B };
+    await respondToChangeRequest(id, false);
+    expect(notifs().map((n) => [n.profile_id, n.kind])).toEqual([[A, "change_rejected"]]);
+  });
+
+  it("with three owners: nothing while waiting, one change_approved after the LAST approval", async () => {
+    db.table("asset_owners").length = 0;
+    db.seed("asset_owners", [
+      { asset_id: ASSET, profile_id: A, name: "Alice Adams", email: EMAIL.A, ownership_percentage: 50, is_creator: true },
+      { asset_id: ASSET, profile_id: B, name: "Bob Brown", email: EMAIL.B, ownership_percentage: 25, is_creator: false },
+      { asset_id: ASSET, profile_id: C, name: "Carol Clark", email: "carol@example.com", ownership_percentage: 25, is_creator: false },
+    ]);
+    const id = await propose(A);
+    await respondToApproval({ userId: B, requestId: id, approve: true });
+    expect(notifs()).toHaveLength(0);
+    await respondToApproval({ userId: C, requestId: id, approve: true });
+    expect(notifs()).toHaveLength(1);
+    expect(notifs()[0]).toMatchObject({ profile_id: A, kind: "change_approved", data: { responderName: "Carol Clark" } });
+  });
+
+  it("a refused or replayed answer creates no extra notification", async () => {
+    const id = await propose(A);
+    await respondToApproval({ userId: A, requestId: id, approve: true }); // the requester cannot answer
+    await respondToApproval({ userId: C, requestId: id, approve: false }); // a non-owner cannot
+    expect(notifs()).toHaveLength(0);
+    await respondToApproval({ userId: B, requestId: id, approve: true });
+    await respondToApproval({ userId: B, requestId: id, approve: true }); // replay
+    expect(notifs()).toHaveLength(1);
+  });
+
+  it("never notifies when the recipient is the actor", async () => {
+    const id = await propose(A);
+    requests()[0].requested_by = B; // degenerate: the requester is also the one who decides
+    await respondToApproval({ userId: B, requestId: id, approve: true });
+    expect(notifs()).toHaveLength(0);
+  });
+
+  it("expiry auto-apply: exactly one change_auto_applied row for the requester, no responder", async () => {
+    const id = await propose(A);
+    requests()[0].expires_at = new Date(Date.now() - 60_000).toISOString();
+    await expirePendingRequests();
+    expect(notifs()).toHaveLength(1);
+    expect(notifs()[0]).toMatchObject({ profile_id: A, kind: "change_auto_applied", asset_id: ASSET, request_id: id, data: { assetName: "Marina flat" } });
+    expect(notifs()[0].data).not.toHaveProperty("responderName");
+    await expirePendingRequests(); // idempotent: nothing more
+    expect(notifs()).toHaveLength(1);
+  });
+
+  it("a rejected request is never auto-applied, so no auto_applied notification", async () => {
+    const id = await propose(A);
+    await respondToApproval({ userId: B, requestId: id, approve: false });
+    requests()[0].expires_at = "2000-01-01T00:00:00Z";
+    await expirePendingRequests();
+    expect(notifs().map((n) => n.kind)).toEqual(["change_rejected"]);
+  });
+
+  describe("best effort: approvals keep working without notifications", () => {
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("table missing (migration not applied): approve, reject and expiry still succeed", async () => {
+      db.missingTables.add("notifications");
+      const approve = await propose(A);
+      expect(await respondToApproval({ userId: B, requestId: approve, approve: true })).toEqual({ ok: true, outcome: "approved" });
+      expect(asset().current_value).toBe(1_200_000);
+
+      const reject = await propose(A, { name: "Retry" });
+      expect(await respondToApproval({ userId: B, requestId: reject, approve: false })).toEqual({ ok: true, outcome: "rejected" });
+
+      await propose(A, { name: "Again" });
+      requests()[requests().length - 1].expires_at = new Date(Date.now() - 1000).toISOString();
+      expect(await expirePendingRequests()).toEqual({ applied: 1, failed: [] });
+      expect(notifs()).toHaveLength(0);
+    });
+
+    it("the insert THROWS: the approval is still applied and the call still resolves", async () => {
+      db.throwingTables.add("notifications");
+      const id = await propose(A);
+      await expect(respondToApproval({ userId: B, requestId: id, approve: true })).resolves.toEqual({ ok: true, outcome: "approved" });
+      expect(asset().current_value).toBe(1_200_000);
+      expect(requests()[0]).toMatchObject({ status: "approved" });
+    });
+
+    it("logs the missing table at most once", async () => {
+      resetNotificationWarning();
+      db.missingTables.add("notifications");
+      const warn = vi.spyOn(console, "warn");
+      for (const approve of [true, false]) {
+        const id = await propose(A, { name: approve ? "One" : "Two" });
+        await respondToApproval({ userId: B, requestId: id, approve });
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("0034");
+    });
   });
 });
 

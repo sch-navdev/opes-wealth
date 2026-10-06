@@ -46,6 +46,7 @@ import {
   scaleHistoryRows,
 } from "@/lib/shared-assets/load";
 import { loadPendingApprovals } from "@/lib/shared-assets/server";
+import { loadNotifications } from "@/lib/shared-assets/notifications-server";
 import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
 import { FutureProjectsCard } from "@/components/future-projects-card";
 import { DEMO_MONTHLY_INCOME, isDemoUser } from "@/lib/demo-mode";
@@ -117,6 +118,7 @@ export default async function DashboardPage({
     rates,
     sharedWithMe,
     pendingApprovals,
+    notifications,
     { data: savedDccRow },
     simulationRows,
   ] = await Promise.all([
@@ -138,6 +140,7 @@ export default async function DashboardPage({
       getExchangeRatesFromUsd(),
       loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, new Set()),
       loadPendingApprovals(user.id),
+      loadNotifications(user.id), // [] until migration 0034 is applied
       // Last Client Knowledge Document entries (migration 0026); null until saved or if the table doesn't exist yet.
       supabase.from("client_knowledge_documents").select("data").eq("profile_id", user.id).maybeSingle(),
       // Future Projects: simulations, shown only in their own widget (never in the totals above).
@@ -484,6 +487,7 @@ export default async function DashboardPage({
             totalNetWorth={totalNetWorth}
             baseCurrency={displayCurrency}
             pendingApprovals={pendingApprovals}
+            notifications={notifications}
           />
         </div>
       </header>

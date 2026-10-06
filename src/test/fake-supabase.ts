@@ -30,6 +30,7 @@ const DEFAULTS: Record<string, () => Row> = {
     notified_at: null,
     notify_error: null,
   }),
+  notifications: () => ({ read_at: null, asset_id: null, request_id: null, data: {}, created_at: new Date().toISOString() }),
   asset_owners: () => ({ invited_at: null, invite_status: "not_sent", invite_error: null }),
 };
 
@@ -38,6 +39,10 @@ export type FakeUser = { id: string; email: string; email_confirmed_at?: string 
 export class FakeDb {
   tables: Record<string, Row[]> = {};
   users: FakeUser[] = [];
+  /** Tables that "do not exist" yet: any query on them returns PostgREST PGRST205 (migration not applied). */
+  missingTables = new Set<string>();
+  /** Tables whose queries THROW instead of returning an error (network failure, client bug). */
+  throwingTables = new Set<string>();
 
   table(name: string): Row[] {
     return (this.tables[name] ??= []);
@@ -116,6 +121,10 @@ class Builder implements PromiseLike<Result> {
     this.filters.push((r) => vs.includes(r[col]));
     return this;
   }
+  is(col: string, v: null | boolean) {
+    this.filters.push((r) => (v === null ? r[col] == null : r[col] === v));
+    return this;
+  }
   lt(col: string, v: string) {
     this.filters.push((r) => String(r[col]) < v);
     return this;
@@ -138,6 +147,13 @@ class Builder implements PromiseLike<Result> {
   }
 
   private run(): Result {
+    if (this.db.throwingTables.has(this.name)) throw new Error(`simulated failure on ${this.name}`);
+    if (this.db.missingTables.has(this.name)) {
+      return {
+        data: null,
+        error: { message: `Could not find the table 'public.${this.name}' in the schema cache`, code: "PGRST205" } as { message: string },
+      };
+    }
     const rows = this.db.table(this.name);
     const match = (r: Row) => this.filters.every((f) => f(r));
     let out: Row[];

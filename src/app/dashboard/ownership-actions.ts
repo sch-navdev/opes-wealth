@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { isDemoUser } from "@/lib/demo-mode";
+import { markAllRead, markRead } from "@/lib/shared-assets/notifications-server";
 import { notifyApprovers, resendInvite, respondToApproval, revokeCoOwner } from "@/lib/shared-assets/server";
 
 export type RespondResult =
@@ -84,4 +85,36 @@ export async function revokePendingCoOwner(assetId: string, email: string): Prom
   const res = await revokeCoOwner(assetId, user.id, email);
   if (res.ok) revalidatePath("/dashboard", "layout");
   return res;
+}
+
+// co-owner notifications
+
+export type NotificationActionResult = { ok: true } | { ok: false; error: string };
+
+/** Marks one of the signed-in user's own notifications as read. */
+export async function markNotificationRead(id: string): Promise<NotificationActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+  if (isDemoUser(user.id)) return { ok: true };
+
+  await markRead(createServiceClient(), user.id, id);
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+/** Marks all of the signed-in user's notifications as read. */
+export async function markAllNotificationsRead(): Promise<NotificationActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "You must be signed in." };
+  if (isDemoUser(user.id)) return { ok: true };
+
+  await markAllRead(createServiceClient(), user.id);
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
 }

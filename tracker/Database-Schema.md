@@ -118,6 +118,10 @@ where n.nspname = 'public' and p.proname in ('is_asset_member', 'link_pending_co
 
 `status` (`active` default / `simulation`) separates live assets from Future Projects simulations; all portfolio queries filter on `active`. `plan` (jsonb) holds a simulation's financing inputs. Index `(profile_id, status)`. See [[Future-Projects|Future Projects]].
 
+## Migration 0034 — notifications (written, NOT applied)
+
+`supabase/migrations/0034_notifications.sql` creates `public.notifications` (profile_id, kind in change_approved / change_rejected / change_auto_applied, asset_id, request_id, structured `data` jsonb, read_at) with owner-only SELECT/UPDATE(read_at)/DELETE RLS, no insert policy (service role writes) and the restrictive demo-mode deny policies. **It has not been applied or run**; Steve applies it in the Supabase SQL editor. The app tolerates the missing table meanwhile. See [[Co-Ownership|Co-Ownership]] ("Requester notifications").
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas
