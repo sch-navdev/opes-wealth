@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 14:45 (Gulf Standard Time, UTC+4).** Everything up to `0a212df` is on `origin/master`; the commits listed under "Push status" at the bottom are local only.
+**Last updated: 2026-10-06 14:47 (Gulf Standard Time, UTC+4).** Everything up to `645b317` is pushed to `origin/master`; Vercel started the production build of `645b317` at 14:47 GST (the first deploy with `"regions": ["bom1"]`). See "Push status" at the bottom.
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -44,4 +44,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 14:45 GST, local `master` is **6 commits ahead of `origin/master`, not pushed**: `41b6ba0` (earlier handoff status), `da6c4dc` (Next 16.3.8), `c39b93b` (Vercel bom1), `99482c9` (Porsche investigation note), `f3766b4` (tier setting) and `2a05800` (handoff refresh), plus this correction. `vercel.json` only takes effect after these are pushed and Vercel redeploys. Waiting for Steve to confirm the push.
+At 2026-10-06 14:47 GST: pushed `0a212df..645b317` (7 commits: `41b6ba0`, `da6c4dc` Next 16.3.8, `c39b93b` Vercel bom1, `99482c9` Porsche note, `f3766b4` tier setting, `2a05800`, `645b317` handoff updates) to `origin/master`. Vercel (project `opes-wealth`, production) began building `645b317` at 14:47 GST; the previous production deploy was `0a212df` (READY). The only thing newer than `origin` is this status edit, committed locally and not pushed until Steve confirms. Still to verify after the build is READY: the `x-vercel-id` response header of https://www.opeswealth.app contains `bom1`.
