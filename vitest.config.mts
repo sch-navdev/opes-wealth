@@ -4,7 +4,7 @@ import path from "node:path";
 // Unit tests cover pure logic under src/lib (no DOM, no network, no database).
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname, "src") },
+    alias: { "@": path.resolve(import.meta.dirname, "src") },
   },
   test: {
     environment: "node",

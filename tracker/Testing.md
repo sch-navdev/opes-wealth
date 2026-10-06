@@ -5,7 +5,7 @@
 **Status (2026-10-06):** automated unit tests added for the core pure logic. 35 test files, **1039 tests, all passing** (`npm test`); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
 
 ## Setup
-- **Runner:** Vitest `^3` (not 5.x: Vitest 5 needs `@types/node` 22+, the project is on 20). Config in `vitest.config.ts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`).
+- **Runner:** Vitest `^5` (upgraded from 3 on 2026-10-06 together with `@types/node` `^22.0.0`; Node 24 locally). Config in `vitest.config.mts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`; `.mts` avoids a Vite native-config-loader warning).
 - **Scripts:** `npm test` (single run), `npm run test:watch`.
 - **Convention:** tests are colocated next to the source as `<name>.test.ts`. Only pure logic is tested: no network, no Supabase, no DOM. The one `vi.mock` is `@/lib/services/fx-client` in `fx.test.ts`.
 
