@@ -7,6 +7,7 @@ import {
   buildTierCookie,
   parseExpertiseLevel,
   readTierFromCookieString,
+  resolveTier,
   type ExpertiseLevel,
 } from "@/stores/useUiTierStore";
 
@@ -23,7 +24,7 @@ describe("EXPERTISE_LEVELS", () => {
   });
 
   it("defaults to a level that exists on the ladder", () => {
-    expect(DEFAULT_EXPERTISE_LEVEL).toBe("standard");
+    expect(DEFAULT_EXPERTISE_LEVEL).toBe("basic");
     expect(EXPERTISE_LEVELS).toContain(DEFAULT_EXPERTISE_LEVEL);
   });
 });
@@ -71,5 +72,32 @@ describe("tier cookie helpers", () => {
     expect(readTierFromCookieString("opes-ui-tier=bogus")).toBeUndefined();
     expect(readTierFromCookieString("x=opes-ui-tier=basic")).toBeUndefined();
     expect(readTierFromCookieString("")).toBeUndefined();
+  });
+
+  it("round-trips every tier through build -> read", () => {
+    for (const level of EXPERTISE_LEVELS) {
+      const header = buildTierCookie(level, false).split(";")[0];
+      expect(readTierFromCookieString(`x=1; ${header}`)).toBe(level);
+    }
+  });
+});
+
+describe("resolveTier (rehydrate fallbacks)", () => {
+  it("is strictly basic with no storage and no cookie", () => {
+    expect(resolveTier(undefined, "")).toBe("basic");
+  });
+
+  it("falls back to basic for invalid values in both sources", () => {
+    expect(resolveTier("godmode", "opes-ui-tier=admin")).toBe("basic");
+    expect(resolveTier(42, "opes-ui-tier=")).toBe("basic");
+  });
+
+  it("uses the cookie when storage is empty or invalid (so the cookie is not flipped to the default)", () => {
+    expect(resolveTier(undefined, "opes-ui-tier=expert")).toBe("expert");
+    expect(resolveTier("bogus", "a=1; opes-ui-tier=professional")).toBe("professional");
+  });
+
+  it("prefers a valid stored value over the cookie", () => {
+    expect(resolveTier("standard", "opes-ui-tier=expert")).toBe("standard");
   });
 });

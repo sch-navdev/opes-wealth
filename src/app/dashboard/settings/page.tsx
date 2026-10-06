@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { ProfileForm } from "@/components/profile-form";
+import { UiTierPreference } from "@/components/ui-tier-preference";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -54,6 +55,10 @@ export default async function SettingsPage() {
 
         <div className="mb-6 flex max-w-xs flex-col gap-1.5">
           <LanguageSetting />
+        </div>
+
+        <div className="mb-6">
+          <UiTierPreference />
         </div>
 
         <ProfileForm

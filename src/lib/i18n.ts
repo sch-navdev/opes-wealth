@@ -1718,6 +1718,30 @@ const dictionary = {
   tier_standard: { en: "Standard", fr: "Standard" },
   tier_professional: { en: "Professional", fr: "Professionnel" },
   tier_expert: { en: "Expert", fr: "Expert" },
+  // ui tier preferences
+  prefs_title: { en: "Preferences", fr: "Préférences" },
+  prefs_tier_title: { en: "Dashboard view", fr: "Vue du tableau de bord" },
+  prefs_tier_hint: {
+    en: "Choose how much detail your dashboard shows. You can change this at any time. It is saved on this browser and device only.",
+    fr: "Choisissez le niveau de détail de votre tableau de bord. Vous pouvez le modifier à tout moment. Il est enregistré uniquement sur ce navigateur et cet appareil.",
+  },
+  prefs_tier_basic_desc: {
+    en: "Simplified net worth, allocation chart and top holdings.",
+    fr: "Patrimoine net simplifié, graphique de répartition et principales positions.",
+  },
+  prefs_tier_standard_desc: {
+    en: "Bento dashboard, performance, cash flow, quick-add and CSV import.",
+    fr: "Tableau de bord en tuiles, performance, flux de trésorerie, ajout rapide et import CSV.",
+  },
+  prefs_tier_professional_desc: {
+    en: "Everything in Standard, plus Future Projects and exports.",
+    fr: "Tout Standard, plus Projets futurs et exports.",
+  },
+  prefs_tier_expert_desc: {
+    en: "Everything in Professional, plus raw data, PE valuations, tax and depreciation, and the currency exposure heatmap.",
+    fr: "Tout Professionnel, plus données brutes, valorisations de capital-investissement, fiscalité et amortissement, et carte thermique d'exposition aux devises.",
+  },
+  prefs_tier_saved: { en: "Dashboard view set to {tier}", fr: "Vue du tableau de bord réglée sur {tier}" },
   security_title: { en: "Security", fr: "Sécurité" },
   security_subtitle: {
     en: "See where your account is signed in and sign out any device you don't recognise.",

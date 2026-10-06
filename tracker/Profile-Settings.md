@@ -27,6 +27,15 @@
 - **Demo account:** the seed saves `scripts/demo-client-knowledge.json` into the demo user's row, so the dialog opens with every field filled — both persons' fields (all 33), all 16 income-tax and 8 wealth-tax lines, all 17 objectives with priority and horizon, advisor, relations, extra income and charges. Earlier the fixture's tax entries used labels instead of the dialog's field ids and the objectives were incomplete, so many fields would have stayed blank; both fixed and checked field by field with a script.
 - **Needs migration 0026 applied**, then re-run the seed (it skips this step with a message until then).
 
+## Preferences: dashboard view (UI tier) (2026-10-06)
+
+- **Where:** a **Preferences** card on `/dashboard/settings` (`components/ui-tier-preference.tsx`): an accessible radio group (`role=radiogroup`, arrow/Home/End keys via `lib/ui-tier-options.ts`, visible focus ring) of four cards (Basic / Standard / Professional / Expert), each with a one-line description of what that tier shows. A polite live region announces "Dashboard view set to Expert". Strings are `prefs_*` keys in `lib/i18n.ts`.
+- **Default is Basic.** If neither the `opes-ui-tier` cookie nor localStorage holds a valid tier, the tier is strictly Basic (`DEFAULT_EXPERTISE_LEVEL`).
+- **Sync:** the selector reads `useUiTier()` (server cookie until the store hydrates, then the store). Choosing calls `setExpertiseLevel`, which updates the Zustand store (sidebar select and dashboard follow instantly) and writes the `opes-ui-tier` cookie so the server render honors it on the next reload. A client-written cookie is used on purpose (non-sensitive UI preference, not access control; no round trip). On rehydrate, `resolveTier` picks a valid localStorage value, else the cookie, else the default, so a settings page opened with a cookie but empty localStorage shows the cookie's tier and the cookie is never overwritten with the default.
+- **Caveat:** cookie and localStorage are per browser and device; the preference is not synced across devices (no profile column).
+- **Verified (dev preview, 2026-10-06):** with no cookie and no saved value the server renders Basic; in the selector, choosing Expert updated the radio, localStorage, the cookie and the live message, and ArrowLeft moved to Professional and synced the same way; at 375 px the cards are one column with no overflow. The real `/dashboard/settings` page needs a real Supabase session (it has no mock-auth path), so it was checked by rendering the component on a temporary route, which was deleted. Not checked: the page itself behind a real login.
+- See [[Design-System|Design System]] (Progressive UI tiers).
+
 ## Related
 - [[Database-Schema|Database Schema]] — extended `profiles` columns (`0003_profile_extended_fields.sql`)
 - [[Authentication-Security|Authentication & Security]] — MFA management link, AAL2 guard
