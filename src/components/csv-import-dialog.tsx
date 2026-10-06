@@ -100,7 +100,7 @@ export function CsvImportDialog({
                 onSuccess={setImportedCount}
               />
             ) : (
-              <CsvDropzone onParsed={setFile} />
+              <CsvDropzone onParsed={setFile} currency={currency} />
             )}
           </CardContent>
         </Card>

@@ -24,6 +24,7 @@ export type ImportTransactionsResult =
 export async function importBankTransactions(
   assetId: string,
   transactions: ImportTransaction[],
+  source: "csv_import" | "pdf_import" = "csv_import",
 ): Promise<ImportTransactionsResult> {
   const supabase = await createClient();
   const {
@@ -51,7 +52,7 @@ export async function importBankTransactions(
     amount: t.amount,
     currency: t.currency,
     description: t.description,
-    source: "csv_import",
+    source: source === "pdf_import" ? "pdf_import" : "csv_import",
   }));
 
   let inserted = 0;

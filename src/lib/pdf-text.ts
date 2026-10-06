@@ -6,7 +6,12 @@
  * Blue Book valuations) goes through here.
  */
 export async function pdfToText(data: ArrayBuffer): Promise<string> {
+  return (await pdfToTextWithPages(data)).text;
+}
+
+/** Same extraction, also returning the page count (the bank-statement importer uses it to tell a scanned PDF from a text one). */
+export async function pdfToTextWithPages(data: ArrayBuffer): Promise<{ text: string; numPages: number }> {
   const pdfParse = (await import("pdf-parse")).default;
   const result = await pdfParse(new Uint8Array(data) as unknown as Buffer);
-  return result.text;
+  return { text: result.text, numPages: result.numpages };
 }

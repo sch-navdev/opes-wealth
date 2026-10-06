@@ -33,6 +33,7 @@ import {
 import { useLanguage } from "@/context/language-context";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { importBankTransactions } from "@/app/dashboard/transaction-import-actions";
+import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
 import { rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import {
   BANK_PROFILES,
@@ -45,10 +46,14 @@ import {
   type StatementGroup,
   type StatementParseResult,
 } from "@/lib/banking/csv-profiles";
+import { statementToParseResult } from "@/lib/parsers/bank-pdf/bridge";
+import { PDF_FAILURE_MESSAGE_KEYS, type PdfFailureCode, type PdfStatement } from "@/lib/parsers/bank-pdf";
+import { TransactionDetailsSheet } from "@/components/transaction-details-sheet";
+import { detailFromFingerprint, detailFromNormalized, type TransactionDetail } from "@/lib/transaction-detail";
 import { computeRunningBalance, type ParsedBankCsvRow, type ParsedTransactionRow } from "@/lib/bank-csv";
 
 const NONE = "__none__";
-const PREVIEW_ROWS = 4;
+const PREVIEW_ROWS = 8;
 
 export type StatementTargetAccount = RoutableAccount & { nativeValue: number };
 
@@ -93,8 +98,13 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   const [detection, setDetection] = useState<"none" | "ambiguous" | "found" | null>(null);
   const [parsed, setParsed] = useState<StatementParseResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  /** Set when the file was a PDF: the parsed statement (with each account's reconciliation). */
+  const [pdfStatement, setPdfStatement] = useState<PdfStatement | null>(null);
   const [groupState, setGroupState] = useState<GroupState[]>([]);
   const [results, setResults] = useState<{ label: string; ok: boolean; text: string }[] | null>(null);
+  /** The preview row open in the details drawer (index into that group's newest-first list). */
+  const [sheet, setSheet] = useState<{ group: number; index: number } | null>(null);
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,8 +115,11 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     setDetection(null);
     setParsed(null);
     setParseError(null);
+    setPdfStatement(null);
     setGroupState([]);
     setResults(null);
+    setSheet(null);
+    setExpanded({});
   }
 
   function applyProfile(content: string, id: BankProfileId) {
@@ -128,9 +141,40 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     );
   }
 
+  async function handlePdfFile(file: File) {
+    setFileName(file.name);
+    setText("");
+    const form = new FormData();
+    form.append("file", file);
+    const result = await readBankStatementPdf(form);
+    if (!result.ok) {
+      const code = result.failure.code;
+      setParseError(t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable"));
+      return;
+    }
+    const statement = result.statement;
+    const parsedPdf = statementToParseResult(statement);
+    const id = parsedPdf.profile.id;
+    setPdfStatement(statement);
+    setProfileId(id);
+    setDetection("found");
+    setParseError(null);
+    setParsed(parsedPdf);
+    setGroupState(
+      parsedPdf.groups.map((g) => {
+        const route = routeGroup(g, id, accounts);
+        return { target: route.kind === "matched" ? route.assetId : NONE, remember: true };
+      }),
+    );
+  }
+
   async function handleFile(file: File | undefined) {
     if (!file) return;
     reset();
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+      await handlePdfFile(file);
+      return;
+    }
     const content = await file.text();
     setText(content);
     setFileName(file.name);
@@ -173,6 +217,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         const tx = await importBankTransactions(
           account.id,
           group.rows.map((r) => ({ date: r.date, amount: r.amount, description: r.description })),
+          pdfStatement ? "pdf_import" : "csv_import",
         );
         out.push({
           label,
@@ -193,6 +238,19 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   }
 
   const profile = profileId ? getBankProfile(profileId) : undefined;
+
+  /** One group's rows, newest first, as drawer view-models. PDF imports carry the full parsed metadata (rows map 1:1 to the statement's transactions); CSV rows only have date / description / amount / balance. */
+  function sheetRows(group: StatementGroup, groupIndex: number): TransactionDetail[] {
+    const pdfTxs = pdfStatement?.accounts[groupIndex]?.transactions;
+    return group.rows
+      .map((r, j) => {
+        const full = pdfTxs?.[j];
+        return full
+          ? detailFromFingerprint(full, { bankName: profile?.name })
+          : detailFromNormalized(r, { currency: group.currency, bankName: profile?.name, accountRef: group.accountRef });
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
   const importable = groupState.some((g) => g.target !== NONE);
 
   return (
@@ -215,7 +273,9 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
           <DialogDescription className="text-muted-foreground">{t("stmt_desc")}</DialogDescription>
         </DialogHeader>
 
-        <p className="border border-border bg-muted/30 p-2 text-xs text-muted-foreground">{t("stmt_unverified_note")}</p>
+        <p className="border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
+          {pdfStatement ? t("bank_pdf_import_note") : t("stmt_unverified_note")}
+        </p>
 
         {results ? (
           <div className="space-y-3">
@@ -236,14 +296,14 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
               <input
                 ref={inputRef}
                 type="file"
-                accept=".csv,text/csv,text/plain"
+                accept=".csv,text/csv,text/plain,.pdf,application/pdf"
                 className="hidden"
                 onChange={(e) => handleFile(e.target.files?.[0])}
               />
               <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
                 {fileName || t("stmt_choose_file")}
               </Button>
-              {text !== null && (
+              {text !== null && !pdfStatement && (
                 <div className="flex items-center gap-2">
                   <Label className="text-xs text-muted-foreground">{t("stmt_bank")}</Label>
                   <Select
@@ -285,8 +345,10 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
             {parsed &&
               parsed.groups.map((group, i) => {
                 const state = groupState[i] ?? { target: NONE, remember: true };
-                const rows = [...group.rows].sort((a, b) => b.date.localeCompare(a.date));
+                const rows = sheetRows(group, i);
+                const visibleRows = expanded[i] ? rows : rows.slice(0, PREVIEW_ROWS);
                 const fmt = new Intl.NumberFormat(intlLocale, { style: "currency", currency: group.currency });
+                const reconciliation = pdfStatement?.accounts[i]?.reconciliation;
                 return (
                   <div key={i} className="space-y-2 border border-border p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -317,6 +379,19 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                         </Select>
                       </div>
                     </div>
+                    {reconciliation && (
+                      <p
+                        className={
+                          reconciliation.status === "mismatch" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
+                        }
+                      >
+                        {reconciliation.status === "ok"
+                          ? t("bank_pdf_verified")
+                          : reconciliation.status === "mismatch"
+                            ? t("bank_pdf_mismatch")
+                            : t("bank_pdf_unverified")}
+                      </p>
+                    )}
                     {state.target !== NONE && (
                       <label className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Checkbox
@@ -339,9 +414,20 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {rows.slice(0, PREVIEW_ROWS).map((r, k) => (
-                            <TableRow key={k}>
-                              <TableCell className="tabular-nums text-foreground">{r.date}</TableCell>
+                          {visibleRows.map((r, k) => (
+                            <TableRow key={k} className="cursor-pointer" onClick={() => setSheet({ group: i, index: k })}>
+                              <TableCell className="tabular-nums text-foreground">
+                                <button
+                                  type="button"
+                                  className="underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSheet({ group: i, index: k });
+                                  }}
+                                >
+                                  {r.date}
+                                </button>
+                              </TableCell>
                               <TableCell className="max-w-56 truncate text-muted-foreground">{r.description || "—"}</TableCell>
                               <TableCell className={r.amount < 0 ? "text-end tabular-nums text-destructive" : "text-end tabular-nums text-foreground"}>
                                 {fmt.format(r.amount)}
@@ -355,9 +441,14 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                       </Table>
                     </div>
                     {rows.length > PREVIEW_ROWS && (
-                      <p className="text-xs text-muted-foreground">
-                        {t("csv_parsed_preview_more", { n: rows.length - PREVIEW_ROWS })}
-                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setExpanded((prev) => ({ ...prev, [i]: !prev[i] }))}
+                      >
+                        {expanded[i] ? t("txd_show_less") : t("txd_view_all", { n: rows.length })}
+                      </Button>
                     )}
                   </div>
                 );
@@ -378,6 +469,13 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
               </div>
             )}
           </div>
+        )}
+        {parsed && sheet && parsed.groups[sheet.group] && (
+          <TransactionDetailsSheet
+            transactions={sheetRows(parsed.groups[sheet.group], sheet.group)}
+            index={sheet.index}
+            onIndexChange={(next) => setSheet(next === null ? null : { group: sheet.group, index: next })}
+          />
         )}
       </DialogContent>
     </Dialog>

@@ -1,0 +1,107 @@
+
+
+Société anonyme coopérative de Banque Populaire à capital variable régie par les articles L 512-2 et suivants du Code monétaire et financier et l'ensemble des textes relatifs aux Banques Populaires et
+aux Etablissements de Crédit, dont le siège social est à EXEMPLEVILLE, 1, Rue de l'Exemple, immatriculée au RCS de EXEMPLEVILLE, sous le n° 000 000 000. Société de courtage et Intermédiaire en assurances
+inscrite auprès de l'ORIAS n° 00 000 000. Tél. : 00 00 00 00 00 (n° non surtaxé) - Pour toutes réclamations et oppositions sur moyens de paiement - Tél. : 00 00 00 00 01 (n° non surtaxé). Succursale
+luxembourgeoise - 1 Rue de l'Exemple L-0000 Exemple - B000000 RCS Luxembourg.
+JE CONSERVE
+CE DOCUMENT
+20260102*000000*EXTCL02*P000000*00000000*00000001/00000003*00000000*0*
+0011 0001
+1 RUE DE L'EXEMPLE
+00000 EXEMPLEVILLE
+FRANCE
+                                M OU MME EXEMPLE
+ Votre Agence :
+E-AGENCE EXEMPLE
+1 RUE DE L'EXEMPLE
+00000 EXEMPLEVILLE
+Votre Conseillère :
+PRENOM NOM
+conseiller@example.invalid
+Tél : 00 00 00 00 00
+3     Page 1/
+Votre relevé de compte n°12 au 02/01/2026
+MESSAGE DE VOTRE BANQUE
+MESSAGE D'INFORMATION SYNTHETIQUE.
+DETAIL DES OPERATIONS DE VOTRE COMPTE CHEQUES N° 00000000000
+M OU MME EXEMPLEIBAN : FR76 0000 0000 0000 0000 0000 000
+BIC : EXEMPLEXXXX
+DATE
+COMPTA
+DATE
+OPERATION
+DATE
+VALEUR
+LIBELLE / REFERENCEMONTANT
+SOLDE CREDITEUR AU 10/12/2025 1 234,50 €
+12/12VIREMENT SEPA12/1212/12 1 000,00 €
+SALAIRE EXEMPLE SA
+15/12PRLV SEPA ASSURANCE EXEMPLE0AB12CD15/1215/12- 45,30 €
+12345678/X000000001 13122025
+X000000001
+17/12COTIS DUO PREMIUM002248516/1216/12- 24,35 €
+F
+XCCNV087 2025121600022485000001
+CONTRAT CNV0000000000
+30/12FRAIS COM INTERVENTION005503928/1129/12- 8,00 €
+F
+XCEBR400 2025122900055039000001
+28/11*VOTRE RELEVE CB*1234,56
+31/12CB           FACTURETTES CB31/1231/12- 21,44 €
+SOLDE CREDITEUR AU 31/12/2025 2 135,41 €
+02/01VIREMENT SEPA02/0102/01 150,00 €
+REMBOURSEMENT EXEMPLE
+02/01PRLV SEPA SANTE EXEMPLE0E43QLG02/0102/01- 165,27 €
+123456789 MONSIEUR EXEMPLE OU
+0E7AF365468E422D8E974DD1AD1AE9B6
+
+Société anonyme coopérative de Banque Populaire à capital variable régie par les articles L 512-2 et suivants du Code monétaire et financier et l'ensemble des textes relatifs aux Banques Populaires et
+aux Etablissements de Crédit, dont le siège social est à EXEMPLEVILLE, 1, Rue de l'Exemple, immatriculée au RCS de EXEMPLEVILLE, sous le n° 000 000 000. Société de courtage et Intermédiaire en assurances
+inscrite auprès de l'ORIAS n° 00 000 000. Tél. : 00 00 00 00 00 (n° non surtaxé) - Pour toutes réclamations et oppositions sur moyens de paiement - Tél. : 00 00 00 00 01 (n° non surtaxé). Succursale
+luxembourgeoise - 1 Rue de l'Exemple L-0000 Exemple - B000000 RCS Luxembourg.
+3     Page 2/
+VOTRE COMPTE CHEQUES N° 00000000000RELEVE N° 12 AU 02/01/2026
+DATE
+COMPTA
+DATE
+OPERATION
+DATE
+VALEUR
+LIBELLE / REFERENCEMONTANT
+TOTAL DES MOUVEMENTS DEBITEURS- 264,36 €
+TOTAL DES MOUVEMENTS CREDITEURS 1 150,00 €
+SOLDE CREDITEUR AU 02/01/2026* 2 120,14 €
+RECAPITULATIF DES FRAIS ET SERVICES BANCAIRES
+17/12COTIS DUO PREMIUM002248516/1216/12- 24,35 €
+F
+30/12FRAIS COM INTERVENTION005503928/1129/12- 8,00 €
+F
+TOTAL DU 11/12/2025 AU 31/12/2025- 32,35 €
+(*) Sous réserve des opérations en cours d'enregistrement et d'une provision suffisante et disponible lors de l'arrêté du solde du compte réalisé en fin de journée.
+DETAIL DE VOS MOUVEMENTS SEPA
+VOTRE COMPTE CHEQUES N° 00000000000RELEVE N° 12 AU 02/01/2026
+DEBIT
+DATEDETAIL DE VOS PRELEVEMENTS SEPA RECUS
+ASSURANCE EXEMPLE SA              FR76ZZZ000000          45,30 €
+15/12
+X000000001      100000001
+12345678/X000000001 13122025
+SANTE EXEMPLE                      FR85ZZZ000000         165,27 €
+02/01
+0E7AF365468E422D8E974DD1AD1AE9B6      000000 0000000 SANTE
+123456789 MONSIEUR EXEMPLE OU M
+VOTRE COMPTE CHEQUES N° 00000000000RELEVE N° 12 AU 02/01/2026
+CREDIT
+DATEDETAIL DE VOS VIREMENTS SEPA  RECUS
+EXEMPLE SA         1 000,00 €
+12/12
+ZZ1JJY2DMGG5HDMUW      SALAIRE 20251101
+SALAIRE 20251101
+EXEMPLE REMB         150,00 €
+02/01
+ZZ1JJY2DMGG5HDMUX      REMBOURSEMENT
+
+INFORMATIONS COMPLEMENTAIRES
+Autorisation de découvert permanent* :
+500 Euros, au taux débiteur de 18,500% l'an.

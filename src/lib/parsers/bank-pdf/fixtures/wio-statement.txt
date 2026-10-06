@@ -1,0 +1,222 @@
+
+
+Summary of Accounts
+ACCOUNT IBANINTEREST RATEACCOUNT OPENEDCLOSING BALANCE
+AE0000000000001234567890%27/11/2023
+800 AED
+AE0000000000009876543210%27/11/2023
+125.5 USD
+Summary of Savings
+ACCOUNT NAMEACCOUNT NUMBERINTEREST RATEACCOUNT OPENEDACCOUNT CLOSURECLOSING BALANCE
+Rainy Day00000000013.25%29/11/2023
+1,005.25 AED
+Pocket00000000020%24/11/2025
+0 AED
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 116
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE
+ACCOUNT STATEMENT
+   FROM01/02/2026TO26/02/2026
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE
+
+DateRef. NumberDescription
+Amount
+(Incl. VAT)
+Balance
+()AED
+02/02/2026P100000001From Acme Payroll Services1,498.341,998.34
+05/02/2026P100000002To Jane Sample (rate: 1.0000)-1,000998.34
+09/02/2026P100000003Savings Pot to Jane Example6,4007,398.34
+09/02/2026P100000004Jane Example to Joint account-6,500898.34
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 26
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+ACCOUNT HOLDER NAME
+JANE 
+EXAMPLE
+CURRENCY
+AED
+INTEREST RATE
+0%
+ACCOUNT TYPE
+CURRENT_ACCOUNT
+ACCOUNT NAME
+Jane Example
+ACCOUNT NUMBER
+0000000001
+ACCOUNT OPENED
+27/11/2023
+IBAN
+AE000000000000123456789
+OPENING BALANCE
+500
+CLOSING BALANCE
+800
+ACCOUNT STATEMENT
+   FROM01/02/2026TO26/02/2026
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE
+
+DateRef. NumberDescription
+Amount
+(Incl. VAT)
+Balance
+()AED
+12/02/2026P100000005Fixed Space to Jane Example101,491.4102,389.74
+12/02/2026P100000006To Gadget Mart (rate: 1.0000)-101,491.4898.34
+20/02/2026P100000007Swift International Transaction Fee-98.34800
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 36
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+
+DateRef. NumberDescription
+Amount
+(Incl. VAT)
+Balance
+()USD
+02/02/2026P200000001Dividend Example ETF25.5325.5
+03/02/2026P200000002Buy Example ETF-200125.5
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 46
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+ACCOUNT HOLDER NAME
+JANE 
+EXAMPLE
+CURRENCY
+USD
+INTEREST RATE
+0%
+ACCOUNT TYPE
+CURRENT_ACCOUNT
+ACCOUNT NAME
+Jane Example
+ACCOUNT NUMBER
+0000000002
+ACCOUNT OPENED
+27/11/2023
+IBAN
+AE000000000000987654321
+OPENING BALANCE
+300
+CLOSING BALANCE
+125.5
+ACCOUNT STATEMENT
+   FROM01/02/2026TO26/02/2026
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE
+
+DateRef. NumberDescription
+Amount
+(Incl. VAT)
+Balance
+()AED
+01/02/2026P300000001Interest credit5.251,005.25
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 56
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+ACCOUNT HOLDER NAME
+JANE 
+EXAMPLE
+CURRENCY
+AED
+INTEREST RATE
+3.25%
+ACCOUNT TYPE
+REGULAR_SAVINGS
+ACCOUNT NAME
+Rainy Day
+ACCOUNT NUMBER
+0000000003
+ACCOUNT OPENED
+29/11/2023
+OPENING BALANCE
+1,000
+CLOSING BALANCE
+1,005.25
+ACCOUNT STATEMENT
+   FROM01/02/2026TO26/02/2026
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE
+
+DateRef. NumberDescription
+Amount
+(Incl. VAT)
+Balance
+()AED
+Please review this account statement and report any discrepancies
+within 30 days. If no issues are reported, the statement will be considered
+correct (subject to the Bank's right to correct errors). For assistance or
+to raise a complaint, contact Wio Bank customer service at .600 500 946
+This bank is regulated by CBUAE.
+Page  of 66
+يرجى مراجعة كشف الحساب هذا والإبلاغ عن أي تناقضات خلال 30 يومًا.
+هذا البنك خاضع لتنظيم مصرف الإمارات العربية المتحدة المركزي
+ACCOUNT HOLDER NAME
+JANE 
+EXAMPLE
+CURRENCY
+AED
+INTEREST RATE
+0%
+ACCOUNT TYPE
+POCKET
+ACCOUNT NAME
+Pocket
+ACCOUNT NUMBER
+0000000004
+ACCOUNT OPENED
+24/11/2025
+OPENING BALANCE
+0
+CLOSING BALANCE
+0
+ACCOUNT STATEMENT
+   FROM01/02/2026TO26/02/2026
+JANE EXAMPLE
+1 Example Street
+Dubai
+000000
+ARE

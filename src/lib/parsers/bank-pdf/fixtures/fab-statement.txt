@@ -1,0 +1,104 @@
+
+
+DATEVALUE DATEDESCRIPTIONDEBITCREDITBALANCE
+30
+Important: The bank must be notified of any objections to the above-mentioned transactions and balances within 30 days from the date of issuing the account statement. In absence of any notification, the data shown in account statement shall be deemed correct.
+*T&Cs Apply. Interest (if any)displayed is the Bank's current prevailing rate.
+
+ACCOUNT STATEMENT
+ 600   52   5500||6316|
+First  Abu  Dhabi  Bank  PJSC    |    PO  Box  6316  Abu  Dhabi    |    United  Arab  Emirates    |    Contact  Centre  600  52  5500
+We shall endeavor to get back to you in 5 working days depending upon the nature of complaint.
+JANE EXAMPLE
+PO Box 000000 Villa 00
+Example District
+Dubai,ARE
+000000
+AC-NUM                                    000-000-0000000-00-0
+CurrencyAED
+IBAN   AE-00-000-000-000-0000000-00-0
+Old Account Number   0000000000
+Account Statement FROM 01 JUL 2026 TO 31 JUL 2026
+Sheet no.1
+Total Debit Txns    :6
+Total Credit Txns   :3
+Tot. Debit Amnt.     :14,000.00
+Tot. Credit Amnt.   :10,500.00
+Debit Interest.   :0.00
+Closing Book Balance                                        6,500.00
+Opening balance                                                          10,000.00
+01 JUL 2026     01 JUL 2026UADDS Cr Trf                                                    250.00                                   9,750.00
+                           501PY-000000000000000000000EXMPL
+
+5000000000000001
+02 JUL 2026     02 JUL 2026Inward IPP Payment  Inward Instant Paymen                                         1,500.00              11,250.00
+
+t,IPP Ref: INSTX0aa11111f00,Remitter Info
+                           : ACME EXAMPLE TRADING LLC,Sender
+                           : 000,Value Date: 02-07-2026,Trf Ccy: AED
+                           ,Trf Amt: 1500.00,Pay Dtls: Consulting Fe
+                           es,POP: GDS,Ord Inst:
+
+000
+03 JUL 2026     03 JUL 2026
+Transfer                                                      4,000.00                                     7,250.00
+05 JUL 2026     05 JUL 2026
+IPP Charges  Instant Payment,FAB Ref: I00                         0.49                                   7,249.51
+                           0A0A0000000000000000000000AA,BeneIBAN:
+                           AE000000000000000000000,Pay Dtls: WidgInv
+
+oice 1001
+05 JUL 2026     05 JUL 2026IPP Transfer  Instant Payment,FAB Ref: I9                     5,000.00                                   2,249.51
+Balance carried forward                                                        2,249.51
+
+
+
+DATEVALUE DATEDESCRIPTIONDEBITCREDITBALANCE
+30
+Important: The bank must be notified of any objections to the above-mentioned transactions and balances within 30 days from the date of issuing the account statement. In absence of any notification, the data shown in account statement shall be deemed correct.
+*T&Cs Apply. Interest (if any)displayed is the Bank's current prevailing rate.
+
+ACCOUNT STATEMENT
+ 600   52   5500||6316|
+First  Abu  Dhabi  Bank  PJSC    |    PO  Box  6316  Abu  Dhabi    |    United  Arab  Emirates    |    Contact  Centre  600  52  5500
+We shall endeavor to get back to you in 5 working days depending upon the nature of complaint.
+JANE EXAMPLE
+PO Box 000000 Villa 00
+Example District
+Dubai,ARE
+000000
+AC-NUM                                    000-000-0000000-00-0
+CurrencyAED
+IBAN   AE-00-000-000-000-0000000-00-0
+Old Account Number   0000000000
+Account Statement FROM 01 JUL 2026 TO 31 JUL 2026
+Sheet no.2
+Balance brought forward                                                   2,249.51
+                           B0B0000000000000000000000BB,BeneIBAN:
+                           AE000000000000000000001,Pay Dtls: Rent Ju
+
+ly 2026
+10 JUL 2026     10 JUL 2026Inward IPP Payment  Inward Instant Paymen                                         3,000.00               5,249.51
+                           t,IPP Ref: INSTY1bb22222f00,Remitter Info
+                           : JOHN SAMPLE,Sender: 111,Value Date: 10-0
+                           7-2026,Trf Ccy: AED,Trf Amt: 3000.00,Pay
+
+Dtls: Own Account Transfer,POP: OAT,Ord I
+                           nst: 111
+12 JUL 2026     12 JUL 2026Transfer                                                      1,249.51                                     4,000.00
+15 JUL 2026     15 JUL 2026
+Transfer                                                      3,500.00                                       500.00
+20 JUL 2026     20 JUL 2026
+Inward IPP Payment  Inward Instant Paymen                                         6,000.00               6,500.00
+                           t,IPP Ref: INSTZ2cc33333f00,Remitter Info
+
+: JANE EXAMPLE,Sender: 222,Value Date: 20-
+                           07-2026,Trf Ccy: AED,Trf Amt: 6000.00,Pay
+                           Dtls: Own Account Transfer,POP: OAT,Ord I
+                           nst: 222
+Closing Statement Balance                                                      6,500.00
+
+
+*** END OF STATEMENT ***
+*** **************** ***
+
