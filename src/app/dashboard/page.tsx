@@ -19,6 +19,12 @@ import {
 import { DashboardBento, type BentoTile } from "@/components/dashboard-bento";
 import { DashboardAnalytics } from "@/components/dashboard-analytics";
 import { PortfolioGroups } from "@/components/portfolio-groups";
+import { DashboardBasicOverview } from "@/components/dashboard-basic-overview";
+import { DashboardCsvCard } from "@/components/dashboard-csv-card";
+import { DashboardExpertPanels } from "@/components/dashboard-expert-panels";
+import { TierGate } from "@/components/tier-gate";
+import { buildAllocation, topAssets } from "@/lib/dashboard-tiers";
+import { buildExpertPanelsData } from "@/lib/dashboard-expert";
 import { T } from "@/components/translated-text";
 import {
   DEFAULT_BASE_CURRENCY,
@@ -426,6 +432,26 @@ export default async function DashboardPage({
     .filter((_, i, all) => i % sparkStep === 0 || i === all.length - 1)
     .map((p) => ({ date: p.date, value: p.total ?? 0 }));
 
+  // UI tiers (see lib/dashboard-tiers.ts): the page always loads everything once;
+  // <TierGate> decides client-side what the active tier shows. Basic view data:
+  // gross holdings by category for the pie, net contributions for the top list.
+  const basicAllocation = buildAllocation(breakdowns.assets);
+  const basicTopAssets = topAssets(breakdowns.netWorth, 5);
+  const expertData = buildExpertPanelsData(assets ?? [], displayCurrency, rates, today);
+
+  const addDialogs = (
+    <>
+      <AddInvestmentsDialog />
+      <AddLiabilityDialog />
+      <AddAssetDialog
+        categories={categories ?? []}
+        companies={(assets ?? [])
+          .filter((a) => a.asset_categories?.name === "Companies")
+          .map((a) => ({ id: a.id, name: a.name }))}
+      />
+    </>
+  );
+
   return (
     <>
       <header className="flex flex-col gap-4 border-b border-border px-4 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -453,49 +479,91 @@ export default async function DashboardPage({
       </header>
 
       <main className="w-full space-y-6 px-4 py-10 sm:px-6 lg:px-8">
-        <DashboardBento
-          netWorth={totalNetWorth}
-          baseCurrency={displayCurrency}
-          tiles={bentoTiles}
-          spark={bentoSpark}
-        />
+        <TierGate section="basicOverview">
+          <DashboardBasicOverview
+            netWorth={totalNetWorth}
+            baseCurrency={displayCurrency}
+            allocation={basicAllocation}
+            top={basicTopAssets}
+            addAction={
+              <AddAssetDialog
+                categories={categories ?? []}
+                companies={(assets ?? [])
+                  .filter((a) => a.asset_categories?.name === "Companies")
+                  .map((a) => ({ id: a.id, name: a.name }))}
+              />
+            }
+          />
+        </TierGate>
 
-        <DashboardMetricCards
-          netWorth={totalNetWorth}
-          assets={totalAssetsValue}
-          liabilities={totalLiabilitiesValue}
-          hasLiabilities={totalLiabilitiesValue > 0}
-          unrealizedGain={Math.abs(totalUnrealizedGain)}
-          unrealizedGainSign={
-            totalUnrealizedGain > 0 ? "+" : totalUnrealizedGain < 0 ? "-" : null
-          }
-          baseCurrency={displayCurrency}
-          breakdowns={breakdowns}
-        />
+        <TierGate section="bento">
+          <DashboardBento
+            netWorth={totalNetWorth}
+            baseCurrency={displayCurrency}
+            tiles={bentoTiles}
+            spark={bentoSpark}
+          />
+        </TierGate>
 
-        <PassiveIncomeCard summary={passiveIncome} baseCurrency={displayCurrency} />
+        <TierGate section="quickAdd">
+          <div className="flex flex-wrap items-center gap-2">{addDialogs}</div>
+        </TierGate>
 
-        <CashBankCard
-          accounts={cashAccounts}
-          baseCurrency={displayCurrency}
-          bankSyncMode={getBankSyncMode()}
-        />
+        <TierGate section="metricCards">
+          <DashboardMetricCards
+            netWorth={totalNetWorth}
+            assets={totalAssetsValue}
+            liabilities={totalLiabilitiesValue}
+            hasLiabilities={totalLiabilitiesValue > 0}
+            unrealizedGain={Math.abs(totalUnrealizedGain)}
+            unrealizedGainSign={
+              totalUnrealizedGain > 0 ? "+" : totalUnrealizedGain < 0 ? "-" : null
+            }
+            baseCurrency={displayCurrency}
+            breakdowns={breakdowns}
+          />
+        </TierGate>
 
-        <FutureProjectsCard
-          baseCurrency={displayCurrency}
-          projects={simulationRows.map((row) => toProjectInput(row, displayCurrency, rates))}
-          {...summariseHoldings(assets ?? [], displayCurrency, rates)}
-          defaultMonthlyIncome={isDemoUser(user.id) ? DEMO_MONTHLY_INCOME : undefined}
-        />
+        <TierGate section="cashFlow">
+          <PassiveIncomeCard summary={passiveIncome} baseCurrency={displayCurrency} />
 
-        <DashboardAnalytics
-          series={performanceSeries}
-          assets={assetLines}
-          currency={displayCurrency}
-          today={today}
-        />
+          <CashBankCard
+            accounts={cashAccounts}
+            baseCurrency={displayCurrency}
+            bankSyncMode={getBankSyncMode()}
+          />
+        </TierGate>
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <TierGate section="csvUpload">
+          <DashboardCsvCard
+            accounts={cashAccounts.map(({ id, name, currency, nativeValue }) => ({
+              id,
+              name,
+              currency,
+              nativeValue,
+            }))}
+          />
+        </TierGate>
+
+        <TierGate section="futureProjects">
+          <FutureProjectsCard
+            baseCurrency={displayCurrency}
+            projects={simulationRows.map((row) => toProjectInput(row, displayCurrency, rates))}
+            {...summariseHoldings(assets ?? [], displayCurrency, rates)}
+            defaultMonthlyIncome={isDemoUser(user.id) ? DEMO_MONTHLY_INCOME : undefined}
+          />
+        </TierGate>
+
+        <TierGate section="analytics">
+          <DashboardAnalytics
+            series={performanceSeries}
+            assets={assetLines}
+            currency={displayCurrency}
+            today={today}
+          />
+        </TierGate>
+
+        <TierGate section="portfolio">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               <T k="portfolio_heading" />
@@ -504,43 +572,39 @@ export default async function DashboardPage({
               <T k="portfolio_subtitle" />
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <AddInvestmentsDialog />
-            <AddLiabilityDialog />
-            <AddAssetDialog
-              categories={categories ?? []}
-              companies={(assets ?? [])
-                .filter((a) => a.asset_categories?.name === "Companies")
-                .map((a) => ({ id: a.id, name: a.name }))}
-            />
-          </div>
-        </div>
 
-        <PortfolioGroups
-          assets={assets ?? []}
-          categories={categories ?? []}
-          displayCurrency={displayCurrency}
-          rates={rates}
-          performanceByAsset={performanceByAsset}
-          sharedAssetIds={[...factorById].filter(([, f]) => f !== 1).map(([id]) => id)}
-        />
+          <PortfolioGroups
+            assets={assets ?? []}
+            categories={categories ?? []}
+            displayCurrency={displayCurrency}
+            rates={rates}
+            performanceByAsset={performanceByAsset}
+            sharedAssetIds={[...factorById].filter(([, f]) => f !== 1).map(([id]) => id)}
+          />
+        </TierGate>
 
-        <ExportReportsCard
-          savedDcc={savedDccRow?.data ?? null}
-          baseCurrency={displayCurrency}
-          portfolio={buildDccPortfolio(assets ?? [], displayCurrency, rates, today)}
-          profile={{
-            firstName: profile?.first_name ?? "",
-            lastName: profile?.last_name ?? "",
-            phone: profile?.phone_number ?? "",
-            address: profile?.address_street ?? "",
-            postalCity: [profile?.address_postal_code, profile?.address_city]
-              .filter(Boolean)
-              .join(" - "),
-            country: profile?.address_country ?? "",
-            email: user.email ?? "",
-          }}
-        />
+        <TierGate section="expertPanels">
+          <DashboardExpertPanels data={expertData} baseCurrency={displayCurrency} />
+        </TierGate>
+
+        <TierGate section="export">
+          <ExportReportsCard
+            savedDcc={savedDccRow?.data ?? null}
+            baseCurrency={displayCurrency}
+            portfolio={buildDccPortfolio(assets ?? [], displayCurrency, rates, today)}
+            profile={{
+              firstName: profile?.first_name ?? "",
+              lastName: profile?.last_name ?? "",
+              phone: profile?.phone_number ?? "",
+              address: profile?.address_street ?? "",
+              postalCity: [profile?.address_postal_code, profile?.address_city]
+                .filter(Boolean)
+                .join(" - "),
+              country: profile?.address_country ?? "",
+              email: user.email ?? "",
+            }}
+          />
+        </TierGate>
       </main>
     </>
   );

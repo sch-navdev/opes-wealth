@@ -73,6 +73,7 @@ Steve wanted the app to match Finary's premium, data-dense feel — the app was 
 - **Nav mapping** (`components/app-sidebar.tsx`, `minTier` per link; a higher tier keeps everything a lower one shows): Dashboard, Settings, Security → basic; Banking → standard; Companies → professional; Planning → expert. A tier selector sits above Sign out (rail + drawer); labels are `tier_*` keys in `lib/i18n.ts` (EN/FR).
 - **Not access control:** routes stay reachable by URL; passkey logic, AAL2 guards and Supabase schemas were not touched — see [[Authentication-Security|Authentication & Security]].
 - **21st.dev:** MCP search found "Animated Sidebar", but it needs `motion` plus two helper files the MCP did not return, and the CLI install needs `API_KEY_21ST` (unset). The existing responsive sidebar (full `lg+`, rail `md`, drawer below) was kept instead.
+- **Dashboard body by tier (2026-10-06):** the tier now also drives what the dashboard page renders (basic / standard+professional bento / expert panels) and the tile entrance animation: see [[Portfolio-Dashboard|Portfolio Dashboard]].
 - **Cleanup:** removed unused `components/ui/slider.tsx`. A scan found no other orphaned components and no unused locals/imports (`tsc --noUnusedLocals`).
 - **Not verified:** `eslint` and a full `tsc` can't run here (`node_modules` is missing `zod/v4/index.cjs` and `lucide-react` types); no browser check of the tier selector.
 
