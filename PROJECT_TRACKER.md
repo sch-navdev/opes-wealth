@@ -120,25 +120,14 @@ opes-wealth/
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
 │   └── migrations/
-│       ├── 0001_initial_schema.sql
-│       ├── 0002_user_profile_trigger.sql
-│       ├── 0003_profile_extended_fields.sql
-│       ├── 0004_real_estate_and_currency.sql
-│       ├── 0005_asset_image.sql
-│       └── 0006_asset_images_loans_history.sql
+│       └── 0001 … 0032_*.sql    # 32 migrations, all applied to the live project (verified 2026-10-06); see Database-Schema
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 ├── PROJECT_TRACKER.md           # hub note — start here (this file)
-└── tracker/                     # one note per module, linked from this hub
-    ├── Design-System.md
-    ├── Authentication-Security.md
-    ├── Database-Schema.md
-    ├── Portfolio-Dashboard.md
-    ├── Profile-Settings.md
-    ├── Real-Estate-Multi-Currency.md
-    ├── CSV-Bank-Uploads.md
-    ├── Live-Pricing.md
-    ├── Deployment.md
-    ├── Codebase-Audits.md
-    └── Changelog.md
+└── tracker/                     # one note per module (19), linked from the Modules table above
+    ├── Architecture.md, Design-System.md, Authentication-Security.md, Database-Schema.md
+    ├── Portfolio-Dashboard.md, Profile-Settings.md, Real-Estate-Multi-Currency.md
+    ├── CSV-Bank-Uploads.md, Broker-Trade-Import.md, Live-Pricing.md, Market-Data-Integration.md
+    ├── Co-Ownership.md, Future-Projects.md, Demo-Mode.md, Privacy-Mode.md, Localization.md
+    └── Deployment.md, Codebase-Audits.md, Changelog.md
 ```

@@ -1,6 +1,6 @@
 # Overnight Report — Progressive UI Tiers (2026-10-04)
 
-Branch: `feature/ui-tiers` (local, not pushed)
+Branch: `feature/ui-tiers` (pushed to origin and merged into `master`; checks re-run clean on 2026-10-06: `tsc`, `eslint`, `next build`. The tier selector itself still has no browser check.)
 
 ## Added
 - `src/stores/useUiTierStore.ts` — Zustand store with `user_expertise_level` (`basic | standard | professional | expert`, default `standard`), `setExpertiseLevel`, `tierRank`. Persisted to localStorage (`opes-ui-tier`) with `skipHydration`.
