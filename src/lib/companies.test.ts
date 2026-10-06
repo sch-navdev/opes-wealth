@@ -179,7 +179,7 @@ describe("buildHoldingStructure", () => {
   // BUG (companies.ts:142-153): two entities that name each other as holding company
   // (a data-entry cycle) become each other's only parent, so neither is a root,
   // personal or untracked: both silently disappear from the structure.
-  it.fails("every company still appears somewhere even if two entities hold each other", () => {
+  it("every company still appears somewhere even if two entities hold each other", () => {
     const s = buildHoldingStructure([
       co("x", { held_via: "holding", holding_company_id: "y" }),
       co("y", { held_via: "holding", holding_company_id: "x" }),

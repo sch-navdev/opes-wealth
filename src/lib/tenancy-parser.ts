@@ -8,6 +8,11 @@ export type ParsedTenancyContract = {
   tenancy_contract_value: number | null;
 };
 
+function isRealDate(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
 /** Normalizes the varied date formats seen on Ejari/Tawtheeq PDFs (`DD/MM/YYYY`, `DD-MM-YYYY`, `DD Month YYYY`) to `YYYY-MM-DD`. Returns `null` if it can't confidently parse. */
 function normalizeDate(raw: string): string | null {
   const trimmed = raw.trim();
@@ -17,7 +22,7 @@ function normalizeDate(raw: string): string | null {
     const [, d, m, y] = numeric;
     const day = d.padStart(2, "0");
     const month = m.padStart(2, "0");
-    if (Number(month) > 12) return null;
+    if (!isRealDate(Number(y), Number(month), Number(day))) return null;
     return `${y}-${month}-${day}`;
   }
 

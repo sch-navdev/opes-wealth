@@ -75,7 +75,7 @@ describe("parseEjariContract", () => {
 
   // tenancy-parser.ts:12-22 — normalizeDate only range-checks the month, so a
   // day like 45 (or 31 February) is emitted as a bogus ISO date instead of null.
-  it.fails("rejects impossible days instead of emitting an invalid ISO date", () => {
+  it("rejects impossible days instead of emitting an invalid ISO date", () => {
     expect(parseEjariContract("Start Date\n45-11-2025\n").tenancy_start_date).toBeNull();
   });
 });

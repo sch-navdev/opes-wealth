@@ -187,7 +187,7 @@ describe("generateAmortizationSchedule", () => {
   // BUG (amortization.ts addMonths, line ~45): setUTCMonth overflows on short
   // months, so a loan starting on the 31st gets its first installment on 3 March
   // instead of the last day of February.
-  it.fails("a loan starting on the 31st has its first installment on the last day of the next short month", () => {
+  it("a loan starting on the 31st has its first installment on the last day of the next short month", () => {
     const s = generateAmortizationSchedule(loan({ start_date: "2025-01-31", duration_months: 2, amount: 2000, interest_rate: 0 }));
     expect(s[0].date).toBe("2025-02-28");
   });

@@ -383,9 +383,8 @@ describe("estimateDepreciatedValue (value curve)", () => {
     expect(estimateDepreciatedValue(collectible, "2024-01-01", "2026-01-01") as number).toBeGreaterThan(115_000);
   });
 
-  // vehicle-depreciation.ts:99-100 (depreciatedValue): a rate below -100% makes the base negative and
-  // Math.pow(negative, fractional) is NaN, which Math.max(0, NaN) lets through. Correct: clamp to 0.
-  it.fails("never goes below zero, even with a rate beyond -100%", () => {
+  // depreciatedValue clamps the growth base at 0, so a rate below -100% gives 0 (not NaN).
+  it("never goes below zero, even with a rate beyond -100%", () => {
     const wreck = meta({ purchase_price: 100_000, depreciation_manual: true, depreciation_first_year: -150, depreciation_annual: -150 });
     const v = estimateDepreciatedValue(wreck, "2020-01-01", "2025-01-01") as number;
     expect(Number.isFinite(v)).toBe(true);

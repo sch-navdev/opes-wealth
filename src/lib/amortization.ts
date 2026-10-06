@@ -44,7 +44,10 @@ export function getRateForMonth(loan: LinkedLoan, monthNumber: number): number {
 
 function addMonths(isoDate: string, months: number): string {
   const d = new Date(isoDate + "T00:00:00Z");
+  const day = d.getUTCDate();
   d.setUTCMonth(d.getUTCMonth() + months);
+  // Month-end overflow (31 Jan + 1 month) rolls into the next month: clamp back.
+  if (d.getUTCDate() !== day) d.setUTCDate(0);
   return d.toISOString().slice(0, 10);
 }
 

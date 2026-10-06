@@ -66,7 +66,7 @@ function parseDate(raw: string, format: GenericCsvDateFormat): string | null {
 
   if (format === "YYYY-MM-DD") {
     const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return match ? value : null;
+    return match && isRealDate(Number(match[1]), Number(match[2]), Number(match[3])) ? value : null;
   }
 
   const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -74,7 +74,13 @@ function parseDate(raw: string, format: GenericCsvDateFormat): string | null {
   const [, first, second, yearStr] = match;
   const month = format === "MM/DD/YYYY" ? first : second;
   const day = format === "MM/DD/YYYY" ? second : first;
+  if (!isRealDate(Number(yearStr), Number(month), Number(day))) return null;
   return `${yearStr}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function isRealDate(year: number, month: number, day: number): boolean {
+  if (month < 1 || month > 12 || day < 1) return false;
+  return day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 function parseSide(raw: string): TradeSide | null {

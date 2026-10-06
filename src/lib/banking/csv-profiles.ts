@@ -623,8 +623,19 @@ export function parseStatement(text: string, profileId: BankProfileId): Statemen
   const errors: StatementParseResult["errors"] = [];
   let skipped = 0;
 
+  // parseCsvTable drops fully-blank lines, so map each table row back to its physical line.
+  // Only reliable when no quoted field spans lines (row count equals non-blank line count).
+  const physicalLines: number[] = [];
+  text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .forEach((l, n) => {
+      if (l !== "") physicalLines.push(n + 1);
+    });
+  const hasLineMap = physicalLines.length === table.length;
+
   table.slice(headerIndex + 1).forEach((cells, i) => {
-    const line = headerIndex + 2 + i;
+    const line = hasLineMap ? physicalLines[headerIndex + 1 + i] : headerIndex + 2 + i;
     const rawDate = (cells[col.date] ?? "").trim();
     if (rawDate === "") {
       skipped += 1;

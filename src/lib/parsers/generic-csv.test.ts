@@ -119,18 +119,18 @@ describe("parseGenericCsvTrades", () => {
   // The bank-csv parser rejects impossible calendar dates ("2026-02-30",
   // "31/04/2026"); the generic trade parser only checks the shape, so a
   // nonsense date flows into the trade history.
-  it.fails("rejects impossible calendar dates like 2026-02-30", () => {
+  it("rejects impossible calendar dates like 2026-02-30", () => {
     const { trades, errors } = parseGenericCsvTrades([row({ Date: "2026-02-30" })], mapping());
     expect(trades).toEqual([]);
     expect(errors).toHaveLength(1);
   });
 
-  it.fails("rejects impossible calendar dates like 31/04/2026 (DD/MM/YYYY)", () => {
+  it("rejects impossible calendar dates like 31/04/2026 (DD/MM/YYYY)", () => {
     const { trades } = parseGenericCsvTrades([row({ Date: "31/04/2026" })], mapping("DD/MM/YYYY"));
     expect(trades).toEqual([]);
   });
 
-  it.fails("rejects a month of 13", () => {
+  it("rejects a month of 13", () => {
     const { trades } = parseGenericCsvTrades([row({ Date: "01/13/2026" })], mapping("DD/MM/YYYY"));
     expect(trades).toEqual([]);
   });

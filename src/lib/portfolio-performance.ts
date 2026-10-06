@@ -360,8 +360,8 @@ export function buildProjectedLines(
 export function rangeStartDate(range: ChartRange, today: string): string | null {
   if (range === "all") return null;
   const d = new Date(`${today}T00:00:00Z`);
-  if (range === "1M") d.setUTCMonth(d.getUTCMonth() - 1);
-  else if (range === "6M") d.setUTCMonth(d.getUTCMonth() - 6);
+  if (range === "1M") return addMonthsIso(today, -1);
+  else if (range === "6M") return addMonthsIso(today, -6);
   else if (range === "1Y") d.setUTCFullYear(d.getUTCFullYear() - 1);
   else d.setUTCFullYear(d.getUTCFullYear() - 5);
   return d.toISOString().slice(0, 10);

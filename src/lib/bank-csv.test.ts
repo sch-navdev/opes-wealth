@@ -126,9 +126,18 @@ describe("parseBankCsvRows (running balance)", () => {
 
   // KNOWN LIMITATION: parseAmount strips every non [0-9.] character, so a
   // European "1.234,56" is read as 1.23456 instead of 1234.56 (or rejected).
-  it.fails("reads European decimal commas correctly", () => {
+  it("reads European decimal commas correctly", () => {
     const { validRows } = parseBankCsvRows([{ Date: "2026-01-01", Balance: "1.234,56" }], balanceMapping("YYYY-MM-DD"));
     expect(validRows[0]?.value).toBe(1234.56);
+  });
+
+  it("reads US, short-comma-decimal and ambiguous 3-digit amounts", () => {
+    const v = (s: string) => parseBankCsvRows([{ Date: "2026-01-01", Balance: s }], balanceMapping("YYYY-MM-DD")).validRows[0]?.value;
+    expect(v("1,234.56")).toBe(1234.56);
+    expect(v("12,5")).toBe(12.5);
+    expect(v("1.234.567,89")).toBe(1234567.89);
+    expect(v("1,234")).toBe(1234);
+    expect(v("(1.234,56)")).toBe(-1234.56);
   });
 });
 

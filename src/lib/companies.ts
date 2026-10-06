@@ -139,10 +139,23 @@ export function buildHoldingStructure(
   const personal: CompanyNode[] = [];
   const untracked = new Map<string, CompanyNode[]>();
 
+  // child id -> parent id for edges attached so far; used to detect (and break) holding cycles.
+  const attachedTo = new Map<string, string>();
+  // Attaching `node` under `parent` would close a loop if `node` is already an ancestor of `parent`.
+  const closesCycle = (node: CompanyNode, parent: CompanyNode): boolean => {
+    for (let cur: string | undefined = parent.id; cur !== undefined; cur = attachedTo.get(cur)) {
+      if (cur === node.id) return true;
+    }
+    return false;
+  };
+
   for (const node of nodes.values()) {
     const md = node.metadata;
     const parent = md.held_via === "holding" ? nodes.get(md.holding_company_id) : undefined;
-    if (parent && parent.id !== node.id) {
+    // A cycle (x<->y, or longer) would make every member a child and drop them all from the
+    // structure; the back-edge is ignored so the member that closes the loop is shown top-level.
+    if (parent && !closesCycle(node, parent)) {
+      attachedTo.set(node.id, parent.id);
       parent.children.push(node);
     } else if (md.held_via === "holding" && md.holding_name.trim()) {
       const key = md.holding_name.trim();

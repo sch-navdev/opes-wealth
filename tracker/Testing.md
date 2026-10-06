@@ -2,7 +2,7 @@
 
 # Testing
 
-**Status (2026-10-06):** automated unit tests added for the core pure logic. 35 test files, **1039 tests, all passing** (`npm test`); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
+**Status (2026-10-06):** automated unit tests for the core pure logic. 35 test files, **1042 tests, all passing, no `it.fails` left** (`npm test`); `tsc --noEmit`, `eslint .` and `npm run build` clean alongside.
 
 ## Setup
 - **Runner:** Vitest `^5` (upgraded from 3 on 2026-10-06 together with `@types/node` `^22.0.0`; Node 24 locally). Config in `vitest.config.mts` (node environment, `@` alias to `src`, includes `src/**/*.test.ts`; `.mts` avoids a Vite native-config-loader warning).

@@ -132,7 +132,7 @@ describe("parseSharesightWorkbook (CSV)", () => {
   // scan in findHeaderRow can never see the real header (its cells are
   // collapsed onto the blank intro-line keys). The module docs promise intro
   // lines are tolerated; only the xlsx path honours that.
-  it.fails("finds the header row below an intro line (CSV)", () => {
+  it("finds the header row below an intro line (CSV)", () => {
     const csv = ["Sharesight All Trades Report,,,,,,,,", HEADER, "NASDAQ,AAPL,2026-01-15,1,2,Buy,0,USD,Apple"].join("\n");
     const { trades, errors } = parseSharesightWorkbook(csvBuffer(csv), "t.csv");
     expect(errors).toEqual([]);

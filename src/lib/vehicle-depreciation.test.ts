@@ -49,10 +49,10 @@ describe("depreciationGroup", () => {
     expect(depreciationGroup("Lexus", "LX 600")).toBe("luxury_suv");
   });
 
-  // BUG (vehicle-depreciation.ts:42): EV_MODEL's `i[3-8x]\d?` also matches the
-  // Hyundai i30 / i40, which are petrol/diesel cars, so they get the EV curve.
-  it.fails("does not treat a Hyundai i30 (petrol hatchback) as electric", () => {
+  it("does not treat a Hyundai i30 / i40 (petrol/diesel) as electric", () => {
     expect(depreciationGroup("Hyundai", "i30")).toBe("general");
+    expect(depreciationGroup("Hyundai", "i40")).toBe("general");
+    expect(depreciationGroup("Hyundai", "Kona Electric")).toBe("electric");
   });
 });
 
@@ -193,6 +193,11 @@ describe("depreciatedValue", () => {
   it("positive rates appreciate (collectibles)", () => {
     expect(depreciatedValue(100000, { first: 10, annual: 5 }, 1, false)).toBe(110000);
     expect(depreciatedValue(100000, { first: 10, annual: 5 }, 2, false)).toBe(115500);
+  });
+
+  it("a rate below -100% never yields NaN and floors at zero", () => {
+    expect(depreciatedValue(100000, { first: -150, annual: -12.5 }, 0.5, false)).toBe(0);
+    expect(depreciatedValue(100000, { first: -10, annual: -150 }, 2.5, false)).toBe(0);
   });
 
   it("a -100% rate floors at zero and stays there", () => {

@@ -18,7 +18,7 @@
  * a blank row, so it doesn't run into Bookings' header/data as bogus trades.
  */
 import * as XLSX from "xlsx";
-import { parseCsv } from "@/lib/csv-parser";
+import { parseCsvTable } from "@/lib/csv-parser";
 import type {
   BrokerParseResult,
   ParsedIncome,
@@ -434,11 +434,11 @@ export function parseSaxoWorkbook(buffer: ArrayBuffer, fileName: string): Broker
 
   if (isCsv) {
     const text = new TextDecoder("utf-8").decode(buffer);
-    const { headers, rows: csvRows } = parseCsv(text);
-    if (headers.length === 0) {
+    // Raw table so an intro/title line above the real header row is tolerated.
+    const rows: RawRow[] = parseCsvTable(text).map((r) => r.map((c) => c.trim()));
+    if (rows.length === 0) {
       return { trades: [], errors: [{ rowIndex: 0, message: "This file has no data rows." }] };
     }
-    const rows: RawRow[] = [headers, ...csvRows.map((row) => headers.map((h) => row[h]))];
     const headerRow = findHeaderRowIndex(rows);
     if (headerRow === -1) {
       return {

@@ -88,7 +88,7 @@ High-net-worth individuals
 - [x] Future Projects: simulation status, planning page, bankability engine, dashboard widget — type-checked, built; migration 0031 applied (verified live 2026-10-06: `assets.status`/`plan` present) — [[Future-Projects|Future Projects]]
 - [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — migration 0032 applied (verified live 2026-10-06: 39 restrictive policies); a `seed-demo.mts --yes` re-run is still a manual step — [[Demo-Mode|Demo Mode]]
 ### Quality
-- [x] Automated unit tests for core logic: Vitest, 35 files / 1039 tests passing, 13 known source issues recorded as `it.fails` — [[Testing|Testing]]
+- [x] Automated unit tests for core logic: Vitest, 35 files / 1039 tests passing, 13 former `it.fails` bugs fixed (1042 tests) — [[Testing|Testing]]
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
@@ -105,7 +105,7 @@ High-net-worth individuals
 - [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
 - [[Deployment|Deployment]] — Step 10, pre-deployment hardening done (clean lint/typecheck/build); actual Vercel deployment still pending
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
-- [[Testing|Testing]] — Vitest unit tests for core pure logic (35 files, 1039 tests) and the 13 known issues they document
+- [[Testing|Testing]] — Vitest unit tests for core pure logic (35 files, 1039 tests) and the record of the 13 bugs they found and that were fixed
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Localization|Localization]] — English/French toggle (partial coverage)

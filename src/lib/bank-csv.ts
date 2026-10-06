@@ -106,7 +106,26 @@ function parseAmount(raw: string): number | null {
     value = value.slice(1);
   }
 
-  value = value.replace(/[^0-9.]/g, "");
+  // Normalize European formats (`1.234,56`, `12,5`) to `.`-decimal. A lone
+  // comma/dot followed by exactly 3 digits stays ambiguous: keep the US reading.
+  value = value.replace(/[^0-9.,]/g, "");
+  const lastComma = value.lastIndexOf(",");
+  const lastDot = value.lastIndexOf(".");
+  if (lastComma !== -1 && lastDot !== -1) {
+    // Both present: the last separator is the decimal one.
+    if (lastComma > lastDot) {
+      value = value.replace(/\./g, "").replace(",", ".");
+    } else {
+      value = value.replace(/,/g, "");
+    }
+  } else if (lastComma !== -1) {
+    const digitsAfter = value.length - lastComma - 1;
+    const commaCount = value.split(",").length - 1;
+    value =
+      commaCount === 1 && (digitsAfter === 1 || digitsAfter === 2)
+        ? value.replace(",", ".")
+        : value.replace(/,/g, "");
+  }
   if (value === "") return null;
 
   const num = Number(value);

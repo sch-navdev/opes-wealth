@@ -117,6 +117,13 @@ describe("parseSaxoWorkbook (CSV)", () => {
     expect(errors).toEqual([]);
   });
 
+  it("finds the header row below an intro line (CSV)", () => {
+    const csv = ["Saxo Trades Report,,,,,,", HEADER, "2026-01-15,Bought,1,10,ABC:xlon,Acme,USD"].join("\n");
+    const { trades, errors } = parseSaxoWorkbook(csvBuffer(csv), "x.csv");
+    expect(errors).toEqual([]);
+    expect(trades).toHaveLength(1);
+  });
+
   it("flags a missing required column", () => {
     const csv = ["Trade execution date,Trade Event Type,Traded Quantity,Instrument Symbol,Instrument", "2026-01-15,Bought,1,A:x,A"].join("\n");
     const { trades, errors } = parseSaxoWorkbook(csvBuffer(csv), "x.csv");

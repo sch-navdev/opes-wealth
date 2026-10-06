@@ -367,12 +367,12 @@ describe("rangeStartDate", () => {
   // portfolio-performance.ts:363 — setUTCMonth(-1) on 31 March yields "31 Feb" which JS
   // rolls forward to 3 March, so the 1M window is shorter than a month. The clamped
   // 28 Feb is the correct start (addMonthsIso in the same file already clamps).
-  it.fails("clamps to the end of a shorter month for 1M (31 Mar -> 28 Feb)", () => {
+  it("clamps to the end of a shorter month for 1M (31 Mar -> 28 Feb)", () => {
     expect(rangeStartDate("1M", "2025-03-31")).toBe("2025-02-28");
   });
 
   // portfolio-performance.ts:364 — same overflow bug for 6M (31 Aug -> "31 Feb" -> 3 Mar).
-  it.fails("clamps to the end of a shorter month for 6M (31 Aug -> 28 Feb)", () => {
+  it("clamps to the end of a shorter month for 6M (31 Aug -> 28 Feb)", () => {
     expect(rangeStartDate("6M", "2025-08-31")).toBe("2025-02-28");
   });
 });

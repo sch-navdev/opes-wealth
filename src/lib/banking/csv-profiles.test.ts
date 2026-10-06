@@ -185,7 +185,7 @@ describe("parseStatement", () => {
   // csv-profiles.ts:626-627 — the line number is derived from the index in the
   // table AFTER parseCsvTable has dropped blank lines, so a blank line anywhere
   // above a bad row makes the reported line number too small.
-  it.fails("reports physical file line numbers even when blank lines precede the bad row", () => {
+  it("reports physical file line numbers even when blank lines precede the bad row", () => {
     const csv = [
       "Transaction Date,Description,Debit,Credit",
       "05/01/2026,Coffee,10,",

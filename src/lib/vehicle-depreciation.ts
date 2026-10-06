@@ -39,7 +39,7 @@ export const DEPRECIATION_DEFAULTS: Record<DepreciationGroup, DepreciationRates>
 const norm = (s: string) => s.trim().toLowerCase();
 
 const EV_MAKES = ["tesla", "byd", "rivian", "lucid", "polestar", "nio", "xpeng", "zeekr"];
-const EV_MODEL = /\b(ev\d?|electric|e-?tron|ioniq|taycan|eq[a-z]|id\.?\s?\d|i[3-8x]\d?|ix\d?)\b/i;
+const EV_MODEL = /\b(ev\d?|electric|e-?tron|ioniq|taycan|eq[a-z]|id\.?\s?\d|i[3-8]|ix\d?)\b/i;
 const LUXURY_SUV_MODEL = /(patrol|land\s?cruiser|prado|\blx\s?\d*)/i;
 const JAPANESE = ["toyota", "nissan", "honda", "mazda", "lexus", "mitsubishi", "suzuki", "subaru", "infiniti"];
 const EUROPEAN_LUXURY = ["bmw", "mercedes", "mercedes-benz", "audi", "land rover", "range rover", "jaguar", "bentley", "maserati", "rolls-royce"];
@@ -96,6 +96,10 @@ export function depreciatedValue(
 ): number {
   const first = secondHand ? rates.annual : rates.first;
   const y = Math.max(0, years);
-  const value = price * Math.pow(1 + first / 100, Math.min(y, 1)) * Math.pow(1 + rates.annual / 100, Math.max(y - 1, 0));
+  // Clamp the growth factors at 0 so a rate below -100% can't yield NaN (negative base ** fractional exponent).
+  const value =
+    price *
+    Math.pow(Math.max(0, 1 + first / 100), Math.min(y, 1)) *
+    Math.pow(Math.max(0, 1 + rates.annual / 100), Math.max(y - 1, 0));
   return Math.max(0, Math.round(value * 100) / 100);
 }
