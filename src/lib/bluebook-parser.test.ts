@@ -132,3 +132,48 @@ describe("parseBlueBookText", () => {
     });
   });
 });
+
+describe("parseBlueBookText skip labels are whole-word labels, not substrings", () => {
+  it("keeps 'Reference value: AED 85,000'", () => {
+    const r = parseBlueBookText("Reference value: AED 85,000", TODAY);
+    expect(r.value).toBe(85000);
+    expect(r.currency).toBe("AED");
+  });
+
+  it("keeps 'Preferred retail value 90 000 EUR'", () => {
+    const r = parseBlueBookText("Preferred retail value 90 000 EUR", TODAY);
+    expect(r.value).toBe(90000);
+    expect(r.currency).toBe("EUR");
+  });
+
+  it("does not treat Hotel / Provincial / Television as skip labels", () => {
+    expect(parseBlueBookText("Hotel Provincial market value AED 60,000", TODAY).value).toBe(60000);
+    expect(parseBlueBookText("Television Provincial price 45 000 AED", TODAY).value).toBe(45000);
+    expect(parseBlueBookText("Advised estimate value: 31,500 USD", TODAY).value).toBe(31500);
+  });
+
+  it("still skips reference numbers, VINs and phone numbers", () => {
+    expect(parseBlueBookText("Ref: 2025/123456", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Ref. no 1234567", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Reference number: 99887766", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("VIN WBA1234567890", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Tel: 04 123 4567", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Telephone +971 4 123 4567\nFax 04 765 4321", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Plate no 123456", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Invoice no 4455667", TODAY).candidates).toEqual([]);
+    expect(parseBlueBookText("Engine 2000 cc 123456", TODAY).candidates).toEqual([]);
+  });
+
+  it("does not use a skipped label line as the look-ahead value", () => {
+    expect(parseBlueBookText("Estimated Value\nVIN 12345678901", TODAY).candidates).toEqual([]);
+  });
+
+  it("on a mixed line keeps the valuation and blanks only the identifier", () => {
+    expect(parseBlueBookText("Estimated value AED 80,000 (ref 12345)", TODAY).value).toBe(80000);
+    expect(parseBlueBookText("Estimated value AED 80,000 (ref 12345)", TODAY).candidates.map((c) => c.value)).toEqual([80000]);
+    expect(parseBlueBookText("Estimated value AED 80,000 Ref: 2025/123456", TODAY).candidates.map((c) => c.value)).toEqual([80000]);
+    expect(parseBlueBookText("Ref no 123456 Estimated value AED 80,000", TODAY).candidates.map((c) => c.value)).toEqual([80000]);
+    expect(parseBlueBookText("Retail value AED 70,000 VIN WBA1234567890", TODAY).candidates.map((c) => c.value)).toEqual([70000]);
+    expect(parseBlueBookText("Market value AED 66,000 mileage 85,000 km", TODAY).candidates.map((c) => c.value)).toEqual([66000]);
+  });
+});

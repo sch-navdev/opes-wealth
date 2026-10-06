@@ -17,6 +17,7 @@
  */
 import * as XLSX from "xlsx";
 import { parseCsvTable } from "@/lib/csv-parser";
+import { parseCellDateUtc } from "./dates";
 import type { BrokerParseResult, ParsedTrade, ParsedTradeRowError, TradeSide } from "./types";
 
 type RawCell = string | number | Date | undefined | null;
@@ -101,17 +102,8 @@ function buildColumnIndex(headerRow: RawRow): Partial<Record<ColumnKey, number>>
   return index;
 }
 
-function parseCellDate(raw: RawCell): string | null {
-  if (raw instanceof Date) {
-    if (Number.isNaN(raw.getTime())) return null;
-    return raw.toISOString().slice(0, 10);
-  }
-  if (typeof raw === "string" && raw.trim()) {
-    const parsed = new Date(raw.trim());
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-  }
-  return null;
-}
+/** Calendar date independent of the machine timezone — see `dates.ts`. */
+const parseCellDate = (raw: RawCell): string | null => parseCellDateUtc(raw);
 
 function parseSide(raw: RawCell): TradeSide | null {
   const text = String(raw ?? "").trim().toLowerCase();
@@ -198,7 +190,12 @@ function mapRows(rows: RawRow[], startRow: number): BrokerParseResult {
     // Sharesight's Brokerage column is a real per-trade fee figure — unlike
     // Saxo, which has no such column, so `ParsedTrade.brokerage` stays
     // `undefined` there and is only ever UI-defaulted.
-    const brokerageRaw = columns.brokerage !== undefined ? Number(row[columns.brokerage]) : NaN;
+    // A blank/whitespace/null cell is "unknown" (undefined), never 0 —
+    // `Number("")` is 0 — while a genuine 0 / "0.00" stays 0.
+    const brokerageCell = columns.brokerage !== undefined ? row[columns.brokerage] : undefined;
+    const brokerageBlank =
+      brokerageCell === undefined || brokerageCell === null || (typeof brokerageCell === "string" && brokerageCell.trim() === "");
+    const brokerageRaw = brokerageBlank ? NaN : Number(typeof brokerageCell === "string" ? brokerageCell.trim() : brokerageCell);
     const brokerage = Number.isFinite(brokerageRaw) ? Math.abs(brokerageRaw) : undefined;
 
     trades.push({

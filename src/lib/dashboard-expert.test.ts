@@ -5,6 +5,7 @@ import {
   type ExpertAssetInput,
   type ExpertTaxRow,
 } from "@/lib/dashboard-expert";
+import { applyOwnershipFactors } from "@/lib/shared-assets/load";
 
 const rates = { USD: 1, AED: 4 };
 const TODAY = "2026-10-06";
@@ -197,5 +198,142 @@ describe("summarizeTaxDepreciation", () => {
   it("handles no rows", () => {
     const s = summarizeTaxDepreciation([], { depreciationView: true, applyTax: true, ratePercent: 20 });
     expect(s).toMatchObject({ totalCost: 0, totalValue: 0, taxableGain: 0, estimatedTax: 0 });
+  });
+});
+
+/**
+ * Co-ownership. The assets handed to `buildExpertPanelsData` are ALREADY the
+ * viewer's pro-rata share (`scaleAssetForOwner`, applied by
+ * `shared-assets/load.ts` before the page builds the panels), so the builder
+ * must NOT scale again. These tests pin that contract: feeding the scaled copy
+ * of an asset yields exactly the owned fraction of every money figure and
+ * identical ratios — which would break if the builder applied a second
+ * ownership factor (it would give a quarter, not a half).
+ */
+describe("co-ownership: panels fed pro-rata (already scaled) assets", () => {
+  const F = 0.5;
+
+  const fund = asset({
+    id: "pe",
+    category: "Private Equity",
+    currency: "AED",
+    current_value: 800,
+    metadata: {
+      commitment_amount: 2000,
+      capital_calls: [
+        { id: "1", due_date: "2024-03-31", amount: 400, percentage: 20, status: "paid" },
+        { id: "2", due_date: "2027-03-31", amount: 400, percentage: 20, status: "pending" },
+      ],
+      distributions_to_date: 200,
+      projected_distributions: [{ id: "d", due_date: "2030-03-31", amount: 1600 }],
+    },
+  });
+  const car = asset({
+    id: "car",
+    category: "Vehicles",
+    current_value: 30000,
+    purchase_date: "2024-10-06",
+    metadata: {
+      make: "Toyota",
+      model: "Corolla",
+      year: "2024",
+      purchase_price: 40000,
+      maintenance_costs: 2000,
+      depreciation_manual: true,
+      depreciation_first_year: -10,
+      depreciation_annual: -10,
+    },
+  });
+  const flat = asset({
+    id: "re",
+    category: "Real Estate",
+    current_value: 600, // equity
+    metadata: {
+      market_valuation: 1000,
+      contract_price: 800,
+      agencyFees: 16,
+      registration_fee_amount: 32,
+      renovationFees: 20,
+      linked_loan: { amount: 400, outstanding_principal: 400 },
+    },
+  });
+
+  /** The real pipeline: `applyOwnershipFactors` (-> `scaleAssetForOwner`) over page rows, which carry the category as `asset_categories.name`. */
+  const scaled = (a: ExpertAssetInput): ExpertAssetInput =>
+    applyOwnershipFactors([{ ...a, profile_id: "owner" }], new Map([[a.id, F]]))[0];
+
+  it("private equity: money is exactly half, DPI/TVPI/projected multiple are identical", () => {
+    const [full] = buildExpertPanelsData([fund], "USD", rates, TODAY).privateEquity;
+    const [half] = buildExpertPanelsData([scaled(fund)], "USD", rates, TODAY).privateEquity;
+    expect(half.commitment).toBe(full.commitment! * F);
+    expect(half.called).toBe(full.called * F);
+    expect(half.unfunded).toBe(full.unfunded * F);
+    expect(half.nav).toBe(full.nav * F);
+    expect(half.distributions).toBe(full.distributions * F);
+    expect(half.dpi).toBe(full.dpi);
+    expect(half.tvpi).toBe(full.tvpi);
+    expect(half.projectedMultiple).toBeCloseTo(full.projectedMultiple!);
+    expect(half.projectedIrr).toBeCloseTo(full.projectedIrr!);
+    // Not double-scaled: a second factor would give a quarter.
+    expect(half.nav).not.toBe(full.nav * F * F);
+  });
+
+  it("private equity with only manual called capital scales the same way", () => {
+    const manual = asset({
+      id: "pe-m",
+      category: "Private Equity",
+      current_value: 600,
+      metadata: { commitment_amount: 1000, called_capital_manual: 400, distributions_to_date: 100 },
+    });
+    const [full] = buildExpertPanelsData([manual], "USD", rates, TODAY).privateEquity;
+    const [half] = buildExpertPanelsData([scaled(manual)], "USD", rates, TODAY).privateEquity;
+    expect(half.called).toBe(full.called * F);
+    expect(half.unfunded).toBe(full.unfunded * F);
+    expect(half.dpi).toBe(full.dpi);
+    expect(half.tvpi).toBe(full.tvpi);
+  });
+
+  it("vehicle: cost basis, market value, gain and depreciated book value are half", () => {
+    const [full] = buildExpertPanelsData([car], "USD", rates, TODAY).taxDepreciation;
+    const [half] = buildExpertPanelsData([scaled(car)], "USD", rates, TODAY).taxDepreciation;
+    expect(half.costBasis).toBe(full.costBasis * F);
+    expect(half.marketValue).toBe(full.marketValue * F);
+    // Book value is rounded to cents on each side, so allow a cent of drift.
+    expect(half.bookValue).toBeCloseTo(full.bookValue! * F, 1);
+
+    const opts = { depreciationView: true, applyTax: false, ratePercent: 0 };
+    const sFull = summarizeTaxDepreciation([full], opts);
+    const sHalf = summarizeTaxDepreciation([half], opts);
+    expect(sHalf.totalValue).toBeCloseTo(sFull.totalValue * F, 1);
+    expect(sHalf.netUnrealisedGain).toBeCloseTo(sFull.netUnrealisedGain * F, 1);
+    // Book value stays between the cost basis and zero, i.e. consistent with the scaled purchase price.
+    expect(half.bookValue!).toBeLessThan(half.costBasis);
+    expect(half.bookValue!).toBeGreaterThan(0);
+  });
+
+  it("real estate: cost basis (price + fees), gross market value and gain are half", () => {
+    const [full] = buildExpertPanelsData([flat], "USD", rates, TODAY).taxDepreciation;
+    const [half] = buildExpertPanelsData([scaled(flat)], "USD", rates, TODAY).taxDepreciation;
+    expect(full.costBasis).toBe(800 + 16 + 32 + 20);
+    expect(half.costBasis).toBe(full.costBasis * F);
+    expect(half.marketValue).toBe(full.marketValue * F);
+    const opts = { depreciationView: false, applyTax: true, ratePercent: 10 };
+    const sFull = summarizeTaxDepreciation([full], opts);
+    const sHalf = summarizeTaxDepreciation([half], opts);
+    expect(sHalf.netUnrealisedGain).toBe(sFull.netUnrealisedGain * F);
+    expect(sHalf.estimatedTax).toBeCloseTo(sFull.estimatedTax * F, 6);
+  });
+
+  it("raw rows and exposure are half too", () => {
+    const all = [fund, car, flat];
+    const full = buildExpertPanelsData(all, "USD", rates, TODAY);
+    const half = buildExpertPanelsData(all.map(scaled), "USD", rates, TODAY);
+    full.rawRows.forEach((r, i) => {
+      expect(half.rawRows[i].nativeValue).toBeCloseTo(r.nativeValue * F, 6);
+      expect(half.rawRows[i].baseValue).toBeCloseTo(r.baseValue * F, 6);
+    });
+    expect(half.exposure.maxCell).toBeCloseTo(full.exposure.maxCell * F, 6);
+    // Shares are proportions: unchanged by the owned fraction.
+    full.exposure.cells.forEach((c, i) => expect(half.exposure.cells[i].share).toBeCloseTo(c.share, 6));
   });
 });

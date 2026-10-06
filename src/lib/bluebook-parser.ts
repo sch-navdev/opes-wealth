@@ -36,7 +36,50 @@ const CURRENCY_CODES: Record<string, string> = { AED: "AED", USD: "USD", EUR: "E
 
 const VALUE_WORDS = /(valuation|valuations|value|valeur|cote|argus|estimate|estimation|estim|price|prix|prezzo|preis|wert|bewertung|valor|valore|trade[-\s]?in|retail|market|قيمة|تقدير|سعر|оценк|стоимост|цена)/i;
 const STRONG_WORDS = /(valuation|valeur|cote|argus|estimated\s+value|fair\s+market|retail|trade[-\s]?in|bewertung|valore|تقييم|оценк)/i;
-const SKIP_WORDS = /(mileage|kilom|odometer|\bkm\b|miles|vin|chassis|engine|cc\b|phone|tel|fax|plate|invoice\s+no|ref)/i;
+/**
+ * Lines that carry an IDENTIFIER or a non-price measurement (VIN, chassis/engine
+ * no/size, mileage, phone/fax, plate, invoice no, "ref"/"reference" followed by a
+ * number or an identifier). Matched as whole-word LABELS, never as substrings —
+ * "Preferred", "Provincial", "Hotel" or "Reference value" must not trip it.
+ */
+const SIMPLE_SKIP_LABELS = new RegExp(
+  [
+    String.raw`\bvin\b`,
+    String.raw`\bchassis\b`,
+    String.raw`\bengine\b`,
+    String.raw`\bmileage\b`,
+    String.raw`\bodometer\b`,
+    String.raw`\bkilom\w*`,
+    String.raw`\bkms?\b`,
+    String.raw`\bmiles\b`,
+    String.raw`(?:\bcc\b|\d\s?cc\b)`,
+    String.raw`\bphone\b`,
+    String.raw`\btel(?:ephone)?\b`,
+    String.raw`\bfax\b`,
+    String.raw`\bplate\b`,
+    String.raw`\binvoice\s*(?:no|nr|number|num|#)`,
+  ].join("|"),
+  "i",
+);
+const ID_CHARS = String.raw`[A-Za-z0-9/_\-.]`;
+const ID_TOKEN = String.raw`[A-Za-z0-9]${ID_CHARS}*`;
+/** "Ref no 123", "Reference number: AB-9", "Ref: 2025/123456", "Ref. #99" — explicit marker. */
+const REF_EXPLICIT = new RegExp(String.raw`\bref(?:erence)?\b\.?\s*(?:(?:no|nr|number|num)\b\.?\s*[:#.]?|[:#])\s*${ID_TOKEN}`, "i");
+/** "(ref 12345)" — no marker, but the following token has a digit so it is an identifier, not a word ("Reference value"). */
+const REF_BARE = new RegExp(String.raw`\bref(?:erence)?\b\.?\s+${ID_CHARS}*\d${ID_CHARS}*`, "i");
+
+function hasSkipLabel(line: string): boolean {
+  return SIMPLE_SKIP_LABELS.test(line) || REF_EXPLICIT.test(line) || REF_BARE.test(line);
+}
+
+/** Removes only the identifiers/measurements that follow a skip label, leaving the rest of the line (e.g. a valuation) intact. */
+function blankIdentifiers(line: string): string {
+  const afterLabel = String.raw`[\s:#.\-]*(?:(?:no|nr|number|num)\b\.?[\s:#.\-]*)?[A-Za-z0-9/_\-.,]*\d[A-Za-z0-9/_\-.,]*(?:\s?(?:km|kms|miles)\b)?`;
+  const labels = String.raw`\b(?:ref(?:erence)?|vin|chassis|engine|mileage|odometer|plate|invoice|phone|tel(?:ephone)?|fax)\b\.?`;
+  return line
+    .replace(new RegExp(labels + afterLabel, "gi"), " ")
+    .replace(/\d[\d.,]*\s?(?:km|kms|kilom\w*|miles)\b/gi, " ");
+}
 
 const MONTHS: Record<string, string> = {
   jan: "01", janv: "01", feb: "02", fev: "02", févr: "02", mar: "03", mars: "03", apr: "04", avr: "04", may: "05", mai: "05",
@@ -106,9 +149,14 @@ export function parseBlueBookText(text: string, todayIso: string = new Date().to
   // Amounts: a value line is one that mentions a value word (also looks one line ahead for a label-then-number layout).
   const scored: (BlueBookCandidate & { score: number })[] = [];
   lines.forEach((line, i) => {
-    if (SKIP_WORDS.test(line)) return;
-    const own = amountsOnLine(line);
-    const next = !own.length && VALUE_WORDS.test(line) && lines[i + 1] && !SKIP_WORDS.test(lines[i + 1]) ? amountsOnLine(lines[i + 1]) : [];
+    let scan = line;
+    if (hasSkipLabel(line)) {
+      // A skip label alone drops the line; alongside a valuation word keep the line and blank just the identifier.
+      if (!VALUE_WORDS.test(line)) return;
+      scan = blankIdentifiers(line);
+    }
+    const own = amountsOnLine(scan);
+    const next = !own.length && VALUE_WORDS.test(line) && lines[i + 1] && !hasSkipLabel(lines[i + 1]) ? amountsOnLine(lines[i + 1]) : [];
     for (const c of [...own, ...next]) {
       let score = 0;
       if (STRONG_WORDS.test(line)) score += 3;

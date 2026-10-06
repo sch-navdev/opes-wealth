@@ -175,3 +175,34 @@ describe("parseSharesightWorkbook (xlsx)", () => {
     expect(errors).toHaveLength(1);
   });
 });
+
+describe("parseSharesightWorkbook brokerage cell", () => {
+  const head = "Market,Code,Trade Date,Quantity,Price,Transaction Type,Brokerage";
+  const brokerageOf = (cell: string) =>
+    parseSharesightWorkbook(csvBuffer([head, `ASX,A,2026-01-15,1,10,Buy,${cell}`].join("\n")), "t.csv").trades[0].brokerage;
+
+  it("treats a blank or whitespace-only cell as unknown, not 0", () => {
+    expect(brokerageOf("")).toBeUndefined();
+    expect(brokerageOf("   ")).toBeUndefined();
+    expect(brokerageOf("n/a")).toBeUndefined();
+  });
+
+  it("keeps a real 0, numeric strings and absolute-values negatives", () => {
+    expect(brokerageOf("0")).toBe(0);
+    expect(brokerageOf("0.00")).toBe(0);
+    expect(brokerageOf("9.95")).toBe(9.95);
+    expect(brokerageOf("-9.95")).toBe(9.95);
+  });
+
+  it("treats empty/null xlsx cells as unknown and numeric 0 as 0", () => {
+    const aoa = [
+      head.split(","),
+      ["ASX", "A", "2026-01-15", 1, 10, "Buy", undefined],
+      ["ASX", "A", "2026-01-15", 1, 10, "Buy", null],
+      ["ASX", "A", "2026-01-15", 1, 10, "Buy", 0],
+      ["ASX", "A", "2026-01-15", 1, 10, "Buy", -9.95],
+    ];
+    const { trades } = parseSharesightWorkbook(xlsxBuffer({ "All Trades": aoa }), "t.xlsx");
+    expect(trades.map((t) => t.brokerage)).toEqual([undefined, undefined, 0, 9.95]);
+  });
+});

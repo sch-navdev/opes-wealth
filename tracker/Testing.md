@@ -27,9 +27,10 @@
 - `companies.ts`: holding cycles (mutual or longer) no longer make entities vanish; the member closing the loop is shown top-level.
 
 ## Observations (not asserted as bugs)
-- Saxo/Sharesight `parseCellDate` uses `new Date(string)` then `toISOString()`: for non-ISO strings it reads month-first and can land a day early in timezones ahead of UTC (e.g. UAE). Depends on machine timezone.
-- Sharesight: an empty Brokerage cell becomes `0` instead of `undefined`.
-- `bluebook-parser.ts` skips any line containing "ref", "vin" or "tel" (drops "Reference value", "Preferred value").
+- ~~Saxo/Sharesight `parseCellDate` day-early shift in timezones ahead of UTC~~ — **fixed**: both use `parsers/dates.ts#parseCellDateUtc` (calendar parts read explicitly; xlsx Date cells read via local components; ambiguous `03/05/2025` stays month-first). Regression tests run in UTC, Asia/Dubai, America/Los_Angeles and Pacific/Kiritimati by switching `process.env.TZ` at runtime.
+- ~~Sharesight: an empty Brokerage cell becomes `0`~~ — **fixed**: blank/whitespace/null is `undefined` (unknown); a real `0`/`"0.00"` stays 0. Saxo and generic-csv have no equivalent default.
+- ~~`bluebook-parser.ts` skips any line containing "ref", "vin" or "tel"~~ — **fixed**: whole-word skip labels only (VIN, chassis, engine, mileage, phone/tel/fax, plate, invoice no, ref/reference + number or identifier); a line that also has a value word is kept with just the identifier blanked.
+- Expert panels and co-ownership: `buildExpertPanelsData` receives already pro-rata assets (`applyOwnershipFactors` -> `scaleAssetForOwner`), so it must not scale again; regression tests in `dashboard-expert.test.ts` pin half-share money and identical DPI/TVPI.
 - `fx.ts` static fallback table is USD-anchored even for a non-USD base (conversions unaffected).
 - 26 base translation keys (tier selector, bento header, sidebar collapse, CSV steps, data-grid labels) are missing from all seven overlay languages and fall back to English (98.3% coverage each). See [[Localization|Localization]].
 

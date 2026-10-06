@@ -19,6 +19,7 @@
  */
 import * as XLSX from "xlsx";
 import { parseCsvTable } from "@/lib/csv-parser";
+import { parseCellDateUtc } from "./dates";
 import type {
   BrokerParseResult,
   ParsedIncome,
@@ -107,17 +108,8 @@ function buildColumnIndex(headerRow: RawRow): Partial<Record<ColumnKey, number>>
   return index;
 }
 
-function parseCellDate(raw: RawCell): string | null {
-  if (raw instanceof Date) {
-    if (Number.isNaN(raw.getTime())) return null;
-    return raw.toISOString().slice(0, 10);
-  }
-  if (typeof raw === "string" && raw.trim()) {
-    const parsed = new Date(raw.trim());
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-  }
-  return null;
-}
+/** Calendar date independent of the machine timezone — see `dates.ts`. */
+const parseCellDate = (raw: RawCell): string | null => parseCellDateUtc(raw);
 
 function parseSide(raw: RawCell): TradeSide | null {
   const text = String(raw ?? "").trim().toLowerCase();
