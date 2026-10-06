@@ -1,15 +1,17 @@
 "use client";
 
 import { useId, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Info, Scale, Target, TrendingUp, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { InfoTooltip } from "@/components/ui/tooltip";
 import { TableCell, TableHead, TableRow } from "@/components/ui/table";
 import { useTierMotion } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
+import { formatMultiple, formatPercent } from "@/lib/format-ratio";
 import { summarizeTaxDepreciation, type ExpertPanelsData } from "@/lib/dashboard-expert";
 import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import type { TranslationKey } from "@/lib/i18n";
@@ -169,8 +171,6 @@ export function DashboardExpertPanels({ data, baseCurrency }: Props) {
         style={tileEntranceStyle(motion, 4)}
         baseCurrency={baseCurrency}
         fmtMoney={fmtMoney}
-        pct1={pct1}
-        ratio={ratio}
       />
     </section>
   );
@@ -554,48 +554,74 @@ function TaxPanel({
 
 /* (v) financial ratios */
 
-const NA = "—";
+/** Gauge caps: the bar is full at this value (a drawing scale only, not a benchmark). */
+const ROA_CAP = 0.1;
+const ROIC_CAP = 0.15;
+const DE_CAP = 3;
 
-function RatiosPanel({
+type DeBand = "low" | "mid" | "high";
+function deBand(n: number): DeBand {
+  return n < 0.5 ? "low" : n <= 1.5 ? "mid" : "high";
+}
+
+function Gauge({ value, cap }: { value: number | null; cap: number }) {
+  const width = value == null ? 0 : Math.min(1, Math.max(0, value / cap)) * 100;
+  return (
+    <div aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
+}
+
+export function RatiosPanel({
   data,
   className,
   style,
   baseCurrency,
   fmtMoney,
-  pct1,
-  ratio,
 }: {
   data: ExpertPanelsData;
   className: string;
   style: PanelStyle;
   baseCurrency: string;
   fmtMoney: (n: number) => string;
-  pct1: Intl.NumberFormat;
-  ratio: Intl.NumberFormat;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const { roa, debtToEquity, roic, totals } = data.ratios;
 
-  const fmtPct = (n: number | null) => (n == null ? NA : maskValue(`${pct1.format(n * 100)}%`));
-  const fmtMultiple = (n: number | null) => (n == null ? NA : maskValue(`${ratio.format(n)}x`));
+  // Privacy Mode masks the ratio values too (as before); an unavailable ratio stays an en dash.
+  const mask = (text: string, isNull: boolean) => (isNull ? text : maskValue(text));
 
   const stats: {
     id: string;
+    Icon: LucideIcon;
     name: string;
     formula: string;
     def: string;
     value: string;
     isNull: boolean;
+    raw: number | null;
+    cap: number;
+    capText: string;
     amounts: [string, number][];
+    hint?: string;
+    band?: string;
   }[] = [
     {
       id: "roa",
+      Icon: TrendingUp,
       name: t("expert_ratios_roa"),
       formula: t("expert_ratios_roa_formula"),
       def: t("expert_ratios_roa_def"),
-      value: fmtPct(roa),
+      value: mask(formatPercent(roa, intlLocale), roa == null),
       isNull: roa == null,
+      raw: roa,
+      cap: ROA_CAP,
+      capText: formatPercent(ROA_CAP, intlLocale),
       amounts: [
         [t("expert_ratios_yield"), totals.annualYield],
         [t("expert_ratios_assets"), totals.totalAssets],
@@ -603,11 +629,17 @@ function RatiosPanel({
     },
     {
       id: "de",
+      Icon: Scale,
       name: t("expert_ratios_de"),
       formula: t("expert_ratios_de_formula"),
       def: t("expert_ratios_de_def"),
-      value: fmtMultiple(debtToEquity),
+      value: mask(formatMultiple(debtToEquity, intlLocale), debtToEquity == null),
       isNull: debtToEquity == null,
+      raw: debtToEquity,
+      cap: DE_CAP,
+      capText: `${DE_CAP}x`,
+      hint: t("expert_ratios_de_hint"),
+      band: debtToEquity == null ? undefined : t(`expert_ratios_de_band_${deBand(debtToEquity)}` as TranslationKey),
       amounts: [
         [t("expert_ratios_liabilities"), totals.totalLiabilities],
         [t("expert_ratios_net_worth"), totals.netWorth],
@@ -615,11 +647,15 @@ function RatiosPanel({
     },
     {
       id: "roic",
+      Icon: Target,
       name: t("expert_ratios_roic"),
       formula: t("expert_ratios_roic_formula"),
       def: t("expert_ratios_roic_def"),
-      value: fmtPct(roic),
+      value: mask(formatPercent(roic, intlLocale), roic == null),
       isNull: roic == null,
+      raw: roic,
+      cap: ROIC_CAP,
+      capText: formatPercent(ROIC_CAP, intlLocale),
       amounts: [
         [t("expert_ratios_yield"), totals.annualYield],
         [t("expert_ratios_assets"), totals.totalAssets],
@@ -637,16 +673,58 @@ function RatiosPanel({
       className={className}
       style={style}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {stats.map((s) => (
-          <section key={s.id} aria-label={s.name} className="min-w-0 space-y-2 rounded-md border border-border p-3">
-            <h3 className="text-sm font-medium text-muted-foreground">{s.name}</h3>
-            <p className="text-3xl font-semibold tabular-nums" aria-label={s.isNull ? t("expert_ratios_na") : undefined}>
-              {s.value}
-            </p>
-            <p className="break-words text-xs font-medium tabular-nums">{s.formula}</p>
-            <p className="text-xs text-muted-foreground">{s.def}</p>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
+          <section
+            key={s.id}
+            aria-label={s.name}
+            className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-background/40 p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 items-start gap-2">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-primary">
+                  <s.Icon className="size-4" aria-hidden />
+                </span>
+                <h3 className="min-w-0 pt-0.5 text-sm font-medium leading-snug text-muted-foreground">{s.name}</h3>
+              </div>
+              <InfoTooltip label={t("expert_ratios_info", { name: s.name })} icon={<Info className="size-4" aria-hidden />}>
+                <span className="block font-medium text-foreground">{s.formula}</span>
+                <span className="mt-1 block text-muted-foreground">{s.def}</span>
+                {s.hint ? <span className="mt-1 block text-muted-foreground">{s.hint}</span> : null}
+                <span className="mt-2 block space-y-0.5 tabular-nums">
+                  {s.amounts.map(([label, amount]) => (
+                    <span key={label} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className={cn(amount < 0 && "text-destructive")}>{fmtMoney(amount)}</span>
+                    </span>
+                  ))}
+                </span>
+                <span className="mt-2 block text-muted-foreground">{t("expert_ratios_scale", { max: s.capText })}</span>
+              </InfoTooltip>
+            </div>
+
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <p className="text-3xl font-semibold tabular-nums" aria-label={s.isNull ? t("expert_ratios_na") : undefined}>
+                {s.value}
+              </p>
+              {s.band ? (
+                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                  {s.band}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="space-y-1">
+              <Gauge value={s.raw} cap={s.cap} />
+              <div aria-hidden className="flex justify-between text-[10px] tabular-nums text-muted-foreground">
+                <span>0</span>
+                <span>{s.capText}</span>
+              </div>
+            </div>
+
+            <p className="break-words text-xs text-muted-foreground">{s.formula}</p>
+
+            <dl className="mt-auto grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 border-t border-border pt-3 text-xs tabular-nums">
               {s.amounts.map(([label, amount]) => (
                 <div key={label} className="contents">
                   <dt className="min-w-0 text-muted-foreground">{label}</dt>
