@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 16:54 (Gulf Standard Time, UTC+4).** Steve asked to commit and push everything: all commits through this file's commit are pushed to `origin/master` right after it is written (see "Push status"). Supabase matches all 34 migrations (0033 and 0034 applied by Steve and verified live). Production runs in Mumbai (`bom1`).
+**Last updated: 2026-10-06 16:55 (Gulf Standard Time, UTC+4).** Steve asked to commit and push everything: all commits through this file's commit are pushed to `origin/master` right after it is written (see "Push status"). Supabase matches all 34 migrations (0033 and 0034 applied by Steve and verified live). Production runs in Mumbai (`bom1`).
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -62,4 +62,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-At 2026-10-06 16:54 GST: Steve asked to "commit and push the 5 commits". All local commits up to and including this handoff/notes commit are pushed to `origin/master` immediately after being written (previous push: `4cafb3e..ada63a6` at 16:22). Vercel redeploys on push; this push contains app code (ratios polish, requester notifications), so check that the production build goes READY. Gates at the last code change: 1308 tests, `tsc`, `eslint`, `npm run build` all pass.
+At 2026-10-06 16:54 GST: Steve asked to "commit and push the 5 commits". All local commits up to and including this handoff/notes commit are pushed to `origin/master` immediately after being written (previous push: `4cafb3e..ada63a6` at 16:22). Vercel redeploys on push; this push contained app code (ratios polish, requester notifications): the production build of `3d302fb` went READY (verified 16:55 GST) and `https://www.opeswealth.app/login` returns `X-Vercel-Id: bom1::bom1::…`. The only thing newer than `origin` is this note, committed locally and not pushed until Steve confirms. Gates at the last code change: 1308 tests, `tsc`, `eslint`, `npm run build` all pass.
