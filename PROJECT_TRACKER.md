@@ -123,7 +123,7 @@ opes-wealth/
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
 │   └── migrations/
-│       └── 0001 … 0032_*.sql    # 32 migrations, all applied to the live project (verified 2026-10-06); see Database-Schema
+│       └── 0001 … 0033_*.sql    # 33 migrations, all applied to the live project (verified 2026-10-06); see Database-Schema
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 ├── PROJECT_TRACKER.md           # hub note — start here (this file)
