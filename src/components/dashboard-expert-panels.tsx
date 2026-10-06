@@ -163,6 +163,15 @@ export function DashboardExpertPanels({ data, baseCurrency }: Props) {
         fmtMoney={fmtMoney}
         pct1={pct1}
       />
+      <RatiosPanel
+        data={data}
+        className={cn(card, "xl:col-span-2")}
+        style={tileEntranceStyle(motion, 4)}
+        baseCurrency={baseCurrency}
+        fmtMoney={fmtMoney}
+        pct1={pct1}
+        ratio={ratio}
+      />
     </section>
   );
 }
@@ -539,6 +548,116 @@ function TaxPanel({
       )}
 
       <p className="text-xs text-muted-foreground">{t("expert_tax_disclaimer")}</p>
+    </PanelShell>
+  );
+}
+
+/* (v) financial ratios */
+
+const NA = "—";
+
+function RatiosPanel({
+  data,
+  className,
+  style,
+  baseCurrency,
+  fmtMoney,
+  pct1,
+  ratio,
+}: {
+  data: ExpertPanelsData;
+  className: string;
+  style: PanelStyle;
+  baseCurrency: string;
+  fmtMoney: (n: number) => string;
+  pct1: Intl.NumberFormat;
+  ratio: Intl.NumberFormat;
+}) {
+  const { t } = useLanguage();
+  const { maskValue } = usePrivacy();
+  const { roa, debtToEquity, roic, totals } = data.ratios;
+
+  const fmtPct = (n: number | null) => (n == null ? NA : maskValue(`${pct1.format(n * 100)}%`));
+  const fmtMultiple = (n: number | null) => (n == null ? NA : maskValue(`${ratio.format(n)}x`));
+
+  const stats: {
+    id: string;
+    name: string;
+    formula: string;
+    def: string;
+    value: string;
+    isNull: boolean;
+    amounts: [string, number][];
+  }[] = [
+    {
+      id: "roa",
+      name: t("expert_ratios_roa"),
+      formula: t("expert_ratios_roa_formula"),
+      def: t("expert_ratios_roa_def"),
+      value: fmtPct(roa),
+      isNull: roa == null,
+      amounts: [
+        [t("expert_ratios_yield"), totals.annualYield],
+        [t("expert_ratios_assets"), totals.totalAssets],
+      ],
+    },
+    {
+      id: "de",
+      name: t("expert_ratios_de"),
+      formula: t("expert_ratios_de_formula"),
+      def: t("expert_ratios_de_def"),
+      value: fmtMultiple(debtToEquity),
+      isNull: debtToEquity == null,
+      amounts: [
+        [t("expert_ratios_liabilities"), totals.totalLiabilities],
+        [t("expert_ratios_net_worth"), totals.netWorth],
+      ],
+    },
+    {
+      id: "roic",
+      name: t("expert_ratios_roic"),
+      formula: t("expert_ratios_roic_formula"),
+      def: t("expert_ratios_roic_def"),
+      value: fmtPct(roic),
+      isNull: roic == null,
+      amounts: [
+        [t("expert_ratios_yield"), totals.annualYield],
+        [t("expert_ratios_assets"), totals.totalAssets],
+        [t("expert_ratios_cash"), totals.cashAssets],
+        [t("expert_ratios_other_liabilities"), totals.otherLiabilities],
+        [t("expert_ratios_invested"), totals.investedCapital],
+      ],
+    },
+  ];
+
+  return (
+    <PanelShell
+      title={t("expert_ratios_title")}
+      description={t("expert_ratios_desc", { currency: baseCurrency })}
+      className={className}
+      style={style}
+    >
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {stats.map((s) => (
+          <section key={s.id} aria-label={s.name} className="min-w-0 space-y-2 rounded-md border border-border p-3">
+            <h3 className="text-sm font-medium text-muted-foreground">{s.name}</h3>
+            <p className="text-3xl font-semibold tabular-nums" aria-label={s.isNull ? t("expert_ratios_na") : undefined}>
+              {s.value}
+            </p>
+            <p className="break-words text-xs font-medium tabular-nums">{s.formula}</p>
+            <p className="text-xs text-muted-foreground">{s.def}</p>
+            <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs tabular-nums">
+              {s.amounts.map(([label, amount]) => (
+                <div key={label} className="contents">
+                  <dt className="min-w-0 text-muted-foreground">{label}</dt>
+                  <dd className={cn("text-end", amount < 0 && "text-destructive")}>{fmtMoney(amount)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">{t("expert_ratios_note")}</p>
     </PanelShell>
   );
 }

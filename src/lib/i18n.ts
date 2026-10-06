@@ -2316,6 +2316,10 @@ const dictionary = {
   bento_hero_caption: { en: "Total across all categories", fr: "Total toutes catégories confondues" },
   bento_aria: { en: "Wealth summary", fr: "Résumé du patrimoine" },
 
+  // asset detail: owner share
+  owner_share_note: { en: "Showing your {pct}% share. Edits apply to the whole asset.", fr: "Affichage de votre part de {pct} %. Les modifications s'appliquent à l'ensemble de l'actif." },
+  owner_share_edit_hint: { en: "Values below are for the whole asset, not just your share.", fr: "Les valeurs ci-dessous concernent l'actif entier, pas seulement votre part." },
+
   // Collapsible sidebar
   sidebar_collapse: { en: "Collapse sidebar", fr: "Réduire le menu" },
   sidebar_expand: { en: "Expand sidebar", fr: "Développer le menu" },
@@ -2400,6 +2404,27 @@ const dictionary = {
   expert_fx_empty: { en: "No assets to show exposure for.", fr: "Aucun actif pour lequel afficher l'exposition." },
   expert_fx_total: { en: "Total", fr: "Total" },
   expert_fx_cell_label: { en: "{currency}, {category}: {pct}% of gross assets", fr: "{currency}, {category} : {pct} % des actifs bruts" },
+  // expert financial ratios
+  expert_ratios_title: { en: "Financial ratios", fr: "Ratios financiers" },
+  expert_ratios_desc: { en: "Return and leverage ratios in {currency}, on your share of each asset.", fr: "Ratios de rendement et d'endettement en {currency}, sur votre quote-part de chaque actif." },
+  expert_ratios_roa: { en: "Return on assets (ROA)", fr: "Rentabilité des actifs (ROA)" },
+  expert_ratios_roa_formula: { en: "Annual yield / total assets", fr: "Rendement annuel / total des actifs" },
+  expert_ratios_roa_def: { en: "How much income your assets generate each year relative to their total value.", fr: "Revenu que vos actifs génèrent chaque année par rapport à leur valeur totale." },
+  expert_ratios_de: { en: "Debt-to-equity (D/E)", fr: "Ratio d'endettement (D/E)" },
+  expert_ratios_de_formula: { en: "Total liabilities / net worth", fr: "Total des passifs / patrimoine net" },
+  expert_ratios_de_def: { en: "How much you owe for every unit of your own equity.", fr: "Montant dû pour chaque unité de vos fonds propres." },
+  expert_ratios_roic: { en: "Return on invested capital (ROIC)", fr: "Rentabilité du capital investi (ROIC)" },
+  expert_ratios_roic_formula: { en: "Annual yield / (total assets - cash - other liabilities)", fr: "Rendement annuel / (total des actifs - trésorerie - autres passifs)" },
+  expert_ratios_roic_def: { en: "Income earned on the capital actually put to work, leaving out cash and non-bank debts.", fr: "Revenu tiré du capital réellement investi, hors trésorerie et dettes non bancaires." },
+  expert_ratios_na: { en: "Not available: the denominator is zero or negative.", fr: "Non disponible : le dénominateur est nul ou négatif." },
+  expert_ratios_yield: { en: "Annual yield", fr: "Rendement annuel" },
+  expert_ratios_assets: { en: "Total assets", fr: "Total des actifs" },
+  expert_ratios_liabilities: { en: "Total liabilities", fr: "Total des passifs" },
+  expert_ratios_net_worth: { en: "Net worth", fr: "Patrimoine net" },
+  expert_ratios_cash: { en: "Cash assets", fr: "Actifs de trésorerie" },
+  expert_ratios_other_liabilities: { en: "Other liabilities", fr: "Autres passifs" },
+  expert_ratios_invested: { en: "Invested capital", fr: "Capital investi" },
+  expert_ratios_note: { en: "Annual yield is the expected passive income over the next 12 months. Other liabilities are all debts except bank loans and mortgages (off-plan balances, capital calls, credit cards, other debts). ROIC follows this simplified formula, not the textbook NOPAT definition.", fr: "Le rendement annuel correspond aux revenus passifs attendus sur les 12 prochains mois. Les autres passifs regroupent toutes les dettes hors prêts bancaires et hypothèques (soldes sur plan, appels de fonds, cartes de crédit, autres dettes). Le ROIC suit cette formule simplifiée, et non la définition classique fondée sur le NOPAT." },
   // micro-sparklines
   spark_up: { en: "Trending up over the period", fr: "En hausse sur la période" },
   spark_down: { en: "Trending down over the period", fr: "En baisse sur la période" },

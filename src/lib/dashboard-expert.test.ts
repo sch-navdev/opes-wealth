@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildExpertPanelsData,
+  classifyLiability,
+  computeFinancialRatios,
   summarizeTaxDepreciation,
   type ExpertAssetInput,
   type ExpertTaxRow,
 } from "@/lib/dashboard-expert";
+import { convertToBaseCurrency } from "@/lib/fx";
+import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import { applyOwnershipFactors } from "@/lib/shared-assets/load";
 
 const rates = { USD: 1, AED: 4 };
@@ -335,5 +339,181 @@ describe("co-ownership: panels fed pro-rata (already scaled) assets", () => {
     expect(half.exposure.maxCell).toBeCloseTo(full.exposure.maxCell * F, 6);
     // Shares are proportions: unchanged by the owned fraction.
     full.exposure.cells.forEach((c, i) => expect(half.exposure.cells[i].share).toBeCloseTo(c.share, 6));
+  });
+});
+
+/* ---------- financial ratios (ROA, D/E, ROIC) ---------- */
+
+describe("classifyLiability", () => {
+  it("treats standalone loans and mortgages as bank debt (and an untyped liability as a loan)", () => {
+    const loan = asset({ id: "l", category: "Liabilities", is_liability: true, current_value: 100, metadata: { liability_type: "loan" } });
+    const mort = asset({ id: "m", category: "Liabilities", is_liability: true, current_value: 200, metadata: { liability_type: "mortgage" } });
+    const bare = asset({ id: "b", category: "Liabilities", is_liability: true, current_value: 30, metadata: null });
+    expect(classifyLiability(loan)).toEqual({ bank: 100, other: 0 });
+    expect(classifyLiability(mort)).toEqual({ bank: 200, other: 0 });
+    expect(classifyLiability(bare)).toEqual({ bank: 30, other: 0 });
+  });
+
+  it("treats credit cards and other debts as other liabilities", () => {
+    const card = asset({ id: "c", category: "Liabilities", is_liability: true, current_value: 50, metadata: { liability_type: "credit_card" } });
+    const other = asset({ id: "o", category: "Liabilities", is_liability: true, current_value: 70, metadata: { liability_type: "other" } });
+    expect(classifyLiability(card)).toEqual({ bank: 0, other: 50 });
+    expect(classifyLiability(other)).toEqual({ bank: 0, other: 70 });
+  });
+
+  it("splits real estate into the linked bank loan and the off-plan developer balance", () => {
+    const re = asset({
+      id: "re",
+      category: "Real Estate",
+      current_value: 500,
+      metadata: { market_valuation: 1000, linked_loan: { amount: 400, outstanding_principal: 400 }, is_offplan: true, outstanding_balance: 100 },
+    });
+    expect(classifyLiability(re)).toEqual({ bank: 400, other: 100 });
+    expect(assetLiability(re)).toBe(500);
+  });
+
+  it("treats private-equity pending capital calls as other, and plain assets as zero", () => {
+    const pe = asset({
+      id: "pe",
+      category: "Private Equity",
+      current_value: 300,
+      metadata: { capital_calls: [{ id: "1", due_date: "2027-01-01", amount: 80, percentage: 8, status: "pending" }] },
+    });
+    expect(classifyLiability(pe)).toEqual({ bank: 0, other: 80 });
+    expect(classifyLiability(asset({ id: "c", current_value: 10 }))).toEqual({ bank: 0, other: 0 });
+  });
+});
+
+describe("computeFinancialRatios", () => {
+  const liab = (id: string, value: number, type: string) =>
+    asset({ id, category: "Liabilities", is_liability: true, current_value: value, metadata: { liability_type: type } });
+
+  const portfolio = (): ExpertAssetInput[] => [
+    asset({ id: "cash", category: "Cash", current_value: 200 }),
+    asset({
+      id: "re",
+      category: "Real Estate",
+      current_value: 600, // equity
+      metadata: { market_valuation: 1000, linked_loan: { amount: 400, outstanding_principal: 400 } },
+    }),
+    asset({
+      id: "pe",
+      category: "Private Equity",
+      current_value: 300,
+      metadata: { capital_calls: [{ id: "1", due_date: "2027-01-01", amount: 80, percentage: 8, status: "pending" }] },
+    }),
+    liab("mort", 100, "mortgage"),
+    liab("card", 50, "credit_card"),
+  ];
+
+  it("computes known numbers", () => {
+    const r = computeFinancialRatios(portfolio(), 120, "USD", rates);
+    expect(r.totals).toEqual({
+      annualYield: 120,
+      totalAssets: 1500, // 200 + 1000 + 300
+      totalLiabilities: 630, // 400 + 80 + 100 + 50
+      netWorth: 870,
+      cashAssets: 200,
+      otherLiabilities: 130, // 80 capital calls + 50 card (loan and mortgage excluded)
+      investedCapital: 1170, // 1500 - 200 - 130
+    });
+    expect(r.roa).toBeCloseTo(120 / 1500, 10);
+    expect(r.debtToEquity).toBeCloseTo(630 / 870, 10);
+    expect(r.roic).toBeCloseTo(120 / 1170, 10);
+  });
+
+  it("totals match the dashboard page formulas for total assets and total liabilities", () => {
+    const list = [...portfolio(), asset({ id: "aed", category: "Cash", currency: "AED", current_value: 400 })];
+    const pageAssets = list
+      .filter((a) => !a.is_liability)
+      .reduce((s, a) => s + convertToBaseCurrency(grossAssetValue(a), a.currency, "USD", rates), 0);
+    const pageLiabs = list.reduce((s, a) => s + convertToBaseCurrency(assetLiability(a), a.currency, "USD", rates), 0);
+    const { totals } = computeFinancialRatios(list, 0, "USD", rates);
+    expect(totals.totalAssets).toBe(pageAssets);
+    expect(totals.totalLiabilities).toBe(pageLiabs);
+    expect(totals.netWorth).toBe(pageAssets - pageLiabs);
+    expect(totals.cashAssets).toBe(300); // 200 + 400 AED / 4
+  });
+
+  it("excludes only cash (not other categories) from invested capital", () => {
+    const only = [asset({ id: "c", category: "Cash", current_value: 100 }), asset({ id: "s", category: "Equities", current_value: 100 })];
+    const r = computeFinancialRatios(only, 10, "USD", rates);
+    expect(r.totals.investedCapital).toBe(100);
+    expect(r.roic).toBeCloseTo(0.1);
+    expect(r.roa).toBeCloseTo(0.05);
+  });
+
+  it("returns nulls for an empty portfolio", () => {
+    const r = computeFinancialRatios([], 0, "USD", rates);
+    expect(r.roa).toBeNull();
+    expect(r.debtToEquity).toBeNull();
+    expect(r.roic).toBeNull();
+    expect(r.totals.totalAssets).toBe(0);
+  });
+
+  it("returns null for a zero or negative denominator, never Infinity or NaN", () => {
+    const cash = (v: number) => asset({ id: "c", category: "Cash", current_value: v });
+    // Only cash: invested capital is 0 -> ROIC null, ROA fine.
+    const cashOnly = computeFinancialRatios([cash(100)], 5, "USD", rates);
+    expect(cashOnly.roic).toBeNull();
+    expect(cashOnly.roa).toBeCloseTo(0.05);
+    // Debts exceed assets: net worth negative -> D/E null.
+    const under = computeFinancialRatios([cash(100), liab("l", 300, "loan")], 5, "USD", rates);
+    expect(under.totals.netWorth).toBe(-200);
+    expect(under.debtToEquity).toBeNull();
+    // Net worth exactly 0 -> null too.
+    const zero = computeFinancialRatios([cash(100), liab("l", 100, "loan")], 0, "USD", rates);
+    expect(zero.debtToEquity).toBeNull();
+    // Other liabilities swallow the invested capital -> negative denominator -> null.
+    const swallowed = computeFinancialRatios([asset({ id: "s", category: "Equities", current_value: 100 }), liab("c", 150, "credit_card")], 5, "USD", rates);
+    expect(swallowed.roic).toBeNull();
+    for (const r of [cashOnly, under, zero, swallowed]) {
+      for (const v of [r.roa, r.debtToEquity, r.roic]) expect(v === null || Number.isFinite(v)).toBe(true);
+    }
+    // A non-finite yield is treated as 0.
+    expect(computeFinancialRatios([asset({ id: "s", category: "Equities", current_value: 100 })], NaN, "USD", rates).roa).toBe(0);
+  });
+
+  it("allows a zero numerator (no debt gives D/E = 0)", () => {
+    const r = computeFinancialRatios([asset({ id: "s", category: "Equities", current_value: 100 })], 0, "USD", rates);
+    expect(r.debtToEquity).toBe(0);
+    expect(r.roa).toBe(0);
+  });
+
+  it("pro-rata (already scaled) input gives half the amounts and identical ratios", () => {
+    const F = 0.5;
+    const full = portfolio();
+    const half = full.map((a) => applyOwnershipFactors([{ ...a, profile_id: "owner" }], new Map([[a.id, F]]))[0]);
+    const rFull = computeFinancialRatios(full, 120, "USD", rates);
+    const rHalf = computeFinancialRatios(half, 120 * F, "USD", rates);
+    expect(rHalf.totals.totalAssets).toBeCloseTo(rFull.totals.totalAssets * F, 6);
+    expect(rHalf.totals.totalLiabilities).toBeCloseTo(rFull.totals.totalLiabilities * F, 6);
+    expect(rHalf.totals.otherLiabilities).toBeCloseTo(rFull.totals.otherLiabilities * F, 6);
+    expect(rHalf.roa).toBeCloseTo(rFull.roa!, 8);
+    expect(rHalf.debtToEquity).toBeCloseTo(rFull.debtToEquity!, 8);
+    expect(rHalf.roic).toBeCloseTo(rFull.roic!, 8);
+  });
+});
+
+describe("buildExpertPanelsData - ratios", () => {
+  it("uses the passive-income projected annual total as the yield and is JSON-serialisable", () => {
+    const rented = asset({
+      id: "re",
+      category: "Real Estate",
+      current_value: 1000,
+      metadata: {
+        market_valuation: 1000,
+        tenancy_contracts: [{ id: "t", tenant_name: "T", start_date: "2026-01-01", end_date: "2028-01-01", annual_rent: 120, contract_value: null, imported_from_file: "", uploaded_at: "" }],
+      },
+    });
+    const d = buildExpertPanelsData([rented], "USD", rates, TODAY);
+    expect(d.ratios.totals.annualYield).toBeCloseTo(120, 6);
+    expect(d.ratios.roa).toBeCloseTo(0.12, 6);
+    expect(JSON.parse(JSON.stringify(d.ratios))).toEqual(d.ratios);
+  });
+
+  it("is all-null for an empty portfolio", () => {
+    const d = buildExpertPanelsData([], "USD", rates, TODAY);
+    expect(d.ratios).toMatchObject({ roa: null, debtToEquity: null, roic: null });
   });
 });

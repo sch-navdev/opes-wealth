@@ -1,6 +1,8 @@
 import { buildCurrencyExposure, type CurrencyExposure } from "@/lib/dashboard-tiers";
 import { convertToBaseCurrency } from "@/lib/fx";
-import { grossAssetValue } from "@/lib/liabilities";
+import { assetLiability, grossAssetValue } from "@/lib/liabilities";
+import { parseLiabilityMetadata } from "@/lib/liability";
+import { buildPassiveIncome } from "@/lib/passive-income";
 import {
   calledCapital,
   fundReturns,
@@ -86,16 +88,125 @@ export type ExpertTaxRow = {
   bookValue: number | null;
 };
 
+/** Underlying Base-Currency amounts behind the ratios (all derived from already ownership-scaled inputs). */
+export type FinancialRatioTotals = {
+  /** Annual passive income (rent, dividends, interest/distributions), Base Currency. */
+  annualYield: number;
+  /** Sum of gross values of non-liability assets (the dashboard's Total Assets). */
+  totalAssets: number;
+  /** Sum of `assetLiability` over all assets (the dashboard's Total Liabilities). */
+  totalLiabilities: number;
+  /** totalAssets - totalLiabilities. */
+  netWorth: number;
+  /** Non-liability assets in the "Cash" category. */
+  cashAssets: number;
+  /** Liabilities that are not standard bank loans/mortgages (see `classifyLiability`). */
+  otherLiabilities: number;
+  /** ROIC denominator: totalAssets - cashAssets - otherLiabilities. */
+  investedCapital: number;
+};
+
+export type FinancialRatios = {
+  /** Total annual yield / total assets, as a fraction (0.05 = 5%); null when assets <= 0. */
+  roa: number | null;
+  /** Total liabilities / net worth, as a multiple (0.42 = 0.42x); null when net worth <= 0. */
+  debtToEquity: number | null;
+  /** Total annual yield / (assets - cash - other liabilities), as a fraction; null when that is <= 0. */
+  roic: number | null;
+  totals: FinancialRatioTotals;
+};
+
 export type ExpertPanelsData = {
   rawRows: ExpertRawRow[];
   privateEquity: ExpertPrivateEquityRow[];
   taxDepreciation: ExpertTaxRow[];
   exposure: CurrencyExposure;
+  ratios: FinancialRatios;
 };
 
 const categoryName = (a: ExpertAssetInput) => a.asset_categories?.name ?? UNCATEGORISED;
 
 const positive = (n: number | null | undefined) => (typeof n === "number" && Number.isFinite(n) ? n : 0);
+
+/** a / b, or null when either is not finite or the denominator is zero or negative (never Infinity/NaN). */
+function safeRatio(numerator: number, denominator: number): number | null {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
+  return numerator / denominator;
+}
+
+/**
+ * Splits the debt an asset contributes (`assetLiability`, in the asset's own
+ * currency) into standard bank debt and "other" debt:
+ *
+ *  - bank:  Real Estate linked loan/mortgage balance, and standalone liabilities
+ *           of type `loan` or `mortgage` (a standalone row with no stored type
+ *           is a loan, matching `parseLiabilityMetadata`'s default).
+ *  - other: off-plan developer balances, private-equity pending capital calls,
+ *           and standalone `credit_card` / `other` liabilities.
+ *
+ * `bank + other` always equals `assetLiability(asset)`.
+ */
+export function classifyLiability(asset: ExpertAssetInput): { bank: number; other: number } {
+  const total = assetLiability(asset);
+  if (!(total > 0)) return { bank: 0, other: 0 };
+
+  if (asset.is_liability) {
+    const type = parseLiabilityMetadata(asset.metadata).liability_type;
+    return type === "loan" || type === "mortgage" ? { bank: total, other: 0 } : { bank: 0, other: total };
+  }
+  if (asset.asset_categories?.name === "Real Estate") {
+    const md = parseRealEstateMetadata(asset.metadata);
+    const offplan = Math.min(total, md.is_offplan ? positive(md.outstanding_balance) : 0);
+    return { bank: total - offplan, other: offplan };
+  }
+  // Private Equity capital calls (the only other non-zero `assetLiability` source).
+  return { bank: 0, other: total };
+}
+
+/**
+ * ROA, Debt-to-Equity and ROIC in the Base Currency. `assets` must already be
+ * scaled to the user's ownership share; `annualYield` is the user's total annual
+ * passive income in the Base Currency.
+ *
+ *  - ROA  = annualYield / totalAssets
+ *  - D/E  = totalLiabilities / netWorth  (null when netWorth <= 0)
+ *  - ROIC = annualYield / (totalAssets - cashAssets - otherLiabilities)
+ *
+ * ROIC follows this specified formula, not the textbook NOPAT / invested capital.
+ */
+export function computeFinancialRatios(
+  assets: ExpertAssetInput[],
+  annualYield: number,
+  displayCurrency: string,
+  rates: Record<string, number>,
+): FinancialRatios {
+  const toBase = (amount: number, currency: string) =>
+    convertToBaseCurrency(amount, currency, displayCurrency, rates);
+
+  let totalAssets = 0;
+  let totalLiabilities = 0;
+  let cashAssets = 0;
+  let otherLiabilities = 0;
+  for (const a of assets) {
+    if (!a.is_liability) {
+      const gross = toBase(grossAssetValue(a), a.currency);
+      totalAssets += gross;
+      if (a.asset_categories?.name === "Cash") cashAssets += gross;
+    }
+    totalLiabilities += toBase(assetLiability(a), a.currency);
+    otherLiabilities += toBase(classifyLiability(a).other, a.currency);
+  }
+  const netWorth = totalAssets - totalLiabilities;
+  const investedCapital = totalAssets - cashAssets - otherLiabilities;
+  const yieldBase = Number.isFinite(annualYield) ? annualYield : 0;
+
+  return {
+    roa: safeRatio(yieldBase, totalAssets),
+    debtToEquity: safeRatio(totalLiabilities, netWorth),
+    roic: safeRatio(yieldBase, investedCapital),
+    totals: { annualYield: yieldBase, totalAssets, totalLiabilities, netWorth, cashAssets, otherLiabilities, investedCapital },
+  };
+}
 
 export function buildExpertPanelsData(
   assets: ExpertAssetInput[],
@@ -188,7 +299,13 @@ export function buildExpertPanelsData(
       })),
   );
 
-  return { rawRows, privateEquity, taxDepreciation, exposure };
+  // Annual yield = the passive-income summary's `projected` total: the expected
+  // gross rent/dividends/distributions over the next 12 months (an annualised
+  // figure, unlike `lastYear`, which is 0 for private equity and backward-looking).
+  const annualYield = buildPassiveIncome(assets, today, toBase, (a) => toBase(grossAssetValue(a), a.currency)).projected;
+  const ratios = computeFinancialRatios(assets, annualYield, displayCurrency, rates);
+
+  return { rawRows, privateEquity, taxDepreciation, exposure, ratios };
 }
 
 export type TaxSummary = {
