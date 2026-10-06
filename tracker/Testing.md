@@ -16,18 +16,15 @@
 - **Not tested:** `assets/metals-valuation.ts` and `assets/watch-valuation.ts` (read secrets and call `fetch`), server actions, React components, the persisted Zustand store, the RLS/DB layer. There are still no browser or end-to-end tests.
 
 ## Known issues the tests document (`it.fails`)
-Each is a test written for the *correct* behaviour that currently fails, so the suite stays green while the bug is recorded. When a bug is fixed, the `it.fails` flips to a failure: change it to a normal `it`. The source was **not** changed. Status of all 13: **open**.
+**All 13 `it.fails` were fixed on 2026-10-06 and flipped to normal `it` tests; none remain.** The suite now has 1042 passing tests. Fixes (all under `src/lib/`):
 
-- `parsers/generic-csv.ts:64-78`: date parser checks shape only; accepts `2026-02-30`, `31/04/2026`, month 13 (3 tests).
-- `parsers/sharesight.ts:248-255` and `saxo.ts:435-449`: CSV path treats the first line as header, so an intro/title line makes the file unreadable (xlsx path is fine).
-- `banking/csv-profiles.ts:626-627`: reported line number ignores dropped blank lines (reports 3, physical line is 4).
-- `tenancy-parser.ts:12-22`: `normalizeDate` only range-checks the month (`45-11-2025` becomes `2025-11-45`).
-- `bank-csv.ts:95-116`: `parseAmount` does not read European `1.234,56` (US format only; known limitation).
-- `portfolio-performance.ts:363-364`: `rangeStartDate` 1M/6M overflows on month-ends (2025-03-31 gives 2025-03-03, expected 2025-02-28). `addMonthsIso` in the same file clamps correctly.
-- `vehicle-depreciation.ts:99-100`: a manual rate below -100% gives `NaN` instead of 0.
-- `vehicle-depreciation.ts:42`: `EV_MODEL` regex also matches Hyundai i30/i40 (petrol/diesel) and gives them the EV curve.
-- `amortization.ts:45-49`: `addMonths` overflows on month-ends (loan starting 2025-01-31 gets first instalment 2025-03-03, expected 2025-02-28); feeds schedule dates and outstanding-principal.
-- `companies.ts:142-153`: two entities naming each other as holding company both vanish from the structure (only self-reference is guarded).
+- `parsers/generic-csv.ts` and `tenancy-parser.ts`: dates are validated as real calendar dates (`2026-02-30`, `31/04/2026`, month 13, `45-11-2025` are rejected).
+- `parsers/sharesight.ts` and `parsers/saxo.ts`: the CSV path finds the real header row below an intro/title line.
+- `banking/csv-profiles.ts`: error line numbers are physical file lines (falls back to the old numbering if a quoted field spans lines).
+- `bank-csv.ts`: `parseAmount` reads European `1.234,56` and `12,5`; a lone comma followed by 3 digits (`1,234`) keeps the US thousands reading.
+- `portfolio-performance.ts` and `amortization.ts`: month arithmetic clamps to the last day of the month (31 Mar minus 1M is 28 Feb; a loan starting 31 Jan gets 28 Feb first).
+- `vehicle-depreciation.ts`: a manual rate below -100% gives 0, not `NaN`; `EV_MODEL` no longer matches Hyundai i30/i40.
+- `companies.ts`: holding cycles (mutual or longer) no longer make entities vanish; the member closing the loop is shown top-level.
 
 ## Observations (not asserted as bugs)
 - Saxo/Sharesight `parseCellDate` uses `new Date(string)` then `toISOString()`: for non-ISO strings it reads month-first and can land a day early in timezones ahead of UTC (e.g. UAE). Depends on machine timezone.
