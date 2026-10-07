@@ -96,7 +96,7 @@ The import now takes **PDF as well as CSV** (dropzone, dashboard card, asset-det
 - **Flow:** PDF -> server action `readBankStatementPdf` (`app/dashboard/bank-pdf-actions.ts`: auth, 10 MB cap, `%PDF` magic bytes, `pdfToTextWithPages`; nothing stored) -> `lib/parsers/bank-pdf/` -> same Date/Description/Debit/Credit/Balance table (`bridge.ts`) that the existing column mapper and importers consume, or `StatementParseResult` for the multi-account dialog. A PDF with several accounts (Wio) or totals that do not reconcile asks the user to pick/confirm.
 - **Architecture** (mirrors `banking/csv-profiles.ts`): `types.ts` (`TransactionFingerprint`: date, valueDate, description, rawDescription, signed amount, debit/credit, balance, reference), `shared.ts` (`reconcile`: opening + movements = closing to the cent, plus every printed running balance), `classify.ts` (scanned/empty detection), `index.ts` (fingerprinting `detectBankPdf`, `parseBankStatementPdfText`, failure -> i18n key map), `bridge.ts`, one file per bank.
 - **Banks (verified against real statements in Steve's archive, read-only, no personal data committed; fixtures are synthetic):** FAB (168/168 text statements reconcile; sign inferred from balance deltas because the single amount column is not split), Wio (27/27 monthly statements, 200 accounts; the amount and balance are glued together and split by balance continuity), Banque Populaire "Extrait de compte" (85/85; year inferred, older layout has no signs so they are recovered by exact subset-sum between printed balances, 9 files carry a "row signs may be swapped" warning).
-- **Not parseable, with specific messages:** HSBC UAE (statement pages are images, only legal boilerplate is text: `image_only`), CBD (password protected: `encrypted`), CBI 2013 (scan, 2 characters of text: `scanned`), non-statement documents (`unsupported`). No OCR. Emirates NBD, ADCB, BNP Paribas and Revolut PDFs were not among the samples, so there is no profile for them.
+- **Not parseable, with specific messages:** HSBC UAE (statement pages are images, only legal boilerplate is text: `image_only`), CBD (password protected: `encrypted`), CBI 2013 (scan, 2 characters of text: `scanned`; later found to be a driving licence, not a statement), non-statement documents (`unsupported`). OCR is now available as an opt-in AWS Textract path (see the OCR setup section). Emirates NBD, ADCB, BNP Paribas and Revolut PDFs were not among the samples, so there is no profile for them.
 - **Caveats:** the real-data check proves opening + movements = closing, not row-by-row equality with the source; FAB 2018 statements have a garbled font layer (not detected); descriptions of wrapped FAB lines can lose/gain a space.
 - Tests: per-bank unit tests on synthetic fixtures (every date/amount/balance asserted to the cent, tamper -> mismatch), `classify`, `index`, `bridge`, and `csv-dropzone.test.tsx` (jsdom).
 
@@ -107,6 +107,69 @@ Previously the UI had **no transaction list at all**, only the import preview.
 - **Statement import preview** shows 8 rows with "view all", and every row opens the drawer; PDF imports carry value date, original label, reference and balance.
 - `importBankTransactions` gained an optional `source` (`"csv_import" | "pdf_import"`) so PDF imports are labelled correctly.
 - 30 `txd_*` keys. Caveat: `txd_desc` is unused. Related: [[Portfolio-Dashboard|Portfolio Dashboard]].
+
+## OCR setup (AWS Textract) and password-protected PDFs (2026-10-06)
+
+**Honesty first.** No real Textract output of an HSBC UAE or CBI statement has ever been seen. The HSBC pages could not be rendered locally, and the only "CBI statement" in the archive turned out to be a scanned driving licence (mis-filed), so there is **no real CBI sample**. The HSBC UAE and CBI OCR profiles are generic header-keyword parsers, verified only on synthetic OCR documents and mock Textract blocks. The real Textract call path was never run (no keys, nothing sent to AWS). Facts found about HSBC UAE PDFs: pages 1-4 of each statement have no text layer (0 extractable text items even with a modern pdf.js); page 5 (terms) has text; the legal-page vocabulary (B/F, CR, DR, CCY, UBP, PTB) is the only verified HSBC vocabulary.
+
+### What was built
+- **Encrypted PDFs:** when a PDF needs a password (e.g. CBD) the dropzone and the multi-account dialog show an inline prompt (`pdf-password-prompt.tsx`). The password travels in the server action's FormData, is used once by pdf.js inside `pdf-parse` (`{data, password}`; `PdfPasswordError` required/incorrect; a wrong password re-prompts), and is never logged, echoed, stored or put in a URL (capped at 256 characters).
+- **Deviation from the brief:** `pdf-lib` cannot decrypt PDFs, so decryption happens inside pdf.js during extraction, in memory. `pdf-lib` is used only to split pages for OCR of unencrypted PDFs.
+- **Size limit:** the action's cap is now **5 MB** to match `next.config.ts` `serverActions.bodySizeLimit` (it was 10 MB in the action, so 5-10 MB files would have failed with a framework error). `bank_pdf_error_too_large` now says 5 MB.
+- **OCR:** `src/lib/services/ocr-client.ts` (`isOcrConfigured`, `ocrPdfToDocument`; lazy client, never created at module load so missing keys cannot crash the app or the build; splits the PDF into single pages because synchronous `AnalyzeDocument` takes one page; `FeatureTypes: ["TABLES"]`; concurrency 3; page cap `OCR_MAX_PAGES` default 8, hard max 20; error mapping), `parsers/bank-pdf/ocr-textract.ts` (Blocks to lines/tables), `ocr-statement.ts` (generic header-driven table parser, OCR-noise-tolerant headers, Dr/Cr markers, balance-delta signs, plain-lines fallback; it never auto-corrects a suspicious number: `reconcile` flags it "mismatch"), HSBC UAE (`hsbc.ts`) and new CBI (`cbi.ts`) profiles, `parseBankStatementOcr`, `PdfStatement.source: "ocr"`.
+- **Routing** (`bank-pdf-actions.ts`): text extraction first; OCR only when the result is `scanned`/`image_only` AND the user consents for that upload (`pdf-ocr-prompt.tsx`: the file is sent once to Amazon Textract (AWS) to be read and is not stored by Opes Wealth; the file is then re-sent with `ocr=1`). OCR results never auto-continue: they always show the confirm panel "Read by OCR: check every row" plus each account's reconciliation.
+- New CSV-profile entries `hsbc_uae` and `cbi` (`pdfOnly: true`, empty column aliases so CSV detection can never match them; skipped by the CSV bank dropdown; not added to the Al Tareq `BANKS` list). `.env.example` has commented placeholders.
+
+### 1. Environment variables (names only, never values)
+| Variable | Required | Notes |
+|---|---|---|
+| `AWS_ACCESS_KEY_ID` | for OCR | Server-only. NEVER prefix with `NEXT_PUBLIC_`. |
+| `AWS_SECRET_ACCESS_KEY` | for OCR | Server-only. NEVER prefix with `NEXT_PUBLIC_`. |
+| `AWS_REGION` | optional | Default `eu-central-1`. Must be a region where Amazon Textract is available: check the AWS regional services list; do not assume `me-central-1`. |
+| `OCR_MAX_PAGES` | optional | Default 8, hard max 20. |
+
+Both keys are needed to enable OCR. **Without keys:** no crash, no network call, and the UI says "OCR is not set up on this server (AWS keys missing)".
+
+### 2. Create the AWS credentials safely
+1. In the AWS console open IAM -> Users -> Create user (name e.g. `opes-wealth-textract`), programmatic access only (no console password).
+2. Attach NO managed policies. Add this inline policy:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "textract:AnalyzeDocument",
+      "Resource": "*"
+    }
+  ]
+}
+```
+3. Create one access key (use case: application running outside AWS). Copy it once and store it only in Vercel and `.env.local`; never paste it in chat, code or the tracker.
+4. If a key is ever exposed, deactivate and delete it in IAM and create a new one, then update Vercel and `.env.local`.
+5. Consider an AWS Budget with an alert (Billing -> Budgets) so an unexpected spike is noticed.
+
+### 3. Vercel
+Project Settings -> Environment Variables -> add `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (tick **Sensitive** for the secret) for Production, and Preview if wanted; add `AWS_REGION` / `OCR_MAX_PAGES` only if you want to change the defaults. Then **Redeploy**: environment changes apply only to new deployments. The function region `bom1` in `vercel.json` is unrelated to the AWS region. `maxDuration = 60` is already declared in `src/app/dashboard/page.tsx` (broker import) but the effective limit depends on the Vercel plan (Hobby caps lower than Pro; not verified for this project: check the plan). OCR takes about several seconds per page, up to 8 pages by default.
+
+### 4. Local
+Add the same names to `.env.local` (git-ignored; `.env.example` lists the commented names) and restart `npm run dev`.
+
+### 5. How to test
+Dashboard -> Bank Statement Import, drop a scanned/image-only PDF (e.g. an HSBC UAE statement), read the consent text, click "Read with OCR", then check every row and the reconciliation line before importing. Expect that "mismatch" is possible with OCR.
+
+### 6. Cost and privacy
+- Textract bills per page; Tables analysis is roughly $15 per 1,000 pages at list price. Check current AWS pricing.
+- Every OCR run sends the page images of a bank statement to AWS. It happens only after per-upload consent. Opes Wealth stores nothing.
+- AWS AI services may use content to improve their services unless the account opts out through an AWS Organizations AI-services opt-out policy. Review this before using real statements.
+
+### 7. Password-protected PDFs
+Drop the PDF; if it needs a password the inline prompt appears. Type it and submit: it is used once, in memory, and discarded. A wrong password shows "incorrect" and asks again. Maximum file size 5 MB. **CBD limitation:** there is still no CBD text profile (no decrypted CBD sample or password was available), so a CBD PDF can now be unlocked but still ends as "unsupported" until a profile is written from a decrypted sample.
+
+### 8. Known limitations and next step
+- HSBC UAE and CBI OCR profiles are unverified; no CBI sample exists; CBD has no profile; OCR can produce "mismatch".
+- **Next step for Steve:** configure the keys, run one real HSBC statement and one real CBI statement through the importer with the consent prompt, and send back the "mismatch"/"unsupported" outcome or the OCR text so the profiles can be tightened.
+- Related: [[Deployment|Deployment]], [[Localization|Localization]], [[Testing|Testing]].
 
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)

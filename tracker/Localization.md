@@ -149,6 +149,10 @@
 - New families, each in all nine languages: `bank_pdf_*` (14, PDF statement import; the CSV import copy was also changed to "CSV & PDF"), `cmdk_*` (17, command palette), `ptable_*` (6, table density and category pills), `txd_*` (30, transaction drawer; `txd_desc` unused), `ical_*` (18, income calendar), `attr_*` (25, asset attribution card) and `xattr_*` (14, Expert attribution panel).
 - **Caveat:** all machine-translated, no native review (ar, hi, ru in particular). `translations.test.ts` still enforces full coverage. See [[CSV-Bank-Uploads|CSV Bank Uploads]], [[Design-System|Design System]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]].
 
+## Keys added 2026-10-06 (encrypted PDFs and OCR)
+- `bank_pdf_password_*` (10 keys, password prompt) and `bank_pdf_ocr_*` (8 keys, OCR consent and not-configured/error texts), each in all nine languages, machine-translated, no native review.
+- Changed texts: the encrypted-PDF message (it now points to the password prompt) and `bank_pdf_error_too_large` (now 5 MB). See [[CSV-Bank-Uploads|CSV Bank Uploads]].
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

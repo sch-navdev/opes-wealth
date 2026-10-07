@@ -39,6 +39,10 @@ Scope: deploy to Vercel. `.env.local` currently holds the Supabase URL/anon key 
 - New optional server-side variables, documented in `.env.example`: `ALTAREQ_SANDBOX_MODE`, `ALTAREQ_CLIENT_ID`, `ALTAREQ_AUTH_URL`, `ALTAREQ_TOKEN_URL`, `ALTAREQ_API_BASE_URL`, `ALTAREQ_REDIRECT_URI` (`https://www.opeswealth.app/dashboard/banking/callback`), `ALTAREQ_CLIENT_CERT`/`ALTAREQ_CLIENT_KEY` (mTLS), and `BANK_TOKEN_ENCRYPTION_KEY` (generate: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). `SUPABASE_SERVICE_ROLE_KEY` (already present in Vercel) is also used by the bank-token code. **Do not set `ALTAREQ_SANDBOX_MODE` in production.** Nothing needs to be set for the app to keep working: without them the Connect bank button is simply disabled. See [[Market-Data-Integration|Market Data Integration]].
 
 
+## OCR Environment Variables (2026-10-06)
+
+Four optional variables enable OCR of scanned bank PDFs via AWS Textract: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (both required for OCR; server-only), `AWS_REGION` (default `eu-central-1`, must support Textract) and `OCR_MAX_PAGES` (default 8, max 20). Not yet configured by Steve; without them the app runs normally and the UI says OCR is not set up. After adding them in Vercel, redeploy. Full steps, IAM policy and caveats: [[CSV-Bank-Uploads|CSV Bank Uploads]].
+
 ## AI Help Assistant Environment Variables (2026-10-01)
 
 - `ANTHROPIC_API_KEY` (required for the chat; without it the widget reports it isn't set up), `ASSISTANT_MODEL` (optional, default `claude-sonnet-5-5`).
