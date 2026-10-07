@@ -11,7 +11,7 @@
 
 import type { OcrDocument } from "./ocr-types";
 
-export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi";
+export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi" | "cbd";
 
 /**
  * One transaction as read from a statement. Named after the app's transaction-dedupe concept

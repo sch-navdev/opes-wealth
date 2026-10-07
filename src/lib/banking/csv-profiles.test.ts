@@ -28,7 +28,7 @@ describe("profile registry", () => {
 
   it("PDF-only profiles (OCR banks) have no aliases and can never match a CSV", () => {
     const pdfOnly = BANK_PROFILES.filter((p) => p.pdfOnly);
-    expect(pdfOnly.map((p) => p.id).sort()).toEqual(["cbi", "hsbc_uae"]);
+    expect(pdfOnly.map((p) => p.id).sort()).toEqual(["cbd", "cbi", "hsbc_uae"]);
     for (const p of pdfOnly) {
       expect(Object.values(p.columns).flat()).toEqual([]);
       expect(p.signature).toEqual([]);

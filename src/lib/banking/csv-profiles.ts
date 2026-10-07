@@ -44,7 +44,8 @@ export type BankProfileId =
   | "fortuneo"
   | "ing_france"
   | "hsbc_uae"
-  | "cbi";
+  | "cbi"
+  | "cbd";
 
 export type BankProfile = {
   id: BankProfileId;
@@ -396,6 +397,15 @@ export const BANK_PROFILES: BankProfile[] = [
   profile({
     id: "cbi",
     name: "Commercial Bank International (CBI)",
+    country: "AE",
+    defaultCurrency: "AED",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
+    signature: [],
+  }),
+  profile({
+    id: "cbd",
+    name: "Commercial Bank of Dubai (CBD)",
     country: "AE",
     defaultCurrency: "AED",
     pdfOnly: true,

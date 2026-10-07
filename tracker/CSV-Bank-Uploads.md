@@ -189,6 +189,12 @@ Drop the PDF; if it needs a password the inline prompt appears. Type it and subm
 - **Tests:** `bank-picker.test.ts`, extended `bank-statement-import-dialog.test.tsx` (CSV detect and re-parse, PDF re-read with `bank`/file/password/OCR consent, failure states, country filter, remembered country; Radix Select polyfills in the test file, pickers carry `data-testid="stmt-country-select"` / `"stmt-bank-select"`), `bank-pdf-actions.test.ts` (forced bank). Not verified in a browser by this change.
 - Related: [[Localization|Localization]].
 
+### CBD (Commercial Bank of Dubai) PDF profile (2026-10-07)
+- `lib/parsers/bank-pdf/cbd.ts`: text-layer parser for CBD current-account statements (password-protected: the dialog's password prompt unlocks them). Built from a real Nov 2025 statement. Layout: value date, amount and running balance are glued with no separator; no debit/credit marker, so the sign comes from the balance movement; rows are either one line or a bare date + description lines + tail; EN/AR page footers are dropped. Closing balance = last row's balance; the printed "TURN OVER" totals (debits, credits) are checked as a second, independent control.
+- **Verified on 14 real statements, Aug 2025 to Sep 2026 (run locally on the decrypted files, nothing committed):** all 14 reconcile (opening + movements = closing to the cent, 0 broken balance rows; 11 to 48 rows each). The first run caught a real gap: overdrawn balances are printed with a TRAILING minus ("1,111.54-") and that row was dropped (May 2026, diff 258.00); balances (and the opening balance) now accept a trailing or leading minus. Repo tests use a synthetic statement in the same layout (`cbd.test.ts`).
+- `cbd` added to `PdfBankId`, `PDF_BANK_PROFILES`, the PDF-only entries of `BANK_PROFILES` (so it appears for PDFs in the country/bank picker) and `bridge.ts`. No logo domain yet (initials fallback, like HSBC UAE).
+- **Not covered:** one account only (current account ending 4990, AED); other CBD account types or currencies, savings or card statements were not seen; the "ITEM COUNT" field is ignored. (The Aug/Sep 2025 files turned out to have a text layer once decrypted, so no OCR is needed for them.)
+
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — where imported history now surfaces (asset's valuation chart/table)

@@ -16,7 +16,7 @@ const ids = (kind: "csv" | "pdf", country: string) => banksForCountry(kind, coun
 describe("bank picker helpers", () => {
   it("every PDF bank has a BANK_PROFILES entry with the same id", () => {
     for (const id of pdfBankIds()) expect(getBankProfile(id)?.id).toBe(id);
-    expect(pdfBankIds().sort()).toEqual(["banque_populaire", "cbi", "fab", "hsbc_uae", "wio"]);
+    expect(pdfBankIds().sort()).toEqual(["banque_populaire", "cbd", "cbi", "fab", "hsbc_uae", "wio"]);
   });
 
   it("CSV kind excludes pdf-only profiles; PDF kind is exactly the PDF pipeline's banks", () => {
@@ -57,7 +57,8 @@ describe("bank picker helpers", () => {
 
   it("validates PDF bank ids", () => {
     expect(isPdfBankId("hsbc_uae")).toBe(true);
-    expect(isPdfBankId("cbd")).toBe(false);
+    expect(isPdfBankId("cbd")).toBe(true);
+    expect(isPdfBankId("nope")).toBe(false);
     expect(isPdfBankId(null)).toBe(false);
   });
 

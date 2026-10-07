@@ -193,7 +193,7 @@ describe("readBankStatementPdf forced bank", () => {
 
   it("ignores an unknown bank value (detection runs as usual)", async () => {
     mocks.pdfToTextWithPages.mockResolvedValue(junk);
-    for (const bank of ["cbd", "__proto__", ""]) {
+    for (const bank of ["nope", "__proto__", ""]) {
       const r = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", false, bank));
       expect(r).toMatchObject({ ok: false, failure: { code: "unsupported" } });
     }

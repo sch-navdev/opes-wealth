@@ -4,6 +4,7 @@
  */
 import { banquePopulaireProfile } from "./banque-populaire";
 import type { TranslationKey } from "@/lib/i18n";
+import { cbdProfile } from "./cbd";
 import { cbiProfile } from "./cbi";
 import { classifyPdfText } from "./classify";
 import { fabProfile } from "./fab";
@@ -17,7 +18,7 @@ export { classifyPdfText } from "./classify";
 export type { PdfTextKind } from "./classify";
 
 /** Detection order matters: the first profile whose `detect` is true wins. */
-export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabProfile, banquePopulaireProfile, hsbcProfile, cbiProfile];
+export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabProfile, banquePopulaireProfile, hsbcProfile, cbiProfile, cbdProfile];
 
 export const PDF_FAILURE_MESSAGE_KEYS = {
   encrypted: "bank_pdf_error_encrypted",
