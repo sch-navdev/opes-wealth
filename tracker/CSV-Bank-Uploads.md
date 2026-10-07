@@ -171,6 +171,10 @@ Drop the PDF; if it needs a password the inline prompt appears. Type it and subm
 - **Next step for Steve:** configure the keys, run one real HSBC statement and one real CBI statement through the importer with the consent prompt, and send back the "mismatch"/"unsupported" outcome or the OCR text so the profiles can be tightened.
 - Related: [[Deployment|Deployment]], [[Localization|Localization]], [[Testing|Testing]].
 
+### OCR troubleshooting (2026-10-07)
+- The message "OCR could not be run" is followed by a bracketed hint: `[not_configured]` = the AWS variables are not in that deployment (add them in Vercel and redeploy); `[access_denied: AccessDeniedException]` / `UnrecognizedClientException` / `InvalidSignatureException` = keys wrong or the account/role blocks `textract:AnalyzeDocument` (check the IAM policy and any account-level policy; the Textract console demo under the console role also returned "not authorized" on 2026-10-07); `[throttled]` = retry later; `[provider_error]` = other AWS error (region without Textract, timeout).
+- The Vercel runtime log line `readBankStatementPdf: OCR failed: <reason> <AWS error name>` carries the same information (never credentials).
+
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — where imported history now surfaces (asset's valuation chart/table)

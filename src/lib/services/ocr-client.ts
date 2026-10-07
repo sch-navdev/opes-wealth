@@ -32,7 +32,7 @@ export type OcrFailureReason =
 
 export type OcrResult =
   | { ok: true; document: OcrDocument; pages: number; truncated: boolean }
-  | { ok: false; reason: OcrFailureReason; message: string };
+  | { ok: false; reason: OcrFailureReason; message: string; /** AWS SDK error class name (e.g. "AccessDeniedException"): safe to show, never contains credentials. */ detail?: string };
 
 const DEFAULT_REGION = "eu-central-1";
 const DEFAULT_MAX_PAGES = 8;
@@ -53,8 +53,10 @@ function resolveMaxPages(explicit: number | undefined, env: Env): number {
 
 class OcrFailure extends Error {
   reason: OcrFailureReason;
-  constructor(reason: OcrFailureReason, message: string) {
+  detail?: string;
+  constructor(reason: OcrFailureReason, message: string, detail?: string) {
     super(message);
+    this.detail = detail;
     this.reason = reason;
   }
 }
@@ -66,17 +68,17 @@ function mapProviderError(err: unknown): OcrFailure {
     case "AccessDeniedException":
     case "UnrecognizedClientException":
     case "InvalidSignatureException":
-      return new OcrFailure("access_denied", "The OCR provider rejected the configured credentials or permissions.");
+      return new OcrFailure("access_denied", "The OCR provider rejected the configured credentials or permissions.", name || undefined);
     case "ThrottlingException":
     case "ProvisionedThroughputExceededException":
     case "LimitExceededException":
-      return new OcrFailure("throttled", "The OCR provider is rate limiting requests; try again shortly.");
+      return new OcrFailure("throttled", "The OCR provider is rate limiting requests; try again shortly.", name || undefined);
     case "UnsupportedDocumentException":
     case "BadDocumentException":
     case "InvalidParameterException":
-      return new OcrFailure("unreadable", "The OCR provider could not read this document.");
+      return new OcrFailure("unreadable", "The OCR provider could not read this document.", name || undefined);
     default:
-      return new OcrFailure("provider_error", "The OCR provider failed to process the document.");
+      return new OcrFailure("provider_error", "The OCR provider failed to process the document.", name || undefined);
   }
 }
 
@@ -166,10 +168,10 @@ export async function ocrPdfToDocument(
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pages) }, worker));
 
-    if (failure) return { ok: false, reason: (failure as OcrFailure).reason, message: (failure as OcrFailure).message };
+    if (failure) return { ok: false, reason: (failure as OcrFailure).reason, message: (failure as OcrFailure).message, detail: (failure as OcrFailure).detail };
     return { ok: true, document: { pages: results }, pages, truncated: total > pages };
   } catch (err) {
     const f = mapProviderError(err);
-    return { ok: false, reason: f.reason, message: f.message };
+    return { ok: false, reason: f.reason, message: f.message, detail: f.detail };
   }
 }

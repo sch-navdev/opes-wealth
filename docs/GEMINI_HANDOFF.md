@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-06 19:25 (Gulf Standard Time, UTC+4).** Items 28-33 are pushed (origin at `201e3a7`; its Vercel build status is unconfirmed). Items 35-36 (encrypted PDFs, OCR) are UNCOMMITTED, awaiting Steve (see "Push status"). Supabase matches all 34 migrations (0033 and 0034 applied by Steve and verified live). Production runs in Mumbai (`bom1`).
+**Last updated: 2026-10-07 17:08 (Gulf Standard Time, UTC+4). AWS OCR is configured in Vercel (IAM user opes-wealth-ocr, region ap-south-1) but the first live attempt failed with the generic "OCR could not be run" message; a diagnostic-hint change is committed locally and awaits push.** Items 28-33 are pushed (origin at `201e3a7`; its Vercel build status is unconfirmed). Items 35-36 (encrypted PDFs, OCR) are UNCOMMITTED, awaiting Steve (see "Push status"). Supabase matches all 34 migrations (0033 and 0034 applied by Steve and verified live). Production runs in Mumbai (`bom1`).
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project

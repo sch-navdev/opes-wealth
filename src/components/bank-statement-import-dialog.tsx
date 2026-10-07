@@ -181,7 +181,11 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         return;
       }
       if (ocrState === "unconfigured") setOcrMissing(true);
-      setParseError(t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable"));
+      {
+        const text = t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable");
+        const detail = "detail" in result.failure ? result.failure.detail : undefined;
+        setParseError(detail ? `${text} [${detail}]` : text);
+      }
       return;
     }
     setLocked(null);

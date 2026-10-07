@@ -88,7 +88,8 @@ export function CsvDropzone({
       }
       if (ocrState === "unconfigured") setOcrMissing(true);
       const key = code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable";
-      setError(t(key));
+      const detail = "detail" in result.failure ? result.failure.detail : undefined;
+      setError(detail ? `${t(key)} [${detail}]` : t(key));
       return;
     }
     setLocked(null);

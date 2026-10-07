@@ -76,14 +76,14 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
   if (!isOcrConfigured()) {
     return {
       ok: false,
-      failure: { code: "ocr_unavailable", message: "OCR is not set up on this server (AWS keys missing)." },
+      failure: { code: "ocr_unavailable", message: "OCR is not set up on this server (AWS keys missing).", detail: "not_configured" },
     };
   }
 
   const ocr = await ocrPdfToDocument(ocrBytes);
   if (!ocr.ok) {
     // Log the reason code only: never the file, the OCR text or any credential.
-    console.error("readBankStatementPdf: OCR failed:", ocr.reason);
+    console.error("readBankStatementPdf: OCR failed:", ocr.reason, ocr.detail ?? "");
     if (ocr.reason === "unreadable") {
       return { ok: false, failure: { code: "unreadable", message: "The PDF could not be read by OCR." } };
     }
@@ -92,7 +92,7 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
     }
     return {
       ok: false,
-      failure: { code: "ocr_unavailable", message: `OCR could not be run (${ocr.reason}).` },
+      failure: { code: "ocr_unavailable", message: `OCR could not be run (${ocr.reason}).`, detail: [ocr.reason, ocr.detail].filter(Boolean).join(": ") },
     };
   }
 

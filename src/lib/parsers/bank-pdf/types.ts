@@ -118,6 +118,8 @@ export type PdfParseFailure = {
   bank?: PdfBankId;
   /** Developer-facing English message (the UI shows the translated one for `code`). */
   message: string;
+  /** Short technical hint shown next to the translated message (e.g. OCR reason + AWS error class name). Never contains secrets. */
+  detail?: string;
 };
 
 export type PdfParseOutcome =
