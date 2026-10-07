@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { ProfileForm } from "@/components/profile-form";
 import { UiTierPreference } from "@/components/ui-tier-preference";
+import { OcrSelfTestButton } from "@/components/ocr-selftest-button";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -59,6 +60,10 @@ export default async function SettingsPage() {
 
         <div className="mb-6">
           <UiTierPreference />
+        </div>
+
+        <div className="mb-6">
+          <OcrSelfTestButton />
         </div>
 
         <ProfileForm

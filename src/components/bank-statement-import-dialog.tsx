@@ -38,7 +38,6 @@ import { importBankTransactions } from "@/app/dashboard/transaction-import-actio
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
 import { rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import {
-  BANK_PROFILES,
   detectProfile,
   getBankProfile,
   parseStatement,
@@ -48,6 +47,17 @@ import {
   type StatementGroup,
   type StatementParseResult,
 } from "@/lib/banking/csv-profiles";
+import {
+  banksForCountry,
+  countriesFor,
+  countryFlag,
+  countryLabel,
+  defaultCountry,
+  isPdfBankId,
+  readStoredCountry,
+  writeStoredCountry,
+  type StatementFileKind,
+} from "@/lib/banking/bank-picker";
 import { statementToParseResult } from "@/lib/parsers/bank-pdf/bridge";
 import { PDF_FAILURE_MESSAGE_KEYS, type PdfFailureCode, type PdfStatement } from "@/lib/parsers/bank-pdf";
 import { TransactionDetailsSheet } from "@/components/transaction-details-sheet";
@@ -90,6 +100,16 @@ type GroupState = { target: string; remember: boolean };
  * for that bank + currency) → check the parsed preview → import. The bank
  * presets are best-effort (see `lib/banking/csv-profiles.ts`), hence the
  * preview and the manual bank override.
+ *
+ * Bank picker (country, then bank): detection stays the default and the picker is
+ * an override. CSV: choosing a bank re-parses the file text with that preset. PDF:
+ * choosing a bank re-sends the SAME file to `readBankStatementPdf` with a `bank`
+ * field that forces that bank's parser (the file, the password and, only when the
+ * current result was OCR-read, the OCR consent are kept in memory for the re-send).
+ * A PDF that failed to parse shows the picker only for the failures where a bank
+ * choice can help (no recognised layout), never for scanned / password / OCR states.
+ * Apart from the PDF-validated banks, the CSV presets are unverified; the
+ * `stmt_unverified_note` above the picker says so for CSV files.
  */
 export function BankStatementImportDialog({ accounts }: { accounts: StatementTargetAccount[] }) {
   const { t, intlLocale } = useLanguage();
@@ -115,6 +135,17 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   const [ocrOffer, setOcrOffer] = useState<{ file: File; password?: string } | null>(null);
   const [ocrMissing, setOcrMissing] = useState(false);
   const [ocrRunning, setOcrRunning] = useState(false);
+  /** Which pipeline the current file went through (decides which banks the picker offers). */
+  const [kind, setKind] = useState<StatementFileKind | null>(null);
+  /** Country step of the picker (preselected from the detected bank, else the remembered country, else the UAE). */
+  const [country, setCountry] = useState("AE");
+  /** The bank the fingerprint / header detection picked (the "Detected" badge shows while it is still the chosen one). */
+  const [detectedId, setDetectedId] = useState<BankProfileId | "">("");
+  /** The PDF last sent to the server, kept in memory so a bank choice can re-send it (password and OCR consent included). */
+  const [pdfSource, setPdfSource] = useState<{ file: File; password?: string; ocr: boolean } | null>(null);
+  /** The PDF has a text layer but no bank layout was recognised: the bank picker can fix it. */
+  const [pickerFailure, setPickerFailure] = useState(false);
+  const [rereading, setRereading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -134,6 +165,11 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     setOcrOffer(null);
     setOcrMissing(false);
     setOcrRunning(false);
+    setKind(null);
+    setDetectedId("");
+    setPdfSource(null);
+    setPickerFailure(false);
+    setRereading(false);
   }
 
   function applyProfile(content: string, id: BankProfileId) {
@@ -155,17 +191,24 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     );
   }
 
-  async function handlePdfFile(file: File, password?: string, ocr = false) {
+  async function handlePdfFile(file: File, opts: { password?: string; ocr?: boolean; bank?: string } = {}) {
+    const { password, ocr = false, bank } = opts;
     setFileName(file.name);
-    setText("");
+    setPickerFailure(false);
     const form = new FormData();
     form.append("file", file);
     if (password) form.append("password", password);
     if (ocr) form.append("ocr", "1");
+    if (bank) form.append("bank", bank);
     const result = await readBankStatementPdf(form);
     setOcrOffer(null);
     setOcrMissing(false);
+    setPdfSource({ file, password, ocr });
     if (!result.ok) {
+      // A failed (re-)read leaves no stale preview behind.
+      setParsed(null);
+      setPdfStatement(null);
+      setGroupState([]);
       const code = result.failure.code;
       if (code === "encrypted" || code === "password_incorrect") {
         setLocked({ file, incorrect: code === "password_incorrect" });
@@ -175,26 +218,37 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
       setLocked(null);
       const ocrState = "ocr" in result.failure ? result.failure.ocr : undefined;
       if (ocrState === "available") {
-        // Scanned PDF and OCR is possible: ask for consent instead of failing.
+        // Scanned PDF and OCR is possible: ask for consent instead of failing (no bank picker here).
         setOcrOffer({ file, password });
         setParseError(null);
         return;
       }
       if (ocrState === "unconfigured") setOcrMissing(true);
-      {
-        const text = t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable");
-        const detail = "detail" in result.failure ? result.failure.detail : undefined;
-        setParseError(detail ? `${text} [${detail}]` : text);
+      // Only "no layout recognised" (or "layout recognised but empty" after a forced bank) can be helped by choosing a bank.
+      if (code === "unsupported" || (bank && code === "no_transactions")) {
+        setPickerFailure(true);
+        if (bank) {
+          setProfileId(bank as BankProfileId);
+          setCountry((c) => defaultCountry("pdf", bank, c));
+        }
       }
+      const message = t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable");
+      const detail = "detail" in result.failure ? result.failure.detail : undefined;
+      setParseError(detail ? `${message} [${detail}]` : message);
       return;
     }
     setLocked(null);
     const statement = result.statement;
     const parsedPdf = statementToParseResult(statement);
     const id = parsedPdf.profile.id;
+    // Re-send with OCR consent only when this result was itself OCR-read.
+    setPdfSource({ file, password, ocr: statement.source === "ocr" });
     setPdfStatement(statement);
     setProfileId(id);
     setDetection("found");
+    // A forced bank is the user's choice, not a detection.
+    setDetectedId(bank ? "" : id);
+    setCountry(defaultCountry("pdf", id, readStoredCountry()));
     setParseError(null);
     setParsed(parsedPdf);
     setGroupState(
@@ -209,18 +263,23 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     if (!file) return;
     reset();
     if (file.name.toLowerCase().endsWith(".pdf")) {
+      setKind("pdf");
+      setCountry(defaultCountry("pdf", null, readStoredCountry()));
       await handlePdfFile(file);
       return;
     }
+    setKind("csv");
     const content = await file.text();
     setText(content);
     setFileName(file.name);
     const found = detectProfile(content);
+    setCountry(defaultCountry("csv", found?.profile.id, readStoredCountry()));
     if (!found) {
       setDetection("none");
       return;
     }
     setDetection(found.ambiguous ? "ambiguous" : "found");
+    setDetectedId(found.profile.id);
     applyProfile(content, found.profile.id);
   }
 
@@ -228,7 +287,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     if (!locked) return;
     setUnlocking(true);
     try {
-      await handlePdfFile(locked.file, password);
+      await handlePdfFile(locked.file, { password });
     } catch {
       setLocked(null);
       setParseError(t("bank_pdf_error_unreadable"));
@@ -242,12 +301,39 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     const { file, password } = ocrOffer;
     setOcrRunning(true);
     try {
-      await handlePdfFile(file, password, true);
+      await handlePdfFile(file, { password, ocr: true });
     } catch {
       setOcrOffer(null);
       setParseError(t("bank_pdf_error_unreadable"));
     } finally {
       setOcrRunning(false);
+    }
+  }
+
+  function changeCountry(next: string) {
+    setCountry(next);
+    writeStoredCountry(next);
+  }
+
+  /** Bank step of the picker: CSV re-parses the text with that preset, PDF re-reads the same file forced to that bank. */
+  async function changeBank(id: string) {
+    const bank = banksForCountry(kind ?? "csv", country).find((b) => b.id === id);
+    if (!bank) return;
+    writeStoredCountry(bank.country);
+    if (kind === "csv") {
+      if (text) applyProfile(text, bank.id);
+      return;
+    }
+    if (kind !== "pdf" || !pdfSource || !isPdfBankId(id) || (pdfStatement && profileId === id)) return;
+    setRereading(true);
+    try {
+      await handlePdfFile(pdfSource.file, { password: pdfSource.password, ocr: pdfSource.ocr, bank: id });
+    } catch {
+      setParsed(null);
+      setPdfStatement(null);
+      setParseError(t("bank_pdf_error_unreadable"));
+    } finally {
+      setRereading(false);
     }
   }
 
@@ -316,6 +402,10 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
       .sort((a, b) => b.date.localeCompare(a.date));
   }
   const importable = groupState.some((g) => g.target !== NONE);
+  /** CSV: always once a file is read. PDF: after a successful read, or when no layout was recognised. */
+  const showPicker = kind === "csv" ? text !== null : kind === "pdf" ? !!pdfStatement || pickerFailure : false;
+  const pickerBanks = kind ? banksForCountry(kind, country) : [];
+  const pickerProfile = profile && profile.country === country ? profile.id : "";
 
   return (
     <Dialog
@@ -367,32 +457,56 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
               <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
                 {fileName || t("stmt_choose_file")}
               </Button>
-              {text !== null && !pdfStatement && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground">{t("stmt_bank")}</Label>
-                  <Select
-                    value={profileId || NONE}
-                    onValueChange={(v) => v !== NONE && text && applyProfile(text, v as BankProfileId)}
-                  >
-                    <SelectTrigger className="h-8 w-56">
-                      <SelectValue placeholder={t("stmt_choose_bank")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NONE} disabled>
-                        {t("stmt_choose_bank")}
-                      </SelectItem>
-                      {BANK_PROFILES.filter((p) => !p.pdfOnly).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          <InstitutionLogo kind="bank" id={p.id} name={p.name} />
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {detection === "found" && <Badge variant="outline">{t("stmt_detected")}</Badge>}
-                </div>
-              )}
             </div>
+
+            {showPicker && kind && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="stmt-country" className="text-xs text-muted-foreground">
+                      {t("stmt_country")}
+                    </Label>
+                    <Select value={country} onValueChange={changeCountry} disabled={rereading}>
+                      <SelectTrigger id="stmt-country" data-testid="stmt-country-select" className="h-8 w-52">
+                        <SelectValue placeholder={t("stmt_choose_country")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countriesFor(kind).map((code) => (
+                          <SelectItem key={code} value={code}>
+                            <span aria-hidden>{countryFlag(code)}</span>
+                            {countryLabel(code, intlLocale)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="stmt-bank" className="text-xs text-muted-foreground">
+                      {t("stmt_bank")}
+                    </Label>
+                    <Select value={pickerProfile} onValueChange={(v) => void changeBank(v)} disabled={rereading}>
+                      <SelectTrigger id="stmt-bank" data-testid="stmt-bank-select" className="h-8 w-64">
+                        <SelectValue placeholder={t("stmt_choose_bank")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {pickerBanks.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            <InstitutionLogo kind="bank" id={p.id} name={p.name} />
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {detectedId && detectedId === profileId && <Badge variant="outline">{t("stmt_detected")}</Badge>}
+                </div>
+                {kind === "pdf" && (
+                  <p className="text-xs text-muted-foreground" role={rereading ? "status" : undefined}>
+                    {rereading ? t("stmt_rereading") : pdfStatement ? t("stmt_pdf_bank_hint") : t("stmt_pdf_unsupported_hint")}
+                  </p>
+                )}
+              </div>
+            )}
 
             {detection === "none" && (
               <p className="text-sm text-muted-foreground">{t("stmt_not_detected")}</p>

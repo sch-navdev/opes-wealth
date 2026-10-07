@@ -2596,6 +2596,26 @@ const dictionary = {
   attr_na_invalid_value: { en: "The current value of this asset is not valid, so the attribution cannot be computed.", fr: "La valeur actuelle de cet actif n'est pas valide : l'attribution ne peut pas être calculée." },
   attr_na_missing_fx_now: { en: "Today's exchange rate for this currency is not available right now.", fr: "Le taux de change du jour pour cette devise n'est pas disponible pour le moment." },
   attr_na_missing_fx_at_cost: { en: "The historical exchange rate for the purchase date could not be retrieved. Try again later.", fr: "Le taux de change historique à la date d'achat n'a pas pu être récupéré. Réessayez plus tard." },
+
+  // Bank picker: country, then bank (2026-10-07)
+  stmt_country: { en: "Country", fr: "Pays" },
+  stmt_choose_country: { en: "Choose the country", fr: "Choisissez le pays" },
+  stmt_pdf_bank_hint: { en: "Detected from the PDF. If the bank is wrong, pick the right one and the PDF is read again with that bank's layout.", fr: "Détectée depuis le PDF. Si la banque est erronée, choisissez la bonne : le PDF sera relu avec la mise en page de cette banque." },
+  stmt_pdf_unsupported_hint: { en: "If this is a statement from one of these banks, pick it and the PDF is read again with that bank's layout.", fr: "S'il s'agit d'un relevé de l'une de ces banques, choisissez-la : le PDF sera relu avec la mise en page de cette banque." },
+  stmt_rereading: { en: "Reading the PDF again…", fr: "Nouvelle lecture du PDF…" },
+  // OCR self-test (2026-10-07)
+  ocrtest_title: { en: "Statement OCR connection", fr: "Connexion OCR des relevés" },
+  ocrtest_hint: { en: "Checks that scanned bank statements can be read by the OCR service. Sends a tiny generated test page; no personal data and no keys are shown.", fr: "Vérifie que les relevés bancaires numérisés peuvent être lus par le service OCR. Envoie une petite page de test générée ; aucune donnée personnelle ni clé n'est affichée." },
+  ocrtest_button: { en: "Test OCR connection", fr: "Tester la connexion OCR" },
+  ocrtest_running: { en: "Testing...", fr: "Test en cours..." },
+  ocrtest_ok: { en: "OCR works (region {region}).", fr: "L'OCR fonctionne (région {region})." },
+  ocrtest_error: { en: "OCR test failed (region {region}).", fr: "Le test OCR a échoué (région {region})." },
+  ocrtest_not_configured: { en: "OCR credentials are not set on this server.", fr: "Les identifiants OCR ne sont pas définis sur ce serveur." },
+  ocrtest_class: { en: "Error class: {value}", fr: "Classe d'erreur : {value}" },
+  ocrtest_status: { en: "HTTP status: {value}", fr: "Statut HTTP : {value}" },
+  ocrtest_request: { en: "Request id: {value}", fr: "ID de requête : {value}" },
+  ocrtest_failed: { en: "The test could not be run. Try again.", fr: "Le test n'a pas pu être exécuté. Réessayez." },
+  ocrtest_signin: { en: "Sign in to run this test.", fr: "Connectez-vous pour lancer ce test." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

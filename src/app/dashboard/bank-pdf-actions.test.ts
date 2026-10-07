@@ -24,8 +24,9 @@ import { PdfPasswordError } from "@/lib/pdf-text";
 
 const PASSWORD = "my-top-secret-pw";
 
-function form(password?: string, bytes = "%PDF-1.4 x", ocr = false) {
+function form(password?: string, bytes = "%PDF-1.4 x", ocr = false, bank?: string) {
   const f = new FormData();
+  if (bank !== undefined) f.append("bank", bank);
   f.append("file", new File([bytes], "s.pdf", { type: "application/pdf" }));
   if (password !== undefined) f.append("password", password);
   if (ocr) f.append("ocr", "1");
@@ -176,5 +177,43 @@ describe("readBankStatementPdf OCR", () => {
     const r = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", true));
     expect(r).toMatchObject({ ok: false, failure: { code: "unsupported" } });
     expect(mocks.ocrPdfToDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe("readBankStatementPdf forced bank", () => {
+  const junk = { text: "Some unrelated document with plenty of words but nothing else here at all", numPages: 1 };
+
+  it("forces the chosen bank's parser instead of reporting an unsupported layout", async () => {
+    mocks.pdfToTextWithPages.mockResolvedValue(junk);
+    const detected = await readBankStatementPdf(form());
+    expect(detected).toMatchObject({ ok: false, failure: { code: "unsupported" } });
+    const forced = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", false, "wio"));
+    expect(forced.ok === false && forced.failure.code).not.toBe("unsupported");
+  });
+
+  it("ignores an unknown bank value (detection runs as usual)", async () => {
+    mocks.pdfToTextWithPages.mockResolvedValue(junk);
+    for (const bank of ["cbd", "__proto__", ""]) {
+      const r = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", false, bank));
+      expect(r).toMatchObject({ ok: false, failure: { code: "unsupported" } });
+    }
+  });
+
+  it("passes the forced bank to the OCR parser too (consent still required)", async () => {
+    mocks.pdfToTextWithPages.mockResolvedValue({ text: "", numPages: 1 });
+    mocks.isOcrConfigured.mockReturnValue(true);
+    const noConsent = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", false, "hsbc_uae"));
+    expect(noConsent).toMatchObject({ ok: false, failure: { code: "scanned", ocr: "available" } });
+    expect(mocks.ocrPdfToDocument).not.toHaveBeenCalled();
+    mocks.ocrPdfToDocument.mockResolvedValue({
+      ok: true,
+      document: { pages: [{ lines: ["Totally unrecognisable text"], tables: [] }] },
+      pages: 1,
+      truncated: false,
+    });
+    const r = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", true, "hsbc_uae"));
+    expect(mocks.ocrPdfToDocument).toHaveBeenCalledTimes(1);
+    // Forced to HSBC UAE: its OCR parser ran (so not the generic "no layout recognised" outcome of detection).
+    expect(r.ok === false && r.failure.message).not.toMatch(/No supported bank statement layout/);
   });
 });

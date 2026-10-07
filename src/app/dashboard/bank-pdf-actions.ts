@@ -1,7 +1,7 @@
 "use server";
 
 import { PdfPasswordError, pdfToTextWithPages } from "@/lib/pdf-text";
-import { parseBankStatementOcr, parseBankStatementPdfText, type PdfParseOutcome } from "@/lib/parsers/bank-pdf";
+import { PDF_BANK_PROFILES, parseBankStatementOcr, parseBankStatementPdfText, type PdfBankId, type PdfParseOutcome } from "@/lib/parsers/bank-pdf";
 import { isOcrConfigured, ocrPdfToDocument } from "@/lib/services/ocr-client";
 import { createClient } from "@/utils/supabase/server";
 
@@ -45,6 +45,12 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
     return { ok: false, failure: { code: "password_incorrect", message: "The PDF password is incorrect." } };
   }
 
+  // Optional bank the user picked in the import dialog: forces that bank's parser instead of the
+  // fingerprint. Unknown values are ignored (detection runs as usual), never an error.
+  const rawBank = formData.get("bank");
+  const bank: PdfBankId | undefined =
+    typeof rawBank === "string" ? PDF_BANK_PROFILES.find((p) => p.id === rawBank)?.id : undefined;
+
   // Explicit per-upload consent to send a scanned PDF to the OCR provider (see below).
   const ocrConsent = formData.get("ocr") === "1";
   // The text reader may detach/transfer the buffer, so keep our own copy for OCR.
@@ -64,7 +70,7 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
     return { ok: false, failure: { code: "unreadable", message: "The PDF could not be read." } };
   }
 
-  const outcome = parseBankStatementPdfText(extracted.text, { numPages: extracted.numPages });
+  const outcome = parseBankStatementPdfText(extracted.text, { numPages: extracted.numPages, bank });
   if (outcome.ok || (outcome.failure.code !== "scanned" && outcome.failure.code !== "image_only")) return outcome;
 
   // Scanned / image-only: OCR is the only way in. It sends the file to a third party (AWS Textract),
@@ -96,7 +102,7 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
     };
   }
 
-  const parsed = parseBankStatementOcr(ocr.document);
+  const parsed = parseBankStatementOcr(ocr.document, { bank });
   if (parsed.ok && ocr.truncated) {
     return {
       ok: true,

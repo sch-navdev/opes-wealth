@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it, vi } from "vitest";
-import { isOcrConfigured, ocrPdfToDocument, type TextractSend } from "./ocr-client";
+import { isOcrConfigured, ocrPdfToDocument, resolveOcrRegion, type TextractSend } from "./ocr-client";
 
 const KEY = "AKIATESTFAKEKEY0000";
 const SECRET = "fake/secret+value/DO-NOT-LEAK";
@@ -94,6 +94,10 @@ describe("ocrPdfToDocument", () => {
 
   it.each([
     ["AccessDeniedException", "access_denied"],
+    ["UnrecognizedClientException", "access_denied"],
+    ["InvalidSignatureException", "access_denied"],
+    ["SubscriptionRequiredException", "access_denied"],
+    ["OptInRequired", "access_denied"],
     ["ThrottlingException", "throttled"],
     ["ProvisionedThroughputExceededException", "throttled"],
     ["UnsupportedDocumentException", "unreadable"],
@@ -110,5 +114,42 @@ describe("ocrPdfToDocument", () => {
       expect(JSON.stringify(res)).not.toContain(KEY);
       expect(JSON.stringify(res)).not.toContain(SECRET);
     }
+  });
+
+  it("exposes only class name, hint, status and a well-formed request id", async () => {
+    const send: TextractSend = async () => {
+      const e = namedError("AccessDeniedException", `User: arn:aws:iam::1:user/x ${KEY}`);
+      Object.assign(e, { $metadata: { httpStatusCode: 403, requestId: "req-1234" } });
+      throw e;
+    };
+    const res = await ocrPdfToDocument(await makePdf(1), { env, send });
+    expect(res).toMatchObject({
+      ok: false,
+      reason: "access_denied",
+      detail: "AccessDeniedException",
+      httpStatus: 403,
+      requestId: "req-1234",
+    });
+    if (!res.ok) expect(res.hint).toMatch(/CloudTrail/);
+    expect(JSON.stringify(res)).not.toContain("arn:aws");
+  });
+
+  it("drops a malformed request id", async () => {
+    const send: TextractSend = async () => {
+      const e = namedError("AccessDeniedException");
+      Object.assign(e, { $metadata: { httpStatusCode: 403, requestId: `bad id ${SECRET}` } });
+      throw e;
+    };
+    const res = await ocrPdfToDocument(await makePdf(1), { env, send });
+    expect(!res.ok && res.requestId).toBeUndefined();
+    expect(JSON.stringify(res)).not.toContain(SECRET);
+  });
+});
+
+describe("resolveOcrRegion", () => {
+  it("prefers OCR_AWS_REGION, then AWS_REGION, then the default", () => {
+    expect(resolveOcrRegion({ OCR_AWS_REGION: "ap-south-1", AWS_REGION: "us-east-1" })).toBe("ap-south-1");
+    expect(resolveOcrRegion({ AWS_REGION: "us-east-1" })).toBe("us-east-1");
+    expect(resolveOcrRegion({})).toBe("eu-central-1");
   });
 });

@@ -30,9 +30,22 @@ export type OcrFailureReason =
   | "throttled"
   | "provider_error";
 
+export type OcrFailureInfo = {
+  reason: OcrFailureReason;
+  message: string;
+  /** AWS SDK error class name (e.g. "AccessDeniedException"): safe to show, never contains credentials. */
+  detail?: string;
+  /** Fixed English sentence per error class explaining the likely fix (never provider text). */
+  hint?: string;
+  /** AWS request id (safe; lets the owner find the event in CloudTrail). */
+  requestId?: string;
+  /** HTTP status AWS answered with, when it answered. */
+  httpStatus?: number;
+};
+
 export type OcrResult =
   | { ok: true; document: OcrDocument; pages: number; truncated: boolean }
-  | { ok: false; reason: OcrFailureReason; message: string; /** AWS SDK error class name (e.g. "AccessDeniedException"): safe to show, never contains credentials. */ detail?: string };
+  | ({ ok: false } & OcrFailureInfo);
 
 const DEFAULT_REGION = "eu-central-1";
 const DEFAULT_MAX_PAGES = 8;
@@ -51,34 +64,90 @@ function resolveMaxPages(explicit: number | undefined, env: Env): number {
   return Math.min(Math.floor(raw), HARD_MAX_PAGES);
 }
 
-class OcrFailure extends Error {
-  reason: OcrFailureReason;
-  detail?: string;
-  constructor(reason: OcrFailureReason, message: string, detail?: string) {
-    super(message);
-    this.detail = detail;
-    this.reason = reason;
+/**
+ * Region used for Textract. `OCR_AWS_REGION` wins over `AWS_REGION` because hosting platforms
+ * (e.g. Vercel/Lambda) may set `AWS_REGION` to the function's own region, not the Textract one.
+ */
+export function resolveOcrRegion(env: Env = process.env): string {
+  return env.OCR_AWS_REGION?.trim() || env.AWS_REGION?.trim() || DEFAULT_REGION;
+}
+
+/** Fixed, provider-text-free explanation per AWS error class. */
+export function hintForErrorClass(name: string | undefined, region?: string): string | undefined {
+  const where = region ? ` in ${region}` : "";
+  switch (name) {
+    case "AccessDeniedException":
+      return `AWS answered but denied textract:AnalyzeDocument: check the IAM policy AND any account-level service control policy or permissions boundary; open CloudTrail Event history${where}, event AnalyzeDocument, and read errorMessage.`;
+    case "UnrecognizedClientException":
+      return "AWS does not recognise the access key id or session token: check AWS_ACCESS_KEY_ID (no spaces, key still active, no stray AWS_SESSION_TOKEN).";
+    case "InvalidSignatureException":
+      return "AWS rejected the request signature: check AWS_SECRET_ACCESS_KEY for typos or stray whitespace, and that the server clock is correct.";
+    case "ExpiredTokenException":
+      return "The AWS session token has expired: remove AWS_SESSION_TOKEN or provide fresh credentials.";
+    case "SubscriptionRequiredException":
+    case "OptInRequired":
+      return `The AWS account is not enabled for Amazon Textract${where}: open the Textract console once in that region or contact AWS Support to activate the service.`;
+    case "ThrottlingException":
+    case "ProvisionedThroughputExceededException":
+    case "LimitExceededException":
+      return "AWS is rate limiting Textract: retry shortly.";
+    case "UnsupportedDocumentException":
+    case "BadDocumentException":
+    case "InvalidParameterException":
+      return "Textract could not read the document it was sent.";
+    default:
+      return undefined;
   }
 }
 
-function mapProviderError(err: unknown): OcrFailure {
+class OcrFailure extends Error {
+  reason: OcrFailureReason;
+  detail?: string;
+  hint?: string;
+  requestId?: string;
+  httpStatus?: number;
+  constructor(reason: OcrFailureReason, message: string, detail?: string, meta: { requestId?: string; httpStatus?: number } = {}) {
+    super(message);
+    this.detail = detail;
+    this.reason = reason;
+    this.hint = hintForErrorClass(detail);
+    this.requestId = meta.requestId;
+    this.httpStatus = meta.httpStatus;
+  }
+}
+
+/** Safe metadata from an AWS SDK error: only a well-formed request id and a numeric status. */
+function safeMetadata(err: unknown): { requestId?: string; httpStatus?: number } {
+  const md = (err as { $metadata?: { httpStatusCode?: unknown; requestId?: unknown } } | null)?.$metadata;
+  if (!md || typeof md !== "object") return {};
+  const requestId = typeof md.requestId === "string" && /^[A-Za-z0-9-]{1,64}$/.test(md.requestId) ? md.requestId : undefined;
+  const httpStatus = typeof md.httpStatusCode === "number" && Number.isInteger(md.httpStatusCode) ? md.httpStatusCode : undefined;
+  return { requestId, httpStatus };
+}
+
+/** Maps a provider error to a safe failure: only the class name and safe metadata are kept, never the provider message. */
+export function mapProviderError(err: unknown): OcrFailure {
   if (err instanceof OcrFailure) return err;
-  const name = err instanceof Error ? err.name : "";
+  const name = (err instanceof Error ? err.name : "") || undefined;
+  const meta = safeMetadata(err);
   switch (name) {
     case "AccessDeniedException":
     case "UnrecognizedClientException":
     case "InvalidSignatureException":
-      return new OcrFailure("access_denied", "The OCR provider rejected the configured credentials or permissions.", name || undefined);
+    case "ExpiredTokenException":
+    case "SubscriptionRequiredException":
+    case "OptInRequired":
+      return new OcrFailure("access_denied", "The OCR provider rejected the configured credentials or permissions.", name, meta);
     case "ThrottlingException":
     case "ProvisionedThroughputExceededException":
     case "LimitExceededException":
-      return new OcrFailure("throttled", "The OCR provider is rate limiting requests; try again shortly.", name || undefined);
+      return new OcrFailure("throttled", "The OCR provider is rate limiting requests; try again shortly.", name, meta);
     case "UnsupportedDocumentException":
     case "BadDocumentException":
     case "InvalidParameterException":
-      return new OcrFailure("unreadable", "The OCR provider could not read this document.", name || undefined);
+      return new OcrFailure("unreadable", "The OCR provider could not read this document.", name, meta);
     default:
-      return new OcrFailure("provider_error", "The OCR provider failed to process the document.", name || undefined);
+      return new OcrFailure("provider_error", "The OCR provider failed to process the document.", name, meta);
   }
 }
 
@@ -91,10 +160,10 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 /** Builds the real Textract sender lazily (dynamic import: the SDK is only loaded when OCR actually runs). */
-async function createSend(env: Env): Promise<TextractSend> {
+export async function createSend(env: Env): Promise<TextractSend> {
   const { TextractClient } = await import("@aws-sdk/client-textract");
   const client = new TextractClient({
-    region: env.AWS_REGION?.trim() || DEFAULT_REGION,
+    region: resolveOcrRegion(env),
     credentials: {
       accessKeyId: env.AWS_ACCESS_KEY_ID as string,
       secretAccessKey: env.AWS_SECRET_ACCESS_KEY as string,
@@ -102,6 +171,10 @@ async function createSend(env: Env): Promise<TextractSend> {
     },
   });
   return (command) => client.send(command) as Promise<{ Blocks?: TextractBlockLike[] }>;
+}
+
+export function failureResult(f: OcrFailure): OcrResult {
+  return { ok: false, reason: f.reason, message: f.message, detail: f.detail, hint: f.hint, requestId: f.requestId, httpStatus: f.httpStatus };
 }
 
 export async function ocrPdfToDocument(
@@ -168,10 +241,9 @@ export async function ocrPdfToDocument(
     };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pages) }, worker));
 
-    if (failure) return { ok: false, reason: (failure as OcrFailure).reason, message: (failure as OcrFailure).message, detail: (failure as OcrFailure).detail };
+    if (failure) return failureResult(failure);
     return { ok: true, document: { pages: results }, pages, truncated: total > pages };
   } catch (err) {
-    const f = mapProviderError(err);
-    return { ok: false, reason: f.reason, message: f.message, detail: f.detail };
+    return failureResult(mapProviderError(err));
   }
 }
