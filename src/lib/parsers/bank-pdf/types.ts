@@ -11,7 +11,7 @@
 
 import type { OcrDocument } from "./ocr-types";
 
-export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi" | "cbd";
+export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi" | "cbd" | "hsbc_uae_card";
 
 /**
  * One transaction as read from a statement. Named after the app's transaction-dedupe concept
@@ -120,6 +120,8 @@ export type PdfParseFailure = {
   message: string;
   /** Short technical hint shown next to the translated message (e.g. OCR reason + AWS error class name). Never contains secrets. */
   detail?: string;
+  /** OCR path only: masked layout of the OCR output (digits and words hidden, see `ocr-layout.ts`) for support diagnostics. Never logged. */
+  layout?: string;
 };
 
 export type PdfParseOutcome =

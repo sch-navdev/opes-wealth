@@ -89,6 +89,8 @@ High-net-worth individuals
 - [x] Demo account: new seed data and read-only mode (RLS deny policies, write shim, toast) — migration 0032 applied (verified live 2026-10-06: 39 restrictive policies); a `seed-demo.mts --yes` re-run is still a manual step — [[Demo-Mode|Demo Mode]]
 ### Quality
 - [x] Bank statement PDF import (FAB, Wio, Banque Populaire), transaction details drawer and stored-transaction list — [[CSV-Bank-Uploads|CSV Bank Uploads]]; not committed yet (2026-10-06)
+- [x] Statement import round 2: CBD and HSBC UAE credit-card PDF profiles, HSBC UAE OCR rewrite (unverified on real OCR), row selection + duplicate check, masked OCR diagnostics — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Customisable dashboard edit mode (toggle, reorder, resize, per-account save; migration 0035 to apply) — [[Portfolio-Dashboard|Portfolio Dashboard]]
 - [x] Income calendar, table density and category pills, Ctrl/Cmd+K command palette — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Design-System|Design System]]
 - [x] FX vs capital performance attribution (asset page + Expert panel) — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
 - [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 88 files / 1626 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]

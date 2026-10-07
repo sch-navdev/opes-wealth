@@ -111,10 +111,10 @@ const numCell = "text-end tabular-nums whitespace-nowrap";
 
 type Props = { data: ExpertPanelsData; baseCurrency: string; attribution?: AttributionPanelData | null };
 
-export function DashboardExpertPanels({ data, baseCurrency, attribution }: Props) {
-  const { t, intlLocale } = useLanguage();
+/** Number formatters shared by every Expert tile (money, multiples, IRR), already privacy-masked. */
+function useExpertFormatters(baseCurrency: string) {
+  const { intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const motion = useTierMotion();
 
   const money = useMemo(
     () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
@@ -131,56 +131,96 @@ export function DashboardExpertPanels({ data, baseCurrency, attribution }: Props
   const fmtMoney = (n: number) => maskValue(money.format(n));
   const fmtRatio = (n: number | null) => (n == null ? "-" : maskValue(`${ratio.format(n)}x`));
   const fmtIrr = (n: number | null) => (n == null ? "-" : `${pct1.format(n * 100)}%`);
+  return { fmtMoney, fmtRatio, fmtIrr, pct1 };
+}
 
-  const card = "animate-in fade-in slide-in-from-bottom-2 gap-4 border-border bg-card py-5 motion-reduce:animate-none min-w-0";
+const CARD = "animate-in fade-in slide-in-from-bottom-2 gap-4 border-border bg-card py-5 motion-reduce:animate-none min-w-0";
 
+/**
+ * The Expert tiles as separate blocks, so the customisable dashboard (lib/dashboard-layout.ts)
+ * can order, hide and resize each one. `h-full` makes the card fill the block cell the layout
+ * grid gives it. Entrance-animation indices match the former single-section order.
+ */
+type BlockProps = { data: ExpertPanelsData; baseCurrency: string };
+
+export function ExpertRawBlock({ data, baseCurrency }: BlockProps) {
+  const motion = useTierMotion();
+  const { fmtMoney } = useExpertFormatters(baseCurrency);
+  return (
+    <RawDataPanel data={data} className={cn(CARD, "h-full")} style={tileEntranceStyle(motion, 0)} baseCurrency={baseCurrency} fmtMoney={fmtMoney} />
+  );
+}
+
+export function ExpertPrivateEquityBlock({ data, baseCurrency }: BlockProps) {
+  const motion = useTierMotion();
+  const { fmtMoney, fmtRatio, fmtIrr } = useExpertFormatters(baseCurrency);
+  return (
+    <PrivateEquityPanel
+      data={data}
+      className={cn(CARD, "h-full")}
+      style={tileEntranceStyle(motion, 1)}
+      baseCurrency={baseCurrency}
+      fmtMoney={fmtMoney}
+      fmtRatio={fmtRatio}
+      fmtIrr={fmtIrr}
+    />
+  );
+}
+
+export function ExpertTaxBlock({ data, baseCurrency }: BlockProps) {
+  const motion = useTierMotion();
+  const { fmtMoney } = useExpertFormatters(baseCurrency);
+  return (
+    <TaxPanel data={data} className={cn(CARD, "h-full")} style={tileEntranceStyle(motion, 2)} baseCurrency={baseCurrency} fmtMoney={fmtMoney} />
+  );
+}
+
+export function ExpertExposureBlock({ data, baseCurrency }: BlockProps) {
+  const motion = useTierMotion();
+  const { fmtMoney, pct1 } = useExpertFormatters(baseCurrency);
+  return (
+    <ExposurePanel
+      data={data}
+      className={cn(CARD, "h-full")}
+      style={tileEntranceStyle(motion, 3)}
+      baseCurrency={baseCurrency}
+      fmtMoney={fmtMoney}
+      pct1={pct1}
+    />
+  );
+}
+
+export function ExpertRatiosBlock({ data, baseCurrency }: BlockProps) {
+  const motion = useTierMotion();
+  const { fmtMoney } = useExpertFormatters(baseCurrency);
+  return (
+    <RatiosPanel data={data} className={cn(CARD, "h-full")} style={tileEntranceStyle(motion, 4)} baseCurrency={baseCurrency} fmtMoney={fmtMoney} />
+  );
+}
+
+export function ExpertAttributionBlock({ attribution, baseCurrency }: { attribution: AttributionPanelData; baseCurrency: string }) {
+  const motion = useTierMotion();
+  return (
+    <DashboardAttributionPanel data={attribution} baseCurrency={baseCurrency} className={cn(CARD, "h-full")} style={tileEntranceStyle(motion, 5)} />
+  );
+}
+
+/** All Expert tiles in one fixed two-column section (the arrangement before the dashboard became customisable). */
+export function DashboardExpertPanels({ data, baseCurrency, attribution }: Props) {
+  const { t } = useLanguage();
   return (
     <section aria-label={t("expert_raw_title")} className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <RawDataPanel
-        data={data}
-        className={card}
-        style={tileEntranceStyle(motion, 0)}
-        baseCurrency={baseCurrency}
-        fmtMoney={fmtMoney}
-      />
-      <PrivateEquityPanel
-        data={data}
-        className={card}
-        style={tileEntranceStyle(motion, 1)}
-        baseCurrency={baseCurrency}
-        fmtMoney={fmtMoney}
-        fmtRatio={fmtRatio}
-        fmtIrr={fmtIrr}
-      />
-      <TaxPanel
-        data={data}
-        className={card}
-        style={tileEntranceStyle(motion, 2)}
-        baseCurrency={baseCurrency}
-        fmtMoney={fmtMoney}
-      />
-      <ExposurePanel
-        data={data}
-        className={card}
-        style={tileEntranceStyle(motion, 3)}
-        baseCurrency={baseCurrency}
-        fmtMoney={fmtMoney}
-        pct1={pct1}
-      />
-      <RatiosPanel
-        data={data}
-        className={cn(card, "xl:col-span-2")}
-        style={tileEntranceStyle(motion, 4)}
-        baseCurrency={baseCurrency}
-        fmtMoney={fmtMoney}
-      />
+      <ExpertRawBlock data={data} baseCurrency={baseCurrency} />
+      <ExpertPrivateEquityBlock data={data} baseCurrency={baseCurrency} />
+      <ExpertTaxBlock data={data} baseCurrency={baseCurrency} />
+      <ExpertExposureBlock data={data} baseCurrency={baseCurrency} />
+      <div className="xl:col-span-2">
+        <ExpertRatiosBlock data={data} baseCurrency={baseCurrency} />
+      </div>
       {attribution ? (
-        <DashboardAttributionPanel
-          data={attribution}
-          baseCurrency={baseCurrency}
-          className={cn(card, "xl:col-span-2")}
-          style={tileEntranceStyle(motion, 5)}
-        />
+        <div className="xl:col-span-2">
+          <ExpertAttributionBlock attribution={attribution} baseCurrency={baseCurrency} />
+        </div>
       ) : null}
     </section>
   );

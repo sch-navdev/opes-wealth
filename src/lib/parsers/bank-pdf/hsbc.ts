@@ -7,13 +7,15 @@
  * handled is `image_only`. If a different HSBC export does contain dated rows with amounts we
  * return `unsupported` rather than invent a layout. For TEXT input this profile never returns `ok: true`.
  *
- * OCR path (`detectOcr`/`parseOcr`): UNVERIFIED AGAINST REAL OCR OUTPUT. Nobody has seen Textract's
- * reading of an HSBC UAE transaction page. `HSBC_UAE_OCR_SPEC` is a GENERIC header-driven spec
- * (Date / Transaction details / Withdrawals / Deposits / Balance, plus generic synonyms); the only
- * vocabulary taken from the real HSBC UAE terms page is the abbreviations `B/F` (balance brought
- * forward), `CR`, `DR`, `CCY`. Correctness rests on reconciliation (`status: "mismatch"` when OCR
- * misreads a figure), not on any assumed layout.
+ * OCR path (`detectOcr`/`parseOcr`): the real "Composite Statement" layout (one block per account, undated
+ * repeated B/F lines, multi-line transactions closed by a REF line, dates only on the first transaction of a
+ * day) is read by `hsbc-ocr.ts` from geometry (`OcrPage.boxes`) or, without boxes, from lines. It was built
+ * from the printed pages seen visually: NO real Textract output has been seen yet. When no account block is
+ * recognised the generic header-driven table parser (`HSBC_UAE_OCR_SPEC`, UNVERIFIED) runs as a fallback.
+ * Correctness rests on reconciliation (`status: "mismatch"` when OCR misreads a figure) and on the printed
+ * Transaction Summary / Count cross-checks, never on silent corrections.
  */
+import { hsbcCompositeOutcome } from "./hsbc-ocr";
 import { parseOcrTableStatement, type OcrStatementSpec } from "./ocr-statement";
 import type { OcrDocument } from "./ocr-types";
 import type { BankPdfProfile, PdfParseOutcome } from "./types";
@@ -35,7 +37,15 @@ export const HSBC_UAE_OCR_SPEC: OcrStatementSpec = {
   closingLabels: ["closing balance", "balance carried forward", "c/f"],
 };
 
-const OCR_STATEMENT_MARKERS = ["statement of account", "account statement", "opening balance", "balance brought forward", "b/f"];
+const OCR_STATEMENT_MARKERS = [
+  "statement of account",
+  "account statement",
+  "opening balance",
+  "balance brought forward",
+  "b/f",
+  "composite statement",
+  "transaction details",
+];
 
 const MARKERS = [
   "following services are included in this statement of account",
@@ -78,10 +88,16 @@ export const hsbcProfile: BankPdfProfile = {
     };
   },
   detectOcr(doc: OcrDocument) {
-    const t = doc.pages.flatMap((p) => p.lines).join(" ").replace(/\s+/g, " ").toLowerCase();
-    return t.includes("hsbc") && OCR_STATEMENT_MARKERS.some((m) => t.includes(m));
+    const t = doc.pages
+      .flatMap((p) => (p.lines.length > 0 ? p.lines : (p.boxes ?? []).map((b) => b.text)))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+    if (t.includes("hsbc") && OCR_STATEMENT_MARKERS.some((m) => t.includes(m))) return true;
+    // The logo is an image: the word HSBC may not be read, but the composite layout with an AE IBAN is distinctive.
+    return t.includes("composite statement") && /iban\s*-?\s*ae/.test(t) && t.includes("transaction details");
   },
   parseOcr(doc: OcrDocument) {
-    return parseOcrTableStatement(doc, HSBC_UAE_OCR_SPEC);
+    return hsbcCompositeOutcome(doc) ?? parseOcrTableStatement(doc, HSBC_UAE_OCR_SPEC);
   },
 };

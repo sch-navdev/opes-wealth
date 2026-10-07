@@ -2,6 +2,7 @@
 
 import { PdfPasswordError, pdfToTextWithPages } from "@/lib/pdf-text";
 import { PDF_BANK_PROFILES, parseBankStatementOcr, parseBankStatementPdfText, type PdfBankId, type PdfParseOutcome } from "@/lib/parsers/bank-pdf";
+import { describeOcrLayout } from "@/lib/parsers/bank-pdf/ocr-layout";
 import { isOcrConfigured, ocrPdfToDocument } from "@/lib/services/ocr-client";
 import { createClient } from "@/utils/supabase/server";
 
@@ -103,7 +104,11 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
   }
 
   const parsed = parseBankStatementOcr(ocr.document, { bank });
-  if (parsed.ok && ocr.truncated) {
+  if (!parsed.ok) {
+    // Masked structure only (digits and names hidden), so support can tune the OCR profile. Never logged.
+    return { ok: false, failure: { ...parsed.failure, layout: describeOcrLayout(ocr.document) } };
+  }
+  if (ocr.truncated) {
     return {
       ok: true,
       statement: {

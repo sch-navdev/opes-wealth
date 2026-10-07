@@ -1,6 +1,7 @@
 "use client";
 
 import { CommandMenuTrigger } from "@/components/command-menu";
+import { DashboardCustomizeButton } from "@/components/dashboard-customize-button";
 import { ComfortModeToggle } from "@/components/comfort-mode-toggle";
 import { ApprovalsBell } from "@/components/approvals-bell";
 import { NotificationsBell } from "@/components/notifications-bell";
@@ -51,6 +52,7 @@ export function DashboardHeaderControls({
       <LanguageSwitcher />
       <ThemeToggle />
       <ComfortModeToggle />
+      <DashboardCustomizeButton />
     </div>
   );
 }

@@ -11,12 +11,20 @@ import { LanguageProvider } from "@/context/language-context";
 import type { PdfStatement } from "@/lib/parsers/bank-pdf";
 
 const action = vi.hoisted(() => ({ readBankStatementPdf: vi.fn() }));
+const imports = vi.hoisted(() => ({
+  importBankCsvHistory: vi.fn(),
+  importBankTransactions: vi.fn(),
+  checkExistingTransactions: vi.fn(),
+}));
 vi.mock("@/app/dashboard/bank-pdf-actions", () => action);
-vi.mock("@/app/dashboard/actions", () => ({ importBankCsvHistory: vi.fn() }));
-vi.mock("@/app/dashboard/transaction-import-actions", () => ({ importBankTransactions: vi.fn() }));
+vi.mock("@/app/dashboard/actions", () => ({ importBankCsvHistory: imports.importBankCsvHistory }));
+vi.mock("@/app/dashboard/transaction-import-actions", () => ({
+  importBankTransactions: imports.importBankTransactions,
+  checkExistingTransactions: imports.checkExistingTransactions,
+}));
 vi.mock("@/app/dashboard/banking/actions", () => ({ rememberCashAccountBank: vi.fn() }));
 
-import { BankStatementImportDialog } from "@/components/bank-statement-import-dialog";
+import { BankStatementImportDialog, type StatementTargetAccount } from "@/components/bank-statement-import-dialog";
 
 // Radix Select and Dialog need a few browser APIs jsdom does not implement.
 beforeAll(() => {
@@ -64,16 +72,22 @@ const wioStatement = statement("wio", "Wio Bank", "text", "WIO SHOP");
 const WIO_CSV = "Date,Description,Amount,Running Balance,Currency\n2026-02-02,CSV SHOP,-40.00,60.00,AED\n2026-02-03,CSV SALARY,500.00,560.00,AED\n";
 const UNKNOWN_CSV = "foo,bar\n1,2\n";
 
-function renderDialog() {
+const MAIN: StatementTargetAccount = { id: "a1", name: "Main", currency: "AED", nativeValue: 100 };
+const SAVINGS: StatementTargetAccount = { id: "a2", name: "Savings", currency: "AED", nativeValue: 5 };
+
+function renderDialog(accounts: StatementTargetAccount[] = [MAIN]) {
   return render(
     <LanguageProvider>
-      <BankStatementImportDialog accounts={[{ id: "a1", name: "Main", currency: "AED", nativeValue: 100 }]} />
+      <BankStatementImportDialog accounts={accounts} />
     </LanguageProvider>,
   );
 }
 
-async function openAndUpload(file = new File(["%PDF-1.4"], "hsbc.pdf", { type: "application/pdf" })) {
-  const view = renderDialog();
+async function openAndUpload(
+  file = new File(["%PDF-1.4"], "hsbc.pdf", { type: "application/pdf" }),
+  accounts: StatementTargetAccount[] = [MAIN],
+) {
+  const view = renderDialog(accounts);
   await userEvent.click(screen.getAllByRole("button")[0]);
   const input = document.querySelector('input[type="file"]') as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
@@ -96,6 +110,9 @@ const sentForm = (call: number) => action.readBankStatementPdf.mock.calls[call][
 
 beforeEach(() => {
   action.readBankStatementPdf.mockReset();
+  imports.importBankCsvHistory.mockReset().mockResolvedValue({ success: true });
+  imports.importBankTransactions.mockReset().mockResolvedValue({ success: true, inserted: 1, duplicates: 0 });
+  imports.checkExistingTransactions.mockReset().mockResolvedValue({ success: true, existing: [false, false] });
   try {
     window.localStorage.clear();
   } catch {
@@ -125,6 +142,31 @@ describe("BankStatementImportDialog OCR", () => {
     await openAndUpload();
     expect(await screen.findByText(/OCR is not set up on this server/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Read with OCR" })).toBeNull();
+  });
+});
+
+describe("BankStatementImportDialog masked OCR layout", () => {
+  const LAYOUT = "OCR layout (masked): 1 page(s)\n  1: xxxx Date | 99/99/9999";
+
+  it("shows the masked layout in a read-only textarea under the error, with a Copy button", async () => {
+    action.readBankStatementPdf.mockResolvedValue({
+      ok: false,
+      failure: { code: "no_transactions", message: "x", bank: "hsbc_uae", layout: LAYOUT },
+    });
+    await openAndUpload();
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    const box = (await screen.findByLabelText("OCR layout for support (numbers and names hidden)")) as HTMLTextAreaElement;
+    expect(box.tagName).toBe("TEXTAREA");
+    expect(box.readOnly).toBe(true);
+    expect(box.value).toBe(LAYOUT);
+    expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
+  });
+
+  it("shows no layout block when the failure carries none", async () => {
+    action.readBankStatementPdf.mockResolvedValue({ ok: false, failure: { code: "no_transactions", message: "x", bank: "hsbc_uae" } });
+    await openAndUpload();
+    await screen.findByRole("alert");
+    expect(screen.queryByLabelText("OCR layout for support (numbers and names hidden)")).toBeNull();
   });
 });
 
@@ -190,7 +232,7 @@ describe("BankStatementImportDialog bank picker, PDF success", () => {
     expect(options.some((n) => /Commercial Bank International/.test(n))).toBe(true);
     expect(options.some((n) => /Wio Bank/.test(n))).toBe(true);
     expect(options.some((n) => /Emirates NBD/.test(n))).toBe(false);
-    await userEvent.click(screen.getByRole("option", { name: /HSBC UAE/ }));
+    await userEvent.click(screen.getByRole("option", { name: /HSBC UAE$/ }));
 
     expect(await screen.findByText("FAKE SHOP")).toBeTruthy();
     expect(action.readBankStatementPdf).toHaveBeenCalledTimes(2);
@@ -226,7 +268,7 @@ describe("BankStatementImportDialog bank picker, PDF success", () => {
     await userEvent.type(await screen.findByLabelText("PDF password"), "s3cret");
     await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
     await screen.findByText("WIO SHOP");
-    await choose("stmt-bank-select", /HSBC UAE/);
+    await choose("stmt-bank-select", /HSBC UAE$/);
     await screen.findByText("FAKE SHOP");
     expect(sentForm(2).get("password")).toBe("s3cret");
     expect(sentForm(2).get("bank")).toBe("hsbc_uae");
@@ -333,5 +375,236 @@ describe("BankStatementImportDialog remembered country", () => {
     expect(screen.getByTestId("stmt-country-select")).toHaveTextContent("France");
     get.mockRestore();
     set.mockRestore();
+  });
+});
+
+describe("BankStatementImportDialog import button reason and account preselection", () => {
+  it("explains why Import is disabled and highlights the account menu still on Don't import", async () => {
+    await openAndUpload(csvFile(WIO_CSV), [MAIN, SAVINGS]);
+    await screen.findByText("CSV SHOP");
+    const button = screen.getByRole("button", { name: "Import" });
+    expect(button).toBeDisabled();
+    expect(screen.getByText("Choose the Cash account to import into for at least one account above.")).toBeTruthy();
+    expect(button.getAttribute("aria-describedby")).toBe("stmt-import-hint");
+    const menu = screen.getByTestId("stmt-target-0");
+    expect(menu).toHaveTextContent("Don't import");
+    expect(menu.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByText("Choose the Cash account to import into")).toBeTruthy();
+    expect(imports.checkExistingTransactions).not.toHaveBeenCalled();
+  });
+
+  it("preselects the only Cash account in the group's currency and says so", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    expect(screen.getByTestId("stmt-target-0")).toHaveTextContent("Main (AED)");
+    expect(screen.getByText("Pre-selected: it is your only AED Cash account.")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+    expect(screen.queryByText("Choose the Cash account to import into")).toBeNull();
+  });
+
+  it("never preselects when several accounts share the currency", async () => {
+    await openAndUpload(csvFile(WIO_CSV), [MAIN, SAVINGS]);
+    await screen.findByText("CSV SHOP");
+    expect(screen.getByTestId("stmt-target-0")).toHaveTextContent("Don't import");
+    expect(screen.queryByText(/Pre-selected/)).toBeNull();
+  });
+
+  it("does not preselect an account in another currency", async () => {
+    await openAndUpload(csvFile(WIO_CSV), [{ ...MAIN, currency: "EUR" }]);
+    await screen.findByText("CSV SHOP");
+    expect(screen.getByTestId("stmt-target-0")).toHaveTextContent("Don't import");
+  });
+
+  it("prefers the remembered account over the single-currency rule", async () => {
+    await openAndUpload(csvFile(WIO_CSV), [MAIN, { ...SAVINGS, bankProfile: "wio" }]);
+    await screen.findByText("CSV SHOP");
+    expect(screen.getByTestId("stmt-target-0")).toHaveTextContent("Savings (AED)");
+    expect(screen.queryByText(/Pre-selected/)).toBeNull();
+  });
+
+  it("checks for existing transactions when the account is chosen, with the whole file's rows", async () => {
+    await openAndUpload(csvFile(WIO_CSV), [MAIN, SAVINGS]);
+    await screen.findByText("CSV SHOP");
+    await choose("stmt-target-0", /Savings/);
+    expect(await screen.findByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+    expect(imports.checkExistingTransactions).toHaveBeenCalledTimes(1);
+    const [assetId, txs] = imports.checkExistingTransactions.mock.calls[0];
+    expect(assetId).toBe("a2");
+    expect(txs).toHaveLength(2);
+    expect(txs[0]).toMatchObject({ date: "2026-02-02", amount: -40, description: "CSV SHOP" });
+  });
+});
+
+const ALL_BOX = "Select all or none of this account's transactions";
+
+describe("BankStatementImportDialog row selection", () => {
+  const rowBox = (name: RegExp) => screen.getByRole("checkbox", { name });
+
+  it("shows a checked checkbox per row and a selected counter", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    expect(rowBox(/Select the transaction of 2026-02-02/)).toBeChecked();
+    expect(rowBox(/Select the transaction of 2026-02-03/)).toBeChecked();
+    expect(screen.getByText("2 of 2 selected")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: ALL_BOX })).toBeChecked();
+  });
+
+  it("unchecking a row removes it from the transactions payload but not from the balance history", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    await userEvent.click(rowBox(/Select the transaction of 2026-02-02/));
+    expect(screen.getByText("1 of 2 selected")).toBeTruthy();
+    expect(screen.getByText(/balance history is built from all rows/i)).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: ALL_BOX })).toHaveAttribute("aria-checked", "mixed");
+
+    await userEvent.click(screen.getByRole("button", { name: "Import 1 transaction(s)" }));
+    expect(await screen.findByText(/1 new transaction\(s\), 0 already imported, 1 skipped by you/)).toBeTruthy();
+
+    expect(imports.importBankCsvHistory).toHaveBeenCalledTimes(1);
+    const history = imports.importBankCsvHistory.mock.calls[0][1] as { recorded_date: string }[];
+    expect(history.map((r) => r.recorded_date).sort()).toEqual(["2026-02-02", "2026-02-03"]);
+
+    expect(imports.importBankTransactions).toHaveBeenCalledTimes(1);
+    const [assetId, sent, source] = imports.importBankTransactions.mock.calls[0];
+    expect(assetId).toBe("a1");
+    expect(source).toBe("csv_import");
+    expect(sent).toEqual([{ date: "2026-02-03", amount: 500, description: "CSV SALARY", occurrence: 0 }]);
+  });
+
+  it("disables Import with a reason when nothing is selected", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    await userEvent.click(screen.getByRole("button", { name: "Select none" }));
+    expect(screen.getByText("0 of 2 selected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(screen.getByText("Select at least one transaction to import.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(screen.getByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+  });
+
+  it("the header checkbox toggles all rows", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    const header = screen.getByRole("checkbox", { name: ALL_BOX });
+    await userEvent.click(header);
+    expect(screen.getByText("0 of 2 selected")).toBeTruthy();
+    await userEvent.click(header);
+    expect(screen.getByText("2 of 2 selected")).toBeTruthy();
+  });
+
+  it("clicking a row checkbox does not open the details drawer, clicking the date does", async () => {
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("CSV SHOP");
+    await userEvent.click(rowBox(/Select the transaction of 2026-02-02/));
+    expect(screen.queryByText("Transaction details")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "2026-02-03" }));
+    expect(await screen.findByText("Transaction details")).toBeTruthy();
+  });
+});
+
+describe("BankStatementImportDialog already imported transactions", () => {
+  it("unchecks rows that are already stored, badges them and shows the group banner", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [true, false] });
+    await openAndUpload(csvFile(WIO_CSV));
+    expect(await screen.findByText("1 of 2 transactions were already imported.")).toBeTruthy();
+    expect(screen.getAllByText("Already imported")).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: /Select the transaction of 2026-02-02/ })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Select the transaction of 2026-02-03/ })).toBeChecked();
+    expect(screen.getByText("1 of 2 selected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import 1 transaction(s)" })).toBeEnabled();
+  });
+
+  it("reports already-imported rows that were not selected in the result and does not send them", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [true, false] });
+    await openAndUpload(csvFile(WIO_CSV));
+    await userEvent.click(await screen.findByRole("button", { name: "Import 1 transaction(s)" }));
+    expect(await screen.findByText(/1 new transaction\(s\), 1 already imported, 0 skipped by you/)).toBeTruthy();
+    expect(imports.importBankTransactions.mock.calls[0][1]).toEqual([
+      { date: "2026-02-03", amount: 500, description: "CSV SALARY", occurrence: 0 },
+    ]);
+  });
+
+  it("skips a group whose rows are all already imported, and Import has nothing to do", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [true, true] });
+    await openAndUpload(csvFile(WIO_CSV));
+    expect(await screen.findByText("This statement was already imported into Main.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import" })).toBeDisabled();
+    expect(screen.getByText("Everything in this file was already imported, so there is nothing to import.")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /Select the transaction of 2026-02-02/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Select all" })).toBeDisabled();
+    expect(imports.importBankCsvHistory).not.toHaveBeenCalled();
+    expect(imports.importBankTransactions).not.toHaveBeenCalled();
+  });
+
+  it("Select only new unticks stored rows; Select all ticks everything again", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [true, false] });
+    await openAndUpload(csvFile(WIO_CSV));
+    await screen.findByText("1 of 2 selected");
+    await userEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(screen.getByText("2 of 2 selected")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Select only new" }));
+    expect(screen.getByText("1 of 2 selected")).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: /Select the transaction of 2026-02-02/ })).not.toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: "Select none" }));
+    expect(screen.getByText("0 of 2 selected")).toBeTruthy();
+  });
+
+  it("degrades to unknown when the check fails and still allows the import", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ error: "relation transactions does not exist" });
+    await openAndUpload(csvFile(WIO_CSV));
+    expect(await screen.findByText(/Could not check for already imported transactions/)).toBeTruthy();
+    expect(screen.queryByText("Already imported")).toBeNull();
+    expect(screen.getByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+  });
+
+  it("also degrades when the check throws", async () => {
+    imports.checkExistingTransactions.mockRejectedValue(new Error("boom"));
+    await openAndUpload(csvFile(WIO_CSV));
+    expect(await screen.findByText(/Could not check for already imported transactions/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+  });
+
+  it("re-checks against the new account when the target changes", async () => {
+    imports.checkExistingTransactions
+      .mockResolvedValueOnce({ success: true, existing: [true, true] })
+      .mockResolvedValueOnce({ success: true, existing: [false, false] });
+    await openAndUpload(csvFile(WIO_CSV), [MAIN, { ...SAVINGS, bankProfile: "wio" }]);
+    expect(await screen.findByText("This statement was already imported into Savings.")).toBeTruthy();
+    await choose("stmt-target-0", /Main/);
+    expect(await screen.findByRole("button", { name: "Import 2 transaction(s)" })).toBeEnabled();
+    expect(screen.queryByText(/was already imported into/)).toBeNull();
+    expect(imports.checkExistingTransactions.mock.calls[1][0]).toBe("a1");
+  });
+});
+
+describe("BankStatementImportDialog identical rows in one file", () => {
+  const DUP_CSV =
+    "Date,Description,Amount,Running Balance,Currency\n2026-02-02,COFFEE,-4.00,96.00,AED\n2026-02-02,COFFEE,-4.00,92.00,AED\n2026-02-03,SALARY,500.00,592.00,AED\n";
+
+  it("warns about identical rows and keeps them as separate transactions with their occurrence numbers", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [false, false, false] });
+    await openAndUpload(csvFile(DUP_CSV));
+    expect(await screen.findByText(/2 rows have the same date, amount and description as another row/)).toBeTruthy();
+    expect(screen.getAllByText("Identical row")).toHaveLength(2);
+    await userEvent.click(await screen.findByRole("button", { name: "Import 3 transaction(s)" }));
+    await screen.findByText(/new transaction\(s\)/);
+    const sent = imports.importBankTransactions.mock.calls[0][1] as { occurrence: number }[];
+    expect(sent.map((t) => t.occurrence)).toEqual([0, 1, 0]);
+  });
+
+  it("keeps the occurrence number of the second identical row when only that one is sent", async () => {
+    imports.checkExistingTransactions.mockResolvedValue({ success: true, existing: [false, false, false] });
+    await openAndUpload(csvFile(DUP_CSV));
+    await screen.findByText(/2 rows have the same date/);
+    // Table order is newest first: SALARY, COFFEE (#0), COFFEE (#1). Untick SALARY and the first COFFEE row.
+    await userEvent.click(screen.getByRole("checkbox", { name: /Select the transaction of 2026-02-03/ }));
+    const coffee = screen.getAllByRole("checkbox", { name: /Select the transaction of 2026-02-02: COFFEE/ });
+    await userEvent.click(coffee[0]);
+    await userEvent.click(screen.getByRole("button", { name: "Import 1 transaction(s)" }));
+    await screen.findByText(/new transaction\(s\)/);
+    const sent = imports.importBankTransactions.mock.calls[0][1] as { description: string; occurrence: number }[];
+    expect(sent).toHaveLength(1);
+    expect(sent[0].description).toBe("COFFEE");
+    expect(sent[0].occurrence).toBe(1);
   });
 });

@@ -1,4 +1,7 @@
 import { createHash } from "node:crypto";
+import { amountKey, normalizeDescription, transactionBaseKey } from "@/lib/transaction-keys";
+
+export { normalizeDescription };
 
 /**
  * Transaction fingerprinting for CSV / statement imports (server-only: uses
@@ -19,6 +22,12 @@ export type ImportTransaction = {
   /** Signed: positive = money in. */
   amount: number;
   description?: string;
+  /**
+   * Optional explicit occurrence number (see `occurrenceIndexes` in transaction-keys.ts). The import
+   * dialog sends it when only a SELECTION of a file's rows is imported, so each row keeps the
+   * fingerprint it has when the whole file is imported (and the duplicate check agrees).
+   */
+  occurrence?: number;
 };
 
 export type FingerprintedTransaction = ImportTransaction & {
@@ -26,22 +35,6 @@ export type FingerprintedTransaction = ImportTransaction & {
   description: string;
   fingerprint: string;
 };
-
-/** Lower-cases, strips accents, collapses whitespace and long reference digits' spacing so cosmetic export differences don't change the hash. */
-export function normalizeDescription(raw: string | undefined): string {
-  return (raw ?? "")
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Amount as a fixed 2-decimal string, with -0 normalised, so 12.5 and 12.50 hash alike. */
-function amountKey(amount: number): string {
-  const rounded = Math.round(amount * 100) / 100;
-  return (Object.is(rounded, -0) ? 0 : rounded).toFixed(2);
-}
 
 export function transactionFingerprint(
   tx: ImportTransaction,
@@ -68,9 +61,14 @@ export function fingerprintTransactions(
 ): FingerprintedTransaction[] {
   const seen = new Map<string, number>();
   return txs.map((tx) => {
-    const base = `${tx.date}|${amountKey(tx.amount)}|${normalizeDescription(tx.description)}`;
-    const occurrence = seen.get(base) ?? 0;
-    seen.set(base, occurrence + 1);
+    let occurrence: number;
+    if (typeof tx.occurrence === "number" && Number.isInteger(tx.occurrence) && tx.occurrence >= 0) {
+      occurrence = tx.occurrence;
+    } else {
+      const base = transactionBaseKey(tx);
+      occurrence = seen.get(base) ?? 0;
+      seen.set(base, occurrence + 1);
+    }
     return {
       ...tx,
       currency: currency.trim().toUpperCase(),

@@ -84,4 +84,23 @@ describe("textractToOcrPage", () => {
     ]);
     expect(page).toEqual({ lines: [], tables: [] });
   });
+
+  it("adds normalised boxes (left/top/right/bottom) for LINE blocks with a complete BoundingBox", () => {
+    const withBox = (id: string, text: string, left: number, top: number, width: number, height: number): TextractBlockLike => ({
+      Id: id,
+      BlockType: "LINE",
+      Text: text,
+      Geometry: { BoundingBox: { Left: left, Top: top, Width: width, Height: height } },
+    });
+    const page = textractToOcrPage([withBox("b", "1,300.00", 0.5, 0.3, 0.08, 0.01), withBox("a", "REF  X-1", 0.2, 0.3, 0.1, 0.01)]);
+    expect(page.lines).toEqual(["REF X-1", "1,300.00"]);
+    expect(page.boxes).toHaveLength(2);
+    expect(page.boxes?.[0]).toMatchObject({ text: "REF X-1", left: 0.2, top: 0.3 });
+    expect(page.boxes?.[1].right).toBeCloseTo(0.58);
+    expect(page.boxes?.[1].bottom).toBeCloseTo(0.31);
+  });
+
+  it("omits boxes when no LINE has a complete BoundingBox", () => {
+    expect(textractToOcrPage([line("l", "x", 0.1)]).boxes).toBeUndefined();
+  });
 });

@@ -7,13 +7,15 @@
  *  - LINE blocks become `lines`, in reading order by `Geometry.BoundingBox` (top then left, with a
  *    small vertical tolerance so columns of one visual row stay together) when every line has one,
  *    otherwise in block order.
+ *  - `boxes` (optional) carries the same LINE blocks with their bounding boxes (left/top/right/bottom, 0..1) so
+ *    parsers can rebuild visual rows; present only when at least one LINE has a complete BoundingBox.
  *  - TABLE blocks become `tables`: CELL children (RowIndex/ColumnIndex are 1-based) are placed in a
  *    grid padded to the table's column count. A cell spanning several rows/columns puts its text in
  *    the top-left slot and leaves the covered slots empty. Cell text = its WORD children joined by
  *    spaces (SELECTION_ELEMENT children are ignored). MERGED_CELL blocks are ignored (their CELL
  *    children carry the content).
  */
-import type { OcrPage, OcrTable } from "./ocr-types";
+import type { OcrBox, OcrPage, OcrTable } from "./ocr-types";
 
 export type TextractBlockLike = {
   Id?: string;
@@ -94,5 +96,17 @@ export function textractToOcrPage(blocks: readonly TextractBlockLike[]): OcrPage
     const t = tableOf(b, byId);
     if (t) tables.push(t);
   }
-  return { lines, tables };
+  const boxes: OcrBox[] = [];
+  for (const b of ordered) {
+    const bb = b.Geometry?.BoundingBox;
+    if (!bb || bb.Left === undefined || bb.Top === undefined || bb.Width === undefined || bb.Height === undefined) continue;
+    boxes.push({
+      text: (b.Text ?? "").replace(/\s+/g, " ").trim(),
+      left: bb.Left,
+      top: bb.Top,
+      right: bb.Left + bb.Width,
+      bottom: bb.Top + bb.Height,
+    });
+  }
+  return boxes.length > 0 ? { lines, tables, boxes } : { lines, tables };
 }

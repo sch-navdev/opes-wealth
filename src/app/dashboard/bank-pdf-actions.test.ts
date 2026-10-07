@@ -160,6 +160,49 @@ describe("readBankStatementPdf OCR", () => {
     spy.mockRestore();
   });
 
+  it("attaches a masked layout to an OCR parse failure (no digits or names), and never logs it", async () => {
+    scanned();
+    mocks.isOcrConfigured.mockReturnValue(true);
+    mocks.ocrPdfToDocument.mockResolvedValue({
+      ok: true,
+      document: {
+        pages: [
+          {
+            lines: ["HSBC Bank Middle East Limited", "Mr Jonathan Whitfield", "IBAN AE070331234567890123456"],
+            tables: [{ rows: [["Date", "Transaction details", "Balance"], ["02 Feb", "FAKE SHOP", "1,234.50"]] }],
+          },
+        ],
+      },
+      pages: 1,
+      truncated: false,
+    });
+    const logs = (["log", "error", "warn", "info"] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
+    const r = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", true, "hsbc_uae"));
+    expect(r.ok).toBe(false);
+    const layout = !r.ok && "layout" in r.failure ? r.failure.layout : undefined;
+    expect(layout).toBeTruthy();
+    expect(layout).toContain("Date | Transaction details | Balance");
+    expect(layout).not.toMatch(/Jonathan|FAKE|AE07|1,234|0331/);
+    expect(layout).toContain("9,999.99");
+    for (const s of logs) expect(JSON.stringify(s.mock.calls)).not.toContain("xxx");
+    logs.forEach((s) => s.mockRestore());
+  });
+
+  it("does not attach a layout to a successful OCR parse or to a text-PDF failure", async () => {
+    scanned();
+    mocks.isOcrConfigured.mockReturnValue(true);
+    mocks.ocrPdfToDocument.mockResolvedValue({ ok: true, document: hsbcDoc, pages: 1, truncated: false });
+    const ok = await readBankStatementPdf(form(undefined, "%PDF-1.4 x", true));
+    expect(JSON.stringify(ok)).not.toContain("layout");
+    mocks.pdfToTextWithPages.mockResolvedValue({
+      text: "Some unrelated document with plenty of words but nothing else here at all",
+      numPages: 1,
+    });
+    const bad = await readBankStatementPdf(form());
+    expect(bad).toMatchObject({ ok: false, failure: { code: "unsupported" } });
+    expect(!bad.ok && "layout" in bad.failure).toBe(false);
+  });
+
   it("never sends an encrypted PDF to OCR, even with consent", async () => {
     mocks.pdfToTextWithPages.mockRejectedValue(new PdfPasswordError("required"));
     mocks.isOcrConfigured.mockReturnValue(true);

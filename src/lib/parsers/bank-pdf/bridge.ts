@@ -14,6 +14,7 @@ const PROFILE_ID: Record<PdfBankId, string> = {
   hsbc_uae: "hsbc_uae",
   cbi: "cbi",
   cbd: "cbd",
+  hsbc_uae_card: "hsbc_uae_card",
 };
 
 export function statementToParseResult(statement: PdfStatement): StatementParseResult {
