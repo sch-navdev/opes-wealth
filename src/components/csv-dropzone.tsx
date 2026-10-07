@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
 import { parseCsv } from "@/lib/csv-parser";
+import { PdfPasswordPrompt } from "@/components/pdf-password-prompt";
+import { PdfOcrPrompt } from "@/components/pdf-ocr-prompt";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
 import { statementAccountToCsvFile } from "@/lib/parsers/bank-pdf/bridge";
 import { PDF_FAILURE_MESSAGE_KEYS, type PdfFailureCode, type PdfStatement } from "@/lib/parsers/bank-pdf";
@@ -49,6 +51,12 @@ export function CsvDropzone({
   const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<{ statement: PdfStatement; fileName: string } | null>(null);
+  /** A password-protected PDF waiting for its password (the File is kept so it can be re-sent with it). */
+  const [locked, setLocked] = useState<{ file: File; incorrect: boolean } | null>(null);
+  /** A scanned PDF waiting for the user's explicit OK to send it to the OCR provider (the File is kept to re-send with `ocr=1`). */
+  const [ocrOffer, setOcrOffer] = useState<{ file: File; password?: string } | null>(null);
+  /** The scanned-PDF message is showing and OCR is not configured on this server. */
+  const [ocrMissing, setOcrMissing] = useState(false);
 
   const busy = disabled || isParsing;
 
@@ -57,22 +65,40 @@ export function CsvDropzone({
     onParsed(statementAccountToCsvFile(statement, index, fileName));
   }
 
-  async function handlePdf(file: File) {
+  async function handlePdf(file: File, password?: string, ocr = false) {
     const form = new FormData();
     form.append("file", file);
+    if (password) form.append("password", password);
+    if (ocr) form.append("ocr", "1");
     const result = await readBankStatementPdf(form);
+    setOcrOffer(null);
+    setOcrMissing(false);
     if (!result.ok) {
       const code = result.failure.code;
+      if (code === "encrypted" || code === "password_incorrect") {
+        setLocked({ file, incorrect: code === "password_incorrect" });
+        return;
+      }
+      setLocked(null);
+      const ocrState = "ocr" in result.failure ? result.failure.ocr : undefined;
+      if (ocrState === "available") {
+        // Scanned PDF and OCR is possible: ask for consent instead of failing.
+        setOcrOffer({ file, password });
+        return;
+      }
+      if (ocrState === "unconfigured") setOcrMissing(true);
       const key = code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable";
       setError(t(key));
       return;
     }
+    setLocked(null);
     const { statement } = result;
     const candidates = statement.accounts
       .map((account, index) => ({ account, index }))
       .filter(({ account }) => !currency || account.currency.toUpperCase() === currency.toUpperCase());
     const only = candidates.length === 1 ? candidates[0] : null;
-    if (statement.accounts.length === 1 && only && only.account.reconciliation.status === "ok") {
+    // An OCR read is never auto-continued: the user always confirms the account and checks the rows.
+    if (statement.source !== "ocr" && statement.accounts.length === 1 && only && only.account.reconciliation.status === "ok") {
       chooseAccount(statement, only.index, file.name);
       return;
     }
@@ -83,6 +109,9 @@ export function CsvDropzone({
   async function handleFile(file: File) {
     setError(null);
     setPending(null);
+    setLocked(null);
+    setOcrOffer(null);
+    setOcrMissing(false);
     const name = file.name.toLowerCase();
     const isPdf = name.endsWith(".pdf");
     if (!isPdf && !name.endsWith(".csv")) {
@@ -107,6 +136,35 @@ export function CsvDropzone({
     } finally {
       setIsParsing(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function unlock(password: string) {
+    if (!locked) return;
+    setError(null);
+    setIsParsing(true);
+    try {
+      await handlePdf(locked.file, password);
+    } catch {
+      setLocked(null);
+      setError(t("csv_dropzone_error_read"));
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
+  async function confirmOcr() {
+    if (!ocrOffer) return;
+    const { file, password } = ocrOffer;
+    setError(null);
+    setIsParsing(true);
+    try {
+      await handlePdf(file, password, true);
+    } catch {
+      setOcrOffer(null);
+      setError(t("csv_dropzone_error_read"));
+    } finally {
+      setIsParsing(false);
     }
   }
 
@@ -174,8 +232,30 @@ export function CsvDropzone({
           if (file) void handleFile(file);
         }}
       />
+      {locked && (
+        <PdfPasswordPrompt
+          fileName={locked.file.name}
+          error={locked.incorrect}
+          pending={isParsing}
+          onSubmit={(password) => void unlock(password)}
+          onCancel={() => setLocked(null)}
+        />
+      )}
+      {ocrOffer && (
+        <PdfOcrPrompt
+          fileName={ocrOffer.file.name}
+          pending={isParsing}
+          onConfirm={() => void confirmOcr()}
+          onCancel={() => setOcrOffer(null)}
+        />
+      )}
       {pending && (
         <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3" role="group" aria-label={t("bank_pdf_choose_account")}>
+          {pending.statement.source === "ocr" && (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm font-medium text-foreground" role="status">
+              {t("bank_pdf_ocr_verify")}
+            </p>
+          )}
           <p className="text-sm text-foreground">{t("bank_pdf_choose_account")}</p>
           <ul className="space-y-2">
             {pending.statement.accounts.map((account, index) => {
@@ -213,6 +293,7 @@ export function CsvDropzone({
           {error}
         </p>
       )}
+      {error && ocrMissing && <p className="text-xs text-muted-foreground">{t("bank_pdf_ocr_keys_missing")}</p>}
     </div>
   );
 }

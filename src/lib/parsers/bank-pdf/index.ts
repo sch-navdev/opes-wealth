@@ -4,8 +4,10 @@
  */
 import { banquePopulaireProfile } from "./banque-populaire";
 import type { TranslationKey } from "@/lib/i18n";
+import { cbiProfile } from "./cbi";
 import { classifyPdfText } from "./classify";
 import { fabProfile } from "./fab";
+import type { OcrDocument } from "./ocr-types";
 import { hsbcProfile } from "./hsbc";
 import type { BankPdfProfile, PdfBankId, PdfFailureCode, PdfParseOutcome } from "./types";
 import { wioProfile } from "./wio";
@@ -15,16 +17,18 @@ export { classifyPdfText } from "./classify";
 export type { PdfTextKind } from "./classify";
 
 /** Detection order matters: the first profile whose `detect` is true wins. */
-export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabProfile, banquePopulaireProfile, hsbcProfile];
+export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabProfile, banquePopulaireProfile, hsbcProfile, cbiProfile];
 
 export const PDF_FAILURE_MESSAGE_KEYS = {
   encrypted: "bank_pdf_error_encrypted",
+  password_incorrect: "bank_pdf_password_incorrect",
   scanned: "bank_pdf_error_scanned",
   image_only: "bank_pdf_error_image_only",
   unsupported: "bank_pdf_error_unsupported",
   no_transactions: "bank_pdf_error_no_transactions",
   unreadable: "bank_pdf_error_unreadable",
   too_large: "bank_pdf_error_too_large",
+  ocr_unavailable: "bank_pdf_ocr_unavailable",
 } as const satisfies Record<PdfFailureCode, TranslationKey>;
 
 export function detectBankPdf(text: string): BankPdfProfile | null {
@@ -57,4 +61,41 @@ export function parseBankStatementPdfText(
     };
   }
   return profile.parse(text);
+}
+
+export type { OcrDocument, OcrPage, OcrTable } from "./ocr-types";
+
+/** All OCR lines of a document joined with newlines (lets the text profiles run on OCR output). */
+export function ocrDocumentToText(doc: OcrDocument): string {
+  return doc.pages.map((p) => p.lines.join("\n")).join("\n");
+}
+
+/**
+ * Parses an OCR'd (image-only) statement. Profiles with `detectOcr` are tried first (hsbc, cbi);
+ * otherwise the text profiles are tried on the OCR text and the result is marked `source: "ocr"`.
+ * UNVERIFIED against real OCR output; reconciliation is the safety net (see `ocr-statement.ts`).
+ */
+export function parseBankStatementOcr(doc: OcrDocument, opts?: { bank?: PdfBankId }): PdfParseOutcome {
+  const unsupported: PdfParseOutcome = {
+    ok: false,
+    failure: { code: "unsupported", message: "No supported bank statement layout was recognised in the OCR text." },
+  };
+  const forced = opts?.bank ? PDF_BANK_PROFILES.find((p) => p.id === opts.bank) : undefined;
+  if (opts?.bank && !forced) return unsupported;
+  const ocrProfile = forced?.parseOcr ? forced : PDF_BANK_PROFILES.find((p) => p.parseOcr && p.detectOcr?.(doc));
+  if (ocrProfile?.parseOcr) return ocrProfile.parseOcr(doc);
+
+  const text = ocrDocumentToText(doc);
+  const textProfile = forced ?? PDF_BANK_PROFILES.find((p) => !p.detectOcr && p.detect(text));
+  if (!textProfile) return unsupported;
+  const out = textProfile.parse(text);
+  if (!out.ok) return out;
+  return {
+    ok: true,
+    statement: {
+      ...out.statement,
+      source: "ocr",
+      warnings: ["OCR read: verify every row against the original statement.", ...out.statement.warnings],
+    },
+  };
 }

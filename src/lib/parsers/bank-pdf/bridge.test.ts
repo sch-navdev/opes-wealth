@@ -64,8 +64,16 @@ describe("statementToParseResult", () => {
     ]);
   });
 
-  it("throws for a bank without a CSV profile", () => {
-    expect(() => statementToParseResult({ ...statement, bank: "hsbc_uae" })).toThrow();
+  it.each([
+    ["hsbc_uae", "HSBC UAE"],
+    ["cbi", "Commercial Bank International (CBI)"],
+  ] as const)("maps the OCR-only bank %s to its PDF-only profile", (bank, name) => {
+    const r = statementToParseResult({ ...statement, bank, source: "ocr" });
+    expect(r.profile.id).toBe(bank);
+    expect(r.profile.name).toBe(name);
+    expect(r.profile.pdfOnly).toBe(true);
+    expect(r.groups).toHaveLength(1);
+    expect(r.groups[0].rows).toHaveLength(3);
   });
 });
 

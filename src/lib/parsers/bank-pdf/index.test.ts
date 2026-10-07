@@ -35,7 +35,7 @@ const filler = " statement body text that is long enough to pass the scanned che
 
 describe("PDF_BANK_PROFILES / detectBankPdf", () => {
   it("keeps the documented order", () => {
-    expect(PDF_BANK_PROFILES.map((p) => p.id)).toEqual(["wio", "fab", "banque_populaire", "hsbc_uae"]);
+    expect(PDF_BANK_PROFILES.map((p) => p.id)).toEqual(["wio", "fab", "banque_populaire", "hsbc_uae", "cbi"]);
   });
 
   it("detects each bank", () => {
@@ -96,17 +96,24 @@ describe("parseBankStatementPdfText", () => {
 });
 
 describe("PDF_FAILURE_MESSAGE_KEYS", () => {
-  it("maps every failure code to a bank_pdf_error_* key", () => {
+  it("maps every failure code to a translation key", () => {
     const codes: PdfFailureCode[] = [
       "encrypted",
+      "password_incorrect",
       "scanned",
       "image_only",
       "unsupported",
       "no_transactions",
       "unreadable",
       "too_large",
+      "ocr_unavailable",
     ];
     expect(Object.keys(PDF_FAILURE_MESSAGE_KEYS).sort()).toEqual([...codes].sort());
-    for (const c of codes) expect(PDF_FAILURE_MESSAGE_KEYS[c]).toBe(`bank_pdf_error_${c}`);
+    // password_incorrect and ocr_unavailable have their own key families.
+    const special: Partial<Record<PdfFailureCode, string>> = {
+      password_incorrect: "bank_pdf_password_incorrect",
+      ocr_unavailable: "bank_pdf_ocr_unavailable",
+    };
+    for (const c of codes) expect(PDF_FAILURE_MESSAGE_KEYS[c]).toBe(special[c] ?? `bank_pdf_error_${c}`);
   });
 });

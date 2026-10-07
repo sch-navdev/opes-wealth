@@ -42,13 +42,22 @@ export type BankProfileId =
   | "hsbc_france"
   | "hello_bank"
   | "fortuneo"
-  | "ing_france";
+  | "ing_france"
+  | "hsbc_uae"
+  | "cbi";
 
 export type BankProfile = {
   id: BankProfileId;
   name: string;
   country: "AE" | "FR";
   defaultCurrency: string;
+  /**
+   * True for banks whose statements are only read from PDFs (OCR): the profile
+   * exists so a PDF result can flow through the statement-import pipeline, has no
+   * column aliases and so can never match a CSV (`detectProfile`, `parseStatement`),
+   * and is not offered in the CSV bank picker. Not in the `BANKS` registry.
+   */
+  pdfOnly?: boolean;
   /** Aliases (normalised: lowercase, no accents/spaces/punctuation) per logical column. */
   columns: {
     date: string[];
@@ -372,6 +381,25 @@ export const BANK_PROFILES: BankProfile[] = [
       credit: ["credit"],
       balance: ["solde"],
     },
+    signature: [],
+  }),
+  // ---- PDF-only banks (read through OCR): no CSV columns, never detected from a CSV.
+  profile({
+    id: "hsbc_uae",
+    name: "HSBC UAE",
+    country: "AE",
+    defaultCurrency: "AED",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
+    signature: [],
+  }),
+  profile({
+    id: "cbi",
+    name: "Commercial Bank International (CBI)",
+    country: "AE",
+    defaultCurrency: "AED",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
     signature: [],
   }),
 ];

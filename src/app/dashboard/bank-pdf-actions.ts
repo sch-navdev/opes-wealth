@@ -1,11 +1,13 @@
 "use server";
 
-import { pdfToTextWithPages } from "@/lib/pdf-text";
-import { parseBankStatementPdfText, type PdfParseOutcome } from "@/lib/parsers/bank-pdf";
+import { PdfPasswordError, pdfToTextWithPages } from "@/lib/pdf-text";
+import { parseBankStatementOcr, parseBankStatementPdfText, type PdfParseOutcome } from "@/lib/parsers/bank-pdf";
+import { isOcrConfigured, ocrPdfToDocument } from "@/lib/services/ocr-client";
 import { createClient } from "@/utils/supabase/server";
 
-/** Statements are a few hundred KB; anything near this is not a statement. */
-const MAX_STATEMENT_PDF_BYTES = 10 * 1024 * 1024;
+/** Statements are a few hundred KB; anything near this is not a statement. Matches `serverActions.bodySizeLimit` ("5mb") in next.config.ts. */
+const MAX_STATEMENT_PDF_BYTES = 5 * 1024 * 1024;
+const MAX_PASSWORD_LENGTH = 256;
 
 export type ReadBankPdfResult = PdfParseOutcome | { ok: false; failure: { code: "unauthenticated"; message: string } };
 
@@ -26,7 +28,7 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, failure: { code: "unreadable", message: "No file was uploaded." } };
   if (file.size > MAX_STATEMENT_PDF_BYTES) {
-    return { ok: false, failure: { code: "too_large", message: "The PDF is larger than 10 MB." } };
+    return { ok: false, failure: { code: "too_large", message: "The PDF is larger than 5 MB." } };
   }
   const bytes = await file.arrayBuffer();
   // %PDF magic bytes: a renamed spreadsheet or image is not a PDF.
@@ -35,17 +37,74 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
     return { ok: false, failure: { code: "unreadable", message: "The file is not a PDF." } };
   }
 
+  // Optional password for an encrypted PDF: used once for this extraction, never logged,
+  // echoed back or stored.
+  const rawPassword = formData.get("password");
+  const password = typeof rawPassword === "string" && rawPassword.length > 0 ? rawPassword : undefined;
+  if (password && password.length > MAX_PASSWORD_LENGTH) {
+    return { ok: false, failure: { code: "password_incorrect", message: "The PDF password is incorrect." } };
+  }
+
+  // Explicit per-upload consent to send a scanned PDF to the OCR provider (see below).
+  const ocrConsent = formData.get("ocr") === "1";
+  // The text reader may detach/transfer the buffer, so keep our own copy for OCR.
+  const ocrBytes = ocrConsent ? new Uint8Array(bytes.slice(0)) : null;
+
   let extracted: { text: string; numPages: number };
   try {
-    extracted = await pdfToTextWithPages(bytes);
+    extracted = await pdfToTextWithPages(bytes, password);
   } catch (e) {
-    const detail = e instanceof Error ? `${e.name} ${e.message}` : String(e);
-    if (/password/i.test(detail)) {
-      return { ok: false, failure: { code: "encrypted", message: "The PDF is password protected." } };
+    if (e instanceof PdfPasswordError) {
+      return e.reason === "incorrect"
+        ? { ok: false, failure: { code: "password_incorrect", message: "The PDF password is incorrect." } }
+        : { ok: false, failure: { code: "encrypted", message: "The PDF is password protected." } };
     }
-    console.error("readBankStatementPdf: pdf-parse failed:", detail.slice(0, 200));
+    // Log the error class only (a library message could in principle carry request data).
+    console.error("readBankStatementPdf: pdf-parse failed:", e instanceof Error ? e.name : "unknown error");
     return { ok: false, failure: { code: "unreadable", message: "The PDF could not be read." } };
   }
 
-  return parseBankStatementPdfText(extracted.text, { numPages: extracted.numPages });
+  const outcome = parseBankStatementPdfText(extracted.text, { numPages: extracted.numPages });
+  if (outcome.ok || (outcome.failure.code !== "scanned" && outcome.failure.code !== "image_only")) return outcome;
+
+  // Scanned / image-only: OCR is the only way in. It sends the file to a third party (AWS Textract),
+  // so it runs ONLY with the explicit `ocr=1` consent of this upload. An encrypted PDF never gets
+  // here (the reader throws first), so a password-protected file is never sent to OCR.
+  if (!ocrBytes) {
+    return { ok: false, failure: { ...outcome.failure, ocr: isOcrConfigured() ? "available" : "unconfigured" } };
+  }
+  if (!isOcrConfigured()) {
+    return {
+      ok: false,
+      failure: { code: "ocr_unavailable", message: "OCR is not set up on this server (AWS keys missing)." },
+    };
+  }
+
+  const ocr = await ocrPdfToDocument(ocrBytes);
+  if (!ocr.ok) {
+    // Log the reason code only: never the file, the OCR text or any credential.
+    console.error("readBankStatementPdf: OCR failed:", ocr.reason);
+    if (ocr.reason === "unreadable") {
+      return { ok: false, failure: { code: "unreadable", message: "The PDF could not be read by OCR." } };
+    }
+    if (ocr.reason === "too_many_pages") {
+      return { ok: false, failure: { code: "unreadable", message: "The PDF is too long to be read with OCR." } };
+    }
+    return {
+      ok: false,
+      failure: { code: "ocr_unavailable", message: `OCR could not be run (${ocr.reason}).` },
+    };
+  }
+
+  const parsed = parseBankStatementOcr(ocr.document);
+  if (parsed.ok && ocr.truncated) {
+    return {
+      ok: true,
+      statement: {
+        ...parsed.statement,
+        warnings: [`Only the first ${ocr.pages} pages were read.`, ...parsed.statement.warnings],
+      },
+    };
+  }
+  return parsed;
 }

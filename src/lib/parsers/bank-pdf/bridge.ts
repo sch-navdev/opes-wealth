@@ -6,16 +6,18 @@ import { getBankProfile, type NormalizedTx, type StatementGroup, type StatementP
 import type { ImportTransaction } from "@/lib/transactions";
 import type { PdfAccountStatement, PdfBankId, PdfStatement } from "./types";
 
+/** PDF bank id -> bank profile id. hsbc_uae and cbi have PDF-only profiles (no CSV columns). */
 const PROFILE_ID: Record<PdfBankId, string> = {
   fab: "fab",
   wio: "wio",
   banque_populaire: "banque_populaire",
-  hsbc_uae: "hsbc_uae", // no CSV profile: never reached (the HSBC profile never returns ok)
+  hsbc_uae: "hsbc_uae",
+  cbi: "cbi",
 };
 
 export function statementToParseResult(statement: PdfStatement): StatementParseResult {
-  const profile = getBankProfile(PROFILE_ID[statement.bank]);
-  if (!profile) throw new Error(`No CSV bank profile for PDF bank "${statement.bank}"`);
+  const profile = getBankProfile(PROFILE_ID[statement.bank] ?? "");
+  if (!profile) throw new Error(`No bank profile for PDF bank "${statement.bank}"`);
 
   const groups: StatementGroup[] = statement.accounts.map((a) => ({
     accountRef: a.accountRef,

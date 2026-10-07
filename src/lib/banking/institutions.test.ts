@@ -27,8 +27,10 @@ describe("BANKS registry integrity", () => {
 
   it("keeps hasCsvProfile in sync with csv-profiles.ts (same key, country and currency)", () => {
     const withProfile = BANKS.filter((b) => b.hasCsvProfile).map((b) => b.key).sort();
-    expect(withProfile).toEqual(BANK_PROFILES.map((p) => p.id).sort());
-    for (const p of BANK_PROFILES) {
+    // PDF-only profiles (hsbc_uae, cbi: read through OCR) are deliberately not connectable banks.
+    const csvProfiles = BANK_PROFILES.filter((p) => !p.pdfOnly);
+    expect(withProfile).toEqual(csvProfiles.map((p) => p.id).sort());
+    for (const p of csvProfiles) {
       const bank = getBank(p.id)!;
       expect(bank.country, p.id).toBe(p.country);
       expect(bank.defaultCurrency, p.id).toBe(p.defaultCurrency);

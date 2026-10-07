@@ -26,8 +26,22 @@ describe("profile registry", () => {
     expect(getBankProfile("nope")).toBeUndefined();
   });
 
-  it("has normalised aliases and a date plus an amount or debit/credit column for every profile", () => {
-    for (const p of BANK_PROFILES) {
+  it("PDF-only profiles (OCR banks) have no aliases and can never match a CSV", () => {
+    const pdfOnly = BANK_PROFILES.filter((p) => p.pdfOnly);
+    expect(pdfOnly.map((p) => p.id).sort()).toEqual(["cbi", "hsbc_uae"]);
+    for (const p of pdfOnly) {
+      expect(Object.values(p.columns).flat()).toEqual([]);
+      expect(p.signature).toEqual([]);
+      const csv = "Date,Description,Debit,Credit,Balance\n2026-01-05,Coffee,10.00,,90.00\n";
+      expect(parseStatement(csv, p.id)).toHaveProperty("error");
+    }
+    // Detection of a generic CSV never picks a PDF-only profile.
+    const detected = detectProfile("Date,Description,Debit,Credit,Balance\n2026-01-05,Coffee,10.00,,90.00\n");
+    expect(detected && BANK_PROFILES.find((p) => p.id === detected.profile.id)?.pdfOnly).toBeFalsy();
+  });
+
+  it("has normalised aliases and a date plus an amount or debit/credit column for every CSV profile", () => {
+    for (const p of BANK_PROFILES.filter((p) => !p.pdfOnly)) {
       const all = Object.values(p.columns).flat() as string[];
       for (const alias of all) expect(alias).toBe(normalizeHeader(alias));
       expect(p.columns.date.length).toBeGreaterThan(0);

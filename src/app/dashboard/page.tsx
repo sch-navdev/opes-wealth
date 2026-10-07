@@ -69,7 +69,12 @@ import {
   parseRealEstateMetadata,
 } from "@/lib/real-estate";
 
-/** The broker import server action (called from this page) fetches daily price history for every holding; give it room on hosts that cap serverless time. */
+/**
+ * Server actions invoked from this page run under this segment's limit. Two of them are slow:
+ * the broker import (fetches daily price history for every holding) and the bank-statement PDF
+ * reader, whose OCR path (AWS Textract, one call per page) takes several seconds per page.
+ * Give them room on hosts that cap serverless time (the effective cap depends on the Vercel plan).
+ */
 export const maxDuration = 60;
 
 type AssetRow = {

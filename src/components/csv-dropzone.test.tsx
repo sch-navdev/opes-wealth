@@ -100,13 +100,12 @@ describe("CsvDropzone", () => {
   });
 
   it.each([
-    ["encrypted", /password protected/],
     ["scanned", /scan \(images only\)/],
     ["image_only", /pages are images/],
     ["unsupported", /isn't a supported bank statement/],
     ["no_transactions", /No transactions were found/],
     ["unreadable", /could not be read as a PDF/],
-    ["too_large", /larger than 10 MB/],
+    ["too_large", /larger than 5 MB/],
   ] as const)("shows the %s message", async (code, pattern) => {
     action.readBankStatementPdf.mockResolvedValue({ ok: false, failure: { code, message: "x" } });
     const { upload, onParsed } = setup();
@@ -120,6 +119,121 @@ describe("CsvDropzone", () => {
     const { upload } = setup();
     upload(pdf());
     expect((await screen.findByRole("alert")).textContent).toMatch(/could not be read as a PDF/);
+  });
+
+  describe("password-protected PDFs", () => {
+    const lockedOut = { ok: false, failure: { code: "encrypted", message: "x" } };
+    const wrong = { ok: false, failure: { code: "password_incorrect", message: "x" } };
+    const good = { ok: true, statement: statement([account()]) };
+
+    it("prompts for the password, re-sends the same file with it and continues on success", async () => {
+      action.readBankStatementPdf.mockResolvedValueOnce(lockedOut).mockResolvedValueOnce(good);
+      const { upload, onParsed } = setup("AED");
+      const file = pdf();
+      upload(file);
+      const input = (await screen.findByLabelText("PDF password")) as HTMLInputElement;
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect((action.readBankStatementPdf.mock.calls[0][0] as FormData).has("password")).toBe(false);
+      await userEvent.type(input, "s3cret{Enter}");
+      await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+      const form = action.readBankStatementPdf.mock.calls[1][0] as FormData;
+      expect(form.get("password")).toBe("s3cret");
+      expect(form.get("file")).toBe(file);
+      expect(screen.queryByLabelText("PDF password")).toBeNull();
+    });
+
+    it("shows the wrong-password error, clears the field and keeps prompting", async () => {
+      action.readBankStatementPdf.mockResolvedValueOnce(lockedOut).mockResolvedValueOnce(wrong).mockResolvedValueOnce(good);
+      const { upload, onParsed } = setup("AED");
+      upload(pdf());
+      const input = (await screen.findByLabelText("PDF password")) as HTMLInputElement;
+      await userEvent.type(input, "nope{Enter}");
+      expect(await screen.findByText("Incorrect password, try again")).toBeTruthy();
+      expect(input.value).toBe("");
+      expect(onParsed).not.toHaveBeenCalled();
+      await waitFor(() => expect(document.activeElement).toBe(input));
+      await userEvent.type(input, "right{Enter}");
+      await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+      expect((action.readBankStatementPdf.mock.calls[2][0] as FormData).get("password")).toBe("right");
+    });
+
+    it("drops the file and shows the message on any other failure", async () => {
+      action.readBankStatementPdf.mockResolvedValueOnce(lockedOut).mockResolvedValueOnce({ ok: false, failure: { code: "unsupported", message: "x" } });
+      const { upload } = setup();
+      upload(pdf());
+      await userEvent.type(await screen.findByLabelText("PDF password"), "pw{Enter}");
+      expect((await screen.findByRole("alert")).textContent).toMatch(/isn't a supported bank statement/);
+      expect(screen.queryByLabelText("PDF password")).toBeNull();
+    });
+
+    it("cancel returns to the idle dropzone", async () => {
+      action.readBankStatementPdf.mockResolvedValueOnce(lockedOut);
+      const { upload, onParsed } = setup();
+      upload(pdf());
+      await screen.findByLabelText("PDF password");
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByLabelText("PDF password")).toBeNull();
+      expect(onParsed).not.toHaveBeenCalled();
+      expect(action.readBankStatementPdf).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("OCR for scanned PDFs", () => {
+    const offer = { ok: false, failure: { code: "scanned", message: "x", ocr: "available" } };
+    const ocrStatement = { ...statement([account()]), source: "ocr" as const };
+
+    it("offers OCR (with the consent text) instead of an error, and does not call it yet", async () => {
+      action.readBankStatementPdf.mockResolvedValue(offer);
+      const { upload } = setup();
+      upload(pdf());
+      expect(await screen.findByText(/sent once to Amazon Textract/)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Read with OCR" })).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(action.readBankStatementPdf).toHaveBeenCalledTimes(1);
+      expect((action.readBankStatementPdf.mock.calls[0][0] as FormData).has("ocr")).toBe(false);
+    });
+
+    it("confirm re-submits the same file with ocr=1; the result is never auto-continued and carries the verify notice", async () => {
+      action.readBankStatementPdf.mockResolvedValueOnce(offer).mockResolvedValueOnce({ ok: true, statement: ocrStatement });
+      const { upload, onParsed } = setup("AED");
+      const file = pdf();
+      upload(file);
+      await userEvent.click(await screen.findByRole("button", { name: "Read with OCR" }));
+      expect(await screen.findByText("Read by OCR: check every row before importing")).toBeTruthy();
+      const sent = action.readBankStatementPdf.mock.calls[1][0] as FormData;
+      expect(sent.get("ocr")).toBe("1");
+      expect(sent.get("file")).toBe(file);
+      // A single verified account would normally continue by itself; an OCR read must not.
+      expect(onParsed).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: "Use this account" }));
+      expect(onParsed).toHaveBeenCalledTimes(1);
+    });
+
+    it("cancel resets without calling OCR", async () => {
+      action.readBankStatementPdf.mockResolvedValue(offer);
+      const { upload, onParsed } = setup();
+      upload(pdf());
+      await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("button", { name: "Read with OCR" })).toBeNull();
+      expect(action.readBankStatementPdf).toHaveBeenCalledTimes(1);
+      expect(onParsed).not.toHaveBeenCalled();
+    });
+
+    it("shows the scanned message plus the keys-missing line when OCR is unconfigured", async () => {
+      action.readBankStatementPdf.mockResolvedValue({ ok: false, failure: { code: "image_only", message: "x", ocr: "unconfigured" } });
+      const { upload } = setup();
+      upload(pdf());
+      expect((await screen.findByRole("alert")).textContent).toMatch(/pages are images/);
+      expect(screen.getByText(/OCR is not set up on this server/)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Read with OCR" })).toBeNull();
+    });
+
+    it("shows the ocr_unavailable message", async () => {
+      action.readBankStatementPdf.mockResolvedValue({ ok: false, failure: { code: "ocr_unavailable", message: "x" } });
+      const { upload } = setup();
+      upload(pdf());
+      expect((await screen.findByRole("alert")).textContent).toMatch(/OCR could not be run/);
+    });
   });
 
   it("still parses a CSV client-side without calling the PDF action", async () => {

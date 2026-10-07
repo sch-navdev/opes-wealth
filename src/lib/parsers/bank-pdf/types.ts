@@ -9,7 +9,9 @@
  * (the same convention as `NormalizedTx` in `lib/banking/csv-profiles.ts`).
  */
 
-export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae";
+import type { OcrDocument } from "./ocr-types";
+
+export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi";
 
 /**
  * One transaction as read from a statement. Named after the app's transaction-dedupe concept
@@ -83,12 +85,16 @@ export type PdfStatement = {
   accounts: PdfAccountStatement[];
   /** Human-readable notes (skipped lines, reconciliation mismatches...). Never contain amounts of other accounts. */
   warnings: string[];
+  /** Where the text came from: the PDF text layer (default when absent) or OCR (must be verified row by row). */
+  source?: "text" | "ocr";
 };
 
 /** Why a PDF could not be turned into transactions. The UI maps each code to a translated message. */
 export type PdfFailureCode =
   /** The PDF is password protected. */
   | "encrypted"
+  /** The PDF is password protected and the password supplied was wrong. */
+  | "password_incorrect"
   /** Pages are images (scanned / printed-to-image): there is no text layer, OCR would be needed. */
   | "scanned"
   /** The bank is recognised but its statement body is not extractable text (image-only layout). */
@@ -100,10 +106,14 @@ export type PdfFailureCode =
   /** The file is not a readable PDF (corrupt, wrong type, empty). */
   | "unreadable"
   /** Larger than the accepted size. */
-  | "too_large";
+  | "too_large"
+  /** OCR was needed but could not run (not configured, keys rejected, service busy or failed). */
+  | "ocr_unavailable";
 
 export type PdfParseFailure = {
   code: PdfFailureCode;
+  /** Set on `scanned` / `image_only`: whether OCR could be run on this server (keys configured) so the UI can offer it. */
+  ocr?: "available" | "unconfigured";
   /** Set when the bank was recognised (`image_only`, `no_transactions`). */
   bank?: PdfBankId;
   /** Developer-facing English message (the UI shows the translated one for `code`). */
@@ -122,4 +132,8 @@ export type BankPdfProfile = {
   detect: (text: string) => boolean;
   /** Parses the text; only called after `detect` returned true. */
   parse: (text: string) => PdfParseOutcome;
+  /** OCR path (image-only statements): true when the OCR document is recognisably this bank's statement. */
+  detectOcr?: (doc: OcrDocument) => boolean;
+  /** OCR path: parses an OCR document; only called after `detectOcr` returned true. */
+  parseOcr?: (doc: OcrDocument) => PdfParseOutcome;
 };

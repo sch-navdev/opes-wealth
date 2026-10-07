@@ -5,6 +5,8 @@ import { FileSpreadsheet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PdfPasswordPrompt } from "@/components/pdf-password-prompt";
+import { PdfOcrPrompt } from "@/components/pdf-ocr-prompt";
 import { InstitutionLogo } from "@/components/institution-logo";
 import {
   Dialog,
@@ -106,6 +108,13 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   const [sheet, setSheet] = useState<{ group: number; index: number } | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
   const [isPending, startTransition] = useTransition();
+  /** A password-protected PDF waiting for its password (the File is kept so it can be re-sent with it). */
+  const [locked, setLocked] = useState<{ file: File; incorrect: boolean } | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+  /** A scanned PDF waiting for the user's explicit OK to send it to the OCR provider. */
+  const [ocrOffer, setOcrOffer] = useState<{ file: File; password?: string } | null>(null);
+  const [ocrMissing, setOcrMissing] = useState(false);
+  const [ocrRunning, setOcrRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -120,6 +129,11 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     setResults(null);
     setSheet(null);
     setExpanded({});
+    setLocked(null);
+    setUnlocking(false);
+    setOcrOffer(null);
+    setOcrMissing(false);
+    setOcrRunning(false);
   }
 
   function applyProfile(content: string, id: BankProfileId) {
@@ -141,17 +155,36 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     );
   }
 
-  async function handlePdfFile(file: File) {
+  async function handlePdfFile(file: File, password?: string, ocr = false) {
     setFileName(file.name);
     setText("");
     const form = new FormData();
     form.append("file", file);
+    if (password) form.append("password", password);
+    if (ocr) form.append("ocr", "1");
     const result = await readBankStatementPdf(form);
+    setOcrOffer(null);
+    setOcrMissing(false);
     if (!result.ok) {
       const code = result.failure.code;
+      if (code === "encrypted" || code === "password_incorrect") {
+        setLocked({ file, incorrect: code === "password_incorrect" });
+        setParseError(null);
+        return;
+      }
+      setLocked(null);
+      const ocrState = "ocr" in result.failure ? result.failure.ocr : undefined;
+      if (ocrState === "available") {
+        // Scanned PDF and OCR is possible: ask for consent instead of failing.
+        setOcrOffer({ file, password });
+        setParseError(null);
+        return;
+      }
+      if (ocrState === "unconfigured") setOcrMissing(true);
       setParseError(t(code in PDF_FAILURE_MESSAGE_KEYS ? PDF_FAILURE_MESSAGE_KEYS[code as PdfFailureCode] : "bank_pdf_error_unreadable"));
       return;
     }
+    setLocked(null);
     const statement = result.statement;
     const parsedPdf = statementToParseResult(statement);
     const id = parsedPdf.profile.id;
@@ -185,6 +218,33 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     }
     setDetection(found.ambiguous ? "ambiguous" : "found");
     applyProfile(content, found.profile.id);
+  }
+
+  async function unlock(password: string) {
+    if (!locked) return;
+    setUnlocking(true);
+    try {
+      await handlePdfFile(locked.file, password);
+    } catch {
+      setLocked(null);
+      setParseError(t("bank_pdf_error_unreadable"));
+    } finally {
+      setUnlocking(false);
+    }
+  }
+
+  async function confirmOcr() {
+    if (!ocrOffer) return;
+    const { file, password } = ocrOffer;
+    setOcrRunning(true);
+    try {
+      await handlePdfFile(file, password, true);
+    } catch {
+      setOcrOffer(null);
+      setParseError(t("bank_pdf_error_unreadable"));
+    } finally {
+      setOcrRunning(false);
+    }
   }
 
   function handleImport() {
@@ -317,7 +377,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                       <SelectItem value={NONE} disabled>
                         {t("stmt_choose_bank")}
                       </SelectItem>
-                      {BANK_PROFILES.map((p) => (
+                      {BANK_PROFILES.filter((p) => !p.pdfOnly).map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           <InstitutionLogo kind="bank" id={p.id} name={p.name} />
                           {p.name}
@@ -336,9 +396,32 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
             {detection === "ambiguous" && (
               <p className="text-sm text-muted-foreground">{t("stmt_ambiguous")}</p>
             )}
+            {locked && (
+              <PdfPasswordPrompt
+                fileName={locked.file.name}
+                error={locked.incorrect}
+                pending={unlocking}
+                onSubmit={(password) => void unlock(password)}
+                onCancel={reset}
+              />
+            )}
+            {ocrOffer && (
+              <PdfOcrPrompt
+                fileName={ocrOffer.file.name}
+                pending={ocrRunning}
+                onConfirm={() => void confirmOcr()}
+                onCancel={reset}
+              />
+            )}
             {parseError && (
               <p className="text-sm text-destructive" role="alert">
                 {parseError}
+              </p>
+            )}
+            {parseError && ocrMissing && <p className="text-xs text-muted-foreground">{t("bank_pdf_ocr_keys_missing")}</p>}
+            {pdfStatement?.source === "ocr" && (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm font-medium text-foreground" role="status">
+                {t("bank_pdf_ocr_verify")}
               </p>
             )}
 
