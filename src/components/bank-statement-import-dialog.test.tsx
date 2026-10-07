@@ -334,7 +334,7 @@ describe("BankStatementImportDialog bank picker, PDF failures", () => {
       .mockResolvedValueOnce({ ok: true, statement: wioStatement });
     await openAndUpload();
     await screen.findByRole("alert");
-    await choose("stmt-bank-select", /First Abu Dhabi Bank/);
+    await choose("stmt-bank-select", /First Abu Dhabi Bank \(FAB\)/);
     await screen.findByRole("alert");
     expect(screen.getByTestId("stmt-bank-select")).toHaveTextContent(/First Abu Dhabi Bank/);
     await choose("stmt-bank-select", /Wio Bank/);

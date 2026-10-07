@@ -12,6 +12,7 @@
  *  - descriptions wrap at ~41 chars (often mid-word) on indented continuation lines, and the
  *    continuation of the last row of a sheet can reappear after "Balance brought forward".
  */
+import { isFabLegacyStatement, parseFabLegacy } from "./fab-legacy";
 import { moneyFields, buildAccount, EN_MONTHS, isoDate, roundMoney, sameMoney, squash } from "./shared";
 import type { BankPdfProfile, PdfParseOutcome, TransactionFingerprint } from "./types";
 
@@ -70,13 +71,15 @@ export const fabProfile: BankPdfProfile = {
 
   detect(text) {
     const bank = /First\s+Abu\s+Dhabi\s+Bank/i.test(text) || /\bFAB\b/.test(text);
-    const named = bank && (/Account Statement FROM/i.test(text) || /AC-NUM/.test(text));
+    // pdf-parse sometimes prints two spaces between the words ("Account Statement  FROM").
+    const named = bank && (/Account\s+Statement\s+FROM/i.test(text) || /AC-NUM/.test(text));
     // Older statements (2018-2022) do not print the bank name: the AC-NUM + FROM/TO + IBAN block is unique to FAB.
-    const anonymous = /AC-NUM/.test(text) && /Account Statement FROM/i.test(text) && /^\s*IBAN\s+AE/m.test(text);
-    return named || anonymous;
+    const anonymous = /AC-NUM/.test(text) && /Account\s+Statement\s+FROM/i.test(text) && /^\s*IBAN\s+AE/m.test(text);
+    return named || anonymous || isFabLegacyStatement(text);
   },
 
   parse(text): PdfParseOutcome {
+    if (!/AC-NUM/.test(text) && isFabLegacyStatement(text)) return parseFabLegacy(text);
     const warnings: string[] = [];
     const lines = text.split(/\r?\n/);
 
@@ -187,6 +190,12 @@ export const fabProfile: BankPdfProfile = {
     }
 
     if (transactions.length === 0) {
+      // A quiet month: nothing moved, so opening and closing agree. That is a valid statement, not a failure.
+      if (openingBalance !== null && closingBalance !== null && sameMoney(openingBalance, closingBalance)) {
+        warnings.push("This statement has no transactions.");
+        const quiet = buildAccount({ accountRef, currency, periodStart, periodEnd, openingBalance, closingBalance, transactions: [] });
+        return { ok: true, statement: { bank: "fab", bankName: "First Abu Dhabi Bank (FAB)", accounts: [quiet], warnings } };
+      }
       return {
         ok: false,
         failure: { code: "no_transactions", bank: "fab", message: "FAB statement recognised but no transaction rows were found." },

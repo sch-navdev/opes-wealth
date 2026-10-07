@@ -46,7 +46,8 @@ export type BankProfileId =
   | "hsbc_uae"
   | "cbi"
   | "cbd"
-  | "hsbc_uae_card";
+  | "hsbc_uae_card"
+  | "fab_card";
 
 export type BankProfile = {
   id: BankProfileId;
@@ -416,6 +417,15 @@ export const BANK_PROFILES: BankProfile[] = [
   profile({
     id: "hsbc_uae_card",
     name: "HSBC UAE credit card",
+    country: "AE",
+    defaultCurrency: "AED",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
+    signature: [],
+  }),
+  profile({
+    id: "fab_card",
+    name: "First Abu Dhabi Bank credit card",
     country: "AE",
     defaultCurrency: "AED",
     pdfOnly: true,

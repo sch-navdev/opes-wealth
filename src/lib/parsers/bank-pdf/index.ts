@@ -8,6 +8,7 @@ import { cbdProfile } from "./cbd";
 import { cbiProfile } from "./cbi";
 import { classifyPdfText } from "./classify";
 import { fabProfile } from "./fab";
+import { fabCardProfile } from "./fab-card";
 import type { OcrDocument } from "./ocr-types";
 import { hsbcProfile } from "./hsbc";
 import { hsbcCardProfile } from "./hsbc-card";
@@ -19,7 +20,7 @@ export { classifyPdfText } from "./classify";
 export type { PdfTextKind } from "./classify";
 
 /** Detection order matters: the first profile whose `detect` is true wins. */
-export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
+export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabCardProfile, fabProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
 
 export const PDF_FAILURE_MESSAGE_KEYS = {
   encrypted: "bank_pdf_error_encrypted",

@@ -17,6 +17,7 @@
  * balance it follows from. `reconcile()` (opening + movements = closing) is the final proof.
  */
 import type { BankPdfProfile, PdfAccountStatement, PdfParseOutcome, TransactionFingerprint } from "./types";
+import { isFabLegacyStatement } from "./fab-legacy";
 import { buildAccount, isoDate, moneyFields, roundMoney, sameMoney, squash } from "./shared";
 
 type RawRow = { date: string; reference: string; text: string; extra: string };
@@ -208,7 +209,17 @@ type Active = {
   started: boolean;
 };
 
+/**
+ * A First Abu Dhabi Bank account statement prints an `AC-NUM` line and an `Account Statement FROM ..
+ * TO ..` header, which a Wio statement never does. Any free-text mention of "Wio" (a transfer
+ * description, a beneficiary name) in such a statement must not make Wio claim it.
+ */
+function looksLikeFabStatement(text: string): boolean {
+  return (/AC-NUM/.test(text) && /Account\s+Statement\s+FROM/i.test(text)) || isFabLegacyStatement(text);
+}
+
 function detect(text: string): boolean {
+  if (looksLikeFabStatement(text)) return false;
   return (/Wio Bank/i.test(text) || (/Summary of Accounts/.test(text) && /Wio/i.test(text) && /CBUAE/.test(text))) &&
     /ACCOUNT STATEMENT/.test(text);
 }
