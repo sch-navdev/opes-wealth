@@ -327,6 +327,40 @@ describe("scaleAssetForOwner", () => {
     expect(md.projected_distributions[0].amount).toBe(25_000);
   });
 
+  it("Assurance-Vie: scales premium money fields; keeps allocation and beneficiary percentages, dates and the schedule day", () => {
+    const out = scaleAssetForOwner(
+      asset({
+        category: "Assurance-Vie",
+        current_value: 50_000,
+        metadata: {
+          version: 1,
+          euro_fund_pct: 60,
+          uc_pct: 40,
+          opened_on: "2018-03-01",
+          premiums_paid_total: 40_000,
+          premiums_before_70: 30_000,
+          premiums_after_70: 10_000,
+          scheduled_amount: 200,
+          scheduled_day: 5,
+          beneficiaries: [{ id: "b1", name: "A", share_pct: 100 }],
+        },
+      }),
+      0.5,
+    );
+    expect(out.current_value).toBe(25_000);
+    expect(out.metadata).toMatchObject({
+      euro_fund_pct: 60,
+      uc_pct: 40,
+      opened_on: "2018-03-01",
+      premiums_paid_total: 20_000,
+      premiums_before_70: 15_000,
+      premiums_after_70: 5_000,
+      scheduled_amount: 100,
+      scheduled_day: 5,
+      beneficiaries: [{ id: "b1", name: "A", share_pct: 100 }],
+    });
+  });
+
   it("Equities: scales trade quantity/booked amount/brokerage and income but never the unit price", () => {
     const out = scaleAssetForOwner(
       asset({

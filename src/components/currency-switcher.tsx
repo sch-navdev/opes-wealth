@@ -10,20 +10,29 @@ import {
 } from "@/components/ui/select";
 import { currencies } from "@/lib/currencies";
 
-export function CurrencySwitcher({ value, className }: { value: string; className?: string }) {
+/**
+ * Sets the dashboard's display (base) currency: the `?currency=` search param, kept alongside any other
+ * params. The one mechanism behind the header switcher AND the Global exposure bar's quick chips, so
+ * there is a single source of truth (the URL, read by the dashboard page on the server).
+ */
+export function useSetDisplayCurrency(): (next: string) => void {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  function handleChange(next: string) {
+  return function setDisplayCurrency(next: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("currency", next);
     router.push(`${pathname}?${params.toString()}`);
-  }
+  };
+}
+
+export function CurrencySwitcher({ value, className, ariaLabel }: { value: string; className?: string; ariaLabel?: string }) {
+  const handleChange = useSetDisplayCurrency();
 
   return (
     <Select value={value} onValueChange={handleChange}>
-      <SelectTrigger className={className ?? "w-40"}>
+      <SelectTrigger className={className ?? "w-40"} aria-label={ariaLabel}>
         <SelectValue>{value}</SelectValue>
       </SelectTrigger>
       <SelectContent>

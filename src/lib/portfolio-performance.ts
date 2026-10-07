@@ -257,6 +257,7 @@ const DEFAULT_ANNUAL_GROWTH: Record<string, number> = {
   Cash: 0.02,
   Vehicles: -0.1,
   "Private Equity": 0.08,
+  "Assurance-Vie": 0.03,
   Liabilities: 0,
 };
 
@@ -265,7 +266,7 @@ const DEFAULT_ANNUAL_GROWTH: Record<string, number> = {
  * (buying more shares, topping up cash), so a CAGR of that curve would
  * wildly overstate growth: always use the category assumption instead.
  */
-const CONTRIBUTION_DRIVEN = new Set(["Equities", "Crypto", "Cash", "Private Equity"]);
+const CONTRIBUTION_DRIVEN = new Set(["Equities", "Crypto", "Cash", "Private Equity", "Assurance-Vie"]);
 
 const MIN_HISTORY_YEARS = 0.5;
 const MIN_GROWTH = -0.15;

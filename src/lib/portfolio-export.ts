@@ -1,7 +1,7 @@
 /**
  * Full portfolio spreadsheet (.xlsx) — one workbook, one sheet per view:
  * Summary, Assets, Liabilities, Real Estate, Brokerage, REIT (+ dividends),
- * Private Equity (+ cash flows), Companies and the complete Valuation History.
+ * Private Equity (+ cash flows), Companies, Assurance-Vie and the complete Valuation History.
  * Numbers are written as real numeric cells (not formatted strings) so the
  * file can be summed, filtered and charted. Values are given in each asset's
  * own currency AND in the Base Currency. Built server-side by
@@ -18,6 +18,7 @@ import {
 } from "@/lib/real-estate";
 import { parseEquityMetadata } from "@/lib/equities";
 import { parseCompanyMetadata } from "@/lib/companies";
+import { parseAssuranceVieMetadata, scheduledAnnualAmount } from "@/lib/assurance-vie";
 import {
   calledCapital,
   fundReturns,
@@ -292,6 +293,30 @@ export function buildPortfolioWorkbook(input: {
       };
     });
 
+  // ---- Assurance-Vie ---------------------------------------------------------------
+  const assuranceVieRows: Row[] = assets
+    .filter((a) => category(a) === "Assurance-Vie")
+    .map((a) => {
+      const md = parseAssuranceVieMetadata(a.metadata);
+      return {
+        Name: a.name,
+        Insurer: md.insurer,
+        Contract: md.contract_name,
+        "Contract no.": md.contract_number,
+        "Opened on": md.opened_on,
+        Household: md.household === "couple" ? "Couple (joint)" : "Single",
+        "Euro fund %": md.euro_fund_pct,
+        "Unit-linked %": md.uc_pct,
+        "Deposit type": md.deposit_type === "scheduled" ? "Scheduled" : "Free",
+        "Premiums paid": md.premiums_paid_total ?? "",
+        "Scheduled premium": md.scheduled_amount ?? "",
+        "Scheduled per year": scheduledAnnualAmount(md) ?? "",
+        Currency: a.currency,
+        "Contract value": r2(a.current_value),
+        [`Contract value (${baseCurrency})`]: base(a.current_value, a.currency),
+      };
+    });
+
   // ---- History -------------------------------------------------------------------
   const byId = new Map(assets.map((a) => [a.id, a]));
   const historyRows: Row[] = history
@@ -325,6 +350,7 @@ export function buildPortfolioWorkbook(input: {
   add("Private Equity", peRows, Object.keys(peRows[0] ?? {}));
   add("PE Cash Flows", peFlowRows, ["Fund", "Type", "Date", "Amount", "Status"]);
   add("Companies", companyRows, Object.keys(companyRows[0] ?? {}));
+  add("Assurance-Vie", assuranceVieRows, Object.keys(assuranceVieRows[0] ?? {}));
   add("Valuation History", historyRows, ["Date", "Asset", "Category", "Currency", "Value", "Net value"]);
 
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

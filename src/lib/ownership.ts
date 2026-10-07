@@ -187,6 +187,11 @@ export function scaleAssetForOwner<T extends Scalable>(asset: T, f: number): T {
       next.income = scaleList(md.income, ["amount"], f);
       break;
     }
+    case "Assurance-Vie": {
+      // Money fields only: allocation and beneficiary percentages, dates and the schedule day stay as they are.
+      next = scaleKeys(md, ["premiums_paid_total", "premiums_before_70", "premiums_after_70", "scheduled_amount"], f);
+      break;
+    }
     case "SCPI": {
       next.dividends = scaleList(md.dividends, ["amount"], f);
       break;

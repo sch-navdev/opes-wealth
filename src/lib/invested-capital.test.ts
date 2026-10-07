@@ -11,7 +11,7 @@ const asset = (over: Partial<Asset>): Asset => ({
 });
 
 describe("buildAssetInvested: categories without cost data", () => {
-  it.each(["Cash", "Crypto", "Precious Metals", "Private Equity", "Startups", "Companies", "Unknown"])(
+  it.each(["Cash", "Crypto", "Precious Metals", "Private Equity", "Startups", "Companies", "Assurance-Vie", "Unknown"])(
     "%s has no invested series",
     (category) => {
       expect(buildAssetInvested(asset({ category }))).toBeUndefined();

@@ -15,7 +15,7 @@ export const PRODUCT_KNOWLEDGE = `
 - Privacy mode (eye icon): hides amounts everywhere on screen.
 
 ## Categories
-Real Estate, REIT (shown as SCPI in the French interface; it is the app's real-estate fund / SCPI category), Brokerage Account (equities), Crypto, Precious Metals, Cash, Vehicles, Private Equity, Companies, Liabilities.
+Real Estate, REIT (shown as SCPI in the French interface; it is the app's real-estate fund / SCPI category), Brokerage Account (equities), Crypto, Precious Metals, Cash, Vehicles, Private Equity, Companies, Assurance-Vie (French life-insurance contract: euro fund / unit-linked split, premiums, beneficiaries and an informational 8-year milestone; the value is the total contract value), Liabilities.
 
 ## Importing data
 - Broker trades: Add investments -> Upload from broker -> Saxo Bank or Sharesight (.xlsx or .csv). Trades are netted into one holding per instrument; re-uploading an overlapping export only adds trades not already imported (duplicates are matched on ticker, exchange, date, side, quantity, price). Review the trade table before importing; set the exchange rate / brokerage if needed.

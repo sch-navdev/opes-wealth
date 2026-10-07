@@ -219,7 +219,7 @@ export function AppSidebar() {
     <>
       <aside
         className={cn(
-          "sticky top-0 hidden h-screen shrink-0 flex-col border-e border-border bg-background transition-[width] duration-300 motion-reduce:transition-none md:flex",
+          "sticky top-0 hidden h-screen shrink-0 flex-col print:!hidden border-e border-border bg-background transition-[width] duration-300 motion-reduce:transition-none md:flex",
           pref === null ? "w-16 lg:w-64" : pref ? "w-16" : "w-64",
         )}
       >
@@ -249,7 +249,7 @@ export function AppSidebar() {
         </button>
       </aside>
 
-      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:hidden">
+      <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4 md:hidden print:hidden">
         <div className="flex items-center gap-2">
           <Brand />
         </div>

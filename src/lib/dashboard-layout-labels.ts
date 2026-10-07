@@ -39,6 +39,7 @@ export const DLAYOUT_EN = {
   "dlayout_ann_off": "{label} switched off.",
   "dlayout_all_hidden": "Every block is switched off. Use Customize to bring blocks back.",
   "dlayout_no_data": "Nothing to show for this block right now.",
+  "dlayout_block_fxExposure": "Global exposure",
   "dlayout_block_basicOverview": "Overview",
   "dlayout_block_bento": "Net worth highlights",
   "dlayout_block_quickAdd": "Quick add",

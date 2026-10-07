@@ -37,6 +37,11 @@ describe("buildCategoryPills", () => {
   it("returns nothing for no rows", () => {
     expect(buildCategoryPills([])).toEqual([]);
   });
+  it("shows the proper noun Assurance-Vie as-is (no translation key) after the main classes", () => {
+    const pills = buildCategoryPills([row("1", "Assurance-Vie"), row("2", "Cash"), row("3", "Real Estate")]);
+    expect(pills.map((p) => p.value)).toEqual(["Real Estate", "Cash", "Assurance-Vie"]);
+    expect(pills.find((p) => p.value === "Assurance-Vie")?.labelKey).toBeNull();
+  });
 });
 
 describe("filterByCategory / pillsWithSelection", () => {

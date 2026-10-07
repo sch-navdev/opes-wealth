@@ -13,6 +13,7 @@
  */
 import { canAmortize, getOutstandingPrincipalAt } from "@/lib/amortization";
 import { parseCompanyMetadata } from "@/lib/companies";
+import { parseAssuranceVieMetadata } from "@/lib/assurance-vie";
 import { convertToBaseCurrency } from "@/lib/fx";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 import { parseLiabilityMetadata } from "@/lib/liability";
@@ -256,7 +257,7 @@ export type DccData = {
   portfolio: DccPortfolio;
 };
 
-const FINANCIAL = new Set(["Equities", "Cash", "Crypto", "Precious Metals", "Private Equity"]);
+const FINANCIAL = new Set(["Equities", "Cash", "Crypto", "Precious Metals", "Private Equity", "Assurance-Vie"]);
 
 export type DccAssetInput = {
   name: string;
@@ -405,6 +406,8 @@ export function buildDccPortfolio(
       if (category === "Equities") {
         const md = parseEquityMetadata(a.metadata);
         row.institution = md.account_name ?? "";
+      } else if (category === "Assurance-Vie") {
+        row.institution = parseAssuranceVieMetadata(a.metadata).insurer;
       } else if (category === "Private Equity") {
         row.institution = parsePrivateEquityMetadata(a.metadata).manager;
         const pending = assetLiability(a);

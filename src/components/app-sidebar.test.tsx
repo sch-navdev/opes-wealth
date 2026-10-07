@@ -25,6 +25,7 @@ const HREFS: Record<NavLinkId, string> = {
   banking: "/dashboard/banking",
   companies: "/dashboard/companies",
   planning: "/dashboard/planning",
+  compare: "/dashboard/compare",
   settings: "/dashboard/settings",
   security: "/dashboard/security",
 };
@@ -32,8 +33,8 @@ const HREFS: Record<NavLinkId, string> = {
 const EXPECTED_LINKS: Record<ExpertiseLevel, NavLinkId[]> = {
   basic: ["dashboard", "settings", "security"],
   standard: ["dashboard", "banking", "settings", "security"],
-  professional: ["dashboard", "banking", "companies", "planning", "settings", "security"],
-  expert: ["dashboard", "banking", "companies", "planning", "settings", "security"],
+  professional: ["dashboard", "banking", "companies", "planning", "compare", "settings", "security"],
+  expert: ["dashboard", "banking", "companies", "planning", "compare", "settings", "security"],
 };
 
 function renderSidebar(tier: ExpertiseLevel) {

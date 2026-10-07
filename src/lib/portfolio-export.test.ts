@@ -329,6 +329,46 @@ describe("buildPortfolioWorkbook", () => {
     });
   });
 
+  describe("Assurance-Vie sheet", () => {
+    it("writes the contract, allocation and premium summary", () => {
+      const av = asset({
+        id: "av",
+        name: "My AV",
+        category: "Assurance-Vie",
+        currency: "EUR",
+        current_value: 1_000,
+        metadata: {
+          insurer: "Insurer X",
+          opened_on: "2018-03-01",
+          household: "couple",
+          euro_fund_pct: 70,
+          uc_pct: 30,
+          deposit_type: "scheduled",
+          scheduled_amount: 100,
+          scheduled_frequency: "monthly",
+          scheduled_day: 5,
+          premiums_paid_total: 800,
+        },
+      });
+      const [r] = rows(build([av]), "Assurance-Vie");
+      expect(r).toMatchObject({
+        Name: "My AV",
+        Insurer: "Insurer X",
+        "Opened on": "2018-03-01",
+        Household: "Couple (joint)",
+        "Euro fund %": 70,
+        "Unit-linked %": 30,
+        "Deposit type": "Scheduled",
+        "Premiums paid": 800,
+        "Scheduled per year": 1_200,
+        "Contract value": 1_000,
+      });
+    });
+    it("is omitted when there is no Assurance-Vie asset", () => {
+      expect(build([cash]).SheetNames).not.toContain("Assurance-Vie");
+    });
+  });
+
   describe("Valuation History sheet", () => {
     const history: ExportHistoryRow[] = [
       { asset_id: "e", recorded_date: "2025-02-01", value: 10, net_equity: null },

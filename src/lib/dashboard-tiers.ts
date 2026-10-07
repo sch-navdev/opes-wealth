@@ -6,10 +6,12 @@ import { tierRank, type ExpertiseLevel } from "@/stores/useUiTierStore";
  *
  *  - basic: simplified net worth, allocation pie, top assets
  *  - standard / professional: bento grid, performance, cash flow, quick-add
+ *  - professional and up: also the Global exposure (FX) bar
  *  - expert: everything, plus raw data, PE valuations, tax/depreciation, FX heatmap
  */
 export type DashboardSection =
   | "basicOverview"
+  | "fxExposure"
   | "bento"
   | "metricCards"
   | "analytics"
@@ -26,6 +28,7 @@ type TierRange = { min: ExpertiseLevel; max?: ExpertiseLevel };
 
 export const SECTION_TIERS: Record<DashboardSection, TierRange> = {
   basicOverview: { min: "basic", max: "basic" },
+  fxExposure: { min: "professional" },
   bento: { min: "standard" },
   metricCards: { min: "standard" },
   analytics: { min: "standard" },
@@ -50,7 +53,7 @@ export function isSectionVisible(section: DashboardSection, tier: ExpertiseLevel
  * a link either follows a dashboard section (so the link and the card it leads
  * to always appear together) or has its own plain minimum tier.
  */
-export type NavLinkId = "dashboard" | "banking" | "companies" | "planning" | "settings" | "security";
+export type NavLinkId = "dashboard" | "banking" | "companies" | "planning" | "compare" | "settings" | "security";
 
 type NavLinkRule = { section: DashboardSection } | { min: ExpertiseLevel };
 
@@ -59,6 +62,7 @@ export const NAV_LINK_TIERS: Record<NavLinkId, NavLinkRule> = {
   banking: { section: "cashFlow" },
   companies: { min: "professional" },
   planning: { section: "futureProjects" },
+  compare: { min: "professional" },
   settings: { min: "basic" },
   security: { min: "basic" },
 };

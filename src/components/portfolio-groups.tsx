@@ -60,6 +60,7 @@ export const CATEGORY_NAME_KEYS: Record<string, TranslationKey> = {
   "Exotic Assets": "category_exotic_assets",
   Startups: "category_startups",
   Companies: "category_companies",
+  // "Assurance-Vie" is a proper noun shown as-is in every language: no entry, the stored name is the label.
   Cash: "category_cash",
   Liabilities: "category_liabilities",
   Vehicles: "category_vehicles",
@@ -76,6 +77,7 @@ const FOLDER_ORDER = [
   "Real Estate",
   "SCPI",
   "Equities",
+  "Assurance-Vie",
   "Crypto",
   "Precious Metals",
   "Exotic Assets",

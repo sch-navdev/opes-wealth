@@ -124,6 +124,29 @@ where n.nspname = 'public' and p.proname in ('is_asset_member', 'link_pending_co
 
 `supabase/migrations/0034_notifications.sql` creates `public.notifications` (profile_id, kind in change_approved / change_rejected / change_auto_applied, asset_id, request_id, structured `data` jsonb, read_at) with owner-only SELECT/UPDATE(read_at)/DELETE RLS, no insert policy (service role writes) and the restrictive demo-mode deny policies. **It has not been applied or run**; Steve applies it in the Supabase SQL editor. The app tolerates the missing table meanwhile. See [[Co-Ownership|Co-Ownership]] ("Requester notifications").
 
+## Assurance-Vie asset class (2026-10-07)
+
+`supabase/migrations/0036_assurance_vie_category.sql` seeds the `Assurance-Vie` row (slug `assurance-vie`) in `asset_categories` with `on conflict (slug) do nothing`, mirroring `0018` (Companies). No new columns or tables, and the migration **has not been applied**: Steve runs it in the SQL editor. Until it is, the category is not offered in Add Asset.
+
+Contract details live in `assets.metadata` as a versioned object (`version: 1`), typed and sanitised by `src/lib/assurance-vie.ts` (`parseAssuranceVieMetadata` never trusts what it reads; `getAssuranceVieMetadataErrors` returns translation keys). `assets.current_value` is the **total contract value** entered by the user.
+
+| Key | Type | Notes |
+|---|---|---|
+| `version` | `1` | always written as 1 |
+| `insurer`, `contract_name`, `contract_number` | string | optional, trimmed, length-capped |
+| `opened_on` | ISO date or `""` | the 8-year clock starts here (not at each premium); not in the future |
+| `household` | `single` / `couple` | `couple` = jointly taxed (married or PACS); only picks the allowance figure |
+| `euro_fund_pct`, `uc_pct` | number 0-100 | "Fonds en euros" / "Unités de compte"; total 100 (+/- 0.01); amounts are implied from the asset value, not stored |
+| `deposit_type` | `free` / `scheduled` | "Versements libres" / "Versements programmés" |
+| `premiums_paid_total` | number or null | optional |
+| `scheduled_amount`, `scheduled_frequency` (`monthly`/`quarterly`/`yearly`), `scheduled_day` (1-31), `scheduled_start_on`, `scheduled_end_on` | | only kept when `deposit_type = scheduled` |
+| `premiums_before_70`, `premiums_after_70` | number or null | informational only (neutral note, no estate amounts) |
+| `beneficiaries[]` | `{id, name, relationship, share_pct, clause: standard / free_text, clause_text}` | max 20, blank rows dropped; third-party personal data stored only in this asset's metadata; a total other than 100 is a warning, not an error |
+
+The 8-year constant, the allowances (EUR 4,600 single / EUR 9,200 couple), `asOf` and `source` are one object, `ASSURANCE_VIE_CONFIG`, in the same file. Co-ownership scaling (`lib/ownership.ts`) scales the premium money fields and leaves percentages, dates and the schedule day alone.
+
+**Deliberately out of scope**: unit-of-account holdings, ISINs and pricing; estate-tax calculation; any tax computation; scheduling programmed premiums into the income calendar. See [[Portfolio-Dashboard|Portfolio Dashboard]] ("Assurance-Vie asset class") for the UI.
+
 ## Related
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline, drafted alongside the Vehicles/Private Equity schema work
 - [[Architecture|Architecture]] — verified live-schema snapshot and financial formulas

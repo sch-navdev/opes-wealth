@@ -30,6 +30,8 @@ import { PrivateEquityFields } from "@/components/private-equity-fields";
 import { EquityFields } from "@/components/equity-fields";
 import { CryptoFields } from "@/components/crypto-fields";
 import { CompanyFields } from "@/components/company-fields";
+import { AssuranceVieFields } from "@/components/assurance-vie-fields";
+import { isAvKey, useAssuranceVieText } from "@/components/assurance-vie-text";
 import { ScpiFields } from "@/components/scpi-fields";
 import { PreciousMetalsFields } from "@/components/precious-metals-fields";
 import { ExoticAssetsFields } from "@/components/exotic-assets-fields";
@@ -77,6 +79,12 @@ import {
   getCompanyMetadataErrors,
   parseCompanyMetadata,
 } from "@/lib/companies";
+import {
+  EMPTY_ASSURANCE_VIE_METADATA,
+  getAssuranceVieMetadataErrors,
+  localTodayIso,
+  parseAssuranceVieMetadata,
+} from "@/lib/assurance-vie";
 import {
   EMPTY_SCPI_METADATA,
   getScpiMetadataErrors,
@@ -150,6 +158,7 @@ export function AddAssetDialog({
 }) {
   const isEditMode = !!asset;
   const { t } = useLanguage();
+  const avT = useAssuranceVieText();
 
   const [open, setOpen] = useState(false);
   // Command palette "Add asset": only the plain dashboard instance reacts (not edit / simulation / preset / custom-trigger ones).
@@ -213,6 +222,13 @@ export function AddAssetDialog({
     asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA,
   );
 
+  const [avMetadata, setAvMetadata] = useState(() =>
+    asset ? parseAssuranceVieMetadata(asset.metadata) : EMPTY_ASSURANCE_VIE_METADATA,
+  );
+  const [showAvErrors, setShowAvErrors] = useState(false);
+  // Mirrors the Value input (which stays uncontrolled) so the allocation can show implied amounts.
+  const [valueInput, setValueInput] = useState(() => (asset ? String(asset.current_value) : ""));
+
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const isRealEstate = selectedCategory?.name === "Real Estate";
   const isVehicle = selectedCategory?.name === "Vehicles";
@@ -224,6 +240,7 @@ export function AddAssetDialog({
   const isStartup = selectedCategory?.name === "Startups";
   const isCompany = selectedCategory?.name === "Companies";
   const isScpi = selectedCategory?.name === "SCPI";
+  const isAssuranceVie = selectedCategory?.name === "Assurance-Vie";
 
   function resetState() {
     setCategoryId(
@@ -261,6 +278,9 @@ export function AddAssetDialog({
     setNotice(null);
     setCompanyMetadata(asset ? parseCompanyMetadata(asset.metadata) : EMPTY_COMPANY_METADATA);
     setScpiMetadata(asset ? parseScpiMetadata(asset.metadata) : EMPTY_SCPI_METADATA);
+    setAvMetadata(asset ? parseAssuranceVieMetadata(asset.metadata) : EMPTY_ASSURANCE_VIE_METADATA);
+    setShowAvErrors(false);
+    setValueInput(asset ? String(asset.current_value) : "");
   }
 
   async function handleImageFileSelected(
@@ -396,6 +416,15 @@ export function AddAssetDialog({
         "metadata",
         JSON.stringify({ ...companyMetadata, company_value: equityValue }),
       );
+    } else if (isAssuranceVie) {
+      const errors = getAssuranceVieMetadataErrors(avMetadata, localTodayIso());
+      if (errors.length > 0) {
+        setShowAvErrors(true);
+        setError(isAvKey(errors[0]) ? avT(errors[0]) : avT("av_err_invalid"));
+        return;
+      }
+      // Blank beneficiary rows are dropped and stale programmed-premium fields cleared.
+      formData.set("metadata", JSON.stringify(parseAssuranceVieMetadata(avMetadata)));
     } else if (isPreciousMetal) {
       const errors = getPreciousMetalErrors(metalMetadata);
       if (errors.length > 0) {
@@ -641,7 +670,9 @@ export function AddAssetDialog({
                         ? t("scpi_value_label")
                         : isStartup
                           ? t("startup_value_label")
-                          : "Value"}
+                          : isAssuranceVie
+                            ? avT("av_contract_value")
+                            : "Value"}
               </Label>
               <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -663,6 +694,7 @@ export function AddAssetDialog({
                         : asset?.current_value ?? ""
                   }
                   required={!isScpi && !isStartup}
+                  onChange={(e) => setValueInput(e.target.value)}
                 />
               </div>
               {isRealEstate && (
@@ -732,6 +764,16 @@ export function AddAssetDialog({
               value={companyMetadata}
               onChange={setCompanyMetadata}
               holdingOptions={companies.filter((c) => c.id !== asset?.id)}
+            />
+          )}
+
+          {isAssuranceVie && (
+            <AssuranceVieFields
+              value={avMetadata}
+              onChange={setAvMetadata}
+              currency={currency}
+              assetValue={valueInput.trim() !== "" && Number.isFinite(Number(valueInput)) ? Number(valueInput) : null}
+              showErrors={showAvErrors}
             />
           )}
 

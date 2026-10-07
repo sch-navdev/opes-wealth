@@ -27,6 +27,7 @@ describe("isNavLinkVisible", () => {
     banking: [false, true, true, true],
     companies: [false, false, true, true],
     planning: [false, false, true, true],
+    compare: [false, false, true, true],
   };
 
   it("covers every link", () => {
@@ -82,6 +83,10 @@ describe("isSectionVisible", () => {
     expect(isSectionVisible("expertPanels", "expert")).toBe(true);
   });
 
+
+  it("shows the Global exposure (FX) section from professional, not before", () => {
+    expect(EXPERTISE_LEVELS.map((tier) => isSectionVisible("fxExposure", tier))).toEqual([false, false, true, true]);
+  });
   it("never hides a section at a higher tier once it is shown (except the basic overview)", () => {
     for (const s of sections.filter((x) => x !== "basicOverview")) {
       let seen = false;

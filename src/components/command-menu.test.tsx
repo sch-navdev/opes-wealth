@@ -142,6 +142,20 @@ describe("CommandMenu", () => {
     expect(push).toHaveBeenCalledWith("/dashboard/banking");
   });
 
+  it("offers the IRR comparison page from Professional up, not at Basic", async () => {
+    // The label (irr_nav_compare) is merged into i18n separately, so assert on the page count and navigation.
+    const { unmount } = renderMenu("basic");
+    open();
+    expect(within(screen.getByRole("group", { name: "Pages" })).getAllByRole("option")).toHaveLength(3);
+    unmount();
+    renderMenu("professional");
+    open();
+    const pages = within(screen.getByRole("group", { name: "Pages" }));
+    expect(pages.getAllByRole("option")).toHaveLength(7);
+    await userEvent.click(pages.getByText(/^(Compare returns|irr_nav_compare)/));
+    expect(push).toHaveBeenCalledWith("/dashboard/compare");
+  });
+
   it("marks the current view and switching calls the tier setter", async () => {
     renderMenu("basic");
     open();

@@ -49,6 +49,21 @@ describe("registry", () => {
     expect(tiersOfBlock("expertTax")).toEqual(["expert"]);
   });
 
+
+  it("registers the Global exposure block first, full width, from Professional up", () => {
+    expect(BLOCK_IDS[0]).toBe("fxExposure");
+    const block = getBlock("fxExposure");
+    expect(block.section).toBe("fxExposure");
+    expect(block.defaultSize).toBe("full");
+    expect([...block.allowedSizes]).toEqual(["l", "full"]);
+    expect(block.labelKey).toBe("dlayout_block_fxExposure");
+    expect(tiersOfBlock("fxExposure")).toEqual(["professional", "expert"]);
+    expect(blocksForTier("standard").map((b) => b.id)).not.toContain("fxExposure");
+    expect(blocksForTier("basic").map((b) => b.id)).not.toContain("fxExposure");
+    expect(defaultLayout("professional").order[0]).toBe("fxExposure");
+    expect(defaultLayout("expert").order[0]).toBe("fxExposure");
+    expect(resizeBlock(defaultLayout("expert"), "fxExposure", "s")).toEqual(defaultLayout("expert"));
+  });
   it("splits the expert panels into six tiles with the old arrangement", () => {
     const tiles = BLOCKS.filter((b) => b.section === "expertPanels");
     expect(tiles.map((b) => [b.id, b.defaultSize])).toEqual([
@@ -67,6 +82,7 @@ describe("defaultLayout", () => {
     const layout = defaultLayout("expert");
     expect(layout.hidden).toEqual([]);
     expect(layout.order).toEqual([
+      "fxExposure",
       "bento",
       "quickAdd",
       "metricCards",
@@ -167,15 +183,15 @@ describe("edit operations", () => {
     expect(moved.order[0]).toBe("export");
     expect(moved.order.slice(1)).toEqual(base.order.filter((id) => id !== "export"));
     expect(moveBlock(base, "bento", 999).order.at(-1)).toBe("bento");
-    expect(moveBlock(base, "bento", -5).order).toEqual(base.order);
+    expect(moveBlock(base, "fxExposure", -5).order).toEqual(base.order);
     expect(moveBlock(base, "basicOverview", 2)).toBe(base);
     expect(moveBlock(base, "bento", Number.NaN)).toBe(base);
   });
 
   it("moveBlockBy moves one slot and stops at the ends", () => {
-    expect(moveBlockBy(base, "quickAdd", -1).order.slice(0, 2)).toEqual(["quickAdd", "bento"]);
-    expect(moveBlockBy(base, "bento", 1).order.slice(0, 2)).toEqual(["quickAdd", "bento"]);
-    expect(moveBlockBy(base, "bento", -1).order).toEqual(base.order);
+    expect(moveBlockBy(base, "quickAdd", -1).order.slice(1, 3)).toEqual(["quickAdd", "bento"]);
+    expect(moveBlockBy(base, "bento", 1).order.slice(1, 3)).toEqual(["quickAdd", "bento"]);
+    expect(moveBlockBy(base, "fxExposure", -1).order).toEqual(base.order);
     expect(moveBlockBy(base, "export", 1).order).toEqual(base.order);
   });
 

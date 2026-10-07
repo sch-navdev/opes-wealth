@@ -17,6 +17,8 @@ import {
   type DashboardBreakdowns,
 } from "@/components/dashboard-metric-cards";
 import { DashboardBento, type BentoTile } from "@/components/dashboard-bento";
+import { FxExposureBar } from "@/components/fx-exposure-bar";
+import { sumByCurrency, type FxExposureInput } from "@/lib/fx-exposure";
 import { DashboardAnalytics } from "@/components/dashboard-analytics";
 import { buildSparkline } from "@/lib/sparkline";
 import { PortfolioGroups } from "@/components/portfolio-groups";
@@ -312,12 +314,16 @@ export default async function DashboardPage({
     liabilities: [],
     gain: [],
   };
+  // Global exposure bar: the same gross / liability figures as above, tagged with the native currency
+  // (share-scaled, in the Base Currency), so its totals equal the metric cards by construction.
+  const fxRows: FxExposureInput[] = [];
   for (const asset of assets ?? []) {
     const category = asset.asset_categories?.name ?? "—";
     const toBase = (n: number) =>
       convertToBaseCurrency(n, asset.currency, displayCurrency, rates);
     const gross = asset.is_liability ? 0 : toBase(grossAssetValue(asset));
     const liability = toBase(assetLiability(asset));
+    fxRows.push({ currency: asset.currency, assets: gross, liabilities: liability });
     const base = { id: asset.id, name: asset.name, category };
     if (gross !== 0) breakdowns.assets.push({ ...base, amount: gross });
     if (liability !== 0) {
@@ -516,6 +522,7 @@ export default async function DashboardPage({
   // server; the client grid decides which blocks to show, in which order and size (the user's saved
   // layout, per UI tier), so server components stay server components. A block missing here is not shown.
   const blocks: DashboardBlockContent = {
+    fxExposure: <FxExposureBar rows={sumByCurrency(fxRows)} baseCurrency={displayCurrency} />,
     basicOverview: (
       <DashboardBasicOverview
         netWorth={totalNetWorth}

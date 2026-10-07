@@ -11,6 +11,7 @@ import {
   Factory,
   Landmark,
   LineChart,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +36,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Cash: Banknote,
   Liabilities: CreditCard,
   SCPI: Landmark,
+  "Assurance-Vie": ShieldCheck,
 };
 
 export function categoryIconFor(name: string | null | undefined): LucideIcon | null {

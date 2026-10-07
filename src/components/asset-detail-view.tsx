@@ -94,6 +94,8 @@ import {
   scpiWithdrawalValue,
 } from "@/lib/scpi";
 import { parseCompanyMetadata } from "@/lib/companies";
+import { parseAssuranceVieMetadata } from "@/lib/assurance-vie";
+import { AssuranceVieDetailCards } from "@/components/assurance-vie-cards";
 import {
   calledCapital,
   fundReturns,
@@ -393,6 +395,7 @@ export function AssetDetailView({
   const isPrivateEquity = categoryName === "Private Equity";
   const isCompany = categoryName === "Companies";
   const isScpi = categoryName === "SCPI";
+  const isAssuranceVie = categoryName === "Assurance-Vie";
   const isEquity = categoryName === "Equities";
   const isCrypto = categoryName === "Crypto";
   const isPreciousMetal = categoryName === "Precious Metals";
@@ -2359,6 +2362,14 @@ export function AssetDetailView({
                   </CardContent>
                 </Card>
               </div>
+            )}
+
+            {isAssuranceVie && (
+              <AssuranceVieDetailCards
+                metadata={parseAssuranceVieMetadata(displayAsset.metadata)}
+                assetValue={displayAsset.current_value}
+                currency={asset.currency}
+              />
             )}
           </TabsContent>
 

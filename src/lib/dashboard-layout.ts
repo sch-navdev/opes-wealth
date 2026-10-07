@@ -38,6 +38,7 @@ export type BlockDef = {
  * sizes reproduce its old arrangement (four half-width tiles, two full-width).
  */
 const REGISTRY = [
+  { id: "fxExposure", section: "fxExposure", defaultSize: "full", allowedSizes: L_UP },
   { id: "basicOverview", section: "basicOverview", defaultSize: "full", allowedSizes: M_UP },
   { id: "bento", section: "bento", defaultSize: "full", allowedSizes: M_UP },
   { id: "quickAdd", section: "quickAdd", defaultSize: "full", allowedSizes: ALL_SIZES },

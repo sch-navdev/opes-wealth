@@ -151,9 +151,10 @@ describe("edit mode", () => {
     const before = domOrder();
     await user.click(screen.getByRole("button", { name: /Move .*Quick add.* down/i }));
     const after = domOrder();
-    expect(after[1]).toBe(before[2]);
-    expect(after[2]).toBe(before[1]);
-    expect(after.slice(3)).toEqual(before.slice(3));
+    expect(after.slice(0, 2)).toEqual(before.slice(0, 2));
+    expect(after[2]).toBe(before[3]);
+    expect(after[3]).toBe(before[2]);
+    expect(after.slice(4)).toEqual(before.slice(4));
     await user.click(screen.getByRole("button", { name: /Move .*Quick add.* up/i }));
     expect(domOrder()).toEqual(before);
   });

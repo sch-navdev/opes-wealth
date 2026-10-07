@@ -6,6 +6,8 @@ import { applyOwnershipFactors, loadCoOwnedAssets, loadOwnershipFactors } from "
 import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
 import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
 import { PlanningBoard } from "@/components/planning-board";
+import { RetirementSimulator } from "@/components/retirement-simulator";
+import { buildInvestableBreakdown } from "@/lib/retirement-assets";
 import { DEMO_MONTHLY_INCOME, isDemoUser } from "@/lib/demo-mode";
 
 type HoldingRow = {
@@ -51,7 +53,11 @@ export default async function PlanningPage() {
   const holdings = applyOwnershipFactors(unscaled, factors);
   const { liquidCash, existingMonthlyDebt } = summariseHoldings(holdings, base, rates);
 
+  // Starting point of the retirement simulator: per-category values (the user's share, display currency).
+  const investable = buildInvestableBreakdown(holdings, base, rates);
+
   return (
+    <>
     <PlanningBoard
       baseCurrency={base}
       categories={categories ?? []}
@@ -75,5 +81,9 @@ export default async function PlanningPage() {
         input: toProjectInput(row, base, rates),
       }))}
     />
+    <div className="w-full px-4 pb-10 sm:px-6 lg:px-8">
+      <RetirementSimulator baseCurrency={base} breakdown={investable} />
+    </div>
+    </>
   );
 }
