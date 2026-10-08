@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-08 18:30 (Gulf Standard Time, UTC+4). OW11 session 2: phases 1-2 (dial on every tier, tiered luxury UI), Groq help chat and the UHNW modules plan (phase 3, awaiting Steve's approval) are done; pushed to origin/master (see Push status).**
+**Last updated: 2026-10-08 18:45 (Gulf Standard Time, UTC+4). Everything is committed and pushed (origin/master d5965ca or later); working tree clean. Waiting on Steve: GROQ_API_KEY in Vercel and four UHNW plan decisions.**
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Project
@@ -9,7 +9,7 @@ Opes Wealth: wealth-tracking web app for high-net-worth individuals. Next.js 16.
 Note for any AI editing Next.js code here: this is a newer Next.js with breaking changes. Read `node_modules/next/dist/docs/` first (see `AGENTS.md`).
 
 ## Toolchain (current)
-Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vitest.config.mts`. Commands: `npm test`, `npx tsc --noEmit`, `npx eslint .`, `npm run build`. All pass (~19:25 GST): 88 test files, 1626 tests, no `it.fails` left. `npm test` runs two Vitest projects: `unit` (node, `src/**/*.test.ts`) and `components` (jsdom + `@testing-library/react`, `src/**/*.test.tsx`, setup in `src/test/setup-dom.ts`; tests that depend on zustand-persist hydration must use `loadTierModules()` from `src/test/tier-test-utils.ts`, because the persist "hydrated" flag cannot be reset). (Do not run `npm run build` while the dev server is running: it breaks the dev server's HMR; restart the dev server afterwards.)
+Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vitest.config.mts`. Commands: `npm test`, `npx tsc --noEmit`, `npx eslint .`, `npm run build`. All pass (2026-10-08 18:20 GST): 136 test files, 2303 tests, no `it.fails` left. `npm test` runs two Vitest projects: `unit` (node, `src/**/*.test.ts`) and `components` (jsdom + `@testing-library/react`, `src/**/*.test.tsx`, setup in `src/test/setup-dom.ts`; tests that depend on zustand-persist hydration must use `loadTierModules()` from `src/test/tier-test-utils.ts`, because the persist "hydrated" flag cannot be reset). (Do not run `npm run build` while the dev server is running: it breaks the dev server's HMR; restart the dev server afterwards.)
 
 ## History in order
 1. **Start (2026-10-06):** work done on an AWS EC2 instance was pulled to the local Windows machine; the repo was the only record. Orchestrator workflow with sub-agents; the orchestrator re-runs tsc, eslint, tests and build before every commit.
@@ -115,6 +115,8 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 - Co-owner approval path: covered only by a mocked two-user simulation; a real two-account run (Supabase Auth, RLS, real e-mail, the profile trigger that links invitations, the Vercel cron) is still manual; the new notification table's RLS is likewise untested against a real database.
 - A working GitHub token is needed for bug-report-to-GitHub-issues (`GITHUB_ISSUES_TOKEN`/`GITHUB_ISSUES_REPO` exist in Vercel; their values were not checked; the local one was rejected with 401).
 - Translations: all overlay languages are at 100% (enforced by a test) but are machine-written and not reviewed by native speakers; Arabic RTL rendering of the new strings was not browser-checked.
+- **Needs Steve (OW11 session 2):** (a) set `GROQ_API_KEY` (and optionally `AI_BASE_URL`) in Vercel, then redeploy and try the help chat; the route and widget are untested against a real Groq reply; (b) answer the four decisions at the end of `tracker/UHNW-Modules-Plan.md` (node map phase A or B, PE ledger in metadata or a table, vault limits and co-owner default, React Flow dependency) before any UHNW code is written; (c) optionally correct the chat system prompt (tier switch is in the sidebar, not Settings; tax lots show for every tier).
+- **Unchecked in a browser (session 2):** the net-worth count-up playing live, the gold border following a real mouse, the Expert dense tables and FX sparklines on live data (dev data has no foreign holding with a cost basis), RTL/Arabic and other languages, Professional/Expert layouts of the new Allocation dial block. The old chat keys `help_welcome`, `help_privacy_note`, `help_capture*`, `help_mask_amounts` and `html-to-image` are now unused (safe to clean up).
 
 ## Working rules Steve set
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
