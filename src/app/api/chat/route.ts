@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { convertToModelMessages, createUIMessageStreamResponse, streamText, toUIMessageStream, type UIMessage } from "ai";
 import { NextResponse } from "next/server";
+import { getMockUserId, isMockAuthEnabled } from "@/utils/supabase/mock-auth";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { createClient } from "@/utils/supabase/server";
 
@@ -33,6 +34,12 @@ function throttled(userId: string): boolean {
   return hits.length > 12;
 }
 
+/** HTTP status of a failed provider call (401 bad key, 404 unknown model, 429 rate limit), when there is one. */
+function upstreamStatus(error: unknown): number | null {
+  const status = (error as { statusCode?: unknown } | null)?.statusCode;
+  return typeof status === "number" ? status : null;
+}
+
 /** Keeps only the last MAX_MESSAGES messages and trims every text part, so a request cannot be made arbitrarily large. */
 function sanitize(value: unknown): UIMessage[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
@@ -53,17 +60,24 @@ function sanitize(value: unknown): UIMessage[] | null {
  * Signed-in (and MFA-complete) users only; anyone else gets a 401 before a prompt is read.
  */
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user || (await needsMfaStepUp(supabase))) {
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  // Local development only: the mock login has no Supabase session (see utils/supabase/mock-auth.ts, which is
+  // hard-gated on NODE_ENV === "development"), so it stands in for one here and nowhere else.
+  const mockUserId = isMockAuthEnabled() ? getMockUserId() : null;
+  let userId = mockUserId;
+  if (!userId) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user || (await needsMfaStepUp(supabase))) {
+      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    }
+    userId = user.id;
   }
   if (!process.env.GROQ_API_KEY) {
     return NextResponse.json({ error: "not_configured" }, { status: 503 });
   }
-  if (throttled(user.id)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  if (throttled(userId)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
 
   let body: { messages?: unknown };
   try {
@@ -80,7 +94,15 @@ export async function POST(request: Request) {
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 1000,
+    // The provider's real answer (bad key, unknown model, rate limit) only ever reaches the server log.
+    onError: ({ error }) => console.error("chat upstream error", upstreamStatus(error) ?? error),
   });
 
-  return createUIMessageStreamResponse({ stream: toUIMessageStream({ stream: result.stream }) });
+  return createUIMessageStreamResponse({
+    stream: toUIMessageStream({
+      stream: result.stream,
+      // The client turns this code into a readable message; the provider's own text is never forwarded.
+      onError: (error) => JSON.stringify({ error: `upstream_${upstreamStatus(error) ?? "failed"}` }),
+    }),
+  });
 }

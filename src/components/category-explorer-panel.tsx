@@ -105,7 +105,7 @@ export function CategoryExplorerPanel({
   const allSelected = selectedIds.size === sortedAssets.length;
 
   return (
-    <Card className="border-border bg-card" aria-label={categoryLabel}>
+    <Card id="category-explorer" className="scroll-mt-4 border-border bg-card" aria-label={categoryLabel}>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2 text-foreground">
           <span className="text-primary">

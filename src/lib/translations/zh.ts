@@ -2274,4 +2274,6 @@ export const zh: Record<string, string> = {
   "xattr_trend_title": "过去12个月{currency}兑{base}：{change}",
   "help_chat_welcome": "您可以询问如何找到某项功能、添加资产、上传银行对账单或切换视图。",
   "help_chat_privacy": "您的消息会发送给AI服务商以便回复。请勿分享密码或账号。助手只讲解如何使用本应用，不提供财务建议。",
+  "help_chat_err_auth": "您的登录已过期或需要验证。请重新登录后再试。",
+  "help_chat_err_provider": "AI服务拒绝了该请求（API密钥或模型可能有误）。请稍后再试或通知管理员。",
 };

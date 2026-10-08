@@ -263,3 +263,6 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-08: Expert tier: terminal-dense sticky-header tables in Plex Mono and 12-month FX sparklines in the currency-vs-capital panel - [[Design-System|Design System]]
 - 2026-10-08: Help chat now streams from Groq (Llama 3.3 70B) via `/api/chat` with the AI SDK `useChat` hook and the Opes Wealth support prompt; screenshot attach and bug logging removed from the widget - [[Architecture|Architecture]]
 - 2026-10-08: UHNW modules technical plan (wealth node map, private-market liquidity ledger, governance vault) written for approval, nothing built - [[UHNW-Modules-Plan|UHNW Modules Plan]]
+- 2026-10-08: Private-equity ledger foundation: dated actual distributions, paid dates and a pure liquidity module (paid-in, unfunded, DPI, RVPI, TVPI, net IRR, portfolio roll-up, upcoming calls), no UI yet - [[UHNW-Modules-Plan|UHNW Modules Plan]]
+- 2026-10-08: Allocation dial is interactive: pointing at an arc highlights it and its legend row, clicking opens that category's explorer - [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-08: Help chat fixes (mock login accepted in dev, provider errors logged and explained to the user) and the theme now really starts on Device (new storage key) - [[Architecture|Architecture]]

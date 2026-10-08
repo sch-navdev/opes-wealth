@@ -2274,4 +2274,6 @@ export const de: Record<string, string> = {
   "xattr_trend_title": "{currency} gegenüber {base} in den letzten 12 Monaten: {change}",
   "help_chat_welcome": "Fragen Sie, wie Sie eine Funktion finden, einen Vermögenswert hinzufügen, einen Kontoauszug hochladen oder die Ansicht wechseln.",
   "help_chat_privacy": "Ihre Nachrichten werden zur Beantwortung an einen KI-Anbieter gesendet. Teilen Sie keine Passwörter oder Kontonummern. Der Assistent erklärt die Bedienung der App und gibt keine Finanzberatung.",
+  "help_chat_err_auth": "Ihre Sitzung ist abgelaufen oder muss bestätigt werden. Melden Sie sich erneut an und versuchen Sie es noch einmal.",
+  "help_chat_err_provider": "Der KI-Dienst hat die Anfrage abgelehnt (API-Schlüssel oder Modell möglicherweise falsch). Versuchen Sie es später erneut oder informieren Sie den Administrator.",
 };

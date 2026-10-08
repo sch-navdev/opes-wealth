@@ -2,7 +2,7 @@
 
 # UHNW modules: technical plan (for approval, nothing built)
 
-Status: **proposal, 2026-10-08.** No code and no migration exists for any of this. SQL below is a draft for Steve to approve; it would be written as `supabase/migrations/00NN_*.sql` and applied by Steve in the SQL editor, never from here. Related: [[Entity-Structures|Entity Structures]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Database-Schema|Database Schema]], [[Design-System|Design System]].
+Status: **decisions approved by Steve 2026-10-08; build in progress (see Progress).** No code and no migration exists for any of this. SQL below is a draft for Steve to approve; it would be written as `supabase/migrations/00NN_*.sql` and applied by Steve in the SQL editor, never from here. Related: [[Entity-Structures|Entity Structures]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Database-Schema|Database Schema]], [[Design-System|Design System]].
 
 ## What already exists (so we extend, not rebuild)
 
@@ -135,6 +135,16 @@ create table public.document_access_log (
 2. Module 2: option A (metadata) or B (table)? Actuals only, or projections too?
 3. Module 3: confirm co-owner visibility default, the 15 MB / PDF+image limits, no customer-managed keys in v1, Professional-and-up only.
 4. React Flow adds one dependency (about 100 KB gzipped, lazy-loaded): accepted?
+
+## Decisions (Steve, 2026-10-08: agreed to all four recommendations)
+1. Node map: **phase A only** (derived from existing data, no migration).
+2. PE ledger: **inside the asset metadata (option A), actuals only**; projections stay out of net worth.
+3. Governance vault: co-owners see documents by default with an owner-only switch, 15 MB limit, PDF and images only, no customer-managed keys in v1, Professional tier and up.
+4. **React Flow accepted** for the map (lazy-loaded on the Companies page only).
+
+## Progress
+- **Module 2, unit 1 (done, 2026-10-08):** `lib/private-equity.ts` gained `distributions: ActualDistribution[]` (dated; capped at 200; parser drops malformed rows), `paid_date` on a capital call, `distributedCapital()` (dated ledger when present, else the legacy lump), and validation codes `pe_paid_date_invalid`, `pe_ledger_too_long`, `pe_actual_distribution_invalid` (no UI string yet: the editor unit adds them in nine languages). New `lib/pe-liquidity.ts`: `buildFundLedger` (paid-in, unfunded, DPI, RVPI, TVPI, net IRR via `xirr` with the NAV as terminal value, null with a reason when flows are undated), `scaleFundLedger`, `buildPortfolioLiquidity` (ratios from summed paid-in, not averaged; pooled IRR) and `upcomingCalls`. 15 new tests incl. an exact IRR (sqrt(1.5)-1). No UI and no migration yet; the Expert panel still shows its old DPI/TVPI, which the new TVPI matches.
+- **Next:** module 2 unit 2 (cash-flow ledger editor in the PE settings), unit 3 (Expert liquidity panel + upcoming calls strip); then module 1 phase A; then module 3.
 
 ## Related
 - [[Entity-Structures|Entity Structures]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Database-Schema|Database Schema]], [[Design-System|Design System]], [[Changelog|Changelog]]

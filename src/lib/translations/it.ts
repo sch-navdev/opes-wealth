@@ -2274,4 +2274,6 @@ export const it: Record<string, string> = {
   "xattr_trend_title": "{currency} rispetto a {base} negli ultimi 12 mesi: {change}",
   "help_chat_welcome": "Chieda come trovare una funzione, aggiungere un bene, caricare un estratto conto o cambiare vista.",
   "help_chat_privacy": "I suoi messaggi vengono inviati a un fornitore di IA per risponderle. Non condivida password o numeri di conto. L'assistente spiega come usare l'app; non fornisce consulenza finanziaria.",
+  "help_chat_err_auth": "La sessione è scaduta o richiede una verifica. Acceda di nuovo e riprovi.",
+  "help_chat_err_provider": "Il servizio di IA ha rifiutato la richiesta (chiave API o modello potrebbero essere errati). Riprovi più tardi o avvisi l'amministratore.",
 };

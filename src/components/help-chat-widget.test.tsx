@@ -53,4 +53,14 @@ describe("HelpChatWidget (useChat)", () => {
     const input = screen.getByRole("textbox") as HTMLInputElement;
     expect(input.disabled).toBe(true);
   });
+
+  it.each([
+    ["unauthenticated", "session has expired"],
+    ["upstream_401", "AI service refused"],
+    ["upstream_500", "couldn't answer"],
+  ])("explains a %s failure", (code, text) => {
+    chat = { messages: [], status: "error", error: new Error(JSON.stringify({ error: code })) };
+    open();
+    expect(screen.getByRole("alert").textContent).toContain(text);
+  });
 });

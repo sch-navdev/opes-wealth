@@ -20,7 +20,11 @@ function errorKey(error: Error): TranslationKey {
   } catch {
     /* a network or streaming failure, not a refusal */
   }
-  return code === "not_configured" ? "help_error_not_configured" : code === "rate_limited" ? "help_error_rate" : "help_error_generic";
+  if (code === "not_configured") return "help_error_not_configured";
+  if (code === "rate_limited" || code === "upstream_429") return "help_error_rate";
+  if (code === "unauthenticated") return "help_chat_err_auth";
+  if (/^upstream_(400|401|403|404)$/.test(code)) return "help_chat_err_provider";
+  return "help_error_generic";
 }
 
 /**
