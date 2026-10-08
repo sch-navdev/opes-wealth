@@ -2271,4 +2271,5 @@ export const ru: Record<string, string> = {
   "theme_dark": "Тёмная",
   "theme_device": "Устройство (как в системе)",
   "dlayout_block_allocation": "Циферблат распределения",
+  "xattr_trend_title": "{currency} к {base} за последние 12 месяцев: {change}",
 };

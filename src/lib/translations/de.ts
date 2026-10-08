@@ -2271,4 +2271,5 @@ export const de: Record<string, string> = {
   "theme_dark": "Dunkel",
   "theme_device": "Gerät (folgt Ihrem System)",
   "dlayout_block_allocation": "Verteilungs-Zifferblatt",
+  "xattr_trend_title": "{currency} gegenüber {base} in den letzten 12 Monaten: {change}",
 };

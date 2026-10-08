@@ -91,7 +91,11 @@ function SortHead<K extends string>({
   );
 }
 
-/** Scroll container: horizontal scroll on narrow screens, capped height so the sticky header works. */
+/**
+ * Scroll container: horizontal scroll on narrow screens, capped height so the sticky header works. The table is
+ * the Expert "terminal" density: 12 px type, tight rows, a gold rule under the sticky header, faint zebra rows and a
+ * warm hover row; figures use the mono face (tabular, so columns line up like a ticker tape).
+ */
 function Scroller({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div
@@ -100,12 +104,19 @@ function Scroller({ label, children }: { label: string; children: ReactNode }) {
       tabIndex={0}
       className="max-h-80 overflow-auto rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <table className="w-full caption-bottom text-sm tabular-nums">{children}</table>
+      <table className={TERMINAL_TABLE}>{children}</table>
     </div>
   );
 }
 
-const numCell = "text-end tabular-nums whitespace-nowrap";
+const TERMINAL_TABLE = cn(
+  "w-full caption-bottom text-xs tabular-nums",
+  "[&_td]:px-2 [&_td]:py-1 [&_th]:h-8 [&_th]:px-2",
+  "[&_thead_th]:border-b [&_thead_th]:border-primary/40",
+  "[&_tbody_tr:nth-child(even)]:bg-muted/25 [&_tbody_tr:hover]:bg-primary/10",
+);
+
+const numCell = "text-end tabular-nums whitespace-nowrap font-mono";
 
 /* ---------- panels ---------- */
 

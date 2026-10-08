@@ -119,6 +119,28 @@ export type AttributionHolding = {
   capitalBase: number;
 };
 
+/** Points in an FX trend sparkline and the spacing between them: 13 x 30 days is about twelve months. */
+export const FX_TREND_POINTS = 13;
+export const FX_TREND_STEP_DAYS = 30;
+
+/** The dates (YYYY-MM-DD, oldest first, ending on `today`) at which each FX trend is sampled. */
+export function fxTrendDates(today: string, points = FX_TREND_POINTS, stepDays = FX_TREND_STEP_DAYS): string[] {
+  const end = new Date(`${day(today)}T00:00:00Z`);
+  if (Number.isNaN(end.getTime())) return [];
+  const out: string[] = [];
+  for (let i = points - 1; i >= 0; i--) {
+    const d = new Date(end);
+    d.setUTCDate(d.getUTCDate() - i * stepDays);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+/** The distinct foreign currencies of the candidates (what the trend fetch needs). */
+export function attributionCurrencies(candidates: AttributionCandidate[]): string[] {
+  return [...new Set(candidates.map((c) => c.currency))].sort();
+}
+
 export type AttributionPanelData = {
   /** Foreign-currency holdings with a cost basis that were attributed / that exist. */
   included: number;
@@ -141,6 +163,11 @@ export type AttributionPanelData = {
   } | null;
   /** Top 3 holdings by absolute currency effect. */
   top: AttributionHolding[];
+  /**
+   * Base-per-local rate of each currency in `top` over about twelve months, oldest first (at least 2 points).
+   * Absent for a currency whose history could not be fetched; the panel then shows no sparkline for it.
+   */
+  fxTrends?: Record<string, number[]>;
 };
 
 /**
@@ -153,6 +180,8 @@ export function buildAttributionPanelData(args: {
   baseCurrency: string;
   rates: Record<string, number>;
   fxHistory: AttributionFxHistory;
+  /** Optional 12-month rate series per currency (see `fetchFxTrends`). */
+  fxTrends?: Record<string, number[]>;
 }): AttributionPanelData | null {
   const { candidates, baseCurrency, rates, fxHistory } = args;
   if (candidates.length === 0) return null;
@@ -216,5 +245,16 @@ export function buildAttributionPanelData(args: {
             currencyShare: absSum > 0 ? Math.abs(agg.currencyBase) / absSum : null,
           },
     top,
+    ...(fxTrendsForTop(top, args.fxTrends) ?? {}),
   };
+}
+
+function fxTrendsForTop(top: AttributionHolding[], trends: Record<string, number[]> | undefined) {
+  if (!trends) return null;
+  const picked: Record<string, number[]> = {};
+  for (const h of top) {
+    const series = trends[h.currency]?.filter(Number.isFinite);
+    if (series && series.length >= 2) picked[h.currency] = series;
+  }
+  return Object.keys(picked).length > 0 ? { fxTrends: picked } : null;
 }

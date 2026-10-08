@@ -2271,4 +2271,5 @@ export const hi: Record<string, string> = {
   "theme_dark": "गहरा",
   "theme_device": "डिवाइस (आपके सिस्टम के अनुसार)",
   "dlayout_block_allocation": "आवंटन डायल",
+  "xattr_trend_title": "पिछले 12 महीनों में {base} के मुकाबले {currency}: {change}",
 };

@@ -89,4 +89,12 @@ describe("DashboardAttributionPanel", () => {
     expect(screen.getByText("Based on 0 of 2 foreign-currency holdings.")).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
   });
+
+  it("shows a 12-month sparkline and signed change for currencies that have a trend", () => {
+    renderPanel({ ...data, fxTrends: { AED: [1, 1, 0.9] } });
+    const trend = screen.getByTestId("fx-trend-AED");
+    expect(trend.querySelector("svg")).toBeTruthy();
+    expect(trend.textContent).toContain("-10.0%");
+    expect(screen.queryByTestId("fx-trend-EUR")).toBeNull();
+  });
 });

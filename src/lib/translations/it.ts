@@ -2271,4 +2271,5 @@ export const it: Record<string, string> = {
   "theme_dark": "Scuro",
   "theme_device": "Dispositivo (segue il sistema)",
   "dlayout_block_allocation": "Quadrante di allocazione",
+  "xattr_trend_title": "{currency} rispetto a {base} negli ultimi 12 mesi: {change}",
 };

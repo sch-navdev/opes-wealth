@@ -2271,4 +2271,5 @@ export const zh: Record<string, string> = {
   "theme_dark": "深色",
   "theme_device": "设备（跟随系统）",
   "dlayout_block_allocation": "配置表盘",
+  "xattr_trend_title": "过去12个月{currency}兑{base}：{change}",
 };

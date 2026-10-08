@@ -4,6 +4,7 @@ import { useMemo, type CSSProperties } from "react";
 import { Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoTooltip } from "@/components/ui/tooltip";
+import { MicroSparkline } from "@/components/micro-sparkline";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import type { AttributionPanelData } from "@/lib/dashboard-attribution";
@@ -47,6 +48,7 @@ export function DashboardAttributionPanel({
   const fmtPct = (n: number | null) => (n == null ? "–" : maskValue(formatPercent(n, intlLocale)));
   const totals = data.totals;
   const share = (n: number | null) => (n == null ? "–" : formatPercent(n, intlLocale));
+  const signedPct = (n: number) => `${n > 0 ? "+" : ""}${formatPercent(n, intlLocale)}`;
 
   const rows = totals
     ? [
@@ -105,14 +107,27 @@ export function DashboardAttributionPanel({
               <div>
                 <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("xattr_top_title")}</h3>
                 <ol className="divide-y divide-border text-sm">
-                  {data.top.map((h) => (
-                    <li key={h.id} className="flex items-center justify-between gap-3 py-1.5">
-                      <span className="min-w-0 truncate" title={h.name}>
-                        {h.name} <span className="text-xs text-muted-foreground">{h.currency}</span>
-                      </span>
-                      <span className={cn("shrink-0 tabular-nums", tone(h.currencyBase))}>{fmtMoney(h.currencyBase)}</span>
-                    </li>
-                  ))}
+                  {data.top.map((h) => {
+                    const trend = data.fxTrends?.[h.currency];
+                    const change = trend && trend.length >= 2 && trend[0] > 0 ? trend[trend.length - 1] / trend[0] - 1 : null;
+                    const trendText =
+                      change == null ? "" : t("xattr_trend_title", { currency: h.currency, base: baseCurrency, change: signedPct(change) });
+                    return (
+                      <li key={h.id} className="flex items-center justify-between gap-3 py-1.5">
+                        <span className="min-w-0 truncate" title={h.name}>
+                          {h.name} <span className="text-xs text-muted-foreground">{h.currency}</span>
+                        </span>
+                        {trend && change != null ? (
+                          <span data-testid={`fx-trend-${h.currency}`} className="ms-auto flex shrink-0 items-center gap-2" title={trendText}>
+                            <MicroSparkline values={trend} width={72} height={22} />
+                            <span className={cn("w-14 text-end font-mono text-xs tabular-nums", tone(change))}>{signedPct(change)}</span>
+                            <span className="sr-only">{trendText}</span>
+                          </span>
+                        ) : null}
+                        <span className={cn("shrink-0 tabular-nums", tone(h.currencyBase))}>{fmtMoney(h.currencyBase)}</span>
+                      </li>
+                    );
+                  })}
                 </ol>
               </div>
             ) : null}

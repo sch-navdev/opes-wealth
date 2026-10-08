@@ -1,8 +1,13 @@
 import { Suspense } from "react";
 import { ExpertAttributionBlock } from "@/components/dashboard-expert-panels";
 import { Card, CardContent } from "@/components/ui/card";
-import { buildAttributionPanelData, type AttributionCandidate } from "@/lib/dashboard-attribution";
-import { fetchAttributionFx } from "@/lib/dashboard-attribution-fetch";
+import {
+  attributionCurrencies,
+  buildAttributionPanelData,
+  fxTrendDates,
+  type AttributionCandidate,
+} from "@/lib/dashboard-attribution";
+import { fetchAttributionFx, fetchFxTrends } from "@/lib/dashboard-attribution-fetch";
 
 type Props = {
   candidates: AttributionCandidate[];
@@ -15,12 +20,11 @@ type Props = {
  * so the rest of the dashboard streams to the browser without waiting for it.
  */
 async function AttributionLoaded({ candidates, baseCurrency, rates }: Props) {
-  const data = buildAttributionPanelData({
-    candidates,
-    baseCurrency,
-    rates,
-    fxHistory: await fetchAttributionFx(candidates, baseCurrency),
-  });
+  const [fxHistory, fxTrends] = await Promise.all([
+    fetchAttributionFx(candidates, baseCurrency),
+    fetchFxTrends(attributionCurrencies(candidates), baseCurrency, fxTrendDates(new Date().toISOString().slice(0, 10))),
+  ]);
+  const data = buildAttributionPanelData({ candidates, baseCurrency, rates, fxHistory, fxTrends });
   return data ? <ExpertAttributionBlock attribution={data} baseCurrency={baseCurrency} /> : null;
 }
 

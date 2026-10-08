@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   attributionFxRequests,
   buildAttributionPanelData,
+  fxTrendDates,
   collectAttributionCandidates,
   type AttributionAssetInput,
 } from "@/lib/dashboard-attribution";
@@ -134,5 +135,18 @@ describe("buildAttributionPanelData", () => {
     const candidates = collectAttributionCandidates([carGbp], "USD");
     const data = buildAttributionPanelData({ candidates, baseCurrency: "USD", rates: { USD: 1 }, fxHistory });
     expect(data!.included).toBe(0);
+  });
+});
+
+describe("fxTrendDates", () => {
+  it("returns 13 dates, 30 days apart, oldest first, ending today", () => {
+    const d = fxTrendDates("2026-10-08");
+    expect(d).toHaveLength(13);
+    expect(d[12]).toBe("2026-10-08");
+    expect(d[11]).toBe("2026-09-08");
+    expect(d[0]).toBe("2025-10-13");
+  });
+  it("is empty for an invalid date", () => {
+    expect(fxTrendDates("nope")).toEqual([]);
   });
 });

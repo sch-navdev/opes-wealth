@@ -3120,6 +3120,7 @@ const dictionary = {
   theme_dark: { en: "Dark", fr: "Sombre" },
   theme_device: { en: "Device (follows your system)", fr: "Appareil (suit votre système)" },
   dlayout_block_allocation: { en: "Allocation dial", fr: "Cadran de répartition" },
+  xattr_trend_title: { en: "{currency} against {base} over the last 12 months: {change}", fr: "{currency} face à {base} sur les 12 derniers mois : {change}" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

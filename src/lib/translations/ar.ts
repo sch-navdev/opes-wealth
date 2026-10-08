@@ -2271,4 +2271,5 @@ export const ar: Record<string, string> = {
   "theme_dark": "داكن",
   "theme_device": "الجهاز (يتبع نظامك)",
   "dlayout_block_allocation": "قرص التوزيع",
+  "xattr_trend_title": "{currency} مقابل {base} خلال آخر 12 شهراً: {change}",
 };
