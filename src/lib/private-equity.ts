@@ -34,7 +34,24 @@ export type CapitalCall = {
   /** Share of the total commitment, for display (derived when generated). */
   percentage: number;
   status: "paid" | "pending";
+  /** When a paid call was actually paid (ISO date); the due date is used when absent. */
+  paid_date?: string;
 };
+
+/** A distribution actually received from the fund (dated, so it can feed an IRR). */
+export type ActualDistribution = {
+  id: string;
+  date: string;
+  amount: number;
+  kind: "income" | "return_of_capital" | "gain";
+};
+
+export const DISTRIBUTION_KINDS = ["income", "return_of_capital", "gain"] as const;
+
+/** Upper bound for each ledger list in `assets.metadata` (keeps the JSON small and the parser cheap). */
+export const MAX_PE_LEDGER_ROWS = 200;
+
+const ISO_DAY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
 /** A projected (future) distribution back to the investor. */
 export type ProjectedDistribution = {
@@ -75,7 +92,10 @@ export type PrivateEquityMetadata = {
   capital_calls: CapitalCall[];
   /** Called capital for funds with no schedule on file (entered by hand). */
   called_capital_manual: number | null;
+  /** Undated lump of distributions (legacy / quick entry). Ignored for totals once `distributions` has rows. */
   distributions_to_date: number | null;
+  /** Dated distributions actually received, the ledger behind DPI and the net IRR. */
+  distributions: ActualDistribution[];
   /** Date of the last NAV reported by the manager. */
   nav_date: string;
   /** Count still-pending capital calls in Total Liabilities (default true). */
@@ -102,6 +122,7 @@ export const EMPTY_PRIVATE_EQUITY_METADATA: PrivateEquityMetadata = {
   capital_calls: [],
   called_capital_manual: null,
   distributions_to_date: null,
+  distributions: [],
   nav_date: "",
   count_unfunded_as_liability: true,
   projection_mode: "model",
@@ -124,10 +145,30 @@ export function parsePrivateEquityMetadata(raw: unknown): PrivateEquityMetadata 
     ...EMPTY_PRIVATE_EQUITY_METADATA,
     ...r,
     capital_calls: Array.isArray(r.capital_calls) ? r.capital_calls : [],
+    distributions: parseActualDistributions((r as { distributions?: unknown }).distributions),
     projected_distributions: Array.isArray(r.projected_distributions)
       ? r.projected_distributions
       : [],
   };
+}
+
+/** Keeps only well-formed rows (dated, positive finite amount), at most MAX_PE_LEDGER_ROWS, oldest first. */
+function parseActualDistributions(raw: unknown): ActualDistribution[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ActualDistribution[] = [];
+  for (const row of raw.slice(0, MAX_PE_LEDGER_ROWS)) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    if (typeof r.date !== "string" || !ISO_DAY.test(r.date)) continue;
+    if (typeof r.amount !== "number" || !Number.isFinite(r.amount) || !(r.amount > 0)) continue;
+    out.push({
+      id: typeof r.id === "string" && r.id ? r.id.slice(0, 64) : `dist-${out.length}`,
+      date: r.date,
+      amount: r.amount,
+      kind: (DISTRIBUTION_KINDS as readonly unknown[]).includes(r.kind) ? (r.kind as ActualDistribution["kind"]) : "income",
+    });
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
 /**
@@ -163,6 +204,13 @@ export function getPrivateEquityMetadataErrors(
   }
   if (metadata.capital_calls.some((c) => !c.due_date || !(c.amount > 0))) {
     errors.push("pe_call_invalid");
+  }
+  if (metadata.capital_calls.some((c) => c.paid_date != null && c.paid_date !== "" && !ISO_DAY.test(c.paid_date))) {
+    errors.push("pe_paid_date_invalid");
+  }
+  if (metadata.distributions.length > MAX_PE_LEDGER_ROWS) errors.push("pe_ledger_too_long");
+  if (metadata.distributions.some((d) => !ISO_DAY.test(d.date) || !(d.amount > 0))) {
+    errors.push("pe_actual_distribution_invalid");
   }
   if (metadata.projected_distributions.some((d) => !d.due_date || !(d.amount > 0))) {
     errors.push("pe_distribution_invalid");
@@ -365,4 +413,11 @@ export function cumulativeCashFlowSeries(
       cumulative += e.distributions - e.calls;
       return { date, calls: e.calls, distributions: e.distributions, cumulative };
     });
+}
+
+/** Total received so far: the dated ledger when it has rows, otherwise the legacy undated lump. */
+export function distributedCapital(metadata: PrivateEquityMetadata): number {
+  if (metadata.distributions.length > 0) return metadata.distributions.reduce((sum, d) => sum + d.amount, 0);
+  const lump = metadata.distributions_to_date;
+  return typeof lump === "number" && Number.isFinite(lump) && lump > 0 ? lump : 0;
 }
