@@ -4,7 +4,7 @@ import { tierRank, type ExpertiseLevel } from "@/stores/useUiTierStore";
  * Which dashboard section shows at which UI tier (a UI preference, not access
  * control). `min` is the lowest tier that shows it; `max` (optional) the highest.
  *
- *  - basic: simplified net worth, allocation pie, top assets
+ *  - basic: simplified net worth, allocation dial, top assets
  *  - standard / professional: bento grid, performance, cash flow, quick-add
  *  - professional and up: also the Global exposure (FX) bar
  *  - expert: everything, plus raw data, PE valuations, tax/depreciation, FX heatmap
@@ -14,6 +14,7 @@ export type DashboardSection =
   | "fxExposure"
   | "bento"
   | "metricCards"
+  | "allocation"
   | "dataQuality"
   | "analytics"
   | "cashFlow"
@@ -32,6 +33,7 @@ export const SECTION_TIERS: Record<DashboardSection, TierRange> = {
   fxExposure: { min: "professional" },
   bento: { min: "standard" },
   metricCards: { min: "standard" },
+  allocation: { min: "standard" },
   dataQuality: { min: "standard" },
   analytics: { min: "standard" },
   cashFlow: { min: "standard" },

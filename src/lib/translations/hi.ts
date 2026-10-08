@@ -2270,4 +2270,5 @@ export const hi: Record<string, string> = {
   "theme_light": "हल्का",
   "theme_dark": "गहरा",
   "theme_device": "डिवाइस (आपके सिस्टम के अनुसार)",
+  "dlayout_block_allocation": "आवंटन डायल",
 };

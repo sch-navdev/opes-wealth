@@ -2270,4 +2270,5 @@ export const it: Record<string, string> = {
   "theme_light": "Chiaro",
   "theme_dark": "Scuro",
   "theme_device": "Dispositivo (segue il sistema)",
+  "dlayout_block_allocation": "Quadrante di allocazione",
 };

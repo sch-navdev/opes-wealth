@@ -2270,4 +2270,5 @@ export const zh: Record<string, string> = {
   "theme_light": "浅色",
   "theme_dark": "深色",
   "theme_device": "设备（跟随系统）",
+  "dlayout_block_allocation": "配置表盘",
 };

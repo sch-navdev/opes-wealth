@@ -2270,4 +2270,5 @@ export const es: Record<string, string> = {
   "theme_light": "Claro",
   "theme_dark": "Oscuro",
   "theme_device": "Dispositivo (sigue su sistema)",
+  "dlayout_block_allocation": "Esfera de distribución",
 };

@@ -2270,4 +2270,5 @@ export const de: Record<string, string> = {
   "theme_light": "Hell",
   "theme_dark": "Dunkel",
   "theme_device": "Gerät (folgt Ihrem System)",
+  "dlayout_block_allocation": "Verteilungs-Zifferblatt",
 };

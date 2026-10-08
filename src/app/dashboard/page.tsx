@@ -22,6 +22,7 @@ import { sumByCurrency, type FxExposureInput } from "@/lib/fx-exposure";
 import { DashboardAnalytics } from "@/components/dashboard-analytics";
 import { buildSparkline } from "@/lib/sparkline";
 import { PortfolioGroups } from "@/components/portfolio-groups";
+import { AllocationCard } from "@/components/allocation-card";
 import { DashboardBasicOverview } from "@/components/dashboard-basic-overview";
 import { DashboardCsvCard } from "@/components/dashboard-csv-card";
 import {
@@ -572,6 +573,7 @@ export default async function DashboardPage({
         breakdowns={breakdowns}
       />
     ),
+    allocation: <AllocationCard allocation={basicAllocation} compact />,
     dataQuality: <DataQualityCard report={dataQuality} />,
     cashFlow: (
       <>

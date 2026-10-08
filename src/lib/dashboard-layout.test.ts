@@ -64,8 +64,16 @@ describe("registry", () => {
     expect(defaultLayout("expert").order[0]).toBe("fxExposure");
     expect(resizeBlock(defaultLayout("expert"), "fxExposure", "s")).toEqual(defaultLayout("expert"));
   });
-  it("registers the Data quality block right after the key figures, medium by default, from Standard up", () => {
-    expect(BLOCK_IDS[BLOCK_IDS.indexOf("metricCards") + 1]).toBe("dataQuality");
+  it("registers the Allocation dial block after the key figures, medium by default, from Standard up", () => {
+    expect(BLOCK_IDS[BLOCK_IDS.indexOf("metricCards") + 1]).toBe("allocation");
+    const block = getBlock("allocation");
+    expect(block.defaultSize).toBe("m");
+    expect([...block.allowedSizes]).toEqual(["m", "l", "full"]);
+    expect(tiersOfBlock("allocation")).toEqual(["standard", "professional", "expert"]);
+    expect(blocksForTier("basic").map((b) => b.id)).not.toContain("allocation");
+  });
+  it("registers the Data quality block next to the allocation dial, medium by default, from Standard up", () => {
+    expect(BLOCK_IDS[BLOCK_IDS.indexOf("allocation") + 1]).toBe("dataQuality");
     const block = getBlock("dataQuality");
     expect(block.section).toBe("dataQuality");
     expect(block.defaultSize).toBe("m");
@@ -101,6 +109,7 @@ describe("defaultLayout", () => {
       "bento",
       "quickAdd",
       "metricCards",
+      "allocation",
       "dataQuality",
       "cashFlow",
       "incomeCalendar",

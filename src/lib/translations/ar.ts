@@ -2270,4 +2270,5 @@ export const ar: Record<string, string> = {
   "theme_light": "فاتح",
   "theme_dark": "داكن",
   "theme_device": "الجهاز (يتبع نظامك)",
+  "dlayout_block_allocation": "قرص التوزيع",
 };

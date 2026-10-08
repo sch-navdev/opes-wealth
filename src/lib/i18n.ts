@@ -3119,6 +3119,7 @@ const dictionary = {
   theme_light: { en: "Light", fr: "Clair" },
   theme_dark: { en: "Dark", fr: "Sombre" },
   theme_device: { en: "Device (follows your system)", fr: "Appareil (suit votre système)" },
+  dlayout_block_allocation: { en: "Allocation dial", fr: "Cadran de répartition" },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

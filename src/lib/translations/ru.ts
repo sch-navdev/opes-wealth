@@ -2270,4 +2270,5 @@ export const ru: Record<string, string> = {
   "theme_light": "Светлая",
   "theme_dark": "Тёмная",
   "theme_device": "Устройство (как в системе)",
+  "dlayout_block_allocation": "Циферблат распределения",
 };

@@ -42,6 +42,7 @@ export const DLAYOUT_EN = {
   "dlayout_block_fxExposure": "Global exposure",
   "dlayout_block_basicOverview": "Overview",
   "dlayout_block_bento": "Net worth highlights",
+  "dlayout_block_allocation": "Allocation dial",
   "dlayout_block_quickAdd": "Quick add",
   "dlayout_block_metricCards": "Key figures",
   "dlayout_block_cashFlow": "Cash flow and accounts",

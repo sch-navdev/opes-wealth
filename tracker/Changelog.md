@@ -257,3 +257,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-08: New landing page: left-aligned headline with a live-style product specimen (net worth and allocation dial, invented figures) replacing the centred slogan stack - [[Design-System|Design System]]
 - 2026-10-08: Theme choice is Light, Dark or Device again, and the app opens in the theme of the visitor's computer or phone by default (radio group, 4 keys in nine languages) - [[Design-System|Design System]]
 - 2026-10-08: Partition bar for narrow screens (replaces the dial below 520 px), tick ruler on the exposure bar and a Chronograph login panel - [[Design-System|Design System]]
+- 2026-10-08: Allocation dial now on every tier: shared allocation card (Basic overview) and a new `allocation` dashboard block from Standard up, nine-language label - [[Portfolio-Dashboard|Portfolio Dashboard]]
