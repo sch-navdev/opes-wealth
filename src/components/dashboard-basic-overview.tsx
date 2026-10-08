@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { AllocationCard } from "@/components/allocation-card";
 import { CategoryIcon } from "@/components/category-icon";
-import { Money } from "@/components/money";
+import { NetWorthTicker } from "@/components/net-worth-ticker";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import { useTierMotion } from "@/components/tier-gate";
 import { MicroSparkline } from "@/components/micro-sparkline";
@@ -49,14 +49,14 @@ export function DashboardBasicOverview({
 
   return (
     <section aria-label={t("dash_basic_aria")} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card className={`${ENTER} gap-3 border-border bg-card py-5 lg:col-span-2`} style={tileEntranceStyle(motion, 0)}>
+      <Card className={`${ENTER} card-glow gap-3 border-primary/30 bg-card py-7 lg:col-span-2`} style={tileEntranceStyle(motion, 0)}>
         <div className="flex flex-wrap items-start justify-between gap-4 px-5">
           <div className="min-w-0">
             <p className="text-xs font-medium text-muted-foreground">
               {t("net_worth")} · {baseCurrency}
             </p>
-            <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-4xl">
-              <Money value={netWorth} currency={baseCurrency} />
+            <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl lg:text-6xl">
+              <NetWorthTicker value={netWorth} currency={baseCurrency} />
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{t("dash_basic_networth_caption")}</p>
           </div>

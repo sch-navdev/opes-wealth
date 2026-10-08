@@ -23,6 +23,7 @@ export function Money({
   decimals = "dim",
   showCurrency = true,
   fractionDigits,
+  animate = true,
   className,
 }: {
   value: number;
@@ -31,6 +32,8 @@ export function Money({
   decimals?: "dim" | "hide" | "normal";
   showCurrency?: boolean;
   fractionDigits?: number;
+  /** False keeps digits still when the value changes (a parent is already animating the figure). */
+  animate?: boolean;
   className?: string;
 }) {
   const { intlLocale } = useLanguage();
@@ -70,7 +73,7 @@ export function Money({
       <bdi aria-hidden="true" className="inline-flex items-baseline">
         {chars.map((ch, i) => {
           const fromRight = chars.length - 1 - i;
-          const rolls = changed.has(fromRight);
+          const rolls = animate && changed.has(fromRight);
           return (
             <span
               key={`${fromRight}:${ch}`}
