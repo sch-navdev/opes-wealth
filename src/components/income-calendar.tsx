@@ -77,7 +77,7 @@ export function IncomeCalendar({
     >
       <CardContent className="space-y-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">
+          <div className="flex shrink-0 items-center justify-center text-primary">
             <CalendarDays className="size-4" />
           </div>
           <div>

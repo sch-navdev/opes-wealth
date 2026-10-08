@@ -1,4 +1,4 @@
-import { Factory, GitCompareArrows, Landmark, LayoutDashboard, Settings, ShieldCheck, Telescope } from "lucide-react";
+import { Factory, GitCompareArrows, Landmark, LayoutDashboard, ListChecks, Settings, ShieldCheck, Telescope } from "lucide-react";
 import type { TranslationKey } from "@/lib/i18n";
 import { isNavLinkVisible, type NavLinkId } from "@/lib/dashboard-tiers";
 import type { ExpertiseLevel } from "@/stores/useUiTierStore";
@@ -16,6 +16,7 @@ export type NavItem = {
  */
 export const NAV_ITEMS: NavItem[] = [
   { id: "dashboard", href: "/dashboard", labelKey: "nav_dashboard", icon: LayoutDashboard },
+  { id: "dataQuality", href: "/dashboard/data-quality", labelKey: "nav_data_quality", icon: ListChecks },
   { id: "banking", href: "/dashboard/banking", labelKey: "nav_banking", icon: Landmark },
   { id: "companies", href: "/dashboard/companies", labelKey: "nav_companies", icon: Factory },
   { id: "planning", href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope },

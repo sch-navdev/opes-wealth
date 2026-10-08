@@ -167,6 +167,7 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
                     />
                   ))}
                 </div>
+                <div aria-hidden="true" className="tick-rule mt-1" />
                 <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden="true">
                   {positive.map((r) => (
                     <li key={r.key} className="inline-flex items-center gap-1.5">
@@ -247,7 +248,7 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
                       <span className="font-medium text-foreground">
                         {r.label}
                         {r.isBase && (
-                          <span className="ms-2 border border-border px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
+                          <span className="ms-2 border border-border px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
                             {text("fxbar_base_tag")}
                           </span>
                         )}

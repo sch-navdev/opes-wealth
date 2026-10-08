@@ -25,8 +25,16 @@ export const ENTITY_TYPE_LABEL_KEYS: Record<CompanyEntityType, TranslationKey> =
   partnership: "company_type_partnership",
   sole_proprietorship: "company_type_sole_proprietorship",
   holding: "company_type_holding",
+  trust: "company_type_trust",
+  foundation: "company_type_foundation",
+  spv: "company_type_spv",
   other: "company_type_other",
 };
+
+/** Label key for a stored entity type; an unknown / legacy value reads as "Other". */
+export function entityTypeLabelKey(type: string): TranslationKey {
+  return ENTITY_TYPE_LABEL_KEYS[type as CompanyEntityType] ?? "company_type_other";
+}
 
 const NONE = "__none__";
 

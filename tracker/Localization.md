@@ -153,6 +153,9 @@
 - `bank_pdf_password_*` (10 keys, password prompt) and `bank_pdf_ocr_*` (8 keys, OCR consent and not-configured/error texts), each in all nine languages, machine-translated, no native review.
 - Changed texts: the encrypted-PDF message (it now points to the password prompt) and `bank_pdf_error_too_large` (now 5 MB). See [[CSV-Bank-Uploads|CSV Bank Uploads]].
 
+## OW11 key families (2026-10-08)
+All in nine languages, machine-translated, no native review: dq_* (56, Data quality), ent_* and company_type_trust/foundation/spv (43, entity structures), lots_* (44, tax lots), theme_* (4, Light/Dark/Device), irr_position_closed (1), landing_example_note (1); bank_pdf_error_unsupported was reworded (no bank list). Keys are merged with a lock-protected script that validates placeholders; translations.test.ts enforces coverage.
+
 ## Related
 - [[Privacy-Mode|Privacy Mode]] — the context/provider pattern this reuses
 - [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]] — `asset-detail-view.tsx`, the file this task's tab labels came from

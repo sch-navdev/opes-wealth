@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  COMPANY_ENTITY_TYPES,
   EMPTY_COMPANY_METADATA,
   buildHoldingStructure,
   companyStakeValue,
   getCompanyMetadataErrors,
   parseCompanyMetadata,
+  sanitizeHeldAssetIds,
   type CompanyMetadata,
   type CompanyNode,
 } from "@/lib/companies";
@@ -31,6 +33,39 @@ describe("parseCompanyMetadata", () => {
     expect(p.ownership_percentage).toBe(60);
     expect(p.held_via).toBe("personal");
     expect(p.entity_type).toBe("llc");
+    expect(p.held_asset_ids).toEqual([]);
+  });
+
+  it("keeps the structure entity types", () => {
+    for (const type of ["trust", "foundation", "spv"] as const) {
+      expect(COMPANY_ENTITY_TYPES).toContain(type);
+      expect(parseCompanyMetadata({ entity_type: type }).entity_type).toBe(type);
+    }
+    expect(new Set(COMPANY_ENTITY_TYPES).size).toBe(COMPANY_ENTITY_TYPES.length);
+  });
+
+  it("sanitises held_asset_ids to unique, non-empty, trimmed strings", () => {
+    expect(parseCompanyMetadata({ held_asset_ids: ["a", " b ", "a", "", "   ", 7, null, { id: "x" }, "b"] }).held_asset_ids).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(parseCompanyMetadata({ held_asset_ids: "a" }).held_asset_ids).toEqual([]);
+    expect(parseCompanyMetadata({ held_asset_ids: null }).held_asset_ids).toEqual([]);
+    expect(parseCompanyMetadata({ held_asset_ids: { 0: "a" } }).held_asset_ids).toEqual([]);
+    expect(sanitizeHeldAssetIds(undefined)).toEqual([]);
+  });
+
+  it("keeps unknown metadata keys (so saving the form never drops them)", () => {
+    const p = parseCompanyMetadata({ held_asset_ids: ["p1"], some_future_key: 1 }) as CompanyMetadata & Record<string, unknown>;
+    expect(p.some_future_key).toBe(1);
+    expect(p.held_asset_ids).toEqual(["p1"]);
+  });
+
+  it("never hands out the shared default list", () => {
+    const a = parseCompanyMetadata(null);
+    a.held_asset_ids.push("x");
+    expect(parseCompanyMetadata(null).held_asset_ids).toEqual([]);
+    expect(EMPTY_COMPANY_METADATA.held_asset_ids).toEqual([]);
   });
 });
 

@@ -825,41 +825,53 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                         {t("stmt_remember")}
                       </label>
                     )}
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="text-muted-foreground" aria-live="polite">
-                        {t("stmt_selected_count", { n: plan.selectedCount, total })}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={plan.fullyImported}
-                        onClick={() => setAllSelected(i, group.rows.map(() => true))}
-                      >
-                        {t("stmt_sel_all")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={plan.fullyImported}
-                        onClick={() => setAllSelected(i, group.rows.map(() => false))}
-                      >
-                        {t("stmt_sel_none")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        disabled={plan.fullyImported || !plan.flags}
-                        onClick={() => setAllSelected(i, group.rows.map((_r, j) => !plan.flags?.[j]))}
-                      >
-                        {t("stmt_sel_new")}
-                      </Button>
+                    <div className="border border-border bg-muted/40">
+                      <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
+                        <span
+                          className={cn("font-medium tabular-nums", plan.selectedCount > 0 ? "text-foreground" : "text-muted-foreground")}
+                          aria-live="polite"
+                        >
+                          {t("stmt_selected_count", { n: plan.selectedCount, total })}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          disabled={plan.fullyImported}
+                          onClick={() => setAllSelected(i, group.rows.map(() => true))}
+                        >
+                          {t("stmt_sel_all")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          disabled={plan.fullyImported}
+                          onClick={() => setAllSelected(i, group.rows.map(() => false))}
+                        >
+                          {t("stmt_sel_none")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          disabled={plan.fullyImported || !plan.flags}
+                          onClick={() => setAllSelected(i, group.rows.map((_r, j) => !plan.flags?.[j]))}
+                        >
+                          {t("stmt_sel_new")}
+                        </Button>
+                      </div>
+                      {/* Selection rule: the share of rows that will be imported (decorative; the count above says it). */}
+                      <div aria-hidden="true" className="h-0.5 bg-border">
+                        <div
+                          className="h-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+                          style={{ width: `${total > 0 ? (plan.selectedCount / total) * 100 : 0}%` }}
+                        />
+                      </div>
                     </div>
-                    <div className="overflow-x-auto border border-border">
+                    <div className="max-h-[26rem] overflow-auto border border-border">
                       <Table>
-                        <TableHeader>
+                        <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
                           <TableRow>
                             <TableHead className="w-8">
                               <Checkbox

@@ -1,12 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import { AllocationDial } from "@/components/allocation-dial";
 import { CategoryIcon } from "@/components/category-icon";
-import { NumberTicker } from "@/components/number-ticker";
+import { Money } from "@/components/money";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import { useTierMotion } from "@/components/tier-gate";
 import { MicroSparkline } from "@/components/micro-sparkline";
+import { PartitionBar } from "@/components/partition-bar";
 import { Card } from "@/components/ui/card";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -23,8 +24,8 @@ const SLICE_COLORS = [
 const ENTER = "animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none";
 
 /**
- * Basic-tier dashboard body: a plain net worth number, a simple allocation
- * donut with a text legend (the percentage is printed, so colour is never the
+ * Basic-tier dashboard body: a plain net worth number, an allocation
+ * dial with a text legend (the percentage is printed, so colour is never the
  * only cue) and the largest holdings. No IRR, sparkline or amortization.
  * Semantic tokens only, so it follows light/dark; figures go through Privacy Mode.
  */
@@ -64,7 +65,7 @@ export function DashboardBasicOverview({
               {t("net_worth")} · {baseCurrency}
             </p>
             <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-4xl">
-              <NumberTicker value={netWorth} format={(v) => maskValue(formatter.format(v))} />
+              <Money value={netWorth} currency={baseCurrency} />
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{t("dash_basic_networth_caption")}</p>
           </div>
@@ -90,27 +91,25 @@ export function DashboardBasicOverview({
               aria-label={t("dash_basic_alloc_aria")}
               className="flex flex-col items-center gap-4 px-5 min-[520px]:flex-row lg:flex-col xl:flex-row"
             >
-              <div className="h-40 w-40 shrink-0" aria-hidden="true">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={allocation}
-                      dataKey="amount"
-                      nameKey="category"
-                      innerRadius="62%"
-                      outerRadius="100%"
-                      paddingAngle={allocation.length > 1 ? 2 : 0}
-                      stroke="var(--card)"
-                      strokeWidth={2}
-                      isAnimationActive={false}
-                    >
-                      {allocation.map((slice, i) => (
-                        <Cell key={slice.category} fill={SLICE_COLORS[i % SLICE_COLORS.length]} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <PartitionBar
+                className="min-[520px]:hidden"
+                segments={allocation.map((slice, i) => ({
+                  key: slice.category,
+                  share: slice.share,
+                  color: SLICE_COLORS[i % SLICE_COLORS.length],
+                }))}
+              />
+              <AllocationDial
+                className="hidden size-40 shrink-0 min-[520px]:block"
+                size={160}
+                slices={allocation.map((slice, i) => ({
+                  key: slice.category,
+                  share: slice.share,
+                  color: SLICE_COLORS[i % SLICE_COLORS.length],
+                }))}
+                centerValue={allocation[0] ? `${percent.format(allocation[0].share)}%` : undefined}
+                centerLabel={allocation[0] ? categoryLabel(allocation[0].category) : undefined}
+              />
               <ul className="w-full min-w-0 flex-1 space-y-2">
                 {allocation.map((slice, i) => (
                   <li key={slice.category} className="flex items-start justify-between gap-3 text-sm">
@@ -142,7 +141,7 @@ export function DashboardBasicOverview({
               {top.map((asset) => (
                 <li key={asset.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">
+                    <div className="flex shrink-0 items-center justify-center text-primary">
                       <CategoryIcon name={asset.category} className="size-4" />
                     </div>
                     <div className="min-w-0">

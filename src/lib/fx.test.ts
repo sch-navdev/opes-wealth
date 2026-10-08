@@ -9,6 +9,7 @@ import {
   convertAmount,
   convertToBaseCurrency,
   getExchangeRatesFromUsd,
+  getExchangeRatesWithStatus,
 } from "@/lib/fx";
 
 const RATES = { USD: 1, EUR: 0.9, GBP: 0.8, JPY: 150, AED: 3.67 };
@@ -125,5 +126,42 @@ describe("getExchangeRatesFromUsd", () => {
     // The fallback is good enough to convert with: USD<->AED is the pegged ~3.67.
     expect(convertAmount(100, "USD", "AED", rates)).toBeCloseTo(367, 6);
     expect(convertAmount(367, "AED", "USD", rates)).toBeCloseTo(100, 6);
+  });
+});
+
+describe("getExchangeRatesWithStatus", () => {
+  beforeEach(() => getFxRatesMock.mockReset());
+
+  it("reports live rates from the real provider, asking for the default base", async () => {
+    getFxRatesMock.mockResolvedValue({ ok: true, isMock: false, rates: { USD: 1, EUR: 0.5 } });
+    await expect(getExchangeRatesWithStatus()).resolves.toEqual({ rates: { USD: 1, EUR: 0.5 }, source: "live" });
+    expect(getFxRatesMock).toHaveBeenCalledWith("USD");
+  });
+
+  it("reports the provider's mock mode as mock", async () => {
+    getFxRatesMock.mockResolvedValue({ ok: true, isMock: true, rates: { EUR: 1, USD: 1.1 } });
+    await expect(getExchangeRatesWithStatus("EUR")).resolves.toEqual({ rates: { EUR: 1, USD: 1.1 }, source: "mock" });
+    expect(getFxRatesMock).toHaveBeenCalledWith("EUR");
+  });
+
+  it("reports the static table as fallback when the provider fails", async () => {
+    getFxRatesMock.mockResolvedValue({ ok: false, code: "timeout", error: "slow" });
+    const status = await getExchangeRatesWithStatus();
+    expect(status.source).toBe("fallback");
+    expect(status.rates.USD).toBe(1);
+    expect(convertAmount(100, "USD", "AED", status.rates)).toBeCloseTo(367, 6);
+  });
+
+  it("returns exactly the table getExchangeRatesFromUsd returns, in every case", async () => {
+    for (const result of [
+      { ok: true, isMock: false, rates: { USD: 1, GBP: 0.8 } },
+      { ok: true, isMock: true, rates: { USD: 1, JPY: 150 } },
+      { ok: false, code: "network_error", error: "down" },
+    ]) {
+      getFxRatesMock.mockResolvedValue(result);
+      const plain = await getExchangeRatesFromUsd();
+      const withStatus = await getExchangeRatesWithStatus();
+      expect(withStatus.rates).toEqual(plain);
+    }
   });
 });

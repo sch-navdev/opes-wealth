@@ -30,6 +30,17 @@ const HOLDINGS: ComparableHolding[] = [
     ],
     includes: { purchase: true, income: false, currentValue: true, financing: true },
   },
+  {
+    id: "sold",
+    name: "Sold Stock",
+    category: "Equities",
+    currency: "AED",
+    flows: [
+      { date: "2021-01-01", amount: -10000 },
+      { date: "2023-01-01", amount: 12000 },
+    ],
+    includes: { purchase: true, income: true, currentValue: false, financing: true },
+  },
   { id: "car", name: "Old Car", category: "Vehicles", currency: "AED", unavailable: "missing_purchase_price" },
   {
     id: "usd",
@@ -146,6 +157,15 @@ describe("IrrCompare: holdings", () => {
     expect(within(inc).getByTestId("irr-b-inc-financing").dataset.included).toBe("true");
     expect(screen.getByTestId("irr-b-warn-income")).toBeInTheDocument();
     expect(screen.queryByTestId("irr-b-warn-financing")).toBeNull();
+  });
+
+  it("labels a fully sold position as closed rather than excluded", async () => {
+    renderIt();
+    await pickHolding("b", "sold");
+    const value = screen.getByTestId("irr-b-inc-value");
+    expect(value.dataset.included).toBe("false");
+    expect(value.textContent).toMatch(/position closed/i);
+    expect(value.textContent).not.toMatch(/not included/i);
   });
 
   it("holding vs holding, with a financing warning", async () => {

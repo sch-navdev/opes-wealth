@@ -65,7 +65,7 @@ describe("command menu items", () => {
     expect(canUploadStatement("basic")).toBe(false);
     expect(canUploadStatement("standard")).toBe(true);
     expect(visibleNavItems("basic").map((i) => i.id)).toEqual(["dashboard", "settings", "security"]);
-    expect(visibleNavItems("expert")).toHaveLength(7);
+    expect(visibleNavItems("expert")).toHaveLength(8);
     expect(visibleNavItems("standard").some((i) => i.id === "compare")).toBe(false);
     expect(visibleNavItems("professional").some((i) => i.id === "compare")).toBe(true);
   });

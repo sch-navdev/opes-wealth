@@ -46,6 +46,30 @@ export async function getExchangeRatesFromUsd(
 }
 
 /**
+ * Where a rate table came from: `live` (the real provider, or its in-memory cache), `mock`
+ * (`FX_MOCK_MODE=true`, the provider's own static table) or `fallback` (the provider failed and
+ * the static `FALLBACK_RATES_FROM_USD` approximation is in use).
+ */
+export type FxSource = "live" | "mock" | "fallback";
+
+export type FxRatesStatus = { rates: Record<string, number>; source: FxSource };
+
+/**
+ * Same rate table as `getExchangeRatesFromUsd(base)` (identical values, same fallback), plus where
+ * it came from, so a page can tell the user when totals rest on approximate rates (see
+ * `lib/data-quality.ts`). Never throws.
+ */
+export async function getExchangeRatesWithStatus(
+  base: string = DEFAULT_BASE_CURRENCY,
+): Promise<FxRatesStatus> {
+  const result = await getFxRates(base);
+  if (!result.ok) {
+    return { rates: FALLBACK_RATES_FROM_USD, source: "fallback" };
+  }
+  return { rates: result.rates, source: result.isMock ? "mock" : "live" };
+}
+
+/**
  * Converts `amount` from `fromCurrency` to `toCurrency` using the given
  * base-anchored rate table. Any currency missing from that table (e.g. the
  * static fallback above doesn't recognize it) is treated as a 1:1 ratio

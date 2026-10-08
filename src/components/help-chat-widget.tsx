@@ -215,7 +215,7 @@ export function HelpChatWidget() {
                 <Send className="size-4" />
               </Button>
             </form>
-            <p className="text-[11px] leading-tight text-muted-foreground">{t("help_privacy_note")}</p>
+            <p className="text-xs leading-tight text-muted-foreground">{t("help_privacy_note")}</p>
           </div>
         </section>
       )}

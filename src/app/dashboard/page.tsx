@@ -25,7 +25,6 @@ import { PortfolioGroups } from "@/components/portfolio-groups";
 import { DashboardBasicOverview } from "@/components/dashboard-basic-overview";
 import { DashboardCsvCard } from "@/components/dashboard-csv-card";
 import {
-  ExpertAttributionBlock,
   ExpertExposureBlock,
   ExpertPrivateEquityBlock,
   ExpertRatiosBlock,
@@ -39,14 +38,16 @@ import { buildAllocation, topAssets } from "@/lib/dashboard-tiers";
 import { buildExpertPanelsData } from "@/lib/dashboard-expert";
 import { cookies } from "next/headers";
 import { UI_TIER_COOKIE, parseExpertiseLevel } from "@/stores/useUiTierStore";
-import { buildAttributionPanelData, collectAttributionCandidates } from "@/lib/dashboard-attribution";
-import { fetchAttributionFx } from "@/lib/dashboard-attribution-fetch";
+import { collectAttributionCandidates } from "@/lib/dashboard-attribution";
+import { StreamedAttribution } from "./attribution-loader";
 import { T } from "@/components/translated-text";
 import {
   DEFAULT_BASE_CURRENCY,
   convertToBaseCurrency,
-  getExchangeRatesFromUsd,
+  getExchangeRatesWithStatus,
 } from "@/lib/fx";
+import { DataQualityCard } from "@/components/data-quality-card";
+import { runDataQualityChecks } from "@/lib/data-quality";
 import { buildNetWorthSeries, thinHistory, type AssetLineInput } from "@/lib/portfolio-performance";
 import { fetchAllAssetHistory } from "@/lib/asset-history-fetch";
 import { buildAssetInvested } from "@/lib/invested-capital";
@@ -137,13 +138,14 @@ export default async function DashboardPage({
     { data: categories },
     { data: ownAssetRows },
     { data: profile },
-    rates,
+    fxStatus,
     sharedWithMe,
     pendingApprovals,
     notifications,
     { data: savedDccRow },
     simulationRows,
     initialLayouts,
+    { data: bankLinks },
   ] = await Promise.all([
       supabase.from("asset_categories").select("id, name").order("name"),
       supabase
@@ -160,7 +162,7 @@ export default async function DashboardPage({
         )
         .eq("id", user.id)
         .single(),
-      getExchangeRatesFromUsd(),
+      getExchangeRatesWithStatus(),
       loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, new Set()),
       loadPendingApprovals(user.id),
       loadNotifications(user.id), // [] until migration 0034 is applied
@@ -170,12 +172,37 @@ export default async function DashboardPage({
       loadSimulations(supabase, user.id),
       // Saved dashboard layout (migration 0035); null until saved or while the column does not exist yet.
       loadDashboardLayouts(supabase, user.id),
+      // Open Finance links for the Cash accounts (non-secret columns only; token columns are not selectable by the browser role, migration 0020). Empty if 0020 isn't applied.
+      supabase
+        .from("bank_account_links")
+        .select(
+          "asset_id, connection_id, last_synced_at, last_sync_status, last_sync_error, bank_connections(institution_name, is_sandbox, status, last_synced_at)",
+        )
+        .eq("profile_id", user.id)
+        // Sandbox links have no asset (migration 0020) — they live only in the banking view.
+        .eq("is_sandbox", false)
+        .returns<
+          {
+            asset_id: string;
+            connection_id: string;
+            last_synced_at: string | null;
+            last_sync_status: "ok" | "error" | null;
+            last_sync_error: string | null;
+            bank_connections: {
+              institution_name: string;
+              is_sandbox: boolean;
+              status: string;
+              last_synced_at: string | null;
+            } | null;
+          }[]
+        >(),
     ]);
 
   // Co-ownership (migration 0025): assets shared WITH me are added and every asset
   // is reduced to MY share, so each total below (net worth, categories, charts,
   // passive income…) is pro-rata — $1M held 50% counts as $500k. With the
   // migration unapplied there are no owner rows and everything stays at 100%.
+  const rates = fxStatus.rates;
   const ownIds = new Set((ownAssetRows ?? []).map((a) => a.id));
   const unscaledAssets = [...(ownAssetRows ?? []), ...sharedWithMe.filter((a) => !ownIds.has(a.id))];
   const factorById = await loadOwnershipFactors(supabase, user.id, unscaledAssets);
@@ -207,9 +234,17 @@ export default async function DashboardPage({
   // Each asset's history rows, in its own currency. Vehicles are plotted from
   // their recorded purchase date (see `buildVehicleHistoryFromPurchase`), not
   // from whenever the first row happens to be — and never before the purchase.
+  // One pass groups the rows per asset (insertion order kept), instead of re-scanning the whole
+  // history once per asset here, in the vehicle performance loop and in the cash accounts below.
+  const rowsByAsset = new Map<string, typeof allHistory>();
+  for (const h of allHistory) {
+    const list = rowsByAsset.get(h.asset_id);
+    if (list) list.push(h);
+    else rowsByAsset.set(h.asset_id, [h]);
+  }
   const historyByAsset = new Map<string, typeof allHistory>();
   for (const asset of assets ?? []) {
-    const rows = allHistory.filter((h) => h.asset_id === asset.id);
+    const rows = rowsByAsset.get(asset.id) ?? [];
     historyByAsset.set(
       asset.id,
       asset.asset_categories?.name === "Vehicles"
@@ -248,6 +283,17 @@ export default async function DashboardPage({
     today,
   );
 
+  // Data quality: findings that silently skew totals or performance. Uses the RAW history rows
+  // (not the vehicle series carried flat to today, which would hide a stale valuation).
+  const dataQuality = runDataQualityChecks({
+    assets: assets ?? [],
+    historyByAsset: rowsByAsset,
+    rates,
+    fxSource: fxStatus.source,
+    baseCurrency: displayCurrency,
+    today,
+  });
+
   // Performance column for categories with no cost basis of their own:
   // vehicles compare the latest valuation with the purchase price (or, if none
   // was entered, the earliest valuation) — see `resolveVehicleValuation`.
@@ -257,9 +303,7 @@ export default async function DashboardPage({
     if (asset.asset_categories?.name !== "Vehicles") continue;
     const { change } = resolveVehicleValuation(
       parseVehicleMetadata(asset.metadata),
-      (allHistory ?? []).filter(
-        (h) => h.asset_id === asset.id && (!asset.purchase_date || h.recorded_date >= asset.purchase_date),
-      ),
+      (rowsByAsset.get(asset.id) ?? []).filter((h) => !asset.purchase_date || h.recorded_date >= asset.purchase_date),
       asset.current_value,
     );
     if (change) performanceByAsset[asset.id] = change;
@@ -399,29 +443,6 @@ export default async function DashboardPage({
   // Open Finance links for the Cash accounts (non-secret columns only — the
   // token columns are not selectable by the browser role, see migration 0020).
   // If 0020 isn't applied yet this simply returns nothing.
-  const { data: bankLinks } = await supabase
-    .from("bank_account_links")
-    .select(
-      "asset_id, connection_id, last_synced_at, last_sync_status, last_sync_error, bank_connections(institution_name, is_sandbox, status, last_synced_at)",
-    )
-    .eq("profile_id", user.id)
-    // Sandbox links have no asset (migration 0020) — they live only in the banking view.
-    .eq("is_sandbox", false)
-    .returns<
-      {
-        asset_id: string;
-        connection_id: string;
-        last_synced_at: string | null;
-        last_sync_status: "ok" | "error" | null;
-        last_sync_error: string | null;
-        bank_connections: {
-          institution_name: string;
-          is_sandbox: boolean;
-          status: string;
-          last_synced_at: string | null;
-        } | null;
-      }[]
-    >();
   const bankByAsset = new Map((bankLinks ?? []).map((l) => [l.asset_id, l]));
 
   const cashAccounts: CashAccount[] = (assets ?? [])
@@ -436,8 +457,7 @@ export default async function DashboardPage({
         typeof a.metadata?.institution_name === "string" ? a.metadata.institution_name : undefined,
       accountType: typeof a.metadata?.account_type === "string" ? a.metadata.account_type : undefined,
       lastDate:
-        (allHistory ?? [])
-          .filter((h) => h.asset_id === a.id)
+        (rowsByAsset.get(a.id) ?? [])
           .reduce<string | null>((max, h) => (!max || h.recorded_date > max ? h.recorded_date : max), null),
       bank: (() => {
         const link = bankByAsset.get(a.id);
@@ -495,15 +515,6 @@ export default async function DashboardPage({
   // Only the Expert view shows it, so the network fetch is skipped for other tiers (cookie = UI preference mirror).
   const showsExpertPanels = parseExpertiseLevel((await cookies()).get(UI_TIER_COOKIE)?.value) === "expert";
   const attributionCandidates = showsExpertPanels ? collectAttributionCandidates(assets ?? [], displayCurrency) : [];
-  const attributionData =
-    attributionCandidates.length === 0
-      ? null
-      : buildAttributionPanelData({
-          candidates: attributionCandidates,
-          baseCurrency: displayCurrency,
-          rates,
-          fxHistory: await fetchAttributionFx(attributionCandidates, displayCurrency),
-        });
 
   const addDialogs = (
     <>
@@ -561,6 +572,7 @@ export default async function DashboardPage({
         breakdowns={breakdowns}
       />
     ),
+    dataQuality: <DataQualityCard report={dataQuality} />,
     cashFlow: (
       <>
         <PassiveIncomeCard summary={passiveIncome} baseCurrency={displayCurrency} />
@@ -626,9 +638,11 @@ export default async function DashboardPage({
     expertTax: <ExpertTaxBlock data={expertData} baseCurrency={displayCurrency} />,
     expertExposure: <ExpertExposureBlock data={expertData} baseCurrency={displayCurrency} />,
     expertRatios: <ExpertRatiosBlock data={expertData} baseCurrency={displayCurrency} />,
-    expertAttribution: attributionData ? (
-      <ExpertAttributionBlock attribution={attributionData} baseCurrency={displayCurrency} />
-    ) : undefined,
+    // Streamed: the historical-FX fetch (up to 6 s) must not hold up the rest of the dashboard.
+    expertAttribution:
+      attributionCandidates.length > 0 ? (
+        <StreamedAttribution candidates={attributionCandidates} baseCurrency={displayCurrency} rates={rates} />
+      ) : undefined,
     export: (
       <ExportReportsCard
         savedDcc={savedDccRow?.data ?? null}

@@ -243,6 +243,9 @@ Multi-account dialog (`bank-statement-import-dialog.tsx`):
 - i18n: 24 `stmt_*` keys in 9 languages (`stmt_import_hint_no_account`, `stmt_autopick_note`, `stmt_import_n`, `stmt_already_badge`, `stmt_banner_*`, `stmt_sel_*`, `stmt_selected_count`, `stmt_identical_*`, `stmt_history_note`, `stmt_imported_tx_sel`, ...). `stmt_imported_tx` is no longer used.
 - Tests: `transaction-import-actions.test.ts` (mocked supabase), `transaction-keys.test.ts`, extended `bank-statement-import-dialog.test.tsx` (hint, preselect, selection, payloads, badges, banners, skip, quick actions, unknown state, identical rows, drawer not opened by checkbox). Not verified in a browser and not run against a real database (migration 0022 still unapplied in production, so live the check reports "unknown").
 
+## Import preview selection bar (2026-10-08, OW11 design unit 6)
+In `bank-statement-import-dialog.tsx` the row-selection controls are one bar: a prominent "N of M selected" count (`aria-live`), Select all / none / only new, and a thin rule showing the share of rows that will be imported (decorative). The preview table scrolls (max height 26rem) with a sticky header. Pattern from the 21st.dev "Data Table Row Selection" (felipemenezes098), rebuilt on the existing selection logic (no TanStack Table, no new keys). Covered by the dialog's jsdom tests; not seen in a browser (needs a real statement upload).
+
 ## Related
 - [[Database-Schema|Database Schema]] — target tables (`assets`, `asset_history`)
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — where imported history now surfaces (asset's valuation chart/table)

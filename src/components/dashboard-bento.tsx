@@ -1,15 +1,13 @@
 "use client";
 
-import { useId } from "react";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CategoryIcon } from "@/components/category-icon";
-import { NumberTicker } from "@/components/number-ticker";
+import { Money } from "@/components/money";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
 import { useTierMotion } from "@/components/tier-gate";
 import { Card } from "@/components/ui/card";
 import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import { useLanguage } from "@/context/language-context";
-import { usePrivacy } from "@/context/privacy-context";
 import { cn } from "@/lib/utils";
 
 export type BentoTile = {
@@ -19,6 +17,30 @@ export type BentoTile = {
   total: number;
   count: number;
 };
+
+/** Pointer readout for the hero chart: the date and the amount at the point under the cursor. */
+function HeroTooltip({
+  active,
+  payload,
+  currency,
+  format,
+}: {
+  active?: boolean;
+  payload?: { value?: number; payload?: { date: string } }[];
+  currency: string;
+  format: (date: string) => string;
+}) {
+  const point = payload?.[0];
+  if (!active || !point || typeof point.value !== "number" || !point.payload) return null;
+  return (
+    <div className="border border-border bg-card px-2.5 py-1.5 text-xs shadow-none">
+      <p className="text-muted-foreground tabular-nums">{format(point.payload.date)}</p>
+      <p className="text-sm font-medium text-foreground">
+        <Money value={point.value} currency={currency} showCurrency={false} decimals="hide" />
+      </p>
+    </div>
+  );
+}
 
 export type BentoSparkPoint = { date: string; value: number };
 
@@ -46,10 +68,7 @@ export function DashboardBento({
   spark: BentoSparkPoint[];
 }) {
   const { t, intlLocale } = useLanguage();
-  const { maskValue } = usePrivacy();
   const motion = useTierMotion();
-  const gradientId = useId();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
   const dateFormatter = new Intl.DateTimeFormat(intlLocale, { month: "short", year: "2-digit" });
   const showSpark = spark.length > 1;
 
@@ -64,37 +83,35 @@ export function DashboardBento({
             {t("net_worth")} · {baseCurrency}
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-4xl">
-            <NumberTicker value={netWorth} format={(v) => maskValue(formatter.format(v))} />
+            <Money value={netWorth} currency={baseCurrency} />
           </p>
           <p className="mt-1 text-xs text-muted-foreground">{t("bento_hero_caption")}</p>
         </div>
         {showSpark && (
           <div className="min-h-32 flex-1 px-1" aria-hidden="true">
             <ResponsiveContainer width="100%" height="100%" minHeight={128}>
-              <AreaChart data={spark} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" style={{ stopColor: "var(--chart-1)", stopOpacity: 0.3 }} />
-                    <stop offset="100%" style={{ stopColor: "var(--chart-1)", stopOpacity: 0 }} />
-                  </linearGradient>
-                </defs>
-                <XAxis
-                  dataKey="date"
-                  hide
-                />
+              <LineChart data={spark} margin={{ top: 6, right: 6, left: 6, bottom: 0 }}>
+                <XAxis dataKey="date" hide />
                 <YAxis hide domain={["dataMin", "dataMax"]} />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  strokeWidth={2}
-                  style={{ stroke: "var(--chart-1)" }}
-                  fill={`url(#${gradientId})`}
+                <Tooltip
+                  cursor={{ stroke: "var(--primary)", strokeWidth: 1, strokeDasharray: "2 3" }}
+                  content={<HeroTooltip currency={baseCurrency} format={(d) => dateFormatter.format(new Date(d))} />}
                   isAnimationActive={false}
                 />
-              </AreaChart>
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  strokeWidth={1.6}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "var(--primary)", stroke: "var(--card)", strokeWidth: 2 }}
+                  style={{ stroke: "var(--chart-1)" }}
+                  isAnimationActive={false}
+                />
+              </LineChart>
             </ResponsiveContainer>
           </div>
         )}
+        {showSpark && <div aria-hidden="true" className="tick-rule mx-5" />}
         {showSpark && (
           <p className="px-5 text-xs text-muted-foreground tabular-nums">
             {dateFormatter.format(new Date(spark[0].date))} –{" "}
@@ -111,7 +128,7 @@ export function DashboardBento({
           <Card
             key={tile.category}
             className={cn(
-              "animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 transition-shadow hover:shadow-md motion-reduce:animate-none",
+              "animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 motion-reduce:animate-none",
               // Third tile spans the full row width beside the hero on lg.
               index === 2 && "lg:col-span-2",
             )}
@@ -121,10 +138,10 @@ export function DashboardBento({
               <div className="min-w-0">
                 <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                  <NumberTicker value={tile.total} format={(v) => maskValue(formatter.format(v))} />
+                  <Money value={tile.total} currency={baseCurrency} showCurrency={false} />
                 </p>
               </div>
-              <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">
+              <div className="flex shrink-0 items-center justify-center text-primary">
                 <CategoryIcon name={tile.category} className="size-4" />
               </div>
             </div>

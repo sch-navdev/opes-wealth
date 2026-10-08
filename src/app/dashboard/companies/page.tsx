@@ -11,8 +11,14 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { Button } from "@/components/ui/button";
 import { CompaniesStructure } from "@/components/companies-structure";
 import { CompaniesSummary } from "@/components/companies-summary";
+import { EntityLookthrough } from "@/components/entity-lookthrough";
 import { T } from "@/components/translated-text";
 import { buildHoldingStructure, parseCompanyMetadata } from "@/lib/companies";
+import {
+  buildEntityLookthrough,
+  buildHoldingOptions,
+  type LookthroughAssetRow,
+} from "@/lib/entity-lookthrough";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
 
 type CompanyRow = {
@@ -22,6 +28,17 @@ type CompanyRow = {
   current_value: number;
   metadata: Record<string, unknown> | null;
 };
+
+type AssetRow = CompanyRow & {
+  profile_id: string;
+  category_id: string;
+  quantity: number;
+  is_liability: boolean;
+  asset_categories: { name: string } | null;
+};
+
+const ASSET_COLUMNS =
+  "id, profile_id, name, category_id, quantity, current_value, currency, is_liability, metadata, asset_categories(name)";
 
 /**
  * Companies / Holdings: corporate entities and business ownership you hold
@@ -54,36 +71,42 @@ export default async function CompaniesPage({
 
   const baseCurrency = currency || profile?.default_currency || DEFAULT_BASE_CURRENCY;
 
-  const { data: companies } = companyCategory
+  // Every active asset the user can see (own + co-owned), reduced to the user's share exactly like
+  // the dashboard: the Companies list below and the look-through (which reconciles with net worth).
+  const { data: ownAssets } = companyCategory
     ? await supabase
         .from("assets")
-        .select("id, name, currency, current_value, metadata")
+        .select(ASSET_COLUMNS)
         .eq("profile_id", user.id)
         .eq("status", "active")
-        .eq("category_id", companyCategory.id)
         .order("name")
-        .returns<CompanyRow[]>()
-    : { data: [] as CompanyRow[] };
+        .returns<AssetRow[]>()
+    : { data: [] as AssetRow[] };
+  const own = ownAssets ?? [];
+  const ownIds = new Set(own.map((a) => a.id));
+  const shared = companyCategory ? await loadCoOwnedAssets<AssetRow>(supabase, user.id, ASSET_COLUMNS, ownIds) : [];
+  const unscaled = [...own, ...shared.filter((a) => !ownIds.has(a.id))];
+  const factors = await loadOwnershipFactors(supabase, user.id, unscaled);
+  const allAssets = applyOwnershipFactors(unscaled, factors);
 
-  // Co-ownership: add companies shared with me and show MY share of each stake.
-  const COMPANY_COLUMNS = "id, profile_id, name, currency, current_value, quantity, metadata, asset_categories(name)";
-  const ownCompanies = (companies ?? []) as (CompanyRow & { profile_id?: string })[];
-  const sharedCompanies = companyCategory
-    ? await loadCoOwnedAssets<CompanyRow & { profile_id: string; quantity: number; asset_categories: { name: string } | null }>(
-        supabase,
-        user.id,
-        COMPANY_COLUMNS,
-        new Set(ownCompanies.map((c) => c.id)),
-        { categoryId: companyCategory.id },
-      )
-    : [];
-  const withOwner = [
-    ...ownCompanies.map((c) => ({ ...c, profile_id: c.profile_id ?? user.id, quantity: 1, asset_categories: { name: "Companies" } })),
-    ...sharedCompanies,
-  ];
-  const companyFactors = await loadOwnershipFactors(supabase, user.id, withOwner);
-  const rows: CompanyRow[] = applyOwnershipFactors(withOwner, companyFactors);
+  const rows: CompanyRow[] = allAssets.filter((a) => a.category_id === companyCategory?.id);
   const structure = buildHoldingStructure(rows);
+
+  const lookthroughRows: LookthroughAssetRow[] = allAssets.map((a) => ({
+    id: a.id,
+    name: a.name,
+    category: a.asset_categories?.name ?? "",
+    currency: a.currency,
+    current_value: a.current_value,
+    is_liability: a.is_liability,
+    metadata: a.metadata,
+  }));
+  const lookthrough = buildEntityLookthrough({ assets: lookthroughRows, baseCurrency, rates });
+  const holdingOptions = buildHoldingOptions(lookthroughRows, lookthrough);
+  // v1: holdings can be managed on the user's OWN entities that nobody else co-owns (the action re-checks).
+  const manageableEntityIds = rows
+    .filter((r) => (r as AssetRow).profile_id === user.id && (factors.get(r.id) ?? 1) === 1)
+    .map((r) => r.id);
   const baseValues: Record<string, number> = {};
   let totalStake = 0;
   let totalEquity = 0;
@@ -136,6 +159,11 @@ export default async function CompaniesPage({
             structure={structure}
             baseValues={baseValues}
             baseCurrency={baseCurrency}
+          />
+          <EntityLookthrough
+            data={lookthrough}
+            options={holdingOptions}
+            manageableEntityIds={manageableEntityIds}
           />
         </>
       )}

@@ -54,6 +54,7 @@ export const IRR_EN = {
   irr_inc_financing: "Financing",
   irr_included: "included",
   irr_excluded: "not included",
+  irr_position_closed: "position closed",
   irr_warn_income:
     "Income (rent, dividends, coupons) is not included in the flows, so the rate may differ from the full return.",
   irr_warn_financing: "Financing is not included: the rate is computed on the full purchase price, without any loan.",

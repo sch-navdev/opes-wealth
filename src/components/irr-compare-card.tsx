@@ -357,7 +357,7 @@ export function IrrCompareCard({
                       <li key={id} data-testid={`irr-${side}-inc-${id}`} data-included={on} className="flex items-center gap-1">
                         <span aria-hidden="true">{on ? "✓" : "✗"}</span>
                         <span className={on ? "text-foreground" : "text-muted-foreground"}>
-                          {tx(key)}: {tx(on ? "irr_included" : "irr_excluded")}
+                          {tx(key)}: {tx(on ? "irr_included" : id === "value" ? "irr_position_closed" : "irr_excluded")}
                         </span>
                       </li>
                     ))}

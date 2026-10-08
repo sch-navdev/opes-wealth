@@ -64,6 +64,21 @@ describe("registry", () => {
     expect(defaultLayout("expert").order[0]).toBe("fxExposure");
     expect(resizeBlock(defaultLayout("expert"), "fxExposure", "s")).toEqual(defaultLayout("expert"));
   });
+  it("registers the Data quality block right after the key figures, medium by default, from Standard up", () => {
+    expect(BLOCK_IDS[BLOCK_IDS.indexOf("metricCards") + 1]).toBe("dataQuality");
+    const block = getBlock("dataQuality");
+    expect(block.section).toBe("dataQuality");
+    expect(block.defaultSize).toBe("m");
+    expect([...block.allowedSizes]).toEqual(["m", "l", "full"]);
+    expect(block.labelKey).toBe("dlayout_block_dataQuality");
+    expect(tiersOfBlock("dataQuality")).toEqual(["standard", "professional", "expert"]);
+    // A layout saved before the block existed gets it appended, visible, at the default size.
+    const old = normalizeLayout({ version: 1, order: ["bento", "metricCards"], hidden: [], sizes: {} }, "standard");
+    expect(old.order).toContain("dataQuality");
+    expect(old.hidden).not.toContain("dataQuality");
+    expect(old.sizes.dataQuality).toBe("m");
+  });
+
   it("splits the expert panels into six tiles with the old arrangement", () => {
     const tiles = BLOCKS.filter((b) => b.section === "expertPanels");
     expect(tiles.map((b) => [b.id, b.defaultSize])).toEqual([
@@ -86,6 +101,7 @@ describe("defaultLayout", () => {
       "bento",
       "quickAdd",
       "metricCards",
+      "dataQuality",
       "cashFlow",
       "incomeCalendar",
       "csvUpload",

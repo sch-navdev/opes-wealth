@@ -74,7 +74,7 @@ export function PassiveIncomeCard({
         <Card className="border-border bg-card transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300 hover:bg-muted motion-reduce:animate-none">
           <CardContent className="grid grid-cols-1 items-center gap-4 py-4 sm:grid-cols-[auto_1fr_1fr_1fr]">
             <div className="flex items-center gap-3">
-              <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">
+              <div className="flex shrink-0 items-center justify-center text-primary">
                 <HandCoins className="size-4" />
               </div>
               <p className="text-sm font-medium text-foreground">{t("passive_income_title")}</p>

@@ -43,6 +43,7 @@ const REGISTRY = [
   { id: "bento", section: "bento", defaultSize: "full", allowedSizes: M_UP },
   { id: "quickAdd", section: "quickAdd", defaultSize: "full", allowedSizes: ALL_SIZES },
   { id: "metricCards", section: "metricCards", defaultSize: "full", allowedSizes: M_UP },
+  { id: "dataQuality", section: "dataQuality", defaultSize: "m", allowedSizes: M_UP },
   { id: "cashFlow", section: "cashFlow", defaultSize: "full", allowedSizes: M_UP },
   { id: "incomeCalendar", section: "incomeCalendar", defaultSize: "full", allowedSizes: L_UP },
   { id: "csvUpload", section: "csvUpload", defaultSize: "full", allowedSizes: M_UP },

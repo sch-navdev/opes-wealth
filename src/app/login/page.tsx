@@ -16,27 +16,21 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
   return (
     <div className="relative flex min-h-screen bg-background">
-      <div className="absolute end-4 top-4 z-10 flex items-center gap-2">
+      <div className="absolute end-4 top-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2">
         <LanguageSwitcher />
         <ThemeToggle />
         <ComfortModeToggle />
       </div>
       <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-e border-border bg-card p-10 lg:flex">
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 60%)",
-          }}
-        />
         <div className="relative max-w-md">
-          <p className="text-sm font-medium uppercase tracking-widest text-primary">
+          <p className="font-index text-[11px] uppercase tracking-[0.2em] text-primary">
             <T k="landing_tagline" />
           </p>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="mt-5 text-balance text-4xl font-medium tracking-tight text-foreground">
             <T k="landing_headline" />
           </h1>
-          <p className="mt-4 text-muted-foreground">
+          <div aria-hidden="true" className="tick-rule mt-6 max-w-xs" />
+          <p className="mt-5 text-muted-foreground">
             <T k="login_lead" />
           </p>
           <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">

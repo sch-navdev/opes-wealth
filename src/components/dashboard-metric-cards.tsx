@@ -23,7 +23,7 @@ import {
 import { usePrivacy } from "@/context/privacy-context";
 import { useLanguage } from "@/context/language-context";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
-import { NumberTicker } from "@/components/number-ticker";
+import { Money } from "@/components/money";
 import { cn } from "@/lib/utils";
 
 /** One asset's contribution to a dashboard total, already converted into the Base Currency. */
@@ -88,7 +88,7 @@ function MetricCard({
               {value}
             </p>
           </div>
-          <div className="flex size-9 shrink-0 items-center justify-center border border-border bg-background text-primary">
+          <div className="flex shrink-0 items-center justify-center text-primary">
             {icon}
           </div>
         </CardContent>
@@ -255,18 +255,11 @@ export function DashboardMetricCards({
   baseCurrency: string;
   breakdowns: DashboardBreakdowns;
 }) {
-  const { maskValue } = usePrivacy();
-  const { t, intlLocale } = useLanguage();
+  const { t } = useLanguage();
   const [open, setOpen] = useState<MetricKey | null>(null);
 
-  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency: baseCurrency,
-  });
-  // Headline figures count up on load and whenever they change; Privacy Mode masks each frame.
-  const ticker = (n: number) => (
-    <NumberTicker value={n} format={(v) => maskValue(currencyFormatter.format(v))} />
-  );
+  // Headline figures: the house Money figure (rolls only the digits that change; Privacy Mode masks it).
+  const ticker = (n: number) => <Money value={n} currency={baseCurrency} showCurrency={false} />;
 
   const gainColorClass =
     unrealizedGainSign === "+"

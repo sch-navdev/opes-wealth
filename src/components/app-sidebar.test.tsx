@@ -22,6 +22,7 @@ beforeEach(async () => {
 
 const HREFS: Record<NavLinkId, string> = {
   dashboard: "/dashboard",
+  dataQuality: "/dashboard/data-quality",
   banking: "/dashboard/banking",
   companies: "/dashboard/companies",
   planning: "/dashboard/planning",
@@ -32,9 +33,9 @@ const HREFS: Record<NavLinkId, string> = {
 
 const EXPECTED_LINKS: Record<ExpertiseLevel, NavLinkId[]> = {
   basic: ["dashboard", "settings", "security"],
-  standard: ["dashboard", "banking", "settings", "security"],
-  professional: ["dashboard", "banking", "companies", "planning", "compare", "settings", "security"],
-  expert: ["dashboard", "banking", "companies", "planning", "compare", "settings", "security"],
+  standard: ["dashboard", "dataQuality", "banking", "settings", "security"],
+  professional: ["dashboard", "dataQuality", "banking", "companies", "planning", "compare", "settings", "security"],
+  expert: ["dashboard", "dataQuality", "banking", "companies", "planning", "compare", "settings", "security"],
 };
 
 function renderSidebar(tier: ExpertiseLevel) {

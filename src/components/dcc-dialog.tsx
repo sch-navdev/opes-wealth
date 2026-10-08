@@ -310,7 +310,7 @@ export function DccDialog({
                 </SelectContent>
               </Select>
               {!PDF_LOCALES.includes(locale) ? (
-                <p className="text-[11px] text-muted-foreground">{t("dcc_pdf_latin_only")}</p>
+                <p className="text-xs text-muted-foreground">{t("dcc_pdf_latin_only")}</p>
               ) : null}
             </div>
             <div className="min-w-0 space-y-1">

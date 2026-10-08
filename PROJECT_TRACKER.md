@@ -111,11 +111,13 @@ High-net-worth individuals
 - [[Live-Pricing|Live Pricing]] — Step 9, equities/crypto pricing — built (Crypto live now, Equities pending a Finnhub key) — see [[Market-Data-Integration|Market Data Integration]] for the Real Estate/ADREC-DARI half of Step 9
 - [[Deployment|Deployment]] — Step 10, pre-deployment hardening done (clean lint/typecheck/build); actual Vercel deployment still pending
 - [[Market-Data-Integration|Market Data Integration]] — design-only ADREC/DARI outline; Vehicles and Private Equity are seeded categories with typed metadata shapes but no UI yet
-- [[Testing|Testing]] — Vitest unit tests for core pure logic (88 files, 1626 tests) and the record of the 13 bugs they found and that were fixed
+- [[Testing|Testing]] — Vitest unit tests for core pure logic (126 files, 2260 tests) and the record of the 13 bugs they found and that were fixed
 - [[Codebase-Audits|Codebase Audits]] — periodic review/cleanup passes
 - [[Privacy-Mode|Privacy Mode]] — global visibility toggle masking financial figures
 - [[Localization|Localization]] — English/French toggle (partial coverage)
 - [[Broker-Trade-Import|Broker Trade Import]] — Phase 2: Add Investments UI, Saxo Bank parser, Portfolio Performance chart. Fully live, migration `0011` applied.
+- [[Data-Quality|Data Quality]] — stale valuations, missing FX rates, cost-basis and balance checks, dashboard card and page
+- [[Entity-Structures|Entity Structures & Look-through]] — trusts, foundations, SPVs, holdings held through entities, net-worth look-through
 - [[Changelog|Changelog]] — full chronological history
 
 ## Folder Structure
@@ -133,10 +135,10 @@ opes-wealth/
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 ├── PROJECT_TRACKER.md           # hub note — start here (this file)
-└── tracker/                     # one note per module (19), linked from the Modules table above
+└── tracker/                     # one note per module (21), linked from the Modules table above
     ├── Architecture.md, Design-System.md, Authentication-Security.md, Database-Schema.md
     ├── Portfolio-Dashboard.md, Profile-Settings.md, Real-Estate-Multi-Currency.md
     ├── CSV-Bank-Uploads.md, Broker-Trade-Import.md, Live-Pricing.md, Market-Data-Integration.md
     ├── Co-Ownership.md, Future-Projects.md, Demo-Mode.md, Privacy-Mode.md, Localization.md
-    └── Deployment.md, Codebase-Audits.md, Changelog.md
+    └── Deployment.md, Codebase-Audits.md, Data-Quality.md, Entity-Structures.md, Changelog.md
 ```

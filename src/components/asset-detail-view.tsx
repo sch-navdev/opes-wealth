@@ -4,15 +4,25 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Building2, Car, CloudDownload, Coins, Download, FileText, Landmark, LineChart, Minus, RefreshCw, Wallet } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  Car,
+  CloudDownload,
+  Coins,
+  Download,
+  FileText,
+  Landmark,
+  LineChart,
+  Minus,
+  RefreshCw,
+  Wallet,
+} from "lucide-react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
-  Cell,
   Legend,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -73,36 +83,16 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VehicleExpenses } from "@/components/vehicle-expenses";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+
 import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { AddLiabilityDialog } from "@/components/add-liability-dialog";
-import { ENTITY_TYPE_LABEL_KEYS } from "@/components/company-fields";
-import { STAGE_LABEL_KEYS } from "@/components/private-equity-fields";
+
 import { PeCashFlowChart } from "@/components/pe-cash-flow-chart";
-import { SCPI_MODE_LABEL_KEYS } from "@/components/scpi-fields";
-import {
-  parseScpiMetadata,
-  scpiAverageYield,
-  scpiEntryFees,
-  scpiInvested,
-  scpiReceived,
-  scpiTrailingYield,
-  scpiWithdrawalValue,
-} from "@/lib/scpi";
-import { parseCompanyMetadata } from "@/lib/companies";
+
 import { parseAssuranceVieMetadata } from "@/lib/assurance-vie";
+import { DetailField, ProgressBar } from "@/components/asset-detail/shared";
 import { AssuranceVieDetailCards } from "@/components/assurance-vie-cards";
-import {
-  calledCapital,
-  fundReturns,
-  isOverdue,
-  pendingCapitalCallsTotal,
-  unfundedCommitment,
-} from "@/lib/private-equity";
+import { fundReturns } from "@/lib/private-equity";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { TenancyContractDialog } from "@/components/tenancy-contract-dialog";
 import { PropertyDocumentDialog } from "@/components/property-document-dialog";
@@ -136,11 +126,7 @@ import {
   resolveOutstandingLoanBalance,
   sumPropertyExpenses,
 } from "@/lib/real-estate";
-import {
-  canAmortize,
-  getOutstandingPrincipalAt,
-  summarizeAmortization,
-} from "@/lib/amortization";
+import { canAmortize, getOutstandingPrincipalAt, summarizeAmortization } from "@/lib/amortization";
 import { calculateIrr, type DatedCashFlow } from "@/lib/irr";
 import {
   averageAnnualCosts,
@@ -156,14 +142,10 @@ import {
 import {
   calculateVehicleTotalCost,
   buildVehicleComparisonSeries,
-  effectiveDepreciation,
-  estimateDepreciatedValue,
-  latestBlueBook,
   parseVehicleMetadata,
   resolveVehicleValuation,
 } from "@/lib/vehicles";
-import { VehicleBlueBookDialog } from "@/components/vehicle-bluebook-dialog";
-import { VehicleBlueBookLog } from "@/components/vehicle-bluebook-log";
+
 import { parsePrivateEquityMetadata } from "@/lib/private-equity";
 import {
   buildInvestedCapitalSeries,
@@ -171,11 +153,8 @@ import {
   parseEquityMetadata,
 } from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
-import {
-  fineTroyOunces,
-  parsePreciousMetalMetadata,
-} from "@/lib/precious-metals";
-import { METAL_FORM_LABEL_KEYS, METAL_LABEL_KEYS } from "@/components/precious-metals-fields";
+import { parsePreciousMetalMetadata } from "@/lib/precious-metals";
+
 import { ExoticAssetCard } from "@/components/exotic-asset-card";
 import { StartupCard } from "@/components/startup-card";
 import { photoThumbUrl } from "@/lib/asset-photos";
@@ -188,12 +167,29 @@ import { fetchMarketPrice } from "@/lib/market-data/market-price";
 import { refreshMarketPrice } from "@/app/dashboard/actions";
 import { cn } from "@/lib/utils";
 import type { TranslationKey } from "@/lib/i18n";
-import { buildDetailDisplay, realEstateShareFigures, toEditPayload } from "@/lib/asset-detail-scaling";
+import {
+  buildDetailDisplay,
+  realEstateShareFigures,
+  toEditPayload,
+} from "@/lib/asset-detail-scaling";
 import { OwnerShareNote } from "@/components/owner-share-note";
 import { TransactionsList } from "@/components/transactions-list";
 import { AttributionCard } from "@/components/attribution-card";
 import type { AssetAttributionView } from "@/lib/asset-attribution-view";
 import type { StoredTransactionRow } from "@/lib/transaction-detail";
+import {
+  CompanySettings,
+  CryptoSettings,
+  EquitySettings,
+  PreciousMetalSettings,
+  PrivateEquityCommitmentSettings,
+  PrivateEquityDetailsSettings,
+  RealEstateSettings,
+  ScpiSettings,
+  VehicleSettings,
+} from "@/components/asset-detail/lazy";
+import { VehicleOverviewCosts } from "@/components/asset-detail/vehicle-overview-costs";
+import { TaxLotsCard } from "@/components/tax-lots-card";
 
 export type AssetDetail = {
   id: string;
@@ -277,39 +273,6 @@ const VEHICLE_VALUATION_ERROR_KEYS: Record<string, TranslationKey> = {
   network_error: "vehicle_valuation_error_network_error",
   under_development: "vehicle_valuation_under_development",
 };
-
-function DetailField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | null | undefined;
-}) {
-  return (
-    <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm text-foreground">{value || "—"}</p>
-    </div>
-  );
-}
-
-function ProgressBar({
-  percent,
-  colorClassName,
-}: {
-  percent: number;
-  colorClassName: string;
-}) {
-  const clamped = Math.max(0, Math.min(100, percent));
-  return (
-    <div className="h-2 w-full min-w-0 overflow-hidden bg-muted">
-      <div
-        className={`h-full ${colorClassName}`}
-        style={{ width: `${clamped}%` }}
-      />
-    </div>
-  );
-}
 
 export function AssetDetailView({
   asset,
@@ -2289,79 +2252,16 @@ export function AssetDetailView({
             )}
 
             {isVehicle && vehicleMetadata && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Card className="border-border bg-card">
-                  <CardContent className="space-y-1 py-4">
-                    <p className="text-xs text-muted-foreground">
-                      {t("total_cost_of_ownership")}
-                    </p>
-                    <p className="text-lg font-semibold text-foreground">
-                      {vehicleTotalCost != null
-                        ? maskValue(currencyFormatter.format(vehicleTotalCost))
-                        : "—"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("all_in_cost_basis")}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardContent className="space-y-1 py-4">
-                    <p className="text-xs text-muted-foreground">{t("mileage")}</p>
-                    <p className="text-lg font-semibold text-foreground">
-                      {vehicleMetadata.mileage != null
-                        ? maskValue(`${vehicleMetadata.mileage.toLocaleString(intlLocale)} km`)
-                        : "—"}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardContent className="space-y-1 py-4">
-                    <p className="text-xs text-muted-foreground">
-                      {t("vehicle_value_change")}
-                    </p>
-                    <div className="flex w-full flex-wrap items-center gap-2">
-                      <p
-                        className={
-                          vehicleChange != null
-                            ? vehicleChange.amount >= 0
-                              ? "text-lg font-semibold text-success"
-                              : "text-lg font-semibold text-destructive"
-                            : "text-lg font-semibold text-foreground"
-                        }
-                      >
-                        {vehicleChange != null
-                          ? `${vehicleChange.amount >= 0 ? "+" : "-"}${maskValue(currencyFormatter.format(Math.abs(vehicleChange.amount)))}`
-                          : "—"}
-                      </p>
-                      {vehicleChange?.percent != null && (
-                        <Badge
-                          variant="secondary"
-                          className={
-                            vehicleChange.amount >= 0
-                              ? "whitespace-nowrap bg-success px-2 py-0.5 text-success-foreground"
-                              : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"
-                          }
-                        >
-                          {vehicleChange.percent >= 0 ? "+" : "-"}
-                          {Math.abs(vehicleChange.percent).toFixed(1)}%
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {vehicleValuation?.baselineSource === "purchase_price"
-                        ? t("vehicle_basis_purchase")
-                        : vehicleValuation?.baselineSource === "first_valuation"
-                          ? t("vehicle_basis_first_valuation", {
-                              date: vehicleValuation.baselineDate ?? "",
-                            })
-                          : t("vehicle_basis_none")}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+              <VehicleOverviewCosts
+                t={t}
+                vehicleTotalCost={vehicleTotalCost}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+                vehicleMetadata={vehicleMetadata}
+                intlLocale={intlLocale}
+                vehicleChange={vehicleChange}
+                vehicleValuation={vehicleValuation}
+              />
             )}
 
             {isAssuranceVie && (
@@ -2374,7 +2274,9 @@ export function AssetDetailView({
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">
-            {!isRealEstate ? (
+            {isEquity && (equityMetadata?.trades.length ?? 0) > 0 ? (
+              <TaxLotsCard asset={asset} ownerFactor={ownerFactor} />
+            ) : !isRealEstate ? (
               <Card className="border-border bg-card">
                 <CardContent className="py-6 text-sm text-muted-foreground">
                   {t("analysis_unavailable")}
@@ -2905,1018 +2807,69 @@ export function AssetDetailView({
             </Card>
 
             {isRealEstate && (
-              <>
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("core_property_details")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField label={t("address")} value={metadata.address} />
-                    <DetailField label={t("type")} value={metadata.propertyType} />
-                    <DetailField
-                      label={t("internal_area")}
-                      value={
-                        metadata.internal_area != null
-                          ? `${metadata.internal_area} m²`
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("terrace_area")}
-                      value={
-                        metadata.terrace_area != null
-                          ? `${metadata.terrace_area} m²`
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("total_area")}
-                      value={
-                        metadata.surfaceArea != null
-                          ? `${metadata.surfaceArea} m²`
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("year_of_construction")}
-                      value={metadata.yearOfConstruction}
-                    />
-                    <DetailField
-                      label={t("epc_rating")}
-                      value={metadata.epcRating}
-                    />
-                  </CardContent>
-                </Card>
-
-                {metadata.emirate !== "abu_dhabi" && (
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("dld_identifiers")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {metadata.is_offplan ? (
-                      <>
-                        <DetailField
-                          label={t("oqood_number")}
-                          value={metadata.oqood_number}
-                        />
-                        <DetailField
-                          label={t("project_number")}
-                          value={metadata.project_number}
-                        />
-                        <DetailField
-                          label={t("escrow_id")}
-                          value={metadata.escrow_id}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <DetailField
-                          label={t("title_deed_number")}
-                          value={metadata.title_deed_number}
-                        />
-                        <DetailField label={t("plot_id")} value={metadata.plot_id} />
-                      </>
-                    )}
-                    <DetailField
-                      label={t("community_id")}
-                      value={metadata.community_id}
-                    />
-                  </CardContent>
-                </Card>
-                )}
-
-                {metadata.emirate === "abu_dhabi" && (
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("adrec_identifiers")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {metadata.is_offplan ? (
-                      <>
-                        <DetailField
-                          label={t("adrec_project_id")}
-                          value={metadata.adrec_project_id}
-                        />
-                        <DetailField
-                          label={t("adrec_developer_id")}
-                          value={metadata.adrec_developer_id}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <DetailField
-                          label={t("adrec_plot_number")}
-                          value={metadata.adrec_plot_number}
-                        />
-                        <DetailField
-                          label={t("adrec_unit_id")}
-                          value={metadata.adrec_unit_id}
-                        />
-                        <DetailField
-                          label={t("adrec_title_deed")}
-                          value={metadata.adrec_title_deed}
-                        />
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-                )}
-
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("material_condition_ratings")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField
-                      label={t("kitchen")}
-                      value={metadata.condition.kitchen}
-                    />
-                    <DetailField
-                      label={t("bathrooms")}
-                      value={metadata.condition.bathrooms}
-                    />
-                    <DetailField
-                      label={t("flooring")}
-                      value={metadata.condition.flooring}
-                    />
-                    <DetailField
-                      label={t("windows")}
-                      value={metadata.condition.windows}
-                    />
-                    <DetailField
-                      label={t("general")}
-                      value={metadata.condition.general}
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("cost_fees_basis")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField
-                      label={
-                        metadata.contract_price != null
-                          ? t("contract_price")
-                          : t("purchase_price")
-                      }
-                      value={
-                        metadata.contract_price ?? metadata.purchasePrice
-                          ? maskValue(
-                              currencyFormatter.format(
-                                (metadata.contract_price ??
-                                  metadata.purchasePrice) as number,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("registration_fee", {
-                        type: metadata.registration_fee_type,
-                      })}
-                      value={
-                        metadata.registration_fee_amount
-                          ? maskValue(
-                              currencyFormatter.format(
-                                metadata.registration_fee_amount,
-                              ),
-                            )
-                          : "—"
-                      }
-                    />
-                    <DetailField
-                      label={t("agency_fees")}
-                      value={
-                        metadata.agencyFees != null
-                          ? maskValue(currencyFormatter.format(metadata.agencyFees))
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("renovation_fees")}
-                      value={
-                        metadata.renovationFees != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.renovationFees),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("furnishing_fees")}
-                      value={
-                        metadata.furnishingFees != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.furnishingFees),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("transfer_trustee_fees")}
-                      value={
-                        metadata.transfer_trustee_fees != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.transfer_trustee_fees),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("agent_sales_progression_fees")}
-                      value={
-                        metadata.agent_sales_progression_fees != null
-                          ? maskValue(
-                              currencyFormatter.format(
-                                metadata.agent_sales_progression_fees,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("rera_title_deed_processing_fees")}
-                      value={
-                        metadata.rera_title_deed_processing_fees != null
-                          ? maskValue(
-                              currencyFormatter.format(
-                                metadata.rera_title_deed_processing_fees,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("rera_mortgage_registration_fees")}
-                      value={
-                        metadata.rera_mortgage_registration_fees != null
-                          ? maskValue(
-                              currencyFormatter.format(
-                                metadata.rera_mortgage_registration_fees,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("rera_knowledge_fee")}
-                      value={
-                        metadata.rera_knowledge_fee != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.rera_knowledge_fee),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("in_principle_bank_approval_fee")}
-                      value={
-                        metadata.in_principle_bank_approval_fee != null
-                          ? maskValue(
-                              currencyFormatter.format(
-                                metadata.in_principle_bank_approval_fee,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("property_valuation_fee")}
-                      value={
-                        metadata.property_valuation_fee != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.property_valuation_fee),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("bank_processing_fees")}
-                      value={
-                        metadata.bank_processing_fees != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.bank_processing_fees),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("yearly_insurance_fee")}
-                      value={
-                        metadata.yearly_insurance_fee != null
-                          ? maskValue(
-                              currencyFormatter.format(metadata.yearly_insurance_fee),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("total_property_cost")}
-                      value={
-                        totalCost != null
-                          ? maskValue(currencyFormatter.format(totalCost))
-                          : null
-                      }
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("financing")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {hasLoan ? (
-                      <div className="space-y-4">
-                        <div className="flex items-end justify-between gap-4 border-b border-border pb-4">
-                          <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground">
-                              {t("outstanding_loan_balance")}
-                            </p>
-                            <p className="text-lg font-semibold text-destructive">
-                              {maskValue(
-                                currencyFormatter.format(outstandingLoanBalance),
-                              )}
-                            </p>
-                          </div>
-                          {metadata.linked_loan.lender_name && (
-                            <DetailField
-                              label={t("lender_name")}
-                              value={metadata.linked_loan.lender_name}
-                            />
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                          <DetailField
-                            label={t("principal")}
-                            value={maskValue(
-                              currencyFormatter.format(
-                                metadata.linked_loan.amount ?? 0,
-                              ),
-                            )}
-                          />
-                          <DetailField
-                            label={t("monthly_payment")}
-                            value={
-                              metadata.linked_loan.monthly_payment != null
-                                ? maskValue(
-                                    currencyFormatter.format(
-                                      metadata.linked_loan.monthly_payment,
-                                    ),
-                                  )
-                                : null
-                            }
-                          />
-                          <DetailField
-                            label={t("interest_rate")}
-                            value={
-                              metadata.linked_loan.interest_rate != null
-                                ? `${metadata.linked_loan.interest_rate}%`
-                                : null
-                            }
-                          />
-                          <DetailField
-                            label={t("duration")}
-                            value={
-                              metadata.linked_loan.duration_months != null
-                                ? t("duration_months", {
-                                    n: metadata.linked_loan.duration_months,
-                                  })
-                                : null
-                            }
-                          />
-                          <DetailField
-                            label={t("start_date")}
-                            value={metadata.linked_loan.start_date}
-                          />
-                        </div>
-
-                        {amortizationSummary && (
-                          <div className="space-y-4 border-t border-border pt-4">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                              <div className="h-40 w-full min-w-0">
-                                <ResponsiveContainer width="100%" height="100%">
-                                  <PieChart>
-                                    <Pie
-                                      data={[
-                                        {
-                                          name: t("principal_paid"),
-                                          value: amortizationSummary.principalPaidToDate,
-                                        },
-                                        {
-                                          name: t("interest_paid"),
-                                          value: amortizationSummary.interestPaidToDate,
-                                        },
-                                      ]}
-                                      dataKey="value"
-                                      nameKey="name"
-                                      innerRadius={35}
-                                      outerRadius={60}
-                                    >
-                                      <Cell fill="var(--color-success)" />
-                                      <Cell fill="var(--color-destructive)" />
-                                    </Pie>
-                                    <Tooltip
-                                      contentStyle={{
-                                        background: "var(--color-card)",
-                                        border: "1px solid var(--color-border)",
-                                        color: "var(--color-foreground)",
-                                      }}
-                                      formatter={(value) =>
-                                        maskValue(currencyFormatter.format(Number(value)))
-                                      }
-                                    />
-                                  </PieChart>
-                                </ResponsiveContainer>
-                              </div>
-                              <div className="flex flex-col justify-center gap-3">
-                                <DetailField
-                                  label={t("principal_paid")}
-                                  value={maskValue(
-                                    currencyFormatter.format(
-                                      amortizationSummary.principalPaidToDate,
-                                    ),
-                                  )}
-                                />
-                                <DetailField
-                                  label={t("interest_paid")}
-                                  value={maskValue(
-                                    currencyFormatter.format(
-                                      amortizationSummary.interestPaidToDate,
-                                    ),
-                                  )}
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>{t("loan_percent_paid")}</span>
-                                <span>{amortizationSummary.percentPaid.toFixed(1)}%</span>
-                              </div>
-                              <ProgressBar
-                                percent={amortizationSummary.percentPaid}
-                                colorClassName="bg-success"
-                              />
-                            </div>
-                            <Collapsible open={scheduleOpen} onOpenChange={setScheduleOpen}>
-                              <CollapsibleTrigger asChild>
-                                <Button type="button" variant="outline" size="sm">
-                                  {scheduleOpen
-                                    ? t("hide_amortization_schedule")
-                                    : t("show_amortization_schedule")}
-                                </Button>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="mt-3 max-h-80 overflow-y-auto border border-border">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead>{t("payment_number")}</TableHead>
-                                        <TableHead>{t("due_date")}</TableHead>
-                                        <TableHead className="text-end">
-                                          {t("interest_rate")}
-                                        </TableHead>
-                                        <TableHead className="text-end">
-                                          {t("principal")}
-                                        </TableHead>
-                                        <TableHead className="text-end">
-                                          {t("interest_paid")}
-                                        </TableHead>
-                                        <TableHead className="text-end">
-                                          {t("outstanding_loan_balance")}
-                                        </TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {amortizationSummary.schedule.map((entry) => (
-                                        <TableRow key={entry.paymentNumber}>
-                                          <TableCell>{entry.paymentNumber}</TableCell>
-                                          <TableCell className="text-muted-foreground">
-                                            {entry.date}
-                                          </TableCell>
-                                          <TableCell className="text-end text-muted-foreground">
-                                            {entry.rateUsed.toFixed(2)}%
-                                          </TableCell>
-                                          <TableCell className="text-end">
-                                            {maskValue(
-                                              currencyFormatter.format(entry.principalAmount),
-                                            )}
-                                          </TableCell>
-                                          <TableCell className="text-end">
-                                            {maskValue(
-                                              currencyFormatter.format(entry.interestAmount),
-                                            )}
-                                          </TableCell>
-                                          <TableCell className="text-end">
-                                            {maskValue(
-                                              currencyFormatter.format(entry.remainingBalance),
-                                            )}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {t("no_loan_attached")}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </>
+              <RealEstateSettings
+                t={t}
+                metadata={metadata}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+                totalCost={totalCost}
+                hasLoan={hasLoan}
+                outstandingLoanBalance={outstandingLoanBalance}
+                amortizationSummary={amortizationSummary}
+                scheduleOpen={scheduleOpen}
+                setScheduleOpen={setScheduleOpen}
+              />
             )}
 
             {isVehicle && vehicleMetadata && (
-              <>
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("vehicle_details")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField label={t("make")} value={vehicleMetadata.make} />
-                    <DetailField label={t("model")} value={vehicleMetadata.model} />
-                    <DetailField
-                      label={t("vehicle_year")}
-                      value={vehicleMetadata.year}
-                    />
-                    <DetailField label={t("vin")} value={vehicleMetadata.vin} />
-                    <DetailField
-                      label={t("license_plate")}
-                      value={vehicleMetadata.license_plate}
-                    />
-                    <DetailField
-                      label={t("mileage")}
-                      value={
-                        vehicleMetadata.mileage != null
-                          ? `${vehicleMetadata.mileage.toLocaleString(intlLocale)} km`
-                          : null
-                      }
-                    />
-                    {vehicleMetadata.last_valuation_date && (
-                      <DetailField
-                        label={t("last_valuation")}
-                        value={`${maskValue(
-                          currencyFormatter.format(vehicleMetadata.market_valuation ?? 0),
-                        )} (${
-                          vehicleMetadata.last_valuation_source === "autobiz"
-                            ? t("provider_autobiz")
-                            : t("provider_la_centrale")
-                        }, ${vehicleMetadata.last_valuation_date})`}
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                    <CardTitle className="text-foreground">{t("bluebook_title")}</CardTitle>
-                    {(!ownershipStatus || ownershipStatus.isCreator) && (
-                      <VehicleBlueBookDialog
-                        assetId={asset.id}
-                        assetCurrency={asset.currency}
-                        estimate={estimateDepreciatedValue(parseVehicleMetadata(asset.metadata), asset.purchase_date)}
-                      />
-                    )}
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField
-                      label={t("bluebook_value")}
-                      value={(() => {
-                        const latest = latestBlueBook(vehicleMetadata);
-                        return latest
-                          ? maskValue(currencyFormatter.format(convertAmount(latest.amount, latest.currency || asset.currency, asset.currency, ratesFromUsd)))
-                          : t("bluebook_none");
-                      })()}
-                    />
-                    <DetailField label={t("bluebook_source")} value={latestBlueBook(vehicleMetadata)?.source || null} />
-                    <DetailField label={t("bluebook_date")} value={latestBlueBook(vehicleMetadata)?.date || null} />
-                    <DetailField
-                      label={t("depreciation_estimate_label")}
-                      value={(() => {
-                        const est = estimateDepreciatedValue(vehicleMetadata, asset.purchase_date);
-                        return est != null ? maskValue(currencyFormatter.format(est)) : null;
-                      })()}
-                    />
-                    <DetailField
-                      label={t("depreciation_title")}
-                      value={(() => {
-                        const r = effectiveDepreciation(vehicleMetadata, asset.purchase_date);
-                        const pct = (n: number) => (n > 0 ? "+" : "") + n + "%";
-                        return vehicleMetadata.second_hand
-                          ? t("depreciation_second_hand") + ": " + pct(r.annual) + " " + t("depreciation_per_year")
-                          : pct(r.first) + " / " + pct(r.annual) + " " + t("depreciation_per_year");
-                      })()}
-                    />
-                    <div className="sm:col-span-2 xl:col-span-4">
-                      <VehicleBlueBookLog
-                        assetId={asset.id}
-                        assetCurrency={asset.currency}
-                        editable={!ownershipStatus || ownershipStatus.isCreator}
-                        rows={vehicleMetadata.blue_book_log.map((e) => ({
-                          id: e.id,
-                          date: e.date,
-                          amount: e.amount,
-                          currency: e.currency || asset.currency,
-                          source: e.source,
-                          document: e.document,
-                          converted: convertAmount(e.amount, e.currency || asset.currency, asset.currency, ratesFromUsd),
-                        }))}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card">
-                  <CardHeader>
-                    <CardTitle className="text-foreground">
-                      {t("cost_fees_basis")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <DetailField
-                      label={t("purchase_price")}
-                      value={
-                        vehicleMetadata.purchase_price != null
-                          ? maskValue(
-                              currencyFormatter.format(vehicleMetadata.purchase_price),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("maintenance_costs")}
-                      value={
-                        vehicleMetadata.maintenance_costs != null
-                          ? maskValue(
-                              currencyFormatter.format(vehicleMetadata.maintenance_costs),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("modifications")}
-                      value={
-                        vehicleMetadata.modifications != null
-                          ? maskValue(
-                              currencyFormatter.format(vehicleMetadata.modifications),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("insurance_registration")}
-                      value={
-                        vehicleMetadata.insurance_registration != null
-                          ? maskValue(
-                              currencyFormatter.format(
-                                vehicleMetadata.insurance_registration,
-                              ),
-                            )
-                          : null
-                      }
-                    />
-                    <DetailField
-                      label={t("total_cost_of_ownership")}
-                      value={
-                        vehicleTotalCost != null
-                          ? maskValue(currencyFormatter.format(vehicleTotalCost))
-                          : null
-                      }
-                    />
-                  </CardContent>
-                </Card>
-              </>
+              <VehicleSettings
+                t={t}
+                vehicleMetadata={vehicleMetadata}
+                intlLocale={intlLocale}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+                ownershipStatus={ownershipStatus}
+                asset={asset}
+                ratesFromUsd={ratesFromUsd}
+                vehicleTotalCost={vehicleTotalCost}
+              />
             )}
 
             {isScpi && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">{t("scpi_details")}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {(() => {
-                    const scpi = parseScpiMetadata(displayAsset.metadata);
-                    const invested = scpiInvested(scpi, displayAsset.quantity);
-                    const fees = scpiEntryFees(scpi, displayAsset.quantity);
-                    const unit = scpiWithdrawalValue(scpi);
-                    const trailing = scpiTrailingYield(scpi, displayAsset.quantity, today);
-                    const average = scpiAverageYield(scpi);
-                    const dividends = [...scpi.dividends].sort((a, b) => b.date.localeCompare(a.date));
-                    const money = (n: number) => maskValue(currencyFormatter.format(n));
-                    return (
-                      <>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                          <DetailField label={t("scpi_management_company")} value={scpi.management_company} />
-                          <DetailField label={t("scpi_sector")} value={scpi.sector} />
-                          <DetailField label={t("scpi_geography")} value={scpi.geography} />
-                          <DetailField
-                            label={t("scpi_holding_mode")}
-                            value={t(SCPI_MODE_LABEL_KEYS[scpi.holding_mode])}
-                          />
-                          <DetailField label={t("scpi_shares")} value={String(displayAsset.quantity)} />
-                          <DetailField
-                            label={t("scpi_subscription_price")}
-                            value={scpi.subscription_price != null ? money(scpi.subscription_price) : null}
-                          />
-                          <DetailField
-                            label={t("scpi_entry_fee")}
-                            value={scpi.entry_fee_pct != null ? `${scpi.entry_fee_pct}%` : null}
-                          />
-                          <DetailField
-                            label={t("scpi_withdrawal_value")}
-                            value={unit != null ? money(unit) : null}
-                          />
-                          <DetailField label={t("scpi_invested")} value={money(invested)} />
-                          <DetailField label={t("scpi_fees_paid")} value={money(fees)} />
-                          <DetailField label={t("scpi_jouissance_date")} value={scpi.jouissance_date || null} />
-                          <DetailField
-                            label={t("scpi_financed_by_credit")}
-                            value={scpi.financed_by_credit ? t("yes") : t("no")}
-                          />
-                          <DetailField
-                            label={t("scpi_dividends_received")}
-                            value={money(scpiReceived(scpi))}
-                          />
-                          <DetailField
-                            label={t("scpi_realised_yield")}
-                            value={trailing != null ? `${trailing.toFixed(2)}%` : null}
-                          />
-                          <DetailField
-                            label={t("scpi_target_yield")}
-                            value={scpi.target_yield_pct != null ? `${scpi.target_yield_pct}%` : null}
-                          />
-                          <DetailField
-                            label={t("scpi_average_yield")}
-                            value={average != null ? `${average.toFixed(2)}%` : null}
-                          />
-                        </div>
-                        {scpi.yield_history.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            {[...scpi.yield_history]
-                              .sort((a, b) => b.year - a.year)
-                              .map((y) => `${y.year}: ${y.rate}%`)
-                              .join(" · ")}
-                          </p>
-                        )}
-                        {dividends.length > 0 ? (
-                          <div className="overflow-x-auto border border-border">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="text-muted-foreground">{t("scpi_quarter")}</TableHead>
-                                  <TableHead className="text-muted-foreground">{t("scpi_dividend_date")}</TableHead>
-                                  <TableHead className="text-end text-muted-foreground">
-                                    {t("scpi_dividend_amount")}
-                                  </TableHead>
-                                  <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {dividends.map((d) => (
-                                  <TableRow key={d.id}>
-                                    <TableCell className="text-foreground">{d.quarter || "—"}</TableCell>
-                                    <TableCell className="tabular-nums text-foreground">{d.date}</TableCell>
-                                    <TableCell className="text-end tabular-nums text-foreground">
-                                      {money(d.amount)}
-                                    </TableCell>
-                                    <TableCell
-                                      className={d.status === "received" ? "text-success" : "text-muted-foreground"}
-                                    >
-                                      {d.status === "received"
-                                        ? t("scpi_status_received")
-                                        : t("scpi_status_expected")}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">{t("scpi_no_dividends")}</p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
+              <ScpiSettings
+                t={t}
+                displayAsset={displayAsset}
+                today={today}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+              />
             )}
 
             {isCompany && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">{t("company_details")}</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {(() => {
-                    const company = parseCompanyMetadata(asset.metadata);
-                    return (
-                      <>
-                        <DetailField label={t("company_legal_name")} value={company.legal_name} />
-                        <DetailField
-                          label={t("company_entity_type")}
-                          value={t(ENTITY_TYPE_LABEL_KEYS[company.entity_type])}
-                        />
-                        <DetailField label={t("company_jurisdiction")} value={company.jurisdiction} />
-                        <DetailField
-                          label={t("company_registration_number")}
-                          value={company.registration_number}
-                        />
-                        <DetailField label={t("company_industry")} value={company.industry} />
-                        <DetailField label={t("company_role")} value={company.role} />
-                        <DetailField
-                          label={t("company_ownership_percentage")}
-                          value={
-                            company.ownership_percentage != null
-                              ? maskValue(`${company.ownership_percentage}%`)
-                              : null
-                          }
-                        />
-                        <DetailField
-                          label={t("company_held_via")}
-                          value={
-                            company.held_via === "holding"
-                              ? `${t("company_held_holding")}${company.holding_name ? ` · ${company.holding_name}` : ""}`
-                              : t("company_held_personal")
-                          }
-                        />
-                        <DetailField
-                          label={t("company_equity_value")}
-                          value={
-                            company.company_value != null
-                              ? maskValue(currencyFormatter.format(company.company_value))
-                              : null
-                          }
-                        />
-                        <DetailField
-                          label={t("company_valuation_date")}
-                          value={company.valuation_date || company.valuation_method || null}
-                        />
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
+              <CompanySettings
+                t={t}
+                asset={asset}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+              />
             )}
 
             {isPrivateEquity && privateEquityMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">
-                    {t("private_equity_details")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <DetailField label={t("pe_manager")} value={privateEquityMetadata.manager} />
-                  <DetailField label={t("pe_strategy")} value={privateEquityMetadata.strategy} />
-                  <DetailField label={t("pe_vintage_year")} value={privateEquityMetadata.vintage_year} />
-                  <DetailField
-                    label={t("pe_lifecycle_stage")}
-                    value={t(STAGE_LABEL_KEYS[privateEquityMetadata.lifecycle_stage])}
-                  />
-                  <DetailField
-                    label={t("entity_name")}
-                    value={privateEquityMetadata.entity_name}
-                  />
-                  <DetailField
-                    label={t("share_class")}
-                    value={privateEquityMetadata.share_class}
-                  />
-                  <DetailField
-                    label={t("ownership_percentage")}
-                    value={
-                      privateEquityMetadata.ownership_percentage != null
-                        ? maskValue(`${privateEquityMetadata.ownership_percentage}%`)
-                        : null
-                    }
-                  />
-                </CardContent>
-              </Card>
+              <PrivateEquityDetailsSettings
+                t={t}
+                privateEquityMetadata={privateEquityMetadata}
+                maskValue={maskValue}
+              />
             )}
 
             {isPrivateEquity && privateEquityMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">{t("pe_commitment_heading")}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {(() => {
-                    const pe = privateEquityMetadata;
-                    const commitment = pe.commitment_amount;
-                    const called = calledCapital(pe);
-                    const unfunded = unfundedCommitment(pe);
-                    const pending = pendingCapitalCallsTotal(pe);
-                    const calledPct =
-                      commitment && commitment > 0 ? Math.min(100, (called / commitment) * 100) : null;
-                    const calls = [...pe.capital_calls].sort((a, b) =>
-                      a.due_date.localeCompare(b.due_date),
-                    );
-                    return (
-                      <>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                          <DetailField
-                            label={t("pe_commitment_amount")}
-                            value={commitment != null ? maskValue(currencyFormatter.format(commitment)) : null}
-                          />
-                          <DetailField
-                            label={t("pe_called_capital")}
-                            value={maskValue(currencyFormatter.format(called))}
-                          />
-                          <DetailField
-                            label={t("pe_unfunded")}
-                            value={maskValue(currencyFormatter.format(unfunded))}
-                          />
-                          <DetailField
-                            label={t("pe_distributions")}
-                            value={
-                              pe.distributions_to_date != null
-                                ? maskValue(currencyFormatter.format(pe.distributions_to_date))
-                                : null
-                            }
-                          />
-                          <DetailField
-                            label={t("pe_liability_counted")}
-                            value={maskValue(currencyFormatter.format(pending))}
-                          />
-                        </div>
-                        {calledPct != null && (
-                          <div className="space-y-1">
-                            <ProgressBar percent={calledPct} colorClassName="bg-primary" />
-                            <p className="text-xs text-muted-foreground">
-                              {t("pe_called_progress", { pct: calledPct.toFixed(1) })}
-                            </p>
-                          </div>
-                        )}
-                        {calls.length > 0 ? (
-                          <div className="overflow-x-auto border border-border">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="text-muted-foreground">{t("pe_call_date")}</TableHead>
-                                  <TableHead className="text-end text-muted-foreground">
-                                    {t("pe_call_amount")}
-                                  </TableHead>
-                                  <TableHead className="text-end text-muted-foreground">%</TableHead>
-                                  <TableHead className="text-muted-foreground">{t("pe_call_status")}</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {calls.map((call) => (
-                                  <TableRow key={call.id}>
-                                    <TableCell className="tabular-nums text-foreground">{call.due_date}</TableCell>
-                                    <TableCell className="text-end tabular-nums text-foreground">
-                                      {maskValue(currencyFormatter.format(call.amount))}
-                                    </TableCell>
-                                    <TableCell className="text-end tabular-nums text-muted-foreground">
-                                      {call.percentage ? `${call.percentage}%` : "—"}
-                                    </TableCell>
-                                    <TableCell
-                                      className={cn(
-                                        call.status === "paid" ? "text-success" : "text-foreground",
-                                        isOverdue(call, today) && "text-destructive",
-                                      )}
-                                    >
-                                      {call.status === "paid"
-                                        ? t("pe_call_paid")
-                                        : isOverdue(call, today)
-                                          ? t("pe_call_overdue")
-                                          : t("pe_call_pending")}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">{t("pe_no_calls")}</p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
+              <PrivateEquityCommitmentSettings
+                t={t}
+                privateEquityMetadata={privateEquityMetadata}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+                today={today}
+              />
             )}
 
             {isPrivateEquity &&
@@ -3989,45 +2942,17 @@ export function AssetDetailView({
               )}
 
             {isEquity && equityMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">
-                    {t("equity_details")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
-                  <DetailField label={t("exchange")} value={equityMetadata.exchange} />
-                  <DetailField
-                    label={t("shares_owned")}
-                    value={maskValue(displayAsset.quantity.toLocaleString(intlLocale))}
-                  />
-                  <DetailField
-                    label={t("average_cost_basis")}
-                    value={
-                      avgCostBasis != null
-                        ? maskValue(currencyFormatter.format(avgCostBasis))
-                        : null
-                    }
-                  />
-                  <DetailField
-                    label={t("current_price")}
-                    value={
-                      equityMetadata.last_unit_price != null
-                        ? maskValue(currencyFormatter.format(equityMetadata.last_unit_price))
-                        : null
-                    }
-                  />
-                  <DetailField
-                    label={t("total_value")}
-                    value={maskValue(currencyFormatter.format(displayAsset.current_value))}
-                  />
-                  <DetailField
-                    label={t("last_updated")}
-                    value={formatLastPricedAt(equityMetadata.last_priced_at)}
-                  />
-                </CardContent>
-              </Card>
+              <EquitySettings
+                t={t}
+                asset={asset}
+                equityMetadata={equityMetadata}
+                maskValue={maskValue}
+                displayAsset={displayAsset}
+                intlLocale={intlLocale}
+                avgCostBasis={avgCostBasis}
+                currencyFormatter={currencyFormatter}
+                formatLastPricedAt={formatLastPricedAt}
+              />
             )}
 
             {owners.length > 1 && <OwnershipSummary rows={owners} />}
@@ -4053,50 +2978,14 @@ export function AssetDetailView({
             )}
 
             {isPreciousMetal && metalMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">{t("metal_details")}</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <DetailField label={t("metal_type")} value={t(METAL_LABEL_KEYS[metalMetadata.metal])} />
-                  <DetailField label={t("metal_form")} value={t(METAL_FORM_LABEL_KEYS[metalMetadata.form])} />
-                  <DetailField label={t("quantity_pieces")} value={String(displayAsset.quantity)} />
-                  <DetailField
-                    label={t("metal_weight_per_unit")}
-                    value={
-                      metalMetadata.weight_per_unit != null
-                        ? `${metalMetadata.weight_per_unit} ${metalMetadata.weight_unit}`
-                        : null
-                    }
-                  />
-                  <DetailField label={t("metal_purity")} value={String(metalMetadata.purity)} />
-                  <DetailField
-                    label={t("metal_fine_weight_label")}
-                    value={`${fineTroyOunces(metalMetadata, displayAsset.quantity).toFixed(4)} oz t`}
-                  />
-                  <DetailField
-                    label={t("metal_premium")}
-                    value={metalMetadata.premium_pct != null ? `${metalMetadata.premium_pct}%` : null}
-                  />
-                  <DetailField
-                    label={t("metal_spot_per_oz")}
-                    value={
-                      metalMetadata.last_spot_price != null
-                        ? maskValue(currencyFormatter.format(metalMetadata.last_spot_price))
-                        : null
-                    }
-                  />
-                  <DetailField label={t("metal_serial")} value={metalMetadata.serial_number || null} />
-                  <DetailField
-                    label={t("metal_storage")}
-                    value={metalMetadata.storage_location || null}
-                  />
-                  <DetailField
-                    label={t("last_updated")}
-                    value={formatLastPricedAt(metalMetadata.last_priced_at)}
-                  />
-                </CardContent>
-              </Card>
+              <PreciousMetalSettings
+                t={t}
+                metalMetadata={metalMetadata}
+                displayAsset={displayAsset}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+                formatLastPricedAt={formatLastPricedAt}
+              />
             )}
 
             {isCash && !asset.is_liability && (
@@ -4104,54 +2993,15 @@ export function AssetDetailView({
             )}
 
             {isCrypto && cryptoMetadata && (
-              <Card className="border-border bg-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">
-                    {t("crypto_details")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <DetailField label={t("ticker_symbol")} value={asset.ticker_symbol} />
-                  <DetailField label={t("coingecko_id")} value={cryptoMetadata.coingecko_id} />
-                  <DetailField
-                    label={t("crypto_holding_source")}
-                    value={isWalletHolding ? t("crypto_source_wallet") : t("crypto_source_manual")}
-                  />
-                  {isWalletHolding ? (
-                    <>
-                      <DetailField
-                        label={t("crypto_wallet_chain")}
-                        value={cryptoMetadata.wallet_chain || null}
-                      />
-                      <DetailField
-                        label={t("crypto_wallet_address")}
-                        value={cryptoMetadata.wallet_address || null}
-                      />
-                      <DetailField
-                        label={t("wallet_last_synced")}
-                        value={formatLastPricedAt(cryptoMetadata.last_synced_at)}
-                      />
-                    </>
-                  ) : (
-                    <DetailField
-                      label={t("crypto_exchange_name")}
-                      value={cryptoMetadata.exchange_name || null}
-                    />
-                  )}
-                  <DetailField
-                    label={t("unit_price")}
-                    value={
-                      cryptoMetadata.last_unit_price != null
-                        ? maskValue(currencyFormatter.format(cryptoMetadata.last_unit_price))
-                        : null
-                    }
-                  />
-                  <DetailField
-                    label={t("last_updated")}
-                    value={formatLastPricedAt(cryptoMetadata.last_priced_at)}
-                  />
-                </CardContent>
-              </Card>
+              <CryptoSettings
+                t={t}
+                asset={asset}
+                cryptoMetadata={cryptoMetadata}
+                isWalletHolding={isWalletHolding}
+                formatLastPricedAt={formatLastPricedAt}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+              />
             )}
           </TabsContent>
         </Tabs>

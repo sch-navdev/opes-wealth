@@ -15,6 +15,13 @@
  * Avoiding double counting: if a company is held through a holding company that
  * you ALSO track as its own entry, value the holding company excluding that
  * subsidiary's stake — Net Worth sums every entry.
+ *
+ * Structures (trusts, foundations, SPVs, holding companies) can also hold
+ * NON-company assets: `held_asset_ids` lists the ids of the other assets and
+ * liabilities held through this entity. It is a reporting link only (see
+ * `lib/entity-lookthrough.ts`): it never changes any value or total. The same
+ * double-counting rule applies: if the entity's own recorded value already
+ * includes those assets, Net Worth counts them twice.
  */
 export type CompanyEntityType =
   | "llc"
@@ -23,6 +30,9 @@ export type CompanyEntityType =
   | "partnership"
   | "sole_proprietorship"
   | "holding"
+  | "trust"
+  | "foundation"
+  | "spv"
   | "other";
 
 export const COMPANY_ENTITY_TYPES: CompanyEntityType[] = [
@@ -32,6 +42,9 @@ export const COMPANY_ENTITY_TYPES: CompanyEntityType[] = [
   "partnership",
   "sole_proprietorship",
   "holding",
+  "trust",
+  "foundation",
+  "spv",
   "other",
 ];
 
@@ -57,6 +70,12 @@ export type CompanyMetadata = {
   company_value: number | null;
   valuation_method: string;
   valuation_date: string;
+  /**
+   * Ids of NON-company assets or liabilities held through this entity (a
+   * property, a brokerage account, a loan…). Company-to-company nesting uses
+   * `holding_company_id` on the child instead. Reporting link only.
+   */
+  held_asset_ids: string[];
 };
 
 export const EMPTY_COMPANY_METADATA: CompanyMetadata = {
@@ -74,11 +93,26 @@ export const EMPTY_COMPANY_METADATA: CompanyMetadata = {
   company_value: null,
   valuation_method: "",
   valuation_date: "",
+  held_asset_ids: [],
 };
 
+/** A list of unique, non-empty (trimmed) id strings, first occurrence kept; anything else gives []. */
+export function sanitizeHeldAssetIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const id = v.trim();
+    if (id) seen.add(id);
+  }
+  return [...seen];
+}
+
 export function parseCompanyMetadata(raw: unknown): CompanyMetadata {
-  if (!raw || typeof raw !== "object") return EMPTY_COMPANY_METADATA;
-  return { ...EMPTY_COMPANY_METADATA, ...(raw as Partial<CompanyMetadata>) };
+  // A fresh array every time, so a caller mutating the list can never change the shared default.
+  if (!raw || typeof raw !== "object") return { ...EMPTY_COMPANY_METADATA, held_asset_ids: [] };
+  const merged = { ...EMPTY_COMPANY_METADATA, ...(raw as Partial<CompanyMetadata>) };
+  return { ...merged, held_asset_ids: sanitizeHeldAssetIds((raw as Record<string, unknown>).held_asset_ids) };
 }
 
 /** Unmet requirements as translation keys. */

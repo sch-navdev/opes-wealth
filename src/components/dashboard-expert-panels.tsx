@@ -758,7 +758,7 @@ export function RatiosPanel({
                 {s.value}
               </p>
               {s.band ? (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
                   {s.band}
                 </span>
               ) : null}
@@ -766,7 +766,7 @@ export function RatiosPanel({
 
             <div className="space-y-1">
               <Gauge value={s.raw} cap={s.cap} />
-              <div aria-hidden className="flex justify-between text-[10px] tabular-nums text-muted-foreground">
+              <div aria-hidden className="flex justify-between text-xs tabular-nums text-muted-foreground">
                 <span>0</span>
                 <span>{s.capText}</span>
               </div>
