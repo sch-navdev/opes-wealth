@@ -117,6 +117,7 @@ High-net-worth individuals
 - [[Localization|Localization]] — English/French toggle (partial coverage)
 - [[Broker-Trade-Import|Broker Trade Import]] — Phase 2: Add Investments UI, Saxo Bank parser, Portfolio Performance chart. Fully live, migration `0011` applied.
 - [[Data-Quality|Data Quality]] — stale valuations, missing FX rates, cost-basis and balance checks, dashboard card and page
+- [[UHNW-Modules-Plan|UHNW Modules Plan]] — proposal (not built): wealth node map, private-market liquidity ledger, governance vault
 - [[Entity-Structures|Entity Structures & Look-through]] — trusts, foundations, SPVs, holdings held through entities, net-worth look-through
 - [[Changelog|Changelog]] — full chronological history
 
@@ -140,5 +141,5 @@ opes-wealth/
     ├── Portfolio-Dashboard.md, Profile-Settings.md, Real-Estate-Multi-Currency.md
     ├── CSV-Bank-Uploads.md, Broker-Trade-Import.md, Live-Pricing.md, Market-Data-Integration.md
     ├── Co-Ownership.md, Future-Projects.md, Demo-Mode.md, Privacy-Mode.md, Localization.md
-    └── Deployment.md, Codebase-Audits.md, Data-Quality.md, Entity-Structures.md, Changelog.md
+    └── Deployment.md, Codebase-Audits.md, Data-Quality.md, Entity-Structures.md, UHNW-Modules-Plan.md, Changelog.md
 ```

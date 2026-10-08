@@ -3121,6 +3121,8 @@ const dictionary = {
   theme_device: { en: "Device (follows your system)", fr: "Appareil (suit votre système)" },
   dlayout_block_allocation: { en: "Allocation dial", fr: "Cadran de répartition" },
   xattr_trend_title: { en: "{currency} against {base} over the last 12 months: {change}", fr: "{currency} face à {base} sur les 12 derniers mois : {change}" },
+  help_chat_welcome: { en: "Ask how to find a feature, add an asset, upload a bank statement or switch your view.", fr: "Demandez comment trouver une fonction, ajouter un actif, importer un relevé bancaire ou changer de vue." },
+  help_chat_privacy: { en: "Your messages are sent to an AI provider to answer you. Don't share passwords or account numbers. The assistant explains how to use the app; it does not give financial advice.", fr: "Vos messages sont envoyés à un fournisseur d'IA pour vous répondre. Ne partagez pas de mots de passe ni de numéros de compte. L'assistant explique comment utiliser l'application ; il ne donne pas de conseils financiers." },
 } as const;
 
 export type TranslationKey = keyof typeof dictionary;

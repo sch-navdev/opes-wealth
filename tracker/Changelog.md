@@ -261,3 +261,5 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-08: Basic tier luxury pass: metallic gold-edge hero card, larger net worth that counts up once per session (reduced-motion and Privacy Mode safe) - [[Design-System|Design System]]
 - 2026-10-08: Standard and Professional tiers: bento, key-figure, data-quality and allocation cards get a gold border highlight that follows the pointer (one shared listener, off on touch and reduced motion) - [[Design-System|Design System]]
 - 2026-10-08: Expert tier: terminal-dense sticky-header tables in Plex Mono and 12-month FX sparklines in the currency-vs-capital panel - [[Design-System|Design System]]
+- 2026-10-08: Help chat now streams from Groq (Llama 3.3 70B) via `/api/chat` with the AI SDK `useChat` hook and the Opes Wealth support prompt; screenshot attach and bug logging removed from the widget - [[Architecture|Architecture]]
+- 2026-10-08: UHNW modules technical plan (wealth node map, private-market liquidity ledger, governance vault) written for approval, nothing built - [[UHNW-Modules-Plan|UHNW Modules Plan]]

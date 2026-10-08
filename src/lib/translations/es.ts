@@ -2272,4 +2272,6 @@ export const es: Record<string, string> = {
   "theme_device": "Dispositivo (sigue su sistema)",
   "dlayout_block_allocation": "Esfera de distribución",
   "xattr_trend_title": "{currency} frente a {base} en los últimos 12 meses: {change}",
+  "help_chat_welcome": "Pregunte cómo encontrar una función, añadir un activo, subir un extracto bancario o cambiar de vista.",
+  "help_chat_privacy": "Sus mensajes se envían a un proveedor de IA para responderle. No comparta contraseñas ni números de cuenta. El asistente explica cómo usar la aplicación; no ofrece asesoramiento financiero.",
 };

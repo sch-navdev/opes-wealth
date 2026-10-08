@@ -2272,4 +2272,6 @@ export const zh: Record<string, string> = {
   "theme_device": "设备（跟随系统）",
   "dlayout_block_allocation": "配置表盘",
   "xattr_trend_title": "过去12个月{currency}兑{base}：{change}",
+  "help_chat_welcome": "您可以询问如何找到某项功能、添加资产、上传银行对账单或切换视图。",
+  "help_chat_privacy": "您的消息会发送给AI服务商以便回复。请勿分享密码或账号。助手只讲解如何使用本应用，不提供财务建议。",
 };

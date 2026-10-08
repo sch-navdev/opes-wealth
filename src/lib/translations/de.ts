@@ -2272,4 +2272,6 @@ export const de: Record<string, string> = {
   "theme_device": "Gerät (folgt Ihrem System)",
   "dlayout_block_allocation": "Verteilungs-Zifferblatt",
   "xattr_trend_title": "{currency} gegenüber {base} in den letzten 12 Monaten: {change}",
+  "help_chat_welcome": "Fragen Sie, wie Sie eine Funktion finden, einen Vermögenswert hinzufügen, einen Kontoauszug hochladen oder die Ansicht wechseln.",
+  "help_chat_privacy": "Ihre Nachrichten werden zur Beantwortung an einen KI-Anbieter gesendet. Teilen Sie keine Passwörter oder Kontonummern. Der Assistent erklärt die Bedienung der App und gibt keine Finanzberatung.",
 };
