@@ -140,6 +140,45 @@
     0 0 44px -22px color-mix(in oklab, var(--primary) 55%, transparent);
 }
 
+/* Lit border for the Standard / Professional / Expert tiles: on hover or keyboard focus a gold highlight
+   follows the pointer along the one-pixel border (position from components/pointer-light.tsx; the middle of the
+   card until the pointer moves). Pure CSS: a masked ::after that shows only the border ring. Off on touch
+   screens and under reduced motion, where the whole border simply turns gold instead. */
+.lit {
+  position: relative;
+  transition: border-color 0.2s ease;
+}
+.lit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), var(--primary), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.lit:hover::after,
+.lit:focus-within::after {
+  opacity: 1;
+}
+.lit:hover,
+.lit:focus-within {
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+}
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .lit::after {
+    display: none;
+  }
+  .lit:hover,
+  .lit:focus-within {
+    border-color: color-mix(in oklab, var(--primary) 70%, transparent);
+  }
+}
+
 /* Help chat screenshots: while capturing with "blur amounts" on, every amount is blurred. */
 .help-capture-mask .tabular-nums {
   filter: blur(6px);

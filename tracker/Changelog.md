@@ -259,3 +259,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-08: Partition bar for narrow screens (replaces the dial below 520 px), tick ruler on the exposure bar and a Chronograph login panel - [[Design-System|Design System]]
 - 2026-10-08: Allocation dial now on every tier: shared allocation card (Basic overview) and a new `allocation` dashboard block from Standard up, nine-language label - [[Portfolio-Dashboard|Portfolio Dashboard]]
 - 2026-10-08: Basic tier luxury pass: metallic gold-edge hero card, larger net worth that counts up once per session (reduced-motion and Privacy Mode safe) - [[Design-System|Design System]]
+- 2026-10-08: Standard and Professional tiers: bento, key-figure, data-quality and allocation cards get a gold border highlight that follows the pointer (one shared listener, off on touch and reduced motion) - [[Design-System|Design System]]

@@ -573,7 +573,7 @@ export default async function DashboardPage({
         breakdowns={breakdowns}
       />
     ),
-    allocation: <AllocationCard allocation={basicAllocation} compact />,
+    allocation: <AllocationCard allocation={basicAllocation} compact className="lit" />,
     dataQuality: <DataQualityCard report={dataQuality} />,
     cashFlow: (
       <>

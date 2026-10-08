@@ -55,7 +55,7 @@ export function DataQualityCard({ report }: { report: DataQualityReport }) {
   return (
     <section aria-label={t("dq_title")} data-testid="data-quality-card">
       <Card
-        className="animate-in fade-in slide-in-from-bottom-2 border-border bg-card motion-reduce:animate-none"
+        className="lit animate-in fade-in slide-in-from-bottom-2 border-border bg-card motion-reduce:animate-none"
         style={tileEntranceStyle(motion, 0)}
       >
         <CardContent className="flex flex-col gap-4">

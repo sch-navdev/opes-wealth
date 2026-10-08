@@ -75,7 +75,7 @@ export function DashboardBento({
   return (
     <section aria-label={t("bento_aria")} className="grid grid-cols-1 gap-4 lg:grid-cols-4">
       <Card
-        className="animate-in fade-in slide-in-from-bottom-2 gap-4 overflow-hidden border-border bg-card py-5 motion-reduce:animate-none sm:col-span-1 lg:col-span-2 lg:row-span-2"
+        className="lit animate-in fade-in slide-in-from-bottom-2 gap-4 overflow-hidden border-border bg-card py-5 motion-reduce:animate-none sm:col-span-1 lg:col-span-2 lg:row-span-2"
         style={tileEntranceStyle(motion, 0)}
       >
         <div className="px-5">
@@ -128,7 +128,7 @@ export function DashboardBento({
           <Card
             key={tile.category}
             className={cn(
-              "animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 motion-reduce:animate-none",
+              "lit animate-in fade-in slide-in-from-bottom-2 gap-3 border-border bg-card py-5 motion-reduce:animate-none",
               // Third tile spans the full row width beside the hero on lg.
               index === 2 && "lg:col-span-2",
             )}

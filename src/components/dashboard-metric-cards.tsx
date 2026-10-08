@@ -73,7 +73,7 @@ function MetricCard({
       className="rounded-xl text-start outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Card
-        className="h-full border-border bg-card transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300 hover:bg-muted motion-reduce:animate-none"
+        className="lit h-full border-border bg-card transition-colors animate-in fade-in slide-in-from-bottom-2 duration-300 hover:bg-muted motion-reduce:animate-none"
         style={{ animationDelay: `${animationDelayMs}ms`, animationFillMode: "backwards" }}
       >
         <CardContent className="flex items-center justify-between gap-4 py-4">

@@ -20,6 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, Check, EyeOff, GripVertical, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PointerLight } from "@/components/pointer-light";
 import { useDashboardLayout } from "@/components/dashboard-layout-provider";
 import { blockLabelKey, useDashboardLayoutText } from "@/components/dashboard-layout-text";
 import { useTierMotion } from "@/components/tier-gate";
@@ -86,6 +87,7 @@ export function DashboardLayoutGrid({ content }: { content: DashboardBlockConten
 
   return (
     <>
+      <PointerLight />
       {/* Always mounted so assistive tech announces the save result when it appears. */}
       <p
         role="status"
