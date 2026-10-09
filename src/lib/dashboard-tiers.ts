@@ -23,6 +23,7 @@ export type DashboardSection =
   | "portfolio"
   | "futureProjects"
   | "incomeCalendar"
+  | "scpi"
   | "export"
   | "expertPanels";
 
@@ -42,6 +43,7 @@ export const SECTION_TIERS: Record<DashboardSection, TierRange> = {
   portfolio: { min: "standard" },
   futureProjects: { min: "professional" },
   incomeCalendar: { min: "professional" },
+  scpi: { min: "standard" },
   export: { min: "professional" },
   expertPanels: { min: "expert" },
 };

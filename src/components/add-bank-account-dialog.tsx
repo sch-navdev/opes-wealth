@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { InstitutionLogo } from "@/components/institution-logo";
 import { addBankAccount } from "@/app/dashboard/actions";
+import { useCompanyCashText } from "@/components/company-cash-text";
 import { useLanguage } from "@/context/language-context";
 import { BANK_ACCOUNT_TYPES, OTHER_BANK, type BankAccountType } from "@/lib/bank-account";
 import { BANK_COUNTRIES, banksByCountry, getBank } from "@/lib/banking/institutions";
@@ -31,6 +32,8 @@ import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import type { TranslationKey } from "@/lib/i18n";
 
 const todayIso = new Date().toISOString().slice(0, 10);
+/** Select value of "no company" (Radix Select cannot hold an empty value). */
+const NO_COMPANY = "__none__";
 
 const TYPE_LABEL_KEYS: Record<BankAccountType, TranslationKey> = {
   checking: "bank_account_type_checking",
@@ -47,8 +50,20 @@ const TYPE_LABEL_KEYS: Record<BankAccountType, TranslationKey> = {
  * account reference that lets imported CSV statements find the account.
  * Credit cards are saved as a liability (amount owed), everything else as Cash.
  */
-export function AddBankAccountDialog({ trigger }: { trigger?: React.ReactNode }) {
+export function AddBankAccountDialog({
+  trigger,
+  companies,
+  defaultCompanyId,
+}: {
+  trigger?: React.ReactNode;
+  /** The user's Company entities: when given (and not empty) the form offers an optional "Company" link. */
+  companies?: { id: string; name: string }[];
+  /** Preselected company (e.g. the "Add company bank account" button of a company on the Companies page). */
+  defaultCompanyId?: string;
+}) {
   const { t, intlLocale } = useLanguage();
+  const cco = useCompanyCashText();
+  const [companyId, setCompanyId] = useState(defaultCompanyId ?? NO_COMPANY);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -84,6 +99,7 @@ export function AddBankAccountDialog({ trigger }: { trigger?: React.ReactNode })
     setAsOf(todayIso);
     setAccountRef("");
     setCreditLimit("");
+    setCompanyId(defaultCompanyId ?? NO_COMPANY);
     setError(null);
   }
 
@@ -126,6 +142,9 @@ export function AddBankAccountDialog({ trigger }: { trigger?: React.ReactNode })
     formData.set("purchase_date", asOf);
     if (accountRef.trim()) formData.set("account_ref", accountRef.trim());
     if (isCard && creditLimit.trim()) formData.set("credit_limit", creditLimit);
+    if (!isCard && companyId !== NO_COMPANY && companies?.some((c) => c.id === companyId)) {
+      formData.set("company_id", companyId);
+    }
 
     startTransition(async () => {
       const result = await addBankAccount(formData);
@@ -311,6 +330,26 @@ export function AddBankAccountDialog({ trigger }: { trigger?: React.ReactNode })
           </div>
 
           {isCard && <p className="text-xs text-muted-foreground">{t("bank_account_card_note")}</p>}
+
+          {!isCard && companies && companies.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="bank_account_company">{cco("cco_company_label")}</Label>
+              <Select value={companyId} onValueChange={setCompanyId}>
+                <SelectTrigger id="bank_account_company" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_COMPANY}>{cco("cco_company_none")}</SelectItem>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{cco("cco_company_hint")}</p>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-destructive" role="alert">

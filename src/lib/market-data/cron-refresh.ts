@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AssetHistorySource } from "@/lib/asset-history";
+import { isMissingColumnError, type AssetHistorySource } from "@/lib/asset-history";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import { normalizeExchange, parseEquityMetadata } from "@/lib/equities";
 import { parseCryptoMetadata } from "@/lib/crypto";
@@ -81,26 +81,40 @@ export type HistoryUpsertRow = {
   value: number;
   net_equity: number | null;
   source: AssetHistorySource;
+  /** File name of the import this row came from (migration 0041); dropped automatically while the column does not exist yet. */
+  source_ref?: string | null;
 };
 
 /**
  * Upserts `asset_history` rows on (asset_id, recorded_date), in chunks. On a
  * CHECK violation (`23514`: the live `asset_history_source_check` can lag the
  * app's `AssetHistorySource` union, migration 0015) the chunk is retried as
- * `manual`, the one value every version of the constraint allows. Returns the
- * error rather than throwing.
+ * `manual`, the one value every version of the constraint allows (`source_ref` is kept). A missing
+ * `source_ref` column (migration 0041 not applied) retries the chunk without it. Returns the error
+ * rather than throwing.
  */
 export async function upsertHistoryRowsWithFallback(supabase: SupabaseClient, rows: HistoryUpsertRow[]) {
   if (rows.length === 0) return null;
   const write = (batch: HistoryUpsertRow[]) =>
     supabase.from("asset_history").upsert(batch, { onConflict: "asset_id,recorded_date" });
+  const withoutRef = (batch: HistoryUpsertRow[]) =>
+    batch.map((r) => {
+      const { source_ref: _ref, ...rest } = r;
+      void _ref;
+      return rest as HistoryUpsertRow;
+    });
 
   const CHUNK = 500;
   for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
-    let { error } = await write(chunk);
+    let batch = rows.slice(i, i + CHUNK);
+    let { error } = await write(batch);
+    // Migration 0041 not applied yet: the file name cannot be stored, the rows still can.
+    if (isMissingColumnError(error, "source_ref")) {
+      batch = withoutRef(batch);
+      ({ error } = await write(batch));
+    }
     if (error?.code === "23514") {
-      ({ error } = await write(chunk.map((r) => ({ ...r, source: "manual" as AssetHistorySource }))));
+      ({ error } = await write(batch.map((r) => ({ ...r, source: "manual" as AssetHistorySource }))));
     }
     if (error) return error;
   }

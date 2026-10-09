@@ -11,6 +11,7 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { Button } from "@/components/ui/button";
 import { CompaniesStructure } from "@/components/companies-structure";
 import { CompaniesSummary } from "@/components/companies-summary";
+import { CompaniesCash, companyCashTotal, type CompanyCashGroup } from "@/components/companies-cash";
 import { EntityLookthroughViews } from "@/components/entity-map-switcher";
 import { T } from "@/components/translated-text";
 import { buildHoldingStructure, parseCompanyMetadata } from "@/lib/companies";
@@ -19,6 +20,10 @@ import {
   buildHoldingOptions,
   type LookthroughAssetRow,
 } from "@/lib/entity-lookthrough";
+import { companyIdSet, splitCashByCompany } from "@/lib/company-cash";
+import { pickBalanceDate } from "@/lib/bank-staleness";
+import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
 
 type CompanyRow = {
@@ -107,6 +112,28 @@ export default async function CompaniesPage({
   const manageableEntityIds = rows
     .filter((r) => (r as AssetRow).profile_id === user.id && (factors.get(r.id) ?? 1) === 1)
     .map((r) => r.id);
+
+  // Company cash: Cash accounts linked to a company (metadata.company_id). In net worth, apart from the
+  // company's value (a company can be sold without its cash); NOT personal cash anywhere else in the app.
+  const { byCompany } = splitCashByCompany(allAssets, companyIdSet(allAssets));
+  const cashIds = [...byCompany.values()].flat().map((a) => a.id);
+  const dateSources = await loadBalanceDateSources(supabase as unknown as SupabaseClient, cashIds);
+  const cashGroups: CompanyCashGroup[] = rows.map((company) => ({
+    companyId: company.id,
+    companyName: company.name,
+    accounts: (byCompany.get(company.id) ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      currency: a.currency,
+      nativeValue: a.current_value,
+      baseValue: convertToBaseCurrency(a.current_value, a.currency, baseCurrency, rates),
+      institutionName: typeof a.metadata?.institution_name === "string" ? a.metadata.institution_name : undefined,
+      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id) }),
+    })),
+  }));
+  const totalCompanyCash = companyCashTotal(cashGroups.flatMap((g) => g.accounts));
+  const today = new Date().toISOString().slice(0, 10);
+
   const baseValues: Record<string, number> = {};
   let totalStake = 0;
   let totalEquity = 0;
@@ -154,7 +181,9 @@ export default async function CompaniesPage({
             totalStake={totalStake}
             totalEquity={totalEquity}
             baseCurrency={baseCurrency}
+            companyCash={totalCompanyCash}
           />
+          <CompaniesCash groups={cashGroups} baseCurrency={baseCurrency} today={today} />
           <CompaniesStructure
             structure={structure}
             baseValues={baseValues}

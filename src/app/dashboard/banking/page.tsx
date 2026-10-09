@@ -10,6 +10,8 @@ import { BankingOverview, type BankingAccountRow } from "@/components/banking-ov
 import { T } from "@/components/translated-text";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
+import { accountCountry, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
+import { companyIdOf } from "@/lib/company-cash";
 import { pickBalanceDate } from "@/lib/bank-staleness";
 import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
@@ -73,6 +75,23 @@ export default async function BankingPage({
         .returns<CashRow[]>()
     : { data: [] as CashRow[] };
 
+  // Company bank accounts (metadata.company_id): the name of the company they belong to. A link to a company that
+  // no longer exists is ignored, so the account is listed with the personal ones.
+  const linkedCompanyIds = [...new Set((cash ?? []).map((a) => companyIdOf(a.metadata)).filter(Boolean))];
+  const companyNameById = new Map<string, string>();
+  if (linkedCompanyIds.length > 0) {
+    const { data: companyRows } = await supabase
+      .from("assets")
+      .select("id, name, asset_categories(name)")
+      .in("id", linkedCompanyIds)
+      .eq("profile_id", user.id)
+      .eq("status", "active")
+      .returns<{ id: string; name: string; asset_categories: { name: string } | null }[]>();
+    for (const c of companyRows ?? []) {
+      if (c.asset_categories?.name === "Companies") companyNameById.set(c.id, c.name);
+    }
+  }
+
   // If migration 0020 isn't applied this returns nothing and the view is manual-only.
   const { data: links } = await supabase
     .from("bank_account_links")
@@ -96,10 +115,13 @@ export default async function BankingPage({
     const link = linkByAsset.get(a.id);
     const profileId = typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : "";
     const ref = typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : "";
+    const institution =
+      link?.bank_connections?.institution_name ?? (institutionOfMetadata(a.metadata) || getBankProfile(profileId)?.name) ?? "";
     rows.push({
       key: a.id,
       name: a.name,
-      institution: link?.bank_connections?.institution_name ?? getBankProfile(profileId)?.name ?? "",
+      institution,
+      country: accountCountry(a.metadata, institution) || undefined,
       masked: link?.masked_number ?? (ref ? `••••${ref.replace(/[^0-9A-Za-z]/g, "").slice(-4)}` : ""),
       currency: a.currency,
       balance: a.current_value,
@@ -110,6 +132,7 @@ export default async function BankingPage({
       lastError: link?.last_sync_error ?? null,
       assetId: a.id,
       balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at }),
+      companyName: companyNameById.get(companyIdOf(a.metadata)),
     });
   }
 
@@ -122,6 +145,7 @@ export default async function BankingPage({
         key: `sandbox-${i}-${l.masked_number ?? ""}`,
         name: l.account_label ?? "Account",
         institution: l.bank_connections?.institution_name ?? "",
+        country: countryOfInstitutionName(l.bank_connections?.institution_name ?? "") || undefined,
         masked: l.masked_number ?? "",
         currency: currencyCode,
         balance,
@@ -135,7 +159,7 @@ export default async function BankingPage({
 
   const accounts = (cash ?? []).map((a) => ({
     id: a.id,
-    name: a.name,
+    name: companyNameById.get(companyIdOf(a.metadata)) ? `${a.name} (${companyNameById.get(companyIdOf(a.metadata))})` : a.name,
     currency: a.currency,
     nativeValue: a.current_value,
     bankProfile: typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : undefined,

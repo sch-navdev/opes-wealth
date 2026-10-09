@@ -47,6 +47,7 @@ const REGISTRY = [
   { id: "dataQuality", section: "dataQuality", defaultSize: "m", allowedSizes: M_UP },
   { id: "cashFlow", section: "cashFlow", defaultSize: "full", allowedSizes: M_UP },
   { id: "incomeCalendar", section: "incomeCalendar", defaultSize: "full", allowedSizes: L_UP },
+  { id: "scpi", section: "scpi", defaultSize: "m", allowedSizes: M_UP },
   { id: "csvUpload", section: "csvUpload", defaultSize: "full", allowedSizes: M_UP },
   { id: "futureProjects", section: "futureProjects", defaultSize: "full", allowedSizes: L_UP },
   { id: "analytics", section: "analytics", defaultSize: "full", allowedSizes: L_UP },

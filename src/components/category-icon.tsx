@@ -34,6 +34,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Startups: Rocket,
   Companies: Factory,
   Cash: Banknote,
+  "Company cash": Banknote,
   Liabilities: CreditCard,
   SCPI: Landmark,
   "Assurance-Vie": ShieldCheck,

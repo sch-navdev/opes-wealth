@@ -1,7 +1,8 @@
 "use client";
 
 import { useLanguage } from "@/context/language-context";
-import { formatPercentPoints } from "@/lib/money-parts";
+import { useScpiText } from "@/components/scpi-text";
+import { formatDecimal, formatPercentPoints } from "@/lib/money-parts";
 import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
@@ -23,9 +24,15 @@ import { SCPI_MODE_LABEL_KEYS } from "@/components/scpi-fields";
 import {
   parseScpiMetadata,
   scpiAverageYield,
+  scpiCurrentSubscriptionPrice,
+  scpiEnjoymentDelayMonths,
   scpiEntryFees,
+  scpiIndicatorHistory,
   scpiInvested,
   scpiReceived,
+  scpiRevalorisationSteps,
+  scpiSaleVsPurchase,
+  scpiTotalRevalorisationPct,
   scpiTrailingYield,
   scpiWithdrawalValue,
 } from "@/lib/scpi";
@@ -50,6 +57,7 @@ export function ScpiSettings({
   currencyFormatter: MoneyFormatter;
 }) {
   const { intlLocale } = useLanguage();
+  const st = useScpiText();
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -65,6 +73,12 @@ export function ScpiSettings({
           const average = scpiAverageYield(scpi);
           const dividends = [...scpi.dividends].sort((a, b) => b.date.localeCompare(a.date));
           const money = (n: number) => maskValue(currencyFormatter.format(n));
+          const delayMonths = scpiEnjoymentDelayMonths(scpi.subscription_date, scpi.jouissance_date);
+          const mds = scpiCurrentSubscriptionPrice(scpi);
+          const totalReval = scpiTotalRevalorisationPct(scpi);
+          const saleVsPurchase = scpiSaleVsPurchase(scpi, displayAsset.quantity);
+          const revalSteps = scpiRevalorisationSteps(scpi);
+          const indicatorRows = scpiIndicatorHistory(scpi);
           return (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -86,7 +100,33 @@ export function ScpiSettings({
                   value={unit != null ? money(unit) : null} />
                 <DetailField label={t("scpi_invested")} value={money(invested)} />
                 <DetailField label={t("scpi_fees_paid")} value={money(fees)} />
+                <DetailField label={st("scpi2_subscription_date")} value={scpi.subscription_date || null} />
                 <DetailField label={t("scpi_jouissance_date")} value={scpi.jouissance_date || null} />
+                <DetailField
+                  label={st("scpi2_enjoyment_delay")}
+                  value={
+                    delayMonths != null
+                      ? st("scpi2_months", { months: formatDecimal(delayMonths, intlLocale, 1) })
+                      : null
+                  } />
+                <DetailField label={st("scpi2_register")} value={scpi.register_numbers || null} />
+                <DetailField
+                  label={st("scpi2_reval_current")}
+                  value={mds != null ? money(mds) : null} />
+                <DetailField
+                  label={st("scpi2_reval_total")}
+                  value={
+                    totalReval != null
+                      ? `${totalReval >= 0 ? "+" : ""}${formatDecimal(totalReval, intlLocale, 2)}%`
+                      : null
+                  } />
+                <DetailField
+                  label={st("scpi2_sale_vs_purchase")}
+                  value={
+                    saleVsPurchase
+                      ? `${money(saleVsPurchase.total)} (${saleVsPurchase.pct >= 0 ? "+" : ""}${formatDecimal(saleVsPurchase.pct, intlLocale, 2)}%)`
+                      : null
+                  } />
                 <DetailField
                   label={t("scpi_financed_by_credit")}
                   value={scpi.financed_by_credit ? t("yes") : t("no")} />
@@ -111,6 +151,55 @@ export function ScpiSettings({
                     .join(" · ")}
                 </p>
               )}
+              {scpi.name_source === "manual" && (
+                <p className="text-xs text-muted-foreground">{st("scpi2_unverified_note")}</p>
+              )}
+              {revalSteps.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">{st("scpi2_reval_heading")}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {revalSteps
+                      .map(
+                        (s) =>
+                          `${s.date}: ${money(s.price)}${s.changePct != null ? ` (${s.changePct >= 0 ? "+" : ""}${formatDecimal(s.changePct, intlLocale, 2)}%)` : ""}`,
+                      )
+                      .join(" · ")}
+                  </p>
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">{st("scpi2_ind_heading")}</p>
+                {indicatorRows.length > 0 ? (
+                  <div className="overflow-x-auto border border-border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-muted-foreground">{st("scpi2_ind_asof")}</TableHead>
+                          <TableHead className="text-end text-muted-foreground">{st("scpi2_vdrec")}</TableHead>
+                          <TableHead className="text-end text-muted-foreground">{st("scpi2_vdrea")}</TableHead>
+                          <TableHead className="text-muted-foreground">{st("scpi2_ind_source")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {indicatorRows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="tabular-nums text-foreground">{row.as_of}</TableCell>
+                            <TableCell className="text-end tabular-nums text-foreground">
+                              {row.vdrec != null ? money(row.vdrec) : "—"}
+                            </TableCell>
+                            <TableCell className="text-end tabular-nums text-foreground">
+                              {row.vdrea != null ? money(row.vdrea) : "—"}
+                            </TableCell>
+                            <TableCell className="text-foreground">{row.source_note || "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{st("scpi2_ind_empty")}</p>
+                )}
+              </div>
               {dividends.length > 0 ? (
                 <div className="overflow-x-auto border border-border">
                   <Table>

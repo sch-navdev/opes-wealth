@@ -1,3 +1,4 @@
+import { companyIdsOf, displayCategory } from "@/lib/company-cash";
 import { convertToBaseCurrency } from "@/lib/fx";
 
 /**
@@ -11,6 +12,8 @@ import { convertToBaseCurrency } from "@/lib/fx";
  *  - Liability rows are skipped; negative or non-finite values are ignored.
  */
 export type RetirementHolding = {
+  id?: string;
+  metadata?: Record<string, unknown> | null;
   currency: string;
   current_value: number;
   is_liability: boolean;
@@ -50,9 +53,11 @@ export function buildInvestableBreakdown(
   rates: Record<string, number>,
 ): CategoryAmount[] {
   const byCategory = new Map<string, number>();
+  const companyIds = companyIdsOf(holdings);
   for (const h of holdings) {
     if (h.is_liability) continue;
-    const category = h.asset_categories?.name;
+    // A company's bank account is its own row ("Company cash"): not switched on by default, never inside "Cash".
+    const category = h.asset_categories?.name ? displayCategory(h, companyIds) : undefined;
     if (!category || category === "Liabilities") continue;
     const amount = convertToBaseCurrency(h.current_value, h.currency, base, rates);
     if (!Number.isFinite(amount) || amount <= 0) continue;

@@ -244,3 +244,40 @@ describe("CsvDropzone", () => {
     expect(action.readBankStatementPdf).not.toHaveBeenCalled();
   });
 });
+
+describe("CsvDropzone multi-select (opt-in with onFiles)", () => {
+  function setupMulti() {
+    const onParsed = vi.fn<(f: ParsedCsvFile) => void>();
+    const onFiles = vi.fn<(files: File[]) => void>();
+    const view = render(
+      <LanguageProvider>
+        <CsvDropzone onParsed={onParsed} onFiles={onFiles} />
+      </LanguageProvider>,
+    );
+    const input = view.container.querySelector('input[type="file"]') as HTMLInputElement;
+    return { onParsed, onFiles, input };
+  }
+
+  it("stays single-file without onFiles", () => {
+    const { input } = setup();
+    expect(input.multiple).toBe(false);
+  });
+
+  it("hands several files to onFiles, capped at 30 with a message", () => {
+    const { onFiles, onParsed, input } = setupMulti();
+    expect(input.multiple).toBe(true);
+    const files = Array.from({ length: 31 }, (_, i) => new File(["a,b\n1,2\n"], `f${i}.csv`, { type: "text/csv" }));
+    fireEvent.change(input, { target: { files } });
+    expect(onFiles).toHaveBeenCalledTimes(1);
+    expect(onFiles.mock.calls[0][0]).toHaveLength(30);
+    expect(onParsed).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Only the first 30 files were kept (31 selected).");
+  });
+
+  it("reads exactly one file the normal way", async () => {
+    const { onFiles, onParsed, input } = setupMulti();
+    fireEvent.change(input, { target: { files: [new File(["Date,Amount\n2026-01-01,5\n"], "one.csv", { type: "text/csv" })] } });
+    await waitFor(() => expect(onParsed).toHaveBeenCalledTimes(1));
+    expect(onFiles).not.toHaveBeenCalled();
+  });
+});

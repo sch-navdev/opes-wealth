@@ -35,8 +35,17 @@
  * `holding_company_id` for nesting), is ignored with a warning. An entity with
  * BOTH a non-zero own value AND linked holdings gets an informational flag: if
  * its value already includes those assets, net worth counts them twice.
+ *
+ * COMPANY BANK ACCOUNTS (`lib/company-cash.ts`): a Cash account whose metadata `company_id` is a visible
+ * Company is kept by THAT company, as an implicit link, before any `held_asset_ids` is read: `company_id`
+ * wins. If another entity also lists the account in its `held_asset_ids` the usual duplicate_link warning is
+ * raised for that other entity (the same entity listing it too is silently merged). The account keeps its Cash
+ * category in the breakdown and is flagged `isCompanyAccount`; `companyCash` is their sum. This never changes
+ * a value: the company's cash is separate from the company's value (no double-count switch), and the
+ * possible-double-count flag only looks at links the user typed in `held_asset_ids`.
  */
 import { buildHoldingStructure, type CompanyEntityType, type CompanyNode } from "@/lib/companies";
+import { companyIdOf } from "@/lib/company-cash";
 import { convertToBaseCurrency } from "@/lib/fx";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
 
@@ -65,6 +74,8 @@ export type LookthroughHolding = {
   nativeValue: number;
   /** Net-worth contribution in the Base Currency (negative for a liability). */
   value: number;
+  /** A Cash account linked to this entity through its `company_id` (company cash, not personal cash). */
+  isCompanyAccount: boolean;
 };
 
 export type LookthroughBreakdownRow = { category: string; value: number };
@@ -94,6 +105,10 @@ export type LookthroughEntity = {
   linkedIds: string[];
   /** Non-zero own value AND linked holdings: the own value may already include them. */
   possibleDoubleCount: boolean;
+  /** Σ of this entity's own company accounts (not its sub-entities'), Base Currency. */
+  companyCash: number;
+  /** Σ companyCash over this entity and all its sub-entities. */
+  companyCashSubtotal: number;
 };
 
 export type LookthroughWarning =
@@ -121,6 +136,8 @@ export type EntityLookthrough = {
   heldPersonally: number;
   /** Σ every row's net-worth contribution: the dashboard's Net Worth. */
   netWorth: number;
+  /** Σ every company bank account kept by an entity (already inside `heldThroughStructures` and `netWorth`). */
+  companyCash: number;
   /** Linked asset id -> the entity that keeps it. */
   holderByAssetId: Record<string, string>;
   /** Every row's net-worth contribution, Base Currency. */
@@ -173,9 +190,12 @@ export type HoldingOption = {
 
 /** The checklist for the "Manage holdings" dialog: every non-Company row, sorted by name, with its current holder. */
 export function buildHoldingOptions(assets: LookthroughAssetRow[], lookthrough: EntityLookthrough): HoldingOption[] {
-  const names = new Map(flattenEntities(lookthrough.roots).map((e) => [e.id, e.name]));
+  const entities = flattenEntities(lookthrough.roots);
+  const names = new Map(entities.map((e) => [e.id, e.name]));
+  // Company bank accounts are linked through their own company_id (set on the account), not through this list.
+  const companyAccounts = new Set(entities.flatMap((e) => e.holdings.filter((h) => h.isCompanyAccount).map((h) => h.id)));
   return assets
-    .filter((a) => a.category !== COMPANIES_CATEGORY)
+    .filter((a) => a.category !== COMPANIES_CATEGORY && !companyAccounts.has(a.id))
     .sort(byNameThenId)
     .map((a) => {
       const holderId = lookthrough.holderByAssetId[a.id];
@@ -223,8 +243,27 @@ export function buildEntityLookthrough(input: {
   const warnings: LookthroughWarning[] = [];
   const keeper = new Map<string, CompanyNode>();
   const kept = new Map<string, string[]>(); // entity id -> asset ids it keeps, in stored order
+  const companyAccountIds = new Set<string>();
+
+  // company_id wins: a company account is kept by its company before any held_asset_ids is read.
+  const nodeById = new Map<string, CompanyNode>();
+  const indexNodes = (node: CompanyNode) => {
+    nodeById.set(node.id, node);
+    node.children.forEach(indexNodes);
+  };
+  topLevel.forEach(indexNodes);
+  const ownCompanyAccounts = new Map<string, string[]>();
+  for (const a of assets) {
+    if (a.category !== "Cash" || a.is_liability) continue;
+    const owner = nodeById.get(companyIdOf(a.metadata));
+    if (!owner) continue; // orphan or unknown link: stays an ordinary (personal) account
+    keeper.set(a.id, owner);
+    companyAccountIds.add(a.id);
+    ownCompanyAccounts.set(owner.id, [...(ownCompanyAccounts.get(owner.id) ?? []), a.id]);
+  }
+
   const resolve = (node: CompanyNode) => {
-    const mine: string[] = [];
+    const mine: string[] = [...(ownCompanyAccounts.get(node.id) ?? [])];
     for (const assetId of node.metadata.held_asset_ids) {
       const row = rowById.get(assetId);
       if (!row) {
@@ -233,7 +272,9 @@ export function buildEntityLookthrough(input: {
         warnings.push({ kind: "company_link", assetId, assetName: row.name, entityId: node.id, entityName: node.name });
       } else {
         const first = keeper.get(assetId);
-        if (first) {
+        if (first && first.id === node.id) {
+          // The same entity lists its own company account too: already kept, nothing to report.
+        } else if (first) {
           warnings.push({
             kind: "duplicate_link",
             assetId,
@@ -268,11 +309,14 @@ export function buildEntityLookthrough(input: {
         isLiability: row.is_liability,
         nativeValue: nativeNetWorthContribution(row),
         value: valueById.get(id) ?? 0,
+        isCompanyAccount: companyAccountIds.has(id),
       };
     });
     const children = node.children.map((child) => build(child, depth + 1));
     const holdingsValue = holdings.reduce((s, h) => s + h.value, 0);
     const subtotal = ownValue + holdingsValue + children.reduce((s, c) => s + c.subtotal, 0);
+    const companyCash = holdings.filter((h) => h.isCompanyAccount).reduce((s, h) => s + h.value, 0);
+    const companyCashSubtotal = companyCash + children.reduce((s, c) => s + c.companyCashSubtotal, 0);
 
     const classes = new Map<string, number>();
     const add = (category: string, value: number) => classes.set(category, (classes.get(category) ?? 0) + value);
@@ -300,16 +344,21 @@ export function buildEntityLookthrough(input: {
       subtotal,
       breakdown,
       linkedIds: md.held_asset_ids,
-      possibleDoubleCount: ownValue !== 0 && holdings.length > 0,
+      // Only links typed in held_asset_ids can overlap with the entity's own value; a company account cannot.
+      possibleDoubleCount: ownValue !== 0 && holdings.some((h) => !h.isCompanyAccount),
+      companyCash,
+      companyCashSubtotal,
     };
   };
   const roots = topLevel.map((node) => build(node, 0));
 
   let netWorth = 0;
   let heldPersonally = 0;
+  let companyCash = 0;
   for (const a of assets) {
     const value = valueById.get(a.id) ?? 0;
     netWorth += value;
+    if (companyAccountIds.has(a.id)) companyCash += value;
     if (a.category !== COMPANIES_CATEGORY && !keeper.has(a.id)) heldPersonally += value;
   }
   const heldThroughStructures = roots.reduce((s, r) => s + r.subtotal, 0);
@@ -321,6 +370,7 @@ export function buildEntityLookthrough(input: {
     heldThroughStructures,
     heldPersonally,
     netWorth,
+    companyCash,
     holderByAssetId: Object.fromEntries([...keeper].map(([assetId, node]) => [assetId, node.id])),
     valueByAssetId: Object.fromEntries(valueById),
     warnings,

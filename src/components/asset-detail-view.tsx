@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { historySourceLabel, useBatchText } from "@/components/batch-import-text";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -88,6 +89,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VehicleExpenses } from "@/components/vehicle-expenses";
 
 import { AddAssetDialog } from "@/components/add-asset-dialog";
+import { EditBankAccountDialog } from "@/components/edit-bank-account-dialog";
+import { isImportedBankAccount } from "@/lib/banking/account-country";
 import { AddLiabilityDialog } from "@/components/add-liability-dialog";
 
 import { PeCashFlowChart } from "@/components/pe-cash-flow-chart";
@@ -197,7 +200,10 @@ import { useUiTier } from "@/components/tier-gate";
 import { useVaultText } from "@/components/vault/vault-text";
 import { tierRank } from "@/stores/useUiTierStore";
 import { VehicleOverviewCosts } from "@/components/asset-detail/vehicle-overview-costs";
-import { TaxLotsCard } from "@/components/tax-lots-card";
+import { ScpiOverviewCard } from "@/components/asset-detail/scpi-overview-card";
+import { AssetAnalysis } from "@/components/asset-detail/analysis";
+import { VehicleValuationChart } from "@/components/vehicle-valuation-chart";
+import type { AnalysisPortfolio } from "@/lib/asset-analysis/common";
 
 export type AssetDetail = {
   id: string;
@@ -220,6 +226,8 @@ export type AssetHistoryPoint = {
   value: number;
   net_equity: number | null;
   source: string;
+  /** File name of the import this row came from (migration 0041); absent before it is applied. */
+  source_ref?: string | null;
 };
 
 type Category = { id: string; name: string };
@@ -292,6 +300,7 @@ export function AssetDetailView({
   ownerFactor = 1,
   transactions = [],
   attribution = null,
+  analysisPortfolio = null,
 }: {
   /** The RAW whole-asset record (100% values). Forms, dialogs and server actions use this one. */
   asset: AssetDetail;
@@ -308,10 +317,13 @@ export function AssetDetailView({
   transactions?: StoredTransactionRow[];
   /** FX-vs-capital attribution (multi-currency holdings only), already scaled to the viewer's share. */
   attribution?: AssetAttributionView | null;
+  /** Portfolio figures for the Analysis tab (share of portfolio, linked accounts); null when not loaded. */
+  analysisPortfolio?: AnalysisPortfolio | null;
 }) {
   const router = useRouter();
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
+  const bt = useBatchText();
   // Governance Vault "Documents" tab: Professional tier and up (a UI preference; access is enforced server-side).
   const vt = useVaultText();
   const showVault = tierRank(useUiTier()) >= tierRank("professional");
@@ -1842,6 +1854,8 @@ export function AssetDetailView({
                   <p className="text-sm text-muted-foreground">
                     {t("no_valuation_history")}
                   </p>
+                ) : isVehicle && vehicleRows ? (
+                  <VehicleValuationChart rows={vehicleRows} currency={asset.currency} heightClassName="h-64" />
                 ) : (
                   <div className={cn("w-full", isRealEstate ? "h-80" : "h-64")}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -1910,30 +1924,7 @@ export function AssetDetailView({
                               strokeWidth={2}
                               connectNulls
                             />
-                            {isVehicle ? (
-                              <>
-                                <Area
-                                  type="monotone"
-                                  dataKey="purchase"
-                                  name={t("purchase_price")}
-                                  stroke="var(--color-muted-foreground)"
-                                  fill="transparent"
-                                  strokeWidth={2}
-                                  strokeDasharray="6 4"
-                                  connectNulls
-                                />
-                                <Area
-                                  type="monotone"
-                                  dataKey="blueBook"
-                                  name={t("bluebook_title")}
-                                  stroke="var(--color-chart-4)"
-                                  fill="transparent"
-                                  strokeWidth={2}
-                                  connectNulls
-                                  dot
-                                />
-                              </>
-                            ) : (
+                            {isVehicle ? null : (
                               <Area
                                 type="monotone"
                                 dataKey="netEquity"
@@ -2100,7 +2091,14 @@ export function AssetDetailView({
                             <TableCell className="text-muted-foreground">
                               {point.recorded_date}
                             </TableCell>
-                            <TableCell className="text-foreground">{point.source}</TableCell>
+                            <TableCell className="text-foreground">
+                              {historySourceLabel(point.source, bt)}
+                              {point.source_ref && (
+                                <span className="block max-w-56 truncate text-xs text-muted-foreground" dir="auto" title={point.source_ref}>
+                                  {bt("hist_file_name", { name: point.source_ref })}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-end text-foreground">
                               {maskValue(currencyFormatter.format(point.value))}
                             </TableCell>
@@ -2272,6 +2270,16 @@ export function AssetDetailView({
               />
             )}
 
+            {isScpi && (
+              <ScpiOverviewCard
+                metadata={displayAsset.metadata}
+                shares={displayAsset.quantity}
+                today={today}
+                maskValue={maskValue}
+                currencyFormatter={currencyFormatter}
+              />
+            )}
+
             {isAssuranceVie && (
               <AssuranceVieDetailCards
                 metadata={parseAssuranceVieMetadata(displayAsset.metadata)}
@@ -2282,14 +2290,17 @@ export function AssetDetailView({
           </TabsContent>
 
           <TabsContent value="analysis" className="space-y-6">
-            {isEquity && (equityMetadata?.trades.length ?? 0) > 0 ? (
-              <TaxLotsCard asset={asset} ownerFactor={ownerFactor} />
-            ) : !isRealEstate ? (
-              <Card className="border-border bg-card">
-                <CardContent className="py-6 text-sm text-muted-foreground">
-                  {t("analysis_unavailable")}
-                </CardContent>
-              </Card>
+            {!isRealEstate ? (
+              <AssetAnalysis
+                asset={displayAsset}
+                rawAsset={asset}
+                history={shareHistory}
+                transactions={transactions}
+                ratesFromUsd={ratesFromUsd}
+                ownerFactor={ownerFactor}
+                today={today}
+                portfolio={analysisPortfolio}
+              />
             ) : (
               <>
                 <Card className="border-border bg-card">
@@ -2526,6 +2537,17 @@ export function AssetDetailView({
                     </CardContent>
                   </Card>
                 )}
+
+                <AssetAnalysis
+                  asset={displayAsset}
+                  rawAsset={asset}
+                  history={shareHistory}
+                  transactions={transactions}
+                  ratesFromUsd={ratesFromUsd}
+                  ownerFactor={ownerFactor}
+                  today={today}
+                  portfolio={analysisPortfolio}
+                />
               </>
             )}
           </TabsContent>
@@ -2796,6 +2818,16 @@ export function AssetDetailView({
                       metadata: asset.metadata,
                       purchase_date: asset.purchase_date,
                     }}
+                  />
+                ) : isCash ? (
+                  <EditBankAccountDialog
+                    asset={toEditPayload(asset)}
+                    ownerShareFactor={ownerFactor}
+                    imported={isImportedBankAccount({
+                      metadata: asset.metadata,
+                      historySources: history.map((h) => h.source),
+                      transactionSources: transactions.map((tr) => tr.source),
+                    })}
                   />
                 ) : (
                   <AddAssetDialog

@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useBatchText } from "@/components/batch-import-text";
 import { useLanguage } from "@/context/language-context";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -62,6 +63,7 @@ export function TransactionDetailsSheet({
   index: number | null;
   onIndexChange: (index: number | null) => void;
 }) {
+  const bt = useBatchText();
   const { t, intlLocale } = useLanguage();
   const [copiedRaw, setCopied] = useState<{ target: CopyTarget; ok: boolean; index: number | null } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,6 +152,7 @@ export function TransactionDetailsSheet({
         value: kind === "csv" ? t("txd_source_csv") : kind === "pdf" ? t("txd_source_pdf") : tx.source,
       });
     }
+    if (tx.sourceFile) rows.push({ label: bt("hist_source_file"), value: tx.sourceFile });
     if (view.importedAt) rows.push({ label: t("txd_imported_on"), value: view.importedAt });
     if (tx.fingerprint) {
       const fingerprint = tx.fingerprint;

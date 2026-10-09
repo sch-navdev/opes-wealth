@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { entityTypeLabelKey } from "@/components/company-fields";
+import { useCompanyCashText } from "@/components/company-cash-text";
 import { ManageHoldingsDialog } from "@/components/entity-lookthrough-manage";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ function EntityNode({
   baseCurrency: string;
 }) {
   const { t } = useLanguage();
+  const cco = useCompanyCashText();
   const categoryLabel = useCategoryLabel();
   const [open, setOpen] = useState(true);
   const bodyId = `ent-body-${entity.id}`;
@@ -110,7 +112,10 @@ function EntityNode({
                       <Link href={`/dashboard/assets/${h.id}`} className="block truncate font-medium text-foreground hover:underline">
                         {h.name}
                       </Link>
-                      <span className="block truncate text-xs text-muted-foreground">{categoryLabel(h.category)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {categoryLabel(h.category)}
+                        {h.isCompanyAccount ? ` · ${cco("cco_lookthrough_badge")}` : ""}
+                      </span>
                     </span>
                     <span className={cn("shrink-0 tabular-nums", h.value < 0 ? "text-destructive" : "text-foreground")}>{fmt(h.value)}</span>
                   </li>
@@ -129,7 +134,8 @@ function EntityNode({
             <ManageHoldingsDialog
               entityId={entity.id}
               entityName={entity.name}
-              initialIds={entity.holdings.map((h) => h.id)}
+              // Company accounts are linked from the account itself (company_id), not through this list.
+              initialIds={entity.holdings.filter((h) => !h.isCompanyAccount).map((h) => h.id)}
               options={options}
               baseCurrency={baseCurrency}
             />

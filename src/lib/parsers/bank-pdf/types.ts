@@ -116,6 +116,8 @@ export type PdfParseFailure = {
   code: PdfFailureCode;
   /** Set on `scanned` / `image_only`: whether OCR could be run on this server (keys configured) so the UI can offer it. */
   ocr?: "available" | "unconfigured";
+  /** Set on `scanned` / `image_only`: the PDF's page count, so a batch import can estimate the OCR cost before asking consent. */
+  pages?: number;
   /** Set when the bank was recognised (`image_only`, `no_transactions`). */
   bank?: PdfBankId;
   /** Developer-facing English message (the UI shows the translated one for `code`). */

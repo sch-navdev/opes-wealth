@@ -29,6 +29,8 @@ export type TransactionDetail = {
   accountRef?: string | null;
   /** `transactions.source` ("csv_import", "pdf_import", ...). */
   source?: string | null;
+  /** Name of the statement file the transaction was imported from (migration 0041), when known. */
+  sourceFile?: string | null;
   /** Full SHA-256 content fingerprint of the stored row. */
   fingerprint?: string | null;
   /** ISO timestamp of the import (`transactions.created_at`). */
@@ -46,6 +48,8 @@ export type StoredTransactionRow = {
   source: string | null;
   fingerprint: string | null;
   created_at: string | null;
+  /** Imported file name; absent until migration 0041 is applied. */
+  source_file?: string | null;
 };
 
 export function detailFromRow(row: StoredTransactionRow): TransactionDetail {
@@ -55,6 +59,7 @@ export function detailFromRow(row: StoredTransactionRow): TransactionDetail {
     amount: Number(row.amount),
     currency: row.currency,
     source: row.source,
+    sourceFile: row.source_file ?? null,
     fingerprint: row.fingerprint,
     importedAt: row.created_at,
   };
@@ -62,7 +67,7 @@ export function detailFromRow(row: StoredTransactionRow): TransactionDetail {
 
 export function detailFromFingerprint(
   tx: TransactionFingerprint,
-  opts: { bankName?: string; source?: string } = {},
+  opts: { bankName?: string; source?: string; sourceFile?: string } = {},
 ): TransactionDetail {
   return {
     date: tx.date,
@@ -76,13 +81,14 @@ export function detailFromFingerprint(
     bank: opts.bankName ?? tx.bank,
     accountRef: tx.accountRef,
     source: opts.source ?? "pdf_import",
+    sourceFile: opts.sourceFile ?? null,
     index: tx.index,
   };
 }
 
 export function detailFromNormalized(
   tx: { date: string; description: string; amount: number; balance: number | null },
-  opts: { currency: string; bankName?: string; accountRef?: string; source?: string },
+  opts: { currency: string; bankName?: string; accountRef?: string; source?: string; sourceFile?: string },
 ): TransactionDetail {
   return {
     date: tx.date,
@@ -93,6 +99,7 @@ export function detailFromNormalized(
     bank: opts.bankName ?? null,
     accountRef: opts.accountRef || null,
     source: opts.source ?? "csv_import",
+    sourceFile: opts.sourceFile ?? null,
   };
 }
 

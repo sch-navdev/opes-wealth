@@ -47,6 +47,7 @@ export const DLAYOUT_EN = {
   "dlayout_block_metricCards": "Key figures",
   "dlayout_block_cashFlow": "Cash flow and accounts",
   "dlayout_block_incomeCalendar": "Income calendar",
+  "dlayout_block_scpi": "SCPI",
   "dlayout_block_csvUpload": "Statement import",
   "dlayout_block_futureProjects": "Future projects",
   "dlayout_block_analytics": "Performance and analytics",

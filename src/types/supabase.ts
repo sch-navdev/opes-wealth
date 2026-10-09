@@ -50,6 +50,7 @@ export type Database = {
           net_equity: number | null
           recorded_date: string
           source: string | null
+          source_ref: string | null
           value: number
         }
         Insert: {
@@ -59,6 +60,7 @@ export type Database = {
           net_equity?: number | null
           recorded_date: string
           source?: string | null
+          source_ref?: string | null
           value: number
         }
         Update: {
@@ -68,6 +70,7 @@ export type Database = {
           net_equity?: number | null
           recorded_date?: string
           source?: string | null
+          source_ref?: string | null
           value?: number
         }
         Relationships: [
@@ -400,6 +403,7 @@ export type Database = {
           currency: string
           description: string
           source: string
+          source_file: string | null
           created_at: string
         }
         Insert: {
@@ -412,6 +416,7 @@ export type Database = {
           currency: string
           description?: string
           source?: string
+          source_file?: string | null
           created_at?: string
         }
         Update: {
@@ -424,6 +429,7 @@ export type Database = {
           currency?: string
           description?: string
           source?: string
+          source_file?: string | null
           created_at?: string
         }
         Relationships: []

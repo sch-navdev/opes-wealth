@@ -649,7 +649,7 @@ describe("BankStatementImportDialog, no matching Cash account", () => {
     expect(banking.recordBalanceSnapshots).toHaveBeenCalledWith("new1", [
       { date: "2025-12-22", value: 392.12 },
       { date: "2026-01-02", value: 392.12 },
-    ]);
+    ], { source: "pdf_import", fileName: "hsbc.pdf" });
     expect(imports.importBankTransactions).not.toHaveBeenCalled();
   });
 });

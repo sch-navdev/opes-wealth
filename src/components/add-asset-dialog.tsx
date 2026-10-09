@@ -33,6 +33,8 @@ import { CompanyFields } from "@/components/company-fields";
 import { AssuranceVieFields } from "@/components/assurance-vie-fields";
 import { isAvKey, useAssuranceVieText } from "@/components/assurance-vie-text";
 import { ScpiFields } from "@/components/scpi-fields";
+import { ScpiNameField } from "@/components/scpi-name-combobox";
+import { useScpiText } from "@/components/scpi-text";
 import { PreciousMetalsFields } from "@/components/precious-metals-fields";
 import { ExoticAssetsFields } from "@/components/exotic-assets-fields";
 import {
@@ -91,6 +93,7 @@ import {
   getScpiMetadataErrors,
   parseScpiMetadata,
   scpiCurrentValue,
+  validateScpiExtras,
 } from "@/lib/scpi";
 import { addAsset, updateAsset } from "@/app/dashboard/actions";
 import { StartupFields } from "@/components/startup-fields";
@@ -160,6 +163,7 @@ export function AddAssetDialog({
   const isEditMode = !!asset;
   const { t } = useLanguage();
   const tf = useAddFormText();
+  const st = useScpiText();
   const avT = useAssuranceVieText();
 
   const [open, setOpen] = useState(false);
@@ -398,6 +402,11 @@ export function AddAssetDialog({
         setError(t(errors[0] as TranslationKey));
         return;
       }
+      const extraIssues = validateScpiExtras(scpiMetadata);
+      if (extraIssues.length > 0) {
+        setError(st(extraIssues[0].code));
+        return;
+      }
       // Value = shares × withdrawal value (what a sale would return today).
       formData.set("current_value", String(scpiCurrentValue(scpiMetadata, shares) ?? 0));
       formData.set("metadata", JSON.stringify(scpiMetadata));
@@ -567,13 +576,22 @@ export function AddAssetDialog({
 
           <div className="space-y-2">
             <Label htmlFor="name">{tf("af_dlg_name", "Name")}</Label>
-            <Input
-              id="name"
-              name="name"
-              placeholder={tf("af_dlg_name_placeholder", "e.g. Apple Inc.")}
-              defaultValue={asset?.name ?? ""}
-              required
-            />
+            {isScpi ? (
+              <ScpiNameField
+                defaultName={asset?.name ?? ""}
+                metadata={scpiMetadata}
+                onMetadataChange={setScpiMetadata}
+                currency={currency}
+              />
+            ) : (
+              <Input
+                id="name"
+                name="name"
+                placeholder={tf("af_dlg_name_placeholder", "e.g. Apple Inc.")}
+                defaultValue={asset?.name ?? ""}
+                required
+              />
+            )}
           </div>
 
           <div className="space-y-2">

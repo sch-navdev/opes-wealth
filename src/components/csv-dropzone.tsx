@@ -5,6 +5,8 @@ import { FileSpreadsheet, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
+import { capFiles, MAX_BATCH_FILES } from "@/lib/banking/batch-import";
+import { useBatchText } from "@/components/batch-import-text";
 import { parseCsv } from "@/lib/csv-parser";
 import { PdfPasswordPrompt } from "@/components/pdf-password-prompt";
 import { PdfOcrPrompt } from "@/components/pdf-ocr-prompt";
@@ -39,13 +41,21 @@ export function CsvDropzone({
   onParsed,
   disabled = false,
   currency,
+  onFiles,
 }: {
   onParsed: (file: ParsedCsvFile) => void;
   disabled?: boolean;
   /** Currency of the account being imported into: picks the matching account of a multi-account PDF. */
   currency?: string;
+  /**
+   * Opt-in multi-select (picker and drop). When given, choosing SEVERAL files hands them (capped at
+   * `MAX_BATCH_FILES`) to this callback instead of reading them here; exactly one file takes the normal
+   * single-file path below. Without it the dropzone stays single-file.
+   */
+  onFiles?: (files: File[]) => void;
 }) {
   const { t } = useLanguage();
+  const bt = useBatchText();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
@@ -105,6 +115,20 @@ export function CsvDropzone({
     }
     // Several accounts, a currency mismatch or totals that do not reconcile: let the user confirm.
     setPending({ statement, fileName: file.name });
+  }
+
+  /** Several files at once (only with `onFiles`): capped, then handed over; one file goes the single-file way. */
+  function handleFiles(list: File[]) {
+    if (list.length === 0) return;
+    if (!onFiles || list.length === 1) {
+      void handleFile(list[0]);
+      return;
+    }
+    setError(null);
+    const { kept, dropped } = capFiles(list);
+    if (dropped > 0) setError(bt("batch_cap_message", { max: MAX_BATCH_FILES, total: list.length }));
+    onFiles(kept);
+    if (inputRef.current) inputRef.current.value = "";
   }
 
   async function handleFile(file: File) {
@@ -192,8 +216,8 @@ export function CsvDropzone({
         onDrop={(e) => {
           e.preventDefault();
           setIsDragging(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file && !busy) void handleFile(file);
+          const dropped = Array.from(e.dataTransfer.files ?? []);
+          if (dropped.length > 0 && !busy) handleFiles(dropped);
         }}
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-6 py-12 text-center transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -225,13 +249,11 @@ export function CsvDropzone({
       <input
         ref={inputRef}
         type="file"
+        multiple={!!onFiles}
         accept=".csv,text/csv,.pdf,application/pdf"
         className="hidden"
         disabled={busy}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
-        }}
+        onChange={(e) => handleFiles(Array.from(e.target.files ?? []))}
       />
       {locked && (
         <PdfPasswordPrompt

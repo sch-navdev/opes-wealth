@@ -399,8 +399,14 @@ export type VehicleComparisonRow = {
   value: number | null;
   /** The purchase price, a flat line from the purchase date; never altered by a market value. */
   purchase: number | null;
-  /** Official guide valuation, converted to the asset's currency. */
+  /** Official guide valuation on the day it was issued (an OBSERVATION: the dots), converted to the asset's currency. Null on every other day. */
   blueBook: number | null;
+  /**
+   * The same valuation carried forward as a STEP line: from each observation until the next one (and, for the
+   * last one, up to `today`). Null before the first observation. An instant valuation is only a dot in
+   * reality; carrying it forward lets the three values be compared along the whole range.
+   */
+  blueBookStep: number | null;
 };
 
 /**
@@ -422,7 +428,7 @@ export function buildVehicleComparisonSeries(opts: {
   const row = (date: string) => {
     let r = rows.get(date);
     if (!r) {
-      r = { date, value: null, purchase: null, blueBook: null };
+      r = { date, value: null, purchase: null, blueBook: null, blueBookStep: null };
       rows.set(date, r);
     }
     return r;
@@ -437,6 +443,17 @@ export function buildVehicleComparisonSeries(opts: {
   if (lastMarket && lastMarket.recorded_date < opts.today) row(opts.today).value = lastMarket.value;
 
   for (const g of opts.guide) row(g.date).blueBook = g.value;
+
+  // Blue Book step line: one row at every observation, plus a row on `today`, each carrying the latest observation.
+  const guide = [...opts.guide].sort((a, b) => a.date.localeCompare(b.date));
+  if (guide.length > 0 && guide[0].date <= opts.today) row(opts.today);
+  if (guide.length > 0) {
+    let k = -1;
+    for (const r of [...rows.values()].sort((a, b) => a.date.localeCompare(b.date))) {
+      while (k + 1 < guide.length && guide[k + 1].date <= r.date) k += 1;
+      if (k >= 0) r.blueBookStep = guide[k].value;
+    }
+  }
 
   const price = opts.purchasePrice != null && opts.purchasePrice > 0 ? opts.purchasePrice : null;
   if (price != null) {

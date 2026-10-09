@@ -28,9 +28,15 @@ import {
 import {
   parseScpiMetadata,
   scpiAverageYield,
+  scpiCurrentSubscriptionPrice,
+  scpiEnjoymentDelayMonths,
   scpiEntryFees,
   scpiInvested,
+  scpiLatestIndicators,
   scpiReceived,
+  scpiRevalorisationSteps,
+  scpiSaleVsPurchase,
+  scpiTotalRevalorisationPct,
   scpiTrailingYield,
   scpiWithdrawalValue,
 } from "@/lib/scpi";
@@ -58,6 +64,42 @@ export type ExportHistoryRow = {
 };
 
 type Row = Record<string, string | number | boolean | null>;
+
+/**
+ * The SCPI tracking-sheet columns (management company is already a column): dates, enjoyment delay,
+ * share numbers, up to three revalorisations, total revalorisation, sale-minus-purchase, the latest
+ * VDRec / VDRea with their date and the two ratios. Blank cell = not recorded.
+ */
+function scpiTrackingColumns(md: ReturnType<typeof parseScpiMetadata>, shares: number): Row {
+  const steps = scpiRevalorisationSteps(md);
+  const sale = scpiSaleVsPurchase(md, shares);
+  const latest = scpiLatestIndicators(md);
+  const total = scpiTotalRevalorisationPct(md);
+  const row: Row = {
+    "Name verified": md.name_source === "catalog" ? "catalog" : md.name_source === "manual" ? "manual (unverified)" : "",
+    "Subscription date": md.subscription_date,
+    "Enjoyment delay (months)": scpiEnjoymentDelayMonths(md.subscription_date, md.jouissance_date) ?? "",
+    "Share numbers": md.register_numbers,
+  };
+  for (let i = 0; i < 3; i++) {
+    const s = steps[i];
+    row[`Revalorisation ${i + 1} price`] = s?.price ?? "";
+    row[`Revalorisation ${i + 1} date`] = s?.date ?? "";
+    row[`Revalorisation ${i + 1} %`] = s?.changePct != null ? Number(s.changePct.toFixed(2)) : "";
+  }
+  row["Revalorisations recorded"] = steps.length;
+  row["Total revalorisation %"] = total != null ? Number(total.toFixed(2)) : "";
+  row["Current subscription price (MDS)"] = scpiCurrentSubscriptionPrice(md) ?? "";
+  row["Sale minus purchase / share"] = sale ? Number(sale.perShare.toFixed(2)) : "";
+  row["Sale minus purchase %"] = sale ? Number(sale.pct.toFixed(2)) : "";
+  row["Sale minus purchase total"] = sale ? Number(sale.total.toFixed(2)) : "";
+  row["Indicators as of"] = latest?.asOf ?? "";
+  row["VDRec / share"] = latest?.vdrec ?? "";
+  row["VDRea / share"] = latest?.vdrea ?? "";
+  row["VDRec / MDS %"] = latest?.vdrecRatioPct != null ? Number(latest.vdrecRatioPct.toFixed(2)) : "";
+  row["VDRea / PDR %"] = latest?.vdreaRatioPct != null ? Number(latest.vdreaRatioPct.toFixed(2)) : "";
+  return row;
+}
 
 function sheet(rows: Row[], headers: string[]): XLSX.WorkSheet {
   const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
@@ -221,6 +263,7 @@ export function buildPortfolioWorkbook(input: {
       "Average distribution rate %": scpiAverageYield(md)?.toFixed(2) ?? "",
       "Financed by loan": md.financed_by_credit,
       "Start of income": md.jouissance_date,
+      ...scpiTrackingColumns(md, a.quantity),
     };
   });
   const scpiDividendRows: Row[] = scpiAssets.flatMap((a) =>
@@ -232,6 +275,7 @@ export function buildPortfolioWorkbook(input: {
         Amount: d.amount,
         Currency: a.currency,
         Status: d.status,
+        Exceptional: d.exceptional === true,
       }),
     ),
   );
@@ -383,7 +427,7 @@ export function buildPortfolioWorkbook(input: {
   add("Real Estate", realEstateRows, Object.keys(realEstateRows[0] ?? {}));
   add("Brokerage", brokerageRows, Object.keys(brokerageRows[0] ?? {}));
   add("REIT", scpiRows, Object.keys(scpiRows[0] ?? {}));
-  add("REIT Dividends", scpiDividendRows, ["REIT", "Quarter", "Payment date", "Amount", "Currency", "Status"]);
+  add("REIT Dividends", scpiDividendRows, ["REIT", "Quarter", "Payment date", "Amount", "Currency", "Status", "Exceptional"]);
   add("Private Equity", peRows, Object.keys(peRows[0] ?? {}));
   add("PE Cash Flows", peFlowRows, ["Fund", "Type", "Date", "Amount", "Status"]);
   add("Companies", companyRows, Object.keys(companyRows[0] ?? {}));

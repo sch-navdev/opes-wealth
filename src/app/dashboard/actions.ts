@@ -35,7 +35,7 @@ import {
   type AdrecErrorCode,
   type AdrecValuationData,
 } from "@/lib/services/adrec-client";
-import type { AssetHistorySource } from "@/lib/asset-history";
+import { cleanSourceRef, type AssetHistorySource } from "@/lib/asset-history";
 import type { ParsedBankCsvRow } from "@/lib/bank-csv";
 import {
   buildInvestedCapitalSeries,
@@ -49,6 +49,7 @@ import {
 import { tradeId } from "@/lib/parsers/broker-registry";
 import { getBank } from "@/lib/banking/institutions";
 import { isBankAccountType } from "@/lib/bank-account";
+import { COMPANY_ID_KEY } from "@/lib/company-cash";
 import type { AggregatedHolding, ParsedIncome } from "@/lib/parsers/types";
 import { convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
 import {
@@ -217,6 +218,34 @@ export async function updateAsset(id: string, formData: FormData) {
     }
   }
 
+  // The generic form sends no metadata for some categories (Cash): never wipe what is stored
+  // (bank_profile, account_ref, company_id, purpose...). Imported bank accounts also keep their
+  // quantity, value and currency: those come from the statements, not from this form.
+  const { data: existing } = await supabase
+    .from("assets")
+    .select("metadata, quantity, current_value, currency, asset_categories(name)")
+    .eq("id", id)
+    .maybeSingle<{
+      metadata: Json | null;
+      quantity: number | null;
+      current_value: number;
+      currency: string;
+      asset_categories: { name: string } | null;
+    }>();
+  const storedMeta =
+    existing?.metadata && typeof existing.metadata === "object" && !Array.isArray(existing.metadata)
+      ? (existing.metadata as Record<string, Json>)
+      : null;
+  if (!metadataRaw && storedMeta) metadata = storedMeta as Json;
+  let quantityValue = quantity ? Number(quantity) : 1;
+  let valueNumber = Number(currentValue);
+  let currencyCode = currency;
+  if (existing && existing.asset_categories?.name === "Cash" && storedMeta && "bank_profile" in storedMeta) {
+    quantityValue = existing.quantity ?? 1;
+    valueNumber = existing.current_value;
+    currencyCode = existing.currency;
+  }
+
   // Co-ownership: an edit of a shared asset may have to be approved first.
   const ownersInput = parseOwnersField(formData);
   const routed = await routeAssetEdit({
@@ -225,9 +254,9 @@ export async function updateAsset(id: string, formData: FormData) {
     fields: {
       name,
       category_id: categoryId,
-      quantity: quantity ? Number(quantity) : 1,
-      current_value: Number(currentValue),
-      currency,
+      quantity: quantityValue,
+      current_value: valueNumber,
+      currency: currencyCode,
       metadata,
       images,
       ticker_symbol: tickerSymbol,
@@ -254,9 +283,9 @@ export async function updateAsset(id: string, formData: FormData) {
     .update({
       category_id: categoryId,
       name,
-      quantity: quantity ? Number(quantity) : 1,
-      current_value: Number(currentValue),
-      currency,
+      quantity: quantityValue,
+      current_value: valueNumber,
+      currency: currencyCode,
       metadata,
       images,
       ticker_symbol: tickerSymbol,
@@ -274,7 +303,7 @@ export async function updateAsset(id: string, formData: FormData) {
   await syncAssetHistory(
     supabase,
     updated.id,
-    Number(currentValue),
+    valueNumber,
     updated.asset_categories?.name,
     metadata,
   );
@@ -1024,6 +1053,7 @@ export async function getAdrecLiveValuation(id: string): Promise<AdrecLiveValuat
 export async function importBankCsvHistory(
   assetId: string,
   rows: ParsedBankCsvRow[],
+  options: { source?: "csv_import" | "pdf_import"; fileName?: string } = {},
 ) {
   const supabase = await createClient();
 
@@ -1050,7 +1080,10 @@ export async function importBankCsvHistory(
     return { error: "Asset not found." };
   }
 
-  const source: AssetHistorySource = "csv_import";
+  // PDF statement imports are recorded as 'pdf_import' (a CHECK that lags behind falls back to 'manual',
+  // see `upsertHistoryRowsWithFallback`) together with the file name (`source_ref`, migration 0041).
+  const source: AssetHistorySource = options.source === "pdf_import" ? "pdf_import" : "csv_import";
+  const sourceRef = cleanSourceRef(options.fileName);
 
   const historyError = await upsertHistoryRows(
     supabase,
@@ -1060,6 +1093,7 @@ export async function importBankCsvHistory(
       value: row.value,
       net_equity: row.value,
       source,
+      ...(sourceRef ? { source_ref: sourceRef } : {}),
     })),
   );
 
@@ -2631,11 +2665,26 @@ export async function addBankAccount(formData: FormData) {
     return { error: "Enter a valid credit limit." };
   }
 
+  // Optional company link (Cash accounts only): must be one of the caller's own active Company entities.
+  // The account is still a Cash asset: it rolls up into net worth but is not personal cash (lib/company-cash.ts).
+  const companyId = isCard ? "" : String(formData.get("company_id") ?? "").trim();
+  if (companyId) {
+    const { data: company } = await supabase
+      .from("assets")
+      .select("id, asset_categories(name)")
+      .eq("id", companyId)
+      .eq("profile_id", user.id)
+      .eq("status", "active")
+      .maybeSingle<{ id: string; asset_categories: { name: string } | null }>();
+    if (!company || company.asset_categories?.name !== "Companies") return { error: "Choose one of your companies." };
+  }
+
   const bankMetadata = {
     institution_name: institutionName,
     ...(bank ? { bank_key: bank.key } : {}),
     account_type: accountType,
     ...(accountRef ? { account_ref: accountRef } : {}),
+    ...(companyId ? { [COMPANY_ID_KEY]: companyId } : {}),
   };
 
   const { data: category } = await supabase

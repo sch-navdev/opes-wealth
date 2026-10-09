@@ -286,3 +286,8 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-09: Cash flow steps 2 and 3: waterfall engine, emergency-fund target and diversion rule - [[Emergency-Fund|Emergency Fund]]
 - 2026-10-09: UAE end-of-service gratuity calculator and tracker (Art. 51; migration 0040 drafted, not applied) - [[Personal-Cash-Flow|Personal Cash Flow]]
 - 2026-10-09: Consistent currency style, locale-aware percentages and Add Asset form labels in i18n - [[Localization|Localization]]
+- 2026-10-09: Batch import of several PDF and CSV statements at once, import source (pdf_import) and file name in the Valuation Log (migration 0041 drafted, not applied) - [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- 2026-10-09: Dedicated Edit Bank Account modal with Country, country grouping on the Banking page, and updateAsset no longer wipes metadata or imported-account values - [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- 2026-10-09: Company bank accounts in the Companies tab, in net worth but excluded from personal cash - [[Entity-Structures|Entity Structures]]
+- 2026-10-09: Analysis tab built for every asset class and the vehicle Blue Book valuation drawn as a stepped line - [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-09: SCPI Phase 1: dated VDRec/VDRea indicators and ratios, revalorisations, searchable verified-name catalog with a manual option, dashboard block, API investigation - [[Scpi-Tracking|SCPI Tracking]]

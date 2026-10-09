@@ -19,7 +19,7 @@ import {
   type BankSyncMode,
 } from "@/lib/banking/altareq";
 import { decryptSecret, encryptSecret, isTokenCryptoConfigured } from "@/lib/banking/token-crypto";
-import type { AssetHistorySource } from "@/lib/asset-history";
+import { cleanSourceRef, isMissingColumnError, type AssetHistorySource } from "@/lib/asset-history";
 import { isDemoUser } from "@/lib/demo-mode";
 
 type Fail = { ok: false; code: AltareqErrorCode | "unauthenticated" | "invalid" | "db_error" | "crypto_not_configured"; error: string };
@@ -528,6 +528,7 @@ export async function createStatementCashAccount(input: {
 export async function recordBalanceSnapshots(
   assetId: string,
   points: { date: string; value: number }[],
+  options: { source?: "csv_import" | "pdf_import"; fileName?: string } = {},
 ): Promise<{ ok: true; added: number; skipped: number } | Fail> {
   const auth = await requireUser(true);
   if (!auth.ok) return auth;
@@ -557,12 +558,27 @@ export async function recordBalanceSnapshots(
   const fresh = clean.filter((p) => !have.has(p.date));
   const skipped = clean.length - fresh.length;
   if (fresh.length > 0) {
-    const write = (source: AssetHistorySource) =>
+    const firstSource: AssetHistorySource = options.source === "pdf_import" ? "pdf_import" : "csv_import";
+    const sourceRef = cleanSourceRef(options.fileName);
+    const write = (source: AssetHistorySource, withRef: boolean) =>
       auth.userClient.from("asset_history").insert(
-        fresh.map((p) => ({ asset_id: assetId, recorded_date: p.date, value: p.value, net_equity: p.value, source })),
+        fresh.map((p) => ({
+          asset_id: assetId,
+          recorded_date: p.date,
+          value: p.value,
+          net_equity: p.value,
+          source,
+          ...(withRef && sourceRef ? { source_ref: sourceRef } : {}),
+        })),
       );
-    let { error } = await write("csv_import");
-    if (error?.code === "23514") ({ error } = await write("manual"));
+    let withRef = true;
+    let { error } = await write(firstSource, withRef);
+    // Migration 0041 not applied yet: write the rows without the file name.
+    if (isMissingColumnError(error, "source_ref")) {
+      withRef = false;
+      ({ error } = await write(firstSource, withRef));
+    }
+    if (error?.code === "23514") ({ error } = await write("manual", withRef));
     if (error) return { ok: false, code: "db_error", error: error.message };
 
     const newest = fresh.reduce((m, p) => (p.date > m.date ? p : m));

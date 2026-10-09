@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, Landmark, RefreshCw, Upload } from "lucide-react";
 import { BankConnectDialog } from "@/components/bank-connect-dialog";
+import { useCompanyCashText } from "@/components/company-cash-text";
 import { BankLogoByName } from "@/components/institution-logo";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -85,15 +86,20 @@ function accountCountry(account: CashAccount): string {
  */
 export function CashBankCard({
   accounts,
+  companyAccounts,
   baseCurrency,
   bankSyncMode,
 }: {
+  /** PERSONAL cash accounts only (company bank accounts are passed apart, see `companyAccounts`). */
   accounts: CashAccount[];
+  /** Company bank accounts: counted in net worth but not here; shown as a separate line linking to Companies. */
+  companyAccounts?: { count: number; total: number };
   baseCurrency: string;
   /** Whether Open Finance sync is live, sample (development) or not configured. */
   bankSyncMode: BankSyncMode;
 }) {
   const { t, intlLocale } = useLanguage();
+  const cco = useCompanyCashText();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -264,6 +270,7 @@ export function CashBankCard({
   };
 
   return (
+    <>
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="border border-border bg-card">
       <CollapsibleTrigger className="flex w-full items-center justify-between gap-4 px-4 py-3 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
         <div className="flex min-w-0 items-center gap-2">
@@ -317,5 +324,25 @@ export function CashBankCard({
         </div>
       </CollapsibleContent>
     </Collapsible>
+    {companyAccounts && companyAccounts.count > 0 && (
+      <div
+        className="mt-2 flex flex-wrap items-center justify-between gap-2 border border-border bg-card px-4 py-3"
+        data-testid="cash-card-company-line"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">{cco("cco_dash_line")}</p>
+          <p className="text-xs text-muted-foreground">{cco("cco_dash_line_note", { n: companyAccounts.count })}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium tabular-nums text-foreground">
+            {maskValue(baseFormatter.format(companyAccounts.total))}
+          </span>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/companies">{cco("cco_dash_open")}</Link>
+          </Button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

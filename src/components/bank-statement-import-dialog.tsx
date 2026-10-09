@@ -43,9 +43,7 @@ import {
   detectProfile,
   getBankProfile,
   parseStatement,
-  routeGroup,
   type BankProfileId,
-  type RoutableAccount,
   type StatementGroup,
   type StatementParseResult,
 } from "@/lib/banking/csv-profiles";
@@ -64,37 +62,23 @@ import { statementToParseResult } from "@/lib/parsers/bank-pdf/bridge";
 import { PDF_FAILURE_MESSAGE_KEYS, type PdfFailureCode, type PdfStatement } from "@/lib/parsers/bank-pdf";
 import { TransactionDetailsSheet } from "@/components/transaction-details-sheet";
 import { detailFromFingerprint, detailFromNormalized, type TransactionDetail } from "@/lib/transaction-detail";
-import { computeRunningBalance, type ParsedBankCsvRow, type ParsedTransactionRow } from "@/lib/bank-csv";
+import { BankStatementBatch } from "@/components/bank-statement-batch";
+import { useBatchText } from "@/components/batch-import-text";
+import {
+  MAX_BATCH_FILES,
+  NEW,
+  NONE,
+  capFiles,
+  initialGroupState as initialGroupStateFor,
+  toBalanceRows,
+  toImportTx,
+  type GroupState,
+  type StatementTargetAccount,
+} from "@/lib/banking/batch-import";
 
-const NONE = "__none__";
-/** Target value meaning "create a new Cash account for this group when importing". */
-const NEW = "__new__";
+export type { StatementTargetAccount } from "@/lib/banking/batch-import";
+
 const PREVIEW_ROWS = 8;
-
-export type StatementTargetAccount = RoutableAccount & { nativeValue: number };
-
-/** Rows → one balance point per day: the file's own running balance when every row has one, else derived from the amounts anchored on the account's current balance (same rule as the single-account CSV import). */
-function toBalanceRows(group: StatementGroup, currentValue: number): ParsedBankCsvRow[] {
-  const sorted = [...group.rows].sort((a, b) => a.date.localeCompare(b.date));
-  if (sorted.length > 0 && sorted.every((r) => r.balance !== null)) {
-    const byDate = new Map<string, ParsedBankCsvRow>();
-    for (const r of sorted) {
-      // Later rows of the same day overwrite: the last balance is the day's closing balance.
-      byDate.set(r.date, { recorded_date: r.date, value: r.balance as number, description: r.description || undefined });
-    }
-    return Array.from(byDate.values());
-  }
-  const transactions: ParsedTransactionRow[] = sorted.map((r) => ({
-    recorded_date: r.date,
-    amount: r.amount,
-    description: r.description || undefined,
-  }));
-  const total = transactions.reduce((s, t) => s + t.amount, 0);
-  const starting = Math.round((currentValue - total) * 100) / 100;
-  return computeRunningBalance(transactions, starting);
-}
-
-type GroupState = { target: string; remember: boolean; /** Pre-selected because it is the only Cash account in the group's currency. */ autoPicked?: boolean };
 
 function without<T>(record: Record<number, T>, key: number): Record<number, T> {
   const copy = { ...record };
@@ -104,11 +88,6 @@ function without<T>(record: Record<number, T>, key: number): Record<number, T> {
 
 /** Duplicate check of one group against the stored transactions of its target account. */
 type CheckState = { assetId: string; status: "loading" | "ready" | "unknown"; existing: boolean[] };
-
-/** A group's rows as import / check payload (same order as the file, which is what the fingerprint occurrence numbering uses). */
-function toImportTx(group: StatementGroup) {
-  return group.rows.map((r) => ({ date: r.date, amount: r.amount, description: r.description }));
-}
 
 /**
  * Multi-account bank statement import: drop a CSV from Wio, Emirates NBD,
@@ -131,7 +110,10 @@ function toImportTx(group: StatementGroup) {
  */
 export function BankStatementImportDialog({ accounts }: { accounts: StatementTargetAccount[] }) {
   const { t, intlLocale } = useLanguage();
+  const bt = useBatchText();
   const [open, setOpen] = useState(false);
+  /** Set when several files were chosen at once: the batch import (`bank-statement-batch.tsx`) takes over; one file keeps the single-file flow below. */
+  const [batch, setBatch] = useState<{ files: File[]; dropped: number; total: number } | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [fileName, setFileName] = useState("");
   const [profileId, setProfileId] = useState<BankProfileId | "">("");
@@ -188,6 +170,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   }
 
   function reset() {
+    setBatch(null);
     setOcrLayout(null);
     setLayoutCopied(false);
     setText(null);
@@ -218,11 +201,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
 
   /** Initial target of a group: remembered route first, else the only Cash account in the group's currency (never a guess between several). */
   function initialGroupState(group: StatementGroup, id: BankProfileId): GroupState {
-    const route = routeGroup(group, id, accounts);
-    if (route.kind === "matched") return { target: route.assetId, remember: true };
-    const sameCurrency = accounts.filter((a) => a.currency.toUpperCase() === group.currency.toUpperCase());
-    if (sameCurrency.length === 1) return { target: sameCurrency[0].id, remember: true, autoPicked: true };
-    return { target: NONE, remember: true };
+    return initialGroupStateFor(group, id, accounts);
   }
 
   /** Asks the server which of a group's rows are already stored for the account; stale answers (target changed meanwhile) are dropped. Failure = "unknown", never blocking. */
@@ -359,6 +338,18 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     setParseError(null);
     setParsed(parsedPdf);
     applyRouting(parsedPdf, id);
+  }
+
+  /** One file: the single-file flow, unchanged. Several: the batch import (capped at MAX_BATCH_FILES files). */
+  function handleFiles(list: File[]) {
+    if (list.length === 0) return;
+    if (list.length === 1) {
+      void handleFile(list[0]);
+      return;
+    }
+    reset();
+    const { kept, dropped } = capFiles(list);
+    setBatch({ files: kept, dropped, total: list.length });
   }
 
   async function handleFile(file: File | undefined) {
@@ -525,6 +516,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
           const snap = await recordBalanceSnapshots(
             account.id,
             (group.balances ?? []).map((b) => ({ date: b.date, value: b.balance })),
+            { source: pdfStatement ? "pdf_import" : "csv_import", fileName },
           );
           if (!snap.ok) {
             out.push({ label, ok: false, text: snap.error });
@@ -540,7 +532,8 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         }
         // Balance history reflects the real account: it always uses ALL parsed rows, never the selection.
         const rows = toBalanceRows(group, account.nativeValue);
-        const result = await importBankCsvHistory(account.id, rows);
+        const importSource = pdfStatement ? "pdf_import" : "csv_import";
+        const result = await importBankCsvHistory(account.id, rows, { source: importSource, fileName });
         if (result?.error) {
           out.push({ label, ok: false, text: result.error });
           continue;
@@ -553,7 +546,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         const all = toImportTx(group);
         const occurrences = occurrenceIndexes(all);
         const chosen = all.flatMap((tx, j) => (plan.isSelected(j) ? [{ ...tx, occurrence: occurrences[j] }] : []));
-        const tx = await importBankTransactions(account.id, chosen, pdfStatement ? "pdf_import" : "csv_import");
+        const tx = await importBankTransactions(account.id, chosen, importSource, fileName);
         let alreadyUnselected = 0;
         let skippedByYou = 0;
         all.forEach((_tx, j) => {
@@ -589,8 +582,8 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
       .map((r, j) => {
         const full = pdfTxs?.[j];
         const detail = full
-          ? detailFromFingerprint(full, { bankName: profile?.name })
-          : detailFromNormalized(r, { currency: group.currency, bankName: profile?.name, accountRef: group.accountRef });
+          ? detailFromFingerprint(full, { bankName: profile?.name, sourceFile: fileName })
+          : detailFromNormalized(r, { currency: group.currency, bankName: profile?.name, accountRef: group.accountRef, sourceFile: fileName });
         return { j, detail };
       })
       .sort((a, b) => b.detail.date.localeCompare(a.detail.date));
@@ -658,19 +651,40 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
               {t("csv_done")}
             </Button>
           </div>
+        ) : batch ? (
+          <BankStatementBatch
+            key={batch.files.map((f) => f.name + f.size).join("|")}
+            files={batch.files}
+            dropped={batch.dropped}
+            total={batch.total}
+            accounts={accounts}
+            onChooseOther={() => setBatch(null)}
+            onDone={() => setOpen(false)}
+          />
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv,text/csv,text/plain,.pdf,application/pdf"
-                className="hidden"
-                onChange={(e) => handleFile(e.target.files?.[0])}
-              />
-              <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-                {fileName || t("stmt_choose_file")}
-              </Button>
+            <div
+              className="space-y-1"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleFiles(Array.from(e.dataTransfer.files ?? []));
+              }}
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={inputRef}
+                  type="file"
+                  multiple
+                  accept=".csv,text/csv,text/plain,.pdf,application/pdf"
+                  className="hidden"
+                  onChange={(e) => handleFiles(Array.from(e.target.files ?? []))}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+                  {fileName || t("stmt_choose_file")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{bt("batch_hint", { max: MAX_BATCH_FILES })}</p>
             </div>
 
             {showPicker && kind && (

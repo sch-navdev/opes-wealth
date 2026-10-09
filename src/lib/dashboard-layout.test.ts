@@ -72,6 +72,20 @@ describe("registry", () => {
     expect(tiersOfBlock("allocation")).toEqual(["standard", "professional", "expert"]);
     expect(blocksForTier("basic").map((b) => b.id)).not.toContain("allocation");
   });
+  it("registers the SCPI block after the income calendar, medium by default, from Standard up", () => {
+    expect(BLOCK_IDS[BLOCK_IDS.indexOf("incomeCalendar") + 1]).toBe("scpi");
+    const block = getBlock("scpi");
+    expect(block.section).toBe("scpi");
+    expect(block.defaultSize).toBe("m");
+    expect([...block.allowedSizes]).toEqual(["m", "l", "full"]);
+    expect(block.labelKey).toBe("dlayout_block_scpi");
+    expect(tiersOfBlock("scpi")).toEqual(["standard", "professional", "expert"]);
+    expect(blocksForTier("basic").map((b) => b.id)).not.toContain("scpi");
+    const old = normalizeLayout({ version: 1, order: ["bento"], hidden: [], sizes: {} }, "standard");
+    expect(old.order).toContain("scpi");
+    expect(old.hidden).not.toContain("scpi");
+    expect(old.sizes.scpi).toBe("m");
+  });
   it("registers the Data quality block next to the allocation dial, medium by default, from Standard up", () => {
     expect(BLOCK_IDS[BLOCK_IDS.indexOf("allocation") + 1]).toBe("dataQuality");
     const block = getBlock("dataQuality");
@@ -114,6 +128,7 @@ describe("defaultLayout", () => {
       "dataQuality",
       "cashFlow",
       "incomeCalendar",
+      "scpi",
       "csvUpload",
       "futureProjects",
       "analytics",

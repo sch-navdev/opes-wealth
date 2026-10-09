@@ -78,7 +78,10 @@ export async function readBankStatementPdf(formData: FormData): Promise<ReadBank
   // so it runs ONLY with the explicit `ocr=1` consent of this upload. An encrypted PDF never gets
   // here (the reader throws first), so a password-protected file is never sent to OCR.
   if (!ocrBytes) {
-    return { ok: false, failure: { ...outcome.failure, ocr: isOcrConfigured() ? "available" : "unconfigured" } };
+    return {
+      ok: false,
+      failure: { ...outcome.failure, ocr: isOcrConfigured() ? "available" : "unconfigured", pages: extracted.numPages },
+    };
   }
   if (!isOcrConfigured()) {
     return {

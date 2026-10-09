@@ -4,6 +4,7 @@
  * status = 'active', and ONLY this module reads status = 'simulation'.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { companyIdsOf, isCompanyAccount } from "@/lib/company-cash";
 import { convertToBaseCurrency } from "@/lib/fx";
 import { parsePlan, projectPriceAndFees, type PlanInputs, type ProjectInput } from "@/lib/planning";
 import { parseRealEstateMetadata } from "@/lib/real-estate";
@@ -49,6 +50,8 @@ export function toProjectInput(row: SimulationRow, base: string, rates: Record<s
 }
 
 type HoldingForPlanning = {
+  /** Optional: with ids, a company_id link only counts when it points at a Company among the holdings. */
+  id?: string;
   currency: string;
   current_value: number;
   is_liability: boolean;
@@ -64,10 +67,12 @@ export function summariseHoldings(
 ): { liquidCash: number; existingMonthlyDebt: number } {
   let liquidCash = 0;
   let existingMonthlyDebt = 0;
+  const companyIds = companyIdsOf(holdings);
   for (const h of holdings) {
     const conv = (n: number) => convertToBaseCurrency(n, h.currency, base, rates);
     const category = h.asset_categories?.name;
-    if (category === "Cash" && !h.is_liability) liquidCash += conv(h.current_value);
+    // A company's bank account is not the person's liquid cash (it stays in net worth, see lib/company-cash.ts).
+    if (category === "Cash" && !h.is_liability && !isCompanyAccount(h, companyIds)) liquidCash += conv(h.current_value);
     if (h.is_liability) {
       const m = h.metadata?.monthly_payment;
       if (typeof m === "number" && m > 0) existingMonthlyDebt += conv(m);

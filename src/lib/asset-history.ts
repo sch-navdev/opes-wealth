@@ -11,9 +11,32 @@ export type AssetHistorySource =
   | "dari"
   | "dubailand"
   | "csv_import"
+  | "pdf_import"
   | "coingecko"
   | "finnhub"
   | "yahoo"
   | "broker_import"
   | "vehicle_valuation"
   | "open_finance";
+
+/** `asset_history.source_ref` / `transactions.source_file` are capped at this many characters (migration 0041). */
+export const SOURCE_REF_MAX_LENGTH = 200;
+
+/** A file name as stored with imported rows: the base name only (no folders), trimmed and capped; `undefined` when empty. */
+export function cleanSourceRef(name: string | null | undefined): string | undefined {
+  if (!name) return undefined;
+  const base = name.split(/[\\/]/).pop() ?? "";
+  const clean = base.replace(/[\u0000-\u001f]/g, "").trim().slice(0, SOURCE_REF_MAX_LENGTH);
+  return clean || undefined;
+}
+
+/**
+ * True when a Postgres / PostgREST error says `column` does not exist: `42703` (undefined_column) or
+ * `PGRST204` (column missing from the schema cache). Lets the importers keep working before migration 0041
+ * (the new `source_ref` / `source_file` columns) is applied.
+ */
+export function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, column: string): boolean {
+  if (!error) return false;
+  if (error.code !== "42703" && error.code !== "PGRST204") return false;
+  return !error.message || error.message.includes(column);
+}

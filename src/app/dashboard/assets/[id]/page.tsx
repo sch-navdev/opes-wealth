@@ -15,6 +15,8 @@ import { loadOwnershipStatus } from "@/lib/shared-assets/server";
 import { ownershipFactor } from "@/lib/ownership";
 import { viewerShareFactor } from "@/lib/asset-detail-scaling";
 import type { StoredTransactionRow } from "@/lib/transaction-detail";
+import type { AnalysisPortfolio } from "@/lib/asset-analysis/common";
+import { loadAnalysisPortfolio } from "@/lib/asset-analysis/portfolio-server";
 
 export default async function AssetDetailsPage({
   params,
@@ -41,7 +43,7 @@ export default async function AssetDetailsPage({
     redirect("/login/mfa");
   }
 
-  const [{ data: asset }, { data: history }, { data: categories }, rates] =
+  const [{ data: asset }, { data: historyWithRef, error: historyRefError }, { data: categories }, rates] =
     await Promise.all([
       supabase
         .from("assets")
@@ -52,13 +54,26 @@ export default async function AssetDetailsPage({
         .single<AssetDetail & { profile_id: string }>(),
       supabase
         .from("asset_history")
-        .select("id, recorded_date, value, net_equity, source")
+        .select("id, recorded_date, value, net_equity, source, source_ref")
         .eq("asset_id", id)
         .order("recorded_date", { ascending: true })
         .returns<AssetHistoryPoint[]>(),
       supabase.from("asset_categories").select("id, name").order("name"),
       getExchangeRatesFromUsd(),
     ]);
+
+  // `source_ref` (the imported file name) needs migration 0041: until it is applied the select above errors,
+  // so the history is read again without that column rather than showing an empty log.
+  let history = historyWithRef;
+  if (historyRefError) {
+    const { data } = await supabase
+      .from("asset_history")
+      .select("id, recorded_date, value, net_equity, source")
+      .eq("asset_id", id)
+      .order("recorded_date", { ascending: true })
+      .returns<AssetHistoryPoint[]>();
+    history = data;
+  }
 
   if (!asset) {
     notFound();
@@ -98,12 +113,24 @@ export default async function AssetDetailsPage({
     try {
       const { data, error } = await supabase
         .from("transactions")
-        .select("booked_date, amount, currency, description, source, fingerprint, created_at")
+        .select("booked_date, amount, currency, description, source, fingerprint, created_at, source_file")
         .eq("asset_id", id)
         .order("booked_date", { ascending: false })
         .limit(200)
         .returns<StoredTransactionRow[]>();
-      if (!error && data) transactions = data;
+      if (!error && data) {
+        transactions = data;
+      } else if (error) {
+        // `source_file` needs migration 0041: read again without it until it is applied.
+        const retry = await supabase
+          .from("transactions")
+          .select("booked_date, amount, currency, description, source, fingerprint, created_at")
+          .eq("asset_id", id)
+          .order("booked_date", { ascending: false })
+          .limit(200)
+          .returns<StoredTransactionRow[]>();
+        if (!retry.error && retry.data) transactions = retry.data;
+      }
     } catch {
       transactions = [];
     }
@@ -146,8 +173,24 @@ export default async function AssetDetailsPage({
     attribution = null;
   }
 
+  // Analysis tab: share of portfolio / class and the accounts linked to a company. Optional: a failure just
+  // leaves those figures as an en dash.
+  let analysisPortfolio: AnalysisPortfolio | null = null;
+  try {
+    const { data: profile } = await supabase.from("profiles").select("default_currency").eq("id", user.id).single();
+    analysisPortfolio = await loadAnalysisPortfolio(supabase, user.id, {
+      assetId: id,
+      categoryName: asset.asset_categories?.name ?? "",
+      base: profile?.default_currency || DEFAULT_BASE_CURRENCY,
+      ratesFromUsd: rates,
+    });
+  } catch {
+    analysisPortfolio = null;
+  }
+
   return (
     <AssetDetailView
+      analysisPortfolio={analysisPortfolio}
       asset={asset}
       history={history ?? []}
       categories={categories ?? []}

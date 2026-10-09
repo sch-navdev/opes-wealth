@@ -6,6 +6,7 @@
  * assets owned by somebody else are not included.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { companyIdsOf, isCompanyAccount } from "@/lib/company-cash";
 import { parseLiabilityMetadata } from "@/lib/liability";
 import { parseRealEstateMetadata } from "@/lib/real-estate";
 import { lastCompleteMonths, type WaterfallCashAccount, type WaterfallLiability, type WaterfallTransaction } from "@/lib/cash-flow-waterfall";
@@ -29,10 +30,16 @@ export type WaterfallData = {
 const PAGE = 1000;
 const MAX_PAGES = 30;
 
-/** Pure: assets -> liabilities with a planned monthly payment and the Cash accounts. */
+/**
+ * Pure: assets -> liabilities with a planned monthly payment and the PERSONAL Cash accounts. A company bank
+ * account (Cash with metadata.company_id on one of the Companies among `rows`, see `lib/company-cash.ts`) is left
+ * out: its balance is not emergency savings and, because the transactions are only loaded for the accounts
+ * returned here, its transactions never enter the daily-expense average either.
+ */
 export function splitAssets(rows: AssetRow[]): { liabilities: WaterfallLiability[]; accounts: WaterfallCashAccount[] } {
   const liabilities: WaterfallLiability[] = [];
   const accounts: WaterfallCashAccount[] = [];
+  const companyIds = companyIdsOf(rows);
   for (const a of rows) {
     const category = a.asset_categories?.name;
     if (a.is_liability) {
@@ -46,7 +53,7 @@ export function splitAssets(rows: AssetRow[]): { liabilities: WaterfallLiability
       if (typeof p === "number" && p > 0) {
         liabilities.push({ id: a.id, name: a.name, type: "mortgage", lender: "", monthlyPayment: p, currency: a.currency });
       }
-    } else if (category === "Cash") {
+    } else if (category === "Cash" && !isCompanyAccount(a, companyIds)) {
       const md = (a.metadata ?? {}) as Record<string, unknown>;
       accounts.push({
         id: a.id,

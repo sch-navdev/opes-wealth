@@ -63,6 +63,8 @@ import { ExportReportsCard } from "@/components/export-reports-card";
 import { PassiveIncomeCard } from "@/components/passive-income-card";
 import { buildPassiveIncome } from "@/lib/passive-income";
 import { IncomeCalendar } from "@/components/income-calendar";
+import { ScpiDashboardBlock } from "@/components/scpi-dashboard-block";
+import { buildScpiBlockData } from "@/lib/scpi-dashboard";
 import { buildIncomeCalendar } from "@/lib/income-calendar";
 import {
   applyOwnershipFactors,
@@ -82,6 +84,7 @@ import {
   resolveVehicleValuation,
 } from "@/lib/vehicles";
 import { assetLiability, grossAssetValue } from "@/lib/liabilities";
+import { companyIdOf, companyIdSet, displayCategory, isCompanyAccount } from "@/lib/company-cash";
 import {
   calculateTotalCost,
   calculateUnrealizedGain,
@@ -214,6 +217,12 @@ export default async function DashboardPage({
   const unscaledAssets = [...(ownAssetRows ?? []), ...sharedWithMe.filter((a) => !ownIds.has(a.id))];
   const factorById = await loadOwnershipFactors(supabase, user.id, unscaledAssets);
   const assets: AssetRow[] = applyOwnershipFactors(unscaledAssets, factorById);
+  // Company bank accounts (Cash assets linked to a Company by metadata.company_id): part of net worth like any
+  // asset, but shown as "Company cash" and kept out of the personal Cash views (see lib/company-cash.ts).
+  const companyIds = companyIdSet(assets);
+  const companyNameById = new Map(
+    assets.filter((a) => a.asset_categories?.name === "Companies").map((a) => [a.id, a.name]),
+  );
 
   const { currency: currencyParam } = await searchParams;
   // The dashboard's Base Currency: every asset's native `currency` is
@@ -295,7 +304,7 @@ export default async function DashboardPage({
 
   const performanceSeries = buildNetWorthSeries(
     (assets ?? []).map((asset) => ({
-      category: asset.asset_categories?.name ?? "—",
+      category: displayCategory(asset, companyIds),
       history: baseHistory(asset),
     })),
     // Run the series to today so it doesn't stop at the last recorded row.
@@ -381,7 +390,7 @@ export default async function DashboardPage({
   // (share-scaled, in the Base Currency), so its totals equal the metric cards by construction.
   const fxRows: FxExposureInput[] = [];
   for (const asset of assets ?? []) {
-    const category = asset.asset_categories?.name ?? "—";
+    const category = displayCategory(asset, companyIds);
     const toBase = (n: number) =>
       convertToBaseCurrency(n, asset.currency, displayCurrency, rates);
     const gross = asset.is_liability ? 0 : toBase(grossAssetValue(asset));
@@ -435,7 +444,7 @@ export default async function DashboardPage({
   const assetLines: AssetLineInput[] = (assets ?? []).map((asset) => ({
     id: asset.id,
     name: asset.name,
-    category: asset.asset_categories?.name ?? "—",
+    category: displayCategory(asset, companyIds),
     currentValue: netWorthById.get(asset.id) ?? 0,
     // Older rows are thinned to keep the payload small; the last ~14 months
     // stay daily so the 1M / 6M / 1Y zoom ranges keep their detail.
@@ -464,8 +473,18 @@ export default async function DashboardPage({
   // If 0020 isn't applied yet this simply returns nothing.
   const bankByAsset = new Map((bankLinks ?? []).map((l) => [l.asset_id, l]));
 
-  const cashAccounts: CashAccount[] = (assets ?? [])
-    .filter((a) => a.asset_categories?.name === "Cash" && !a.is_liability)
+  const allCashAssets = (assets ?? []).filter((a) => a.asset_categories?.name === "Cash" && !a.is_liability);
+  // Personal cash only: the company accounts have their own line in the card and live under Companies.
+  const companyCashAssets = allCashAssets.filter((a) => isCompanyAccount(a, companyIds));
+  const companyAccounts = {
+    count: companyCashAssets.length,
+    total: companyCashAssets.reduce(
+      (sum, a) => sum + convertToBaseCurrency(a.current_value, a.currency, displayCurrency, rates),
+      0,
+    ),
+  };
+  const cashAccounts: CashAccount[] = allCashAssets
+    .filter((a) => !isCompanyAccount(a, companyIds))
     .map((a) => ({
       id: a.id,
       name: a.name,
@@ -555,6 +574,8 @@ export default async function DashboardPage({
   // The dashboard's blocks, by id (lib/dashboard-layout.ts). Everything is still computed once, on the
   // server; the client grid decides which blocks to show, in which order and size (the user's saved
   // layout, per UI tier), so server components stay server components. A block missing here is not shown.
+  const scpiData = buildScpiBlockData(assets ?? [], displayCurrency, rates, today);
+
   const blocks: DashboardBlockContent = {
     fxExposure: <FxExposureBar rows={sumByCurrency(fxRows)} baseCurrency={displayCurrency} />,
     basicOverview: (
@@ -603,20 +624,27 @@ export default async function DashboardPage({
 
         <CashBankCard
           accounts={cashAccounts}
+          companyAccounts={companyAccounts}
           baseCurrency={displayCurrency}
           bankSyncMode={getBankSyncMode()}
         />
       </>
     ),
     incomeCalendar: <IncomeCalendar calendar={incomeCalendar} baseCurrency={displayCurrency} />,
+    // Only when the user holds SCPI: an empty block would be noise for everyone else.
+    scpi: scpiData.holdings.length > 0 ? <ScpiDashboardBlock data={scpiData} baseCurrency={displayCurrency} /> : undefined,
     csvUpload: (
       <DashboardCsvCard
-        accounts={cashAccounts.map(({ id, name, currency, nativeValue }) => ({
-          id,
-          name,
-          currency,
-          nativeValue,
-        }))}
+        // Every Cash account, company ones included (labelled with the company), so statement import still routes.
+        accounts={allCashAssets.map((a) => {
+          const company = companyIds.has(companyIdOf(a.metadata)) ? companyNameById.get(companyIdOf(a.metadata)) : undefined;
+          return {
+            id: a.id,
+            name: company ? `${a.name} (${company})` : a.name,
+            currency: a.currency,
+            nativeValue: a.current_value,
+          };
+        })}
       />
     ),
     futureProjects: (

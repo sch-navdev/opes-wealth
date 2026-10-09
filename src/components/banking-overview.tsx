@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BankConnectDialog } from "@/components/bank-connect-dialog";
 import { BankLogoByName, InstitutionLogo } from "@/components/institution-logo";
@@ -14,7 +14,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle } from "lucide-react";
 import { BalanceAsOf } from "@/components/balance-as-of";
+import { CompanyAccountsSection } from "@/components/company-accounts-section";
 import { useBankingText } from "@/components/banking-text";
+import { useEditBankText } from "@/components/edit-bank-account-text";
+import {
+  ALL_COUNTRIES,
+  NO_COUNTRY,
+  countriesInRows,
+  groupRowsByCountry,
+  readCountryFilter,
+  resolveCountryFilter,
+  writeCountryFilter,
+} from "@/lib/banking/account-country";
+import { countryFlag, countryLabel } from "@/lib/banking/bank-picker";
 import { countStaleBalances } from "@/lib/bank-staleness";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -45,6 +57,10 @@ export type BankingAccountRow = {
   assetId?: string;
   /** ISO date (YYYY-MM-DD) the balance is as of; absent for sandbox rows (not part of net worth). */
   balanceAsOf?: string | null;
+  /** ISO country code (metadata.country, else the bank's); groups and filters the list. */
+  country?: string;
+  /** Name of the company this account belongs to (Cash account with metadata.company_id): shown under "Company accounts". */
+  companyName?: string;
 };
 
 type Filter = "real" | "sandbox" | "all";
@@ -76,6 +92,14 @@ export function BankingOverview({
   const tx = useBankingText();
   const { maskValue } = usePrivacy();
   const [filter, setFilter] = useState<Filter>("real");
+  const ebk = useEditBankText();
+  // Country filter chip, remembered per device (read after mount so the server and client markup agree).
+  const [countryFilter, setCountryFilter] = useState<string>(ALL_COUNTRIES);
+  useEffect(() => {
+    const stored = readCountryFilter();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored) setCountryFilter(stored);
+  }, []);
   const syncTime = new Intl.DateTimeFormat(intlLocale, {
     day: "2-digit",
     month: "2-digit",
@@ -89,17 +113,22 @@ export function BankingOverview({
   const sandbox = rows.filter((r) => r.kind === "sandbox");
   const realTotal = real.reduce((s, r) => s + r.baseBalance, 0);
   const sandboxTotal = sandbox.reduce((s, r) => s + r.baseBalance, 0);
-  const visible = filter === "real" ? real : filter === "sandbox" ? sandbox : rows;
+  const visibleAll = filter === "real" ? real : filter === "sandbox" ? sandbox : rows;
+  // Company accounts stay in the real total (they are in net worth) but are listed apart, under their company.
+  const visible = visibleAll.filter((r) => !r.companyName);
+  const companyVisible = visibleAll.filter((r) => r.companyName);
 
-  const groups = new Map<string, BankingAccountRow[]>();
-  for (const row of visible) {
-    const key = row.institution || t("banking_group_other");
-    groups.set(key, [...(groups.get(key) ?? []), row]);
-  }
-  const ordered = Array.from(groups.entries()).sort(
-    (a, b) =>
-      b[1].reduce((s, r) => s + r.baseBalance, 0) - a[1].reduce((s, r) => s + r.baseBalance, 0),
-  );
+  // Country, then institution inside each country. A stored filter whose country is gone shows everything.
+  const availableCountries = countriesInRows(visible);
+  const activeCountry = resolveCountryFilter(countryFilter, availableCountries);
+  const countryGroups = groupRowsByCountry(visible, activeCountry, t("banking_group_other"));
+  const hasCountries = availableCountries.some((c) => c !== NO_COUNTRY);
+  const countryName = (c: string) =>
+    c === NO_COUNTRY ? ebk("ebk_country_unset") : `${countryFlag(c)} ${countryLabel(c, intlLocale)}`.trim();
+  const pickCountry = (c: string) => {
+    setCountryFilter(c);
+    writeCountryFilter(c);
+  };
 
   const uaeBanks = banksByCountry("AE").filter((b) => b.dedicated);
   const frenchBanks = banksByCountry("FR").filter((b) => b.dedicated);
@@ -189,10 +218,35 @@ export function BankingOverview({
 
       <p className="text-xs text-muted-foreground">{tx("bank_asof_legend")}</p>
 
-      {ordered.length === 0 ? (
+      {hasCountries && (
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={ebk("ebk_country_filter_label")}>
+          {[ALL_COUNTRIES, ...availableCountries].map((c) => (
+            <Button
+              key={c || "none"}
+              type="button"
+              size="sm"
+              variant={activeCountry === c ? "default" : "outline"}
+              aria-pressed={activeCountry === c}
+              onClick={() => pickCountry(c)}
+            >
+              {c === ALL_COUNTRIES ? ebk("ebk_country_all") : countryName(c)}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {countryGroups.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("banking_no_accounts")}</p>
       ) : (
-        ordered.map(([institution, accounts]) => {
+        countryGroups.map((group) => (
+        <div key={group.country || "none"} className="space-y-4">
+          {hasCountries && (
+            <h2 className="flex items-center justify-between text-sm font-semibold text-foreground" data-testid="banking-country-heading">
+              <span>{countryName(group.country)}</span>
+              <span className="tabular-nums text-muted-foreground">{maskValue(base.format(group.total))}</span>
+            </h2>
+          )}
+        {group.institutions.map(({ institution, rows: accounts }) => {
           const total = accounts.reduce((s, r) => s + r.baseBalance, 0);
           const staleCount = countStaleBalances(accounts, today);
           return (
@@ -295,8 +349,11 @@ export function BankingOverview({
               </CardContent>
             </Card>
           );
-        })
+        })}
+        </div>
+        ))
       )}
+      <CompanyAccountsSection rows={companyVisible} baseCurrency={baseCurrency} today={today} />
     </div>
   );
 }

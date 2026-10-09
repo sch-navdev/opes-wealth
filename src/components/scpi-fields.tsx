@@ -14,18 +14,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useLanguage } from "@/context/language-context";
+import { useScpiText } from "@/components/scpi-text";
 import {
   SCPI_HOLDING_MODES,
+  SCPI_MAX_INDICATORS,
+  SCPI_MAX_NOTE_CHARS,
+  SCPI_MAX_REGISTER_CHARS,
+  SCPI_MAX_REVALORISATIONS,
   generateQuarterlyDividends,
   scpiAverageYield,
+  scpiCurrentSubscriptionPrice,
+  scpiEnjoymentDelayMonths,
   scpiEntryFees,
   scpiInvested,
+  scpiRevalorisationSteps,
+  scpiTotalRevalorisationPct,
   scpiTrailingYield,
   scpiWithdrawalValue,
   type ScpiDividend,
   type ScpiHoldingMode,
+  type ScpiIndicator,
   type ScpiMetadata,
+  type ScpiRevalorisation,
 } from "@/lib/scpi";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -56,11 +68,31 @@ export function ScpiFields({
   currency: string;
 }) {
   const { t, intlLocale } = useLanguage();
+  const st = useScpiText();
   const formatter = moneyFormatter(intlLocale, currency);
 
   function set<K extends keyof ScpiMetadata>(key: K, next: ScpiMetadata[K]) {
     onChange({ ...value, [key]: next });
   }
+
+  function setReval(index: number, patch: Partial<ScpiRevalorisation>) {
+    set(
+      "revalorisations",
+      value.revalorisations.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+    );
+  }
+
+  function setIndicator(index: number, patch: Partial<ScpiIndicator>) {
+    set(
+      "indicators",
+      value.indicators.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+    );
+  }
+
+  const delayMonths = scpiEnjoymentDelayMonths(value.subscription_date, value.jouissance_date);
+  const revalSteps = scpiRevalorisationSteps(value);
+  const totalReval = scpiTotalRevalorisationPct(value);
+  const mds = scpiCurrentSubscriptionPrice(value);
 
   function setDividend(index: number, patch: Partial<ScpiDividend>) {
     set(
@@ -183,6 +215,15 @@ export function ScpiFields({
             <p className="text-xs text-muted-foreground">{t("scpi_withdrawal_hint")}</p>
           </div>
           <div className="min-w-0 space-y-2">
+            <Label htmlFor="scpi_subscription_date">{st("scpi2_subscription_date")}</Label>
+            <Input
+              id="scpi_subscription_date"
+              type="date"
+              value={value.subscription_date}
+              onChange={(e) => set("subscription_date", e.target.value)}
+            />
+          </div>
+          <div className="min-w-0 space-y-2">
             <Label htmlFor="scpi_jouissance">{t("scpi_jouissance_date")}</Label>
             <Input
               id="scpi_jouissance"
@@ -190,6 +231,20 @@ export function ScpiFields({
               value={value.jouissance_date}
               onChange={(e) => set("jouissance_date", e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              {st("scpi2_enjoyment_delay")}:{" "}
+              {delayMonths != null ? st("scpi2_months", { months: formatDecimal(delayMonths, intlLocale, 1) }) : "—"}
+            </p>
+          </div>
+          <div className="min-w-0 space-y-2 sm:col-span-2">
+            <Label htmlFor="scpi_register">{st("scpi2_register")}</Label>
+            <Input
+              id="scpi_register"
+              maxLength={SCPI_MAX_REGISTER_CHARS}
+              value={value.register_numbers}
+              onChange={(e) => set("register_numbers", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{st("scpi2_register_hint")}</p>
           </div>
           <div className="min-w-0 space-y-2">
             <Label htmlFor="scpi_target_yield">{t("scpi_target_yield")}</Label>
@@ -220,6 +275,155 @@ export function ScpiFields({
               fees: formatter.format(scpiEntryFees(value, shares)),
             })}
           </p>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-sm font-medium text-foreground">{st("scpi2_reval_heading")}</h4>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={value.revalorisations.length >= SCPI_MAX_REVALORISATIONS}
+            onClick={() =>
+              set("revalorisations", [
+                ...value.revalorisations,
+                { id: `rev-${Date.now()}`, price: mds ?? 0, date: todayIso },
+              ])
+            }
+          >
+            {st("scpi2_reval_add")}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">{st("scpi2_reval_hint")}</p>
+        {value.revalorisations.length > 0 && (
+          <ul className="space-y-2">
+            {value.revalorisations.map((r, index) => {
+              const step = revalSteps.find((s) => s.id === r.id);
+              return (
+                <li key={r.id} className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-2">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    aria-label={st("scpi2_reval_price")}
+                    value={r.price}
+                    onChange={(e) => setReval(index, { price: Number(e.target.value) })}
+                  />
+                  <Input
+                    type="date"
+                    aria-label={st("scpi2_reval_date")}
+                    value={r.date}
+                    onChange={(e) => setReval(index, { date: e.target.value })}
+                  />
+                  <span className="w-16 text-end text-xs tabular-nums text-muted-foreground">
+                    {step?.changePct != null ? `${step.changePct >= 0 ? "+" : ""}${formatDecimal(step.changePct, intlLocale, 2)}%` : "—"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={st("scpi2_remove")}
+                    onClick={() =>
+                      set(
+                        "revalorisations",
+                        value.revalorisations.filter((_, i) => i !== index),
+                      )
+                    }
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {totalReval != null && (
+          <p className="text-xs text-muted-foreground">
+            {st("scpi2_reval_total")}: {totalReval >= 0 ? "+" : ""}
+            {formatDecimal(totalReval, intlLocale, 2)}%
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <h4 className="text-sm font-medium text-foreground">{st("scpi2_ind_heading")}</h4>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={value.indicators.length >= SCPI_MAX_INDICATORS}
+            onClick={() =>
+              set("indicators", [
+                ...value.indicators,
+                { id: `ind-${Date.now()}`, as_of: todayIso, vdrec: null, vdrea: null, source_note: "" },
+              ])
+            }
+          >
+            {st("scpi2_ind_add")}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">{st("scpi2_ind_hint")}</p>
+        {value.indicators.length > 0 && (
+          <ul className="space-y-3">
+            {value.indicators.map((row, index) => (
+              <li key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-2">
+                <div className="min-w-0 space-y-1">
+                  <Label className="text-xs text-muted-foreground">{st("scpi2_ind_asof")}</Label>
+                  <Input
+                    type="date"
+                    value={row.as_of}
+                    onChange={(e) => setIndicator(index, { as_of: e.target.value })}
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <Label className="text-xs text-muted-foreground">{st("scpi2_ind_vdrec")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={row.vdrec ?? ""}
+                    onChange={(e) => setIndicator(index, { vdrec: numberOrNull(e.target.value) })}
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <Label className="text-xs text-muted-foreground">{st("scpi2_ind_vdrea")}</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={row.vdrea ?? ""}
+                    onChange={(e) => setIndicator(index, { vdrea: numberOrNull(e.target.value) })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={st("scpi2_remove")}
+                  onClick={() =>
+                    set(
+                      "indicators",
+                      value.indicators.filter((_, i) => i !== index),
+                    )
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+                <div className="col-span-4 min-w-0">
+                  <Input
+                    aria-label={st("scpi2_ind_source")}
+                    placeholder={st("scpi2_ind_source_placeholder")}
+                    maxLength={SCPI_MAX_NOTE_CHARS}
+                    value={row.source_note}
+                    onChange={(e) => setIndicator(index, { source_note: e.target.value })}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
@@ -324,7 +528,7 @@ export function ScpiFields({
         {value.dividends.length > 0 && (
           <ul className="space-y-2">
             {value.dividends.map((d, index) => (
-              <li key={d.id} className="grid grid-cols-[1fr_1fr_auto_auto] items-center gap-2">
+              <li key={d.id} className="grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-2">
                 <Input
                   type="date"
                   aria-label={t("scpi_dividend_date")}
@@ -351,6 +555,14 @@ export function ScpiFields({
                     <SelectItem value="expected">{t("scpi_status_expected")}</SelectItem>
                   </SelectContent>
                 </Select>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Checkbox
+                    checked={d.exceptional === true}
+                    aria-label={st("scpi2_div_exceptional_aria")}
+                    onCheckedChange={(checked) => setDividend(index, { exceptional: checked === true })}
+                  />
+                  {st("scpi2_div_exceptional")}
+                </label>
                 <Button
                   type="button"
                   variant="ghost"

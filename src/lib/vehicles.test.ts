@@ -422,11 +422,11 @@ describe("buildVehicleComparisonSeries", () => {
       today,
     });
     expect(rows).toEqual([
-      { date: "2024-01-01", value: null, purchase: 100, blueBook: null },
-      { date: "2024-02-01", value: 90, purchase: 100, blueBook: null },
-      { date: "2024-03-01", value: null, purchase: 100, blueBook: 85 },
-      { date: "2024-06-01", value: 80, purchase: 100, blueBook: null },
-      { date: "2025-01-01", value: 80, purchase: 100, blueBook: null },
+      { date: "2024-01-01", value: null, purchase: 100, blueBook: null, blueBookStep: null },
+      { date: "2024-02-01", value: 90, purchase: 100, blueBook: null, blueBookStep: null },
+      { date: "2024-03-01", value: null, purchase: 100, blueBook: 85, blueBookStep: 85 },
+      { date: "2024-06-01", value: 80, purchase: 100, blueBook: null, blueBookStep: 85 },
+      { date: "2025-01-01", value: 80, purchase: 100, blueBook: null, blueBookStep: 85 },
     ]);
   });
 
@@ -438,7 +438,7 @@ describe("buildVehicleComparisonSeries", () => {
       guide: [],
       today,
     });
-    expect(rows[0]).toEqual({ date: "2024-01-01", value: 95, purchase: 100, blueBook: null });
+    expect(rows[0]).toEqual({ date: "2024-01-01", value: 95, purchase: 100, blueBook: null, blueBookStep: null });
   });
 
   it("omits the purchase line without a positive price", () => {
@@ -463,7 +463,7 @@ describe("buildVehicleComparisonSeries", () => {
       guide: [{ date: "2023-06-01", value: 70 }],
       today,
     });
-    expect(rows[0]).toEqual({ date: "2023-06-01", value: null, purchase: null, blueBook: 70 });
+    expect(rows[0]).toEqual({ date: "2023-06-01", value: null, purchase: null, blueBook: 70, blueBookStep: 70 });
     expect(rows[1]).toMatchObject({ date: "2024-01-01", purchase: 100 });
   });
 
@@ -491,6 +491,52 @@ describe("buildVehicleComparisonSeries", () => {
       guide: [],
       today,
     });
-    expect(rows).toEqual([{ date: today, value: 50, purchase: null, blueBook: null }]);
+    expect(rows).toEqual([{ date: today, value: 50, purchase: null, blueBook: null, blueBookStep: null }]);
+  });
+
+  describe("Blue Book step line (instant valuation carried forward)", () => {
+    it("a single valuation is carried from its date to today as a step, the observation stays a single dot", () => {
+      const rows = buildVehicleComparisonSeries({
+        market: [{ recorded_date: "2024-02-01", value: 90 }],
+        purchaseDate: "2024-01-01",
+        purchasePrice: 100,
+        guide: [{ date: "2024-03-01", value: 85 }],
+        today,
+      });
+      expect(rows.map((r) => [r.date, r.blueBook, r.blueBookStep])).toEqual([
+        ["2024-01-01", null, null],
+        ["2024-02-01", null, null],
+        ["2024-03-01", 85, 85],
+        ["2025-01-01", null, 85],
+      ]);
+      expect(rows.filter((r) => r.blueBook != null)).toHaveLength(1);
+    });
+
+    it("several valuations are joined by steps: each value holds until the next observation", () => {
+      const rows = buildVehicleComparisonSeries({
+        market: [{ recorded_date: "2024-02-01", value: 90 }, { recorded_date: "2024-09-01", value: 70 }],
+        purchaseDate: "2024-01-01",
+        purchasePrice: 100,
+        guide: [{ date: "2024-08-01", value: 75 }, { date: "2024-03-01", value: 85 }],
+        today,
+      });
+      const step = Object.fromEntries(rows.map((r) => [r.date, r.blueBookStep]));
+      expect(step).toEqual({
+        "2024-01-01": null,
+        "2024-02-01": null,
+        "2024-03-01": 85,
+        "2024-08-01": 75,
+        "2024-09-01": 75,
+        "2025-01-01": 75,
+      });
+      expect(rows.filter((r) => r.blueBook != null).map((r) => r.blueBook)).toEqual([85, 75]);
+    });
+
+    it("adds no step without a valuation, and none when the only valuation is in the future", () => {
+      const none = buildVehicleComparisonSeries({ market: [{ recorded_date: "2024-02-01", value: 90 }], purchaseDate: null, purchasePrice: null, guide: [], today });
+      expect(none.every((r) => r.blueBookStep === null)).toBe(true);
+      const future = buildVehicleComparisonSeries({ market: [], purchaseDate: null, purchasePrice: null, guide: [{ date: "2026-01-01", value: 60 }], today });
+      expect(future).toEqual([{ date: "2026-01-01", value: null, purchase: null, blueBook: 60, blueBookStep: 60 }]);
+    });
   });
 });
