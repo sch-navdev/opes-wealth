@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import Link from "next/link";
 import { Building2, Factory, Landmark } from "lucide-react";
 import { ENTITY_TYPE_LABEL_KEYS } from "@/components/company-fields";
@@ -23,7 +24,7 @@ function NodeRow({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
+  const formatter = moneyFormatter(intlLocale, baseCurrency);
   const md = node.metadata;
   const meta = [
     t(ENTITY_TYPE_LABEL_KEYS[md.entity_type]),

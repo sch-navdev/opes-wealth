@@ -364,6 +364,25 @@ describe("buildPortfolioWorkbook", () => {
         "Contract value": 1_000,
       });
     });
+    it("writes one AV Holdings line per holding with the reconciliation", () => {
+      const av = asset({
+        id: "av2",
+        name: "AV H",
+        category: "Assurance-Vie",
+        currency: "EUR",
+        current_value: 1_000,
+        metadata: { holdings: [{ id: "a", type: "euro_fund", name: "Fonds Euro Demo", value: 600 }, { id: "b", type: "etf", name: "ETF Demo", isin: "IE00B4L5Y983", value: 300 }] },
+      });
+      const out = build([av]);
+      expect(rows(out, "Assurance-Vie")[0]).toMatchObject({ "Euro fund %": 66.67, "Allocation from holdings": "Yes" });
+      const lines = rows(out, "AV Holdings");
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toMatchObject({ Contract: "AV H", Type: "Euro fund", Value: 600, "Holdings total": 900, "Difference vs contract value": -100 });
+      expect(lines[1]).toMatchObject({ ISIN: "IE00B4L5Y983" });
+    });
+    it("has no AV Holdings sheet without holdings", () => {
+      expect(build([asset({ id: "av3", name: "A", category: "Assurance-Vie", currency: "EUR", current_value: 5, metadata: {} })]).SheetNames).not.toContain("AV Holdings");
+    });
     it("is omitted when there is no Assurance-Vie asset", () => {
       expect(build([cash]).SheetNames).not.toContain("Assurance-Vie");
     });

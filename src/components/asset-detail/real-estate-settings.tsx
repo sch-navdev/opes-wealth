@@ -1,5 +1,8 @@
 "use client";
 
+import { useLanguage } from "@/context/language-context";
+import { formatPercentPoints } from "@/lib/money-parts";
+import type { MoneyFormatter } from "@/lib/money-parts";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { Button } from "@/components/ui/button";
@@ -47,7 +50,7 @@ export function RealEstateSettings({
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
   metadata: RealEstateMetadata;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   totalCost: number | null;
   hasLoan: boolean;
   outstandingLoanBalance: number;
@@ -55,6 +58,7 @@ export function RealEstateSettings({
   scheduleOpen: boolean;
   setScheduleOpen: (open: boolean) => void;
 }) {
+  const { intlLocale } = useLanguage();
   return (
     <>
       <Card className="border-border bg-card">
@@ -427,7 +431,7 @@ export function RealEstateSettings({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>{t("loan_percent_paid")}</span>
-                      <span>{amortizationSummary.percentPaid.toFixed(1)}%</span>
+                      <span>{formatPercentPoints(amortizationSummary.percentPaid, intlLocale, { digits: 1 })}</span>
                     </div>
                     <ProgressBar
                       percent={amortizationSummary.percentPaid}
@@ -470,7 +474,7 @@ export function RealEstateSettings({
                                   {entry.date}
                                 </TableCell>
                                 <TableCell className="text-end text-muted-foreground">
-                                  {entry.rateUsed.toFixed(2)}%
+                                  {formatPercentPoints(entry.rateUsed, intlLocale, { digits: 2 })}
                                 </TableCell>
                                 <TableCell className="text-end">
                                   {maskValue(

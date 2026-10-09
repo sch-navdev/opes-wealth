@@ -56,14 +56,14 @@ describe("IncomeStreamsManager", () => {
     expect(within(table).getByText("Year-end bonus")).toBeInTheDocument();
     // Run-rate: 3,000 + 6,000 EUR / 12 (= 12,000 USD / 12 = 1,000) = 4,000. Next 12 months: 36,000 + 12,000 = 48,000.
     const foot = table.querySelector("tfoot") as HTMLElement;
-    expect(foot.textContent).toContain("$4,000");
-    expect(foot.textContent).toContain("$48,000");
+    expect(foot.textContent).toContain("USD 4,000");
+    expect(foot.textContent).toContain("USD 48,000");
   });
 
   it("an ended stream has no run-rate", () => {
     renderManager([{ ...salary, end_date: "2026-02-28" }]);
     const foot = screen.getByRole("table").querySelector("tfoot") as HTMLElement;
-    expect(foot.textContent).toContain("$0");
+    expect(foot.textContent).toContain("USD 0");
   });
 
   it("validates the add form before calling the server", async () => {

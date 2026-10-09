@@ -41,6 +41,7 @@ import {
   parseExoticMetadata,
 } from "@/lib/exotic-assets";
 import { useLanguage } from "@/context/language-context";
+import { useAddFormText } from "@/components/add-form-text";
 import { currencies, getCurrencySymbol } from "@/lib/currencies";
 import { discardUploadedPhoto, uploadAssetPhoto } from "@/lib/asset-photos-client";
 import { photoThumbUrl } from "@/lib/asset-photos";
@@ -158,6 +159,7 @@ export function AddAssetDialog({
 }) {
   const isEditMode = !!asset;
   const { t } = useLanguage();
+  const tf = useAddFormText();
   const avT = useAssuranceVieText();
 
   const [open, setOpen] = useState(false);
@@ -508,15 +510,15 @@ export function AddAssetDialog({
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isEditMode
-              ? "Update the details for this asset."
-              : "Track a new asset or liability in your portfolio."}
+              ? tf("af_dlg_desc_edit", "Update the details for this asset.")
+              : tf("af_dlg_desc_add", "Track a new asset or liability in your portfolio.")}
           </DialogDescription>
           {isEditMode && <OwnerShareNote factor={ownerShareFactor} variant="edit" />}
         </DialogHeader>
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div className="w-full min-w-0 space-y-2">
-            <Label>Images ({images.length}/{MAX_ASSET_IMAGES})</Label>
+            <Label>{tf("af_dlg_images", "Images ({count}/{max})", { count: images.length, max: MAX_ASSET_IMAGES })}</Label>
             <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
               {images.map((src, index) => (
                 <div key={index} className="relative">
@@ -528,7 +530,7 @@ export function AddAssetDialog({
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    aria-label="Remove image"
+                    aria-label={tf("af_dlg_remove_image", "Remove image")}
                     className="absolute -end-2 -top-2 size-5 rounded-full bg-card p-0"
                     onClick={() => removeImage(index)}
                   >
@@ -550,7 +552,7 @@ export function AddAssetDialog({
                   size="sm"
                   onClick={() => imageInputRef.current?.click()}
                 >
-                  {uploadingPhoto ? t("photo_uploading") : images.length === 0 ? "Upload Image" : "Add Image"}
+                  {uploadingPhoto ? t("photo_uploading") : images.length === 0 ? tf("af_dlg_upload_image", "Upload Image") : tf("af_dlg_add_image", "Add Image")}
                 </Button>
               )}
               <input
@@ -564,18 +566,18 @@ export function AddAssetDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">{tf("af_dlg_name", "Name")}</Label>
             <Input
               id="name"
               name="name"
-              placeholder="e.g. Apple Inc."
+              placeholder={tf("af_dlg_name_placeholder", "e.g. Apple Inc.")}
               defaultValue={asset?.name ?? ""}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category_id">Category</Label>
+            <Label htmlFor="category_id">{tf("af_dlg_category", "Category")}</Label>
             <Select
               name="category_id"
               required
@@ -583,7 +585,7 @@ export function AddAssetDialog({
               onValueChange={setCategoryId}
             >
               <SelectTrigger id="category_id" className="w-full">
-                <SelectValue placeholder="Select a category" />
+                <SelectValue placeholder={tf("af_dlg_select_category", "Select a category")} />
               </SelectTrigger>
               <SelectContent>
                 {/* Liabilities have their own flow (Add Liability), so they're not offered here. */}
@@ -636,7 +638,7 @@ export function AddAssetDialog({
                     ? t("startup_shares")
                     : isExotic && exoticMetadata.kind === "wine"
                       ? t("exotic_bottles")
-                      : "Quantity"}
+                      : tf("af_dlg_quantity", "Quantity")}
               </Label>
               <Input
                 id="quantity"
@@ -661,7 +663,7 @@ export function AddAssetDialog({
             <div className="min-w-0 space-y-2">
               <Label htmlFor="current_value">
                 {isRealEstate
-                  ? "Current Market Valuation"
+                  ? tf("af_dlg_market_valuation", "Current Market Valuation")
                   : isCompany
                     ? t("company_equity_value")
                     : isPrivateEquity
@@ -672,7 +674,7 @@ export function AddAssetDialog({
                           ? t("startup_value_label")
                           : isAssuranceVie
                             ? avT("av_contract_value")
-                            : "Value"}
+                            : t("value")}
               </Label>
               <div className="relative w-full min-w-0">
                 <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
@@ -699,17 +701,21 @@ export function AddAssetDialog({
               </div>
               {isRealEstate && (
                 <p className="text-xs text-muted-foreground">
-                  Saved as net equity (this minus any linked loan
-                  {realEstateMetadata.is_offplan
-                    ? " and the outstanding contract balance"
-                    : ""}
-                  ).
+                  {tf(
+                    "af_dlg_net_equity_hint",
+                    "Saved as net equity (this minus any linked loan{extra}).",
+                    {
+                      extra: realEstateMetadata.is_offplan
+                        ? tf("af_dlg_net_equity_offplan", " and the outstanding contract balance")
+                        : "",
+                    },
+                  )}
                 </p>
               )}
             </div>
             )}
             <div className="min-w-0 space-y-2">
-              <Label htmlFor="currency">Currency</Label>
+              <Label htmlFor="currency">{t("currency_label")}</Label>
               <Select name="currency" value={currency} onValueChange={setCurrency}>
                 <SelectTrigger id="currency" className="w-full">
                   <SelectValue />

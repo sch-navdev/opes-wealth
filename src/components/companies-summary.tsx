@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -18,7 +19,7 @@ export function CompaniesSummary({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
+  const formatter = moneyFormatter(intlLocale, baseCurrency);
 
   const items = [
     { label: t("companies_count"), value: String(count) },

@@ -142,6 +142,14 @@ describe("CommandMenu", () => {
     expect(push).toHaveBeenCalledWith("/dashboard/banking");
   });
 
+  it("offers the Brokerage page from Standard up and navigates to it", async () => {
+    renderMenu("standard");
+    open();
+    const pages = screen.getByRole("group", { name: "Pages" });
+    await userEvent.click(within(pages).getByText("Brokerage"));
+    expect(push).toHaveBeenCalledWith("/dashboard/brokerage");
+  });
+
   it("offers the IRR comparison page from Professional up, not at Basic", async () => {
     // The label (irr_nav_compare) is merged into i18n separately, so assert on the page count and navigation.
     const { unmount } = renderMenu("basic");
@@ -151,7 +159,7 @@ describe("CommandMenu", () => {
     renderMenu("professional");
     open();
     const pages = within(screen.getByRole("group", { name: "Pages" }));
-    expect(pages.getAllByRole("option")).toHaveLength(9);
+    expect(pages.getAllByRole("option")).toHaveLength(10);
     await userEvent.click(pages.getByText(/^(Compare returns|irr_nav_compare)/));
     expect(push).toHaveBeenCalledWith("/dashboard/compare");
   });

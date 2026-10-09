@@ -1,5 +1,8 @@
 "use client";
 
+import { formatDecimal } from "@/lib/money-parts";
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -403,10 +406,7 @@ export function AssetDetailView({
     : null;
   const images = asset.images ?? [];
 
-  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency: asset.currency,
-  });
+  const currencyFormatter = moneyFormatter(intlLocale, asset.currency);
 
   const today = new Date().toISOString().slice(0, 10);
   const loan = metadata.linked_loan;
@@ -2052,7 +2052,7 @@ export function AssetDetailView({
                 {showForward && (
                   <p className="text-xs text-muted-foreground">
                     {t("projection_note", {
-                      rate: (growthRate * 100).toFixed(1),
+                      rate: formatDecimal(growthRate * 100, intlLocale, 1),
                       source:
                         Number.isFinite(growthParsed)
                           ? t("growth_assumption")
@@ -2196,8 +2196,7 @@ export function AssetDetailView({
                             : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"
                         }
                       >
-                        {unrealizedGain.amount >= 0 ? "+" : ""}
-                        {unrealizedGain.percent.toFixed(1)}%
+                        {formatPercentPoints(unrealizedGain.percent, intlLocale, { digits: 1, signDisplay: unrealizedGain.amount >= 0 ? "always" : "auto" })}
                       </Badge>
                     )}
                   </div>
@@ -2249,7 +2248,7 @@ export function AssetDetailView({
                     }
                   >
                     {netROI != null
-                      ? maskValue(`${netROI.toFixed(2)}%`)
+                      ? maskValue(formatPercentPoints(netROI, intlLocale, { digits: 2 }))
                       : "—"}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -2352,7 +2351,7 @@ export function AssetDetailView({
                     <div className="flex items-end justify-between gap-4">
                       <DetailField
                         label={t("net_equity_share", {
-                          percent: maskValue(`${equityRatio.toFixed(1)}%`),
+                          percent: maskValue(formatPercentPoints(equityRatio, intlLocale, { digits: 1 })),
                         })}
                         value={maskValue(currencyFormatter.format(netShare))}
                       />
@@ -2751,7 +2750,7 @@ export function AssetDetailView({
                   />
                   <DetailField
                     label={t("property_irr")}
-                    value={propertyIrr != null ? `${(propertyIrr * 100).toFixed(2)}%` : "—"}
+                    value={propertyIrr != null ? formatPercentPoints(propertyIrr * 100, intlLocale, { digits: 2 }) : "—"}
                   />
                   <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
                     {t("net_rent_hint")}
@@ -2920,7 +2919,7 @@ export function AssetDetailView({
                             />
                             <DetailField
                               label={t("pe_expected_irr")}
-                              value={returns.irr != null ? `${(returns.irr * 100).toFixed(1)}%` : null}
+                              value={returns.irr != null ? formatPercentPoints(returns.irr * 100, intlLocale, { digits: 1 }) : null}
                             />
                             <DetailField
                               label={t("pe_projection_source")}

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AllocationBar } from "@/components/assurance-vie-cards";
+import { AssuranceVieHoldingsEditor } from "@/components/assurance-vie-holdings-editor";
 import { useAssuranceVieText } from "@/components/assurance-vie-text";
 import { useLanguage } from "@/context/language-context";
 import {
@@ -13,6 +14,7 @@ import {
   AV_FREQUENCIES,
   AV_HOUSEHOLDS,
   AV_MAX_BENEFICIARIES,
+  allocationIsDerived,
   allocationTotal,
   beneficiarySharesState,
   beneficiarySharesTotal,
@@ -21,6 +23,7 @@ import {
   getAssuranceVieWarnings,
   impliedAllocationAmounts,
   linkAllocation,
+  withDerivedAllocation,
   type AssuranceVieMetadata,
   type AvBeneficiary,
   type AvClauseType,
@@ -132,7 +135,8 @@ export function AssuranceVieFields({
 
   function update(patch: Partial<AssuranceVieMetadata>) {
     setDirty(true);
-    onChange({ ...value, ...patch });
+    // With holdings, the euro-fund / unit-linked percentages follow them.
+    onChange(withDerivedAllocation({ ...value, ...patch }));
   }
 
   const errors = dirty || showErrors ? getAssuranceVieMetadataErrors(value) : [];
@@ -141,6 +145,7 @@ export function AssuranceVieFields({
     return hit ? t(hit as AvKey) : null;
   };
   const warnings = getAssuranceVieWarnings(value);
+  const derivedAllocation = allocationIsDerived(value);
 
   const money = (n: number) => {
     try {
@@ -240,6 +245,15 @@ export function AssuranceVieFields({
         </div>
       </div>
 
+      {/* Contract holdings */}
+      <AssuranceVieHoldingsEditor
+        holdings={value.holdings}
+        onChange={(holdings) => update({ holdings })}
+        currency={currency}
+        contractValue={assetValue}
+        showErrors={dirty || showErrors}
+      />
+
       {/* Allocation */}
       <div className="space-y-3 border-t border-border pt-4">
         <h4 className="text-sm font-medium text-foreground">{t("av_alloc_heading")}</h4>
@@ -259,7 +273,9 @@ export function AssuranceVieFields({
                   step="any"
                   inputMode="decimal"
                   className="pe-8"
-                  value={draft?.field === field ? draft.text : fmtPct(pct)}
+                  readOnly={derivedAllocation}
+                  data-derived={derivedAllocation || undefined}
+                  value={draft?.field === field && !derivedAllocation ? draft.text : fmtPct(pct)}
                   aria-invalid={allocationError ? true : undefined}
                   aria-describedby={`${id(`alloc-${field}-hint`)}${allocationError ? ` ${id("alloc-error")}` : ""}`}
                   onChange={(e) => onAllocation(field, e.target.value)}
@@ -277,6 +293,11 @@ export function AssuranceVieFields({
           ))}
         </div>
         <AllocationBar euroPct={value.euro_fund_pct} ucPct={value.uc_pct} />
+        {derivedAllocation && (
+          <p className="text-xs text-muted-foreground" data-testid="av-alloc-locked">
+            {t("av_hold_alloc_locked")}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground" data-testid="av-alloc-total">
           {t("av_alloc_note")} {t("av_alloc_total", { total: fmtPct(allocationTotal(value)) })}
         </p>

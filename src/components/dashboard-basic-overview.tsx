@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import type { ReactNode } from "react";
 import { AllocationCard } from "@/components/allocation-card";
 import { CategoryIcon } from "@/components/category-icon";
@@ -39,7 +40,7 @@ export function DashboardBasicOverview({
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const motion = useTierMotion();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
+  const formatter = moneyFormatter(intlLocale, baseCurrency);
   const categoryLabel = (category: string) => {
     const key = CATEGORY_NAME_KEYS[category];
     return key ? t(key) : category;

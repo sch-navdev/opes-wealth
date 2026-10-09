@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
@@ -141,7 +142,7 @@ export function LiabilitiesGroup({
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const [isOpen, setIsOpen] = useState(false);
-  const money = new Intl.NumberFormat(intlLocale, { style: "currency", currency: displayCurrency });
+  const money = moneyFormatter(intlLocale, displayCurrency);
 
   const lines = collectLines(assets)
     .map((line) => ({ line, base: convertAmount(line.owed, line.currency, displayCurrency, rates) }))
@@ -189,7 +190,7 @@ export function LiabilitiesGroup({
             </TableHeader>
             <TableBody>
               {lines.map(({ line, base }) => {
-                const native = new Intl.NumberFormat(intlLocale, { style: "currency", currency: line.currency });
+                const native = moneyFormatter(intlLocale, line.currency);
                 return (
                   <TableRow key={line.key}>
                     <TableCell className="font-medium">

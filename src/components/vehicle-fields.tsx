@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/language-context";
@@ -59,7 +60,7 @@ export function VehicleFields({
   const estimate = estimateDepreciatedValue(value, purchaseDate);
   const fmt = (n: number) => {
     try {
-      return new Intl.NumberFormat(intlLocale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+      return moneyFormatter(intlLocale, currency, { maximumFractionDigits: 0 }).format(n);
     } catch {
       return n.toLocaleString(intlLocale, { maximumFractionDigits: 0 });
     }

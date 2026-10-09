@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +79,7 @@ export function VehicleExpenses({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
 
-  const money = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
+  const money = moneyFormatter(intlLocale, currency);
   const categoryLabel = (value: string) =>
     isVehicleExpenseCategory(value) ? t(CATEGORY_KEYS[value]) : value;
 
@@ -179,7 +181,7 @@ export function VehicleExpenses({
                     </span>
                     <span className="tabular-nums text-foreground">
                       {maskValue(money.format(row.total))}
-                      <span className="ms-2 text-xs text-muted-foreground">{share.toFixed(0)}%</span>
+                      <span className="ms-2 text-xs text-muted-foreground">{formatPercentPoints(share, intlLocale, { digits: 0 })}</span>
                     </span>
                   </div>
                   <div className="h-1.5 w-full bg-muted">

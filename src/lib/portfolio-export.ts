@@ -18,7 +18,7 @@ import {
 } from "@/lib/real-estate";
 import { parseEquityMetadata } from "@/lib/equities";
 import { parseCompanyMetadata } from "@/lib/companies";
-import { parseAssuranceVieMetadata, scheduledAnnualAmount } from "@/lib/assurance-vie";
+import { parseAssuranceVieMetadata, reconcileHoldings, scheduledAnnualAmount, type AvHoldingType } from "@/lib/assurance-vie";
 import {
   calledCapital,
   fundReturns,
@@ -307,6 +307,7 @@ export function buildPortfolioWorkbook(input: {
         Household: md.household === "couple" ? "Couple (joint)" : "Single",
         "Euro fund %": md.euro_fund_pct,
         "Unit-linked %": md.uc_pct,
+        "Allocation from holdings": md.holdings.length > 0 ? "Yes" : "No",
         "Deposit type": md.deposit_type === "scheduled" ? "Scheduled" : "Free",
         "Premiums paid": md.premiums_paid_total ?? "",
         "Scheduled premium": md.scheduled_amount ?? "",
@@ -315,6 +316,42 @@ export function buildPortfolioWorkbook(input: {
         "Contract value": r2(a.current_value),
         [`Contract value (${baseCurrency})`]: base(a.current_value, a.currency),
       };
+    });
+
+  // One line per holding (type, name, ISIN, units, price, value in the contract currency) plus the reconciliation.
+  const AV_TYPE_LABEL: Record<AvHoldingType, string> = {
+    euro_fund: "Euro fund",
+    fund_opcvm: "Fund (OPCVM/SICAV/FCP)",
+    etf: "ETF / tracker",
+    scpi_sci_opci: "Real estate units (SCPI/SCI/OPCI)",
+    private_equity_fund: "Private equity fund",
+    structured_product: "Structured product",
+    bond: "Bond",
+    equity_direct: "Direct equity",
+    commodity_etc: "Commodity / gold ETC",
+    money_market: "Money-market fund",
+    cash_balance: "Cash balance",
+    other: "Other",
+  };
+  const assuranceVieHoldingRows: Row[] = assets
+    .filter((a) => category(a) === "Assurance-Vie")
+    .flatMap((a) => {
+      const md = parseAssuranceVieMetadata(a.metadata);
+      const recon = reconcileHoldings(md.holdings, a.current_value);
+      return md.holdings.map((h): Row => ({
+        Contract: a.name,
+        Type: AV_TYPE_LABEL[h.type],
+        Holding: h.name,
+        ISIN: h.isin,
+        Ticker: h.ticker,
+        Units: h.units ?? "",
+        "Unit price": h.unit_price ?? "",
+        Currency: a.currency,
+        Value: h.value === null ? "" : r2(h.value),
+        "As of": h.as_of,
+        "Holdings total": recon.state === "none" ? "" : r2(recon.holdingsTotal),
+        "Difference vs contract value": recon.state === "none" || recon.difference === null ? "" : r2(recon.difference),
+      }));
     });
 
   // ---- History -------------------------------------------------------------------
@@ -351,6 +388,7 @@ export function buildPortfolioWorkbook(input: {
   add("PE Cash Flows", peFlowRows, ["Fund", "Type", "Date", "Amount", "Status"]);
   add("Companies", companyRows, Object.keys(companyRows[0] ?? {}));
   add("Assurance-Vie", assuranceVieRows, Object.keys(assuranceVieRows[0] ?? {}));
+  add("AV Holdings", assuranceVieHoldingRows, ["Contract", "Type", "Holding", "ISIN", "Ticker", "Units", "Unit price", "Currency", "Value", "As of", "Holdings total", "Difference vs contract value"]);
   add("Valuation History", historyRows, ["Date", "Asset", "Category", "Currency", "Value", "Net value"]);
 
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

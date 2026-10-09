@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState } from "react";
 import { CategoryIcon } from "@/components/category-icon";
 import { CATEGORY_NAME_KEYS } from "@/components/portfolio-groups";
@@ -30,7 +31,7 @@ export function CategoryCards({
   const { t, intlLocale } = useLanguage();
   const [sort, setSort] = useState<"share" | "alpha">("share");
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
+  const formatter = moneyFormatter(intlLocale, currency);
 
   const byCategory = new Map<string, { count: number; total: number }>();
   for (const asset of assets) {

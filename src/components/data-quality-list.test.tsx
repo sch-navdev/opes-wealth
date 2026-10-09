@@ -124,6 +124,6 @@ describe("DataQualityList", () => {
 
   it("shows money when Privacy Mode is off", () => {
     renderList(report(issues));
-    expect(screen.getByText(/\$5,200\.00 differs from the latest recorded balance of \$5,000\.00 on 2026-10-01/)).toBeInTheDocument();
+    expect(screen.getByText(/USD 5,200\.00 differs from the latest recorded balance of USD 5,000\.00 on 2026-10-01/)).toBeInTheDocument();
   });
 });

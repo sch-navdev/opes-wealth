@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { Fragment, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, RefreshCw } from "lucide-react";
@@ -42,7 +44,7 @@ export type BrokerageAsset = {
 };
 
 function formatMoneyWithLocale(amount: number, currency: string, locale: string) {
-  return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
+  return moneyFormatter(locale, currency).format(amount);
 }
 
 function signedClass(n: number | null) {
@@ -231,7 +233,7 @@ export function BrokerageHoldingsTable({
   const total = summarize(activeRows);
   const money = (n: number) => maskValue(formatMoney(n, displayCurrency));
   const pct = (n: number | null) =>
-    n == null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+    n == null ? "—" : formatPercentPoints(n, intlLocale, { digits: 2, signDisplay: n > 0 ? "always" : "auto" });
 
   return (
     <div className="space-y-2">
@@ -410,7 +412,7 @@ export function BrokerageHoldingsTable({
                         {metrics.income ? maskValue(formatMoney(metrics.income, asset.currency)) : "—"}
                         {metrics.income > 0 && metrics.cost != null && metrics.cost > 0 && (
                           <p className="text-xs" title={t("brokerage_income_yield_hint")}>
-                            {((metrics.income / metrics.cost) * 100).toFixed(1)}%
+                            {formatPercentPoints((metrics.income / metrics.cost) * 100, intlLocale, { digits: 1 })}
                           </p>
                         )}
                       </TableCell>

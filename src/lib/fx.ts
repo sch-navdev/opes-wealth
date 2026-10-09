@@ -16,7 +16,8 @@ import { getFxRates } from "@/lib/services/fx-client";
 /** The app's default Base Currency when no user preference is set. */
 export const DEFAULT_BASE_CURRENCY = "USD";
 
-const FALLBACK_RATES_FROM_USD: Record<string, number> = {
+/** Static last-resort table (per USD); also the daily-rates job's final fallback for a currency nobody else covers. */
+export const FALLBACK_RATES_FROM_USD: Record<string, number> = {
   USD: 1,
   EUR: 0.92,
   GBP: 0.79,

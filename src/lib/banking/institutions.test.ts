@@ -7,7 +7,10 @@ import {
   bankInstitutionId,
   banksByCountry,
   canConnect,
+  PROFILE_LOGO_BANKS,
+  bankLogoDomain,
   getBank,
+  logoBankByName,
 } from "./institutions";
 import { BANK_PROFILES } from "./csv-profiles";
 
@@ -86,5 +89,36 @@ describe("canConnect", () => {
 
   it("allows nothing when unconfigured", () => {
     expect(canConnect(uae, "unconfigured")).toBe(false);
+  });
+});
+
+describe("bank logos", () => {
+  it("every statement profile (CSV and PDF-only) resolves a logo by its display name", () => {
+    for (const p of BANK_PROFILES) {
+      const logo = logoBankByName(p.name);
+      expect(logo, p.id).toBeDefined();
+      expect(logo!.domain, p.id).toMatch(/^[a-z0-9.-]+.[a-z]{2,}$/);
+      expect(bankLogoDomain(logo!.key), p.id).toBe(logo!.domain);
+    }
+  });
+
+  it("gives HSBC UAE (and its card) the hsbc.ae domain", () => {
+    expect(logoBankByName("HSBC UAE")).toEqual({ key: "hsbc_uae", domain: "hsbc.ae" });
+    expect(bankLogoDomain("hsbc_uae_card")).toBe("hsbc.ae");
+  });
+
+  it("maps the FAB profile name onto the FAB bank logo", () => {
+    expect(logoBankByName("First Abu Dhabi Bank (FAB)")?.key).toBe("fab");
+  });
+
+  it("keeps PDF-only logo keys out of BANKS and unique", () => {
+    const keys = PROFILE_LOGO_BANKS.map((b) => b.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const k of keys) expect(getBank(k), k).toBeUndefined();
+  });
+
+  it("returns undefined for an unknown institution", () => {
+    expect(logoBankByName("Nowhere Bank")).toBeUndefined();
+    expect(bankLogoDomain("nope")).toBeUndefined();
   });
 });

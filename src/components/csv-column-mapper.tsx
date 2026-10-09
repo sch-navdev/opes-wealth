@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useTransition } from "react";
 import { FileSpreadsheet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -151,7 +152,7 @@ export function CsvColumnMapper({
   const [startingBalanceTouched, setStartingBalanceTouched] = useState(false);
 
   const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    () => moneyFormatter(intlLocale, currency),
     [intlLocale, currency],
   );
 

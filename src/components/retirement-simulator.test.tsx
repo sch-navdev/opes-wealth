@@ -48,13 +48,13 @@ describe("defaults and result", () => {
     renderSim();
     // 40 -> 65, 3,000/month, 5 %, 2 % inflation, 4 % rule, 200,000 starting assets
     expect(screen.getByTestId("ret-time").textContent).toMatch(/25 years \(300 months\)/);
-    expect(screen.getByTestId("ret-income-nominal").textContent).toMatch(/\$4,9\d\d/);
+    expect(screen.getByTestId("ret-income-nominal").textContent).toMatch(/USD 4,9\d\d/);
     expect(screen.getByTestId("ret-target")).toBeTruthy();
     expect(screen.getByTestId("ret-assets-grown")).toBeTruthy();
     expect(screen.getByTestId("ret-gap")).toBeTruthy();
     expect(screen.getByTestId("ret-sens")).toBeTruthy();
     expect(screen.getByTestId("ret-summary").textContent).toMatch(/4 % withdrawal rate/);
-    expect(required()).toMatch(/^\$[\d,]+$/);
+    expect(required()).toMatch(/^USD [\d,]+$/);
   });
 
   it("matches the worked example (40 to 60, 5 %, no inflation: about 910 per month)", async () => {
@@ -62,10 +62,10 @@ describe("defaults and result", () => {
     await setField("retirement age", "60");
     await openAssumptions();
     await setField("annual inflation", "0");
-    expect(required()).toBe("$910");
-    expect(screen.getByTestId("ret-target").textContent).toBe("$900,000");
-    expect(screen.getByTestId("ret-gap").textContent).toBe("$369,340");
-    expect(screen.getByTestId("ret-live").textContent).toMatch(/\$910 per month over 20 years/);
+    expect(required()).toBe("USD 910");
+    expect(screen.getByTestId("ret-target").textContent).toBe("USD 900,000");
+    expect(screen.getByTestId("ret-gap").textContent).toBe("USD 369,340");
+    expect(screen.getByTestId("ret-live").textContent).toMatch(/USD 910 per month over 20 years/);
   });
 
   it("switches to the returns-only method (about 467 per month)", async () => {
@@ -74,8 +74,8 @@ describe("defaults and result", () => {
     await openAssumptions();
     await setField("annual inflation", "0");
     await userEvent.setup().click(screen.getByRole("radio", { name: /returns only/i }));
-    expect(required()).toBe("$467");
-    expect(screen.getByTestId("ret-target").textContent).toBe("$720,000");
+    expect(required()).toBe("USD 467");
+    expect(screen.getByTestId("ret-target").textContent).toBe("USD 720,000");
     expect(screen.getByTestId("ret-summary").textContent).toMatch(/never drawn down/);
     expect(screen.queryByRole("spinbutton", { name: /withdrawal rate/i })).toBeNull();
   });
@@ -97,7 +97,7 @@ describe("sliders and fields", () => {
     expect((slider("estimated annual return") as HTMLInputElement).value).toBe("6.5");
     expect(slider("estimated annual return").getAttribute("aria-valuetext")).toBe("6.5 % a year");
     expect(slider("current age").getAttribute("aria-valuetext")).toBe("40 years");
-    expect(slider("desired net passive income").getAttribute("aria-valuetext")).toBe("$3,000 per month");
+    expect(slider("desired net passive income").getAttribute("aria-valuetext")).toBe("USD 3,000 per month");
   });
 
   it("remembers the inputs in localStorage and restores them on the next render", async () => {
@@ -133,7 +133,7 @@ describe("validation", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/between 0 % and 20 %/);
     await setField("estimated annual return", "0");
     expect(screen.queryByRole("alert")).toBeNull(); // the 4 % rule works at 0 %
-    expect(required()).toMatch(/^\$/);
+    expect(required()).toMatch(/^USD /);
     await openAssumptions();
     await userEvent.setup().click(screen.getByRole("radio", { name: /returns only/i }));
     expect(screen.getByRole("alert").textContent).toMatch(/return above 0 %/);
@@ -160,9 +160,9 @@ describe("on track", () => {
     const onTrack = screen.getByTestId("ret-on-track");
     expect(onTrack.textContent).toMatch(/already on track/i);
     expect(onTrack.textContent).toMatch(/No extra saving is needed/);
-    expect(required()).toBe("$0");
+    expect(required()).toBe("USD 0");
     expect(screen.getByTestId("ret-live").textContent).toMatch(/on track/i);
-    expect(screen.getByTestId("ret-gap").textContent).toBe("$0");
+    expect(screen.getByTestId("ret-gap").textContent).toBe("USD 0");
   });
 });
 
@@ -191,10 +191,10 @@ describe("on track with the demo preset (invented numbers)", () => {
     const onTrack = screen.getByTestId("ret-on-track");
     expect(onTrack.textContent).toMatch(/Already on track/);
     expect(onTrack.textContent).toMatch(/No extra saving is needed/);
-    expect(onTrack.textContent).toMatch(/\$2,8\d\d,\d{3}/); // 1,170,000 grown 18 years at 5 %
-    expect(onTrack.textContent).toMatch(/\$1,9\d\d,\d{3}/); // target capital
-    expect(required()).toBe("$0");
-    expect(screen.getByTestId("ret-gap").textContent).toBe("$0");
+    expect(onTrack.textContent).toMatch(/USD 2,8\d\d,\d{3}/); // 1,170,000 grown 18 years at 5 %
+    expect(onTrack.textContent).toMatch(/USD 1,9\d\d,\d{3}/); // target capital
+    expect(required()).toBe("USD 0");
+    expect(screen.getByTestId("ret-gap").textContent).toBe("USD 0");
     expect(screen.getByTestId("ret-live").textContent).toMatch(/On track/);
     expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
   });
@@ -215,7 +215,7 @@ describe("on track with the demo preset (invented numbers)", () => {
     expect((field("desired") as HTMLInputElement).value).toBe("9000");
     expect((field("current age") as HTMLInputElement).value).toBe("42"); // untouched fields keep the preset
     expect(screen.queryByTestId("ret-on-track")).toBeNull();
-    expect(required()).not.toBe("$0");
+    expect(required()).not.toBe("USD 0");
   });
 
   it("without a preset the normal defaults apply", () => {
@@ -251,22 +251,22 @@ describe("assumptions disclosure", () => {
     expect(cash).toBeChecked();
     expect(realEstate).not.toBeChecked();
     expect(vehicles).not.toBeChecked();
-    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/\$200,000/);
+    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/USD 200,000/);
 
     await user.click(realEstate);
-    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/\$700,000/);
+    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/USD 700,000/);
     await user.click(cash);
-    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/\$600,000/);
+    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/USD 600,000/);
 
     await setField("own figure", "123456");
-    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/\$123,456/);
-    expect(screen.getByTestId("ret-assets-auto").textContent).toMatch(/\$600,000/);
+    expect(screen.getByTestId("ret-assets-used").textContent).toMatch(/USD 123,456/);
+    expect(screen.getByTestId("ret-assets-auto").textContent).toMatch(/USD 600,000/);
   });
 
   it("works with an empty portfolio", () => {
     renderSim([]);
-    expect(required()).toMatch(/^\$/);
-    expect(screen.getByTestId("ret-assets-grown").textContent).toBe("$0");
+    expect(required()).toMatch(/^USD /);
+    expect(screen.getByTestId("ret-assets-grown").textContent).toBe("USD 0");
   });
 });
 
@@ -278,9 +278,9 @@ describe("monthly effort comparison", () => {
     await setField("annual inflation", "0");
     expect(screen.queryByTestId("ret-effort")).toBeNull();
     await setField("your current monthly saving", "500");
-    expect(screen.getByTestId("ret-effort").textContent).toMatch(/\$410 more per month than the saving entered \(\$500\)/);
+    expect(screen.getByTestId("ret-effort").textContent).toMatch(/USD 410 more per month than the saving entered \(USD 500\)/);
     await setField("your current monthly saving", "1000");
-    expect(screen.getByTestId("ret-effort").textContent).toMatch(/\$90 less per month/);
+    expect(screen.getByTestId("ret-effort").textContent).toMatch(/USD 90 less per month/);
     await setField("your current monthly saving", "910");
     expect(screen.getByTestId("ret-effort").textContent).toMatch(/Matches the saving entered/);
   });
@@ -314,11 +314,11 @@ describe("privacy mode", () => {
     localStorage.setItem("opes_privacy_mode", "true");
     renderSim();
     for (const id of ["ret-required", "ret-target", "ret-assets-grown", "ret-gap", "ret-income-nominal"]) {
-      expect(screen.getByTestId(id).textContent).not.toMatch(/\$/);
+      expect(screen.getByTestId(id).textContent).not.toMatch(/USD/);
     }
     expect(screen.getByTestId("ret-required").textContent).toBe("••••••••");
-    expect(screen.getByTestId("ret-live").textContent).not.toMatch(/\$/);
-    expect(screen.getByTestId("ret-chart").getAttribute("aria-label")).not.toMatch(/\$/);
+    expect(screen.getByTestId("ret-live").textContent).not.toMatch(/USD/);
+    expect(screen.getByTestId("ret-chart").getAttribute("aria-label")).not.toMatch(/USD/);
     expect(screen.getByTestId("ret-time").textContent).toMatch(/25 years/);
   });
 });

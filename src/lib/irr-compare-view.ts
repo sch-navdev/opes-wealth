@@ -3,6 +3,7 @@
  * manual savings-plan fields, and the computed card ("side") for a manual plan or a holding.
  * The maths is in `lib/irr.ts`; the holding flows come from `compare/actions.ts`.
  */
+import { moneyFormatter } from "./money-parts";
 import { savingsPlanFlows, solveSavingsPlan, summarizeFlows, xirr } from "@/lib/irr";
 import type {
   ComparableHolding,
@@ -199,7 +200,7 @@ export function formatPoints(points: number, locale: string): string {
 
 export function formatMoney(n: number, locale: string, currency: string): string {
   try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+    return moneyFormatter(locale, currency, { maximumFractionDigits: 0 }).format(n);
   } catch {
     return n.toLocaleString(locale, { maximumFractionDigits: 0 });
   }

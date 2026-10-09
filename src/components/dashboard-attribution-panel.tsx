@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, type CSSProperties } from "react";
 import { Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,12 +35,8 @@ export function DashboardAttributionPanel({
 
   const money = useMemo(
     () =>
-      new Intl.NumberFormat(intlLocale, {
-        style: "currency",
-        currency: baseCurrency,
-        maximumFractionDigits: 0,
-        signDisplay: "exceptZero",
-      }),
+      moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0,
+        signDisplay: "exceptZero" }),
     [intlLocale, baseCurrency],
   );
   if (!data) return null;

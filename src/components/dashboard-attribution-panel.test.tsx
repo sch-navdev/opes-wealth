@@ -47,13 +47,13 @@ describe("DashboardAttributionPanel", () => {
   it("shows signed capital, currency and total amounts with colour coding", () => {
     renderPanel(data);
     const capital = screen.getByText("Capital return").closest("div")!;
-    expect(within(capital).getByText("+$170").className).toContain("text-success");
+    expect(within(capital).getByText("USD +170").className).toContain("text-success");
     expect(within(capital).getByText("42.5% of cost")).toBeTruthy();
     const currency = screen.getByText("Currency return").closest("div")!;
-    expect(within(currency).getByText("-$180").className).toContain("text-destructive");
+    expect(within(currency).getByText("USD -180").className).toContain("text-destructive");
     expect(within(currency).getByText("-45.0% of cost")).toBeTruthy();
     const total = screen.getByText("Total return").closest("div")!;
-    expect(within(total).getByText("-$10").className).toContain("text-destructive");
+    expect(within(total).getByText("USD -10").className).toContain("text-destructive");
   });
 
   it("describes the split bar, coverage and the top holdings", () => {
@@ -64,8 +64,8 @@ describe("DashboardAttributionPanel", () => {
     expect(items).toHaveLength(2);
     expect(items[0].textContent).toContain("Dubai Flat");
     expect(items[0].textContent).toContain("AED");
-    expect(items[0].textContent).toContain("-$150");
-    expect(items[1].textContent).toContain("+$30");
+    expect(items[0].textContent).toContain("USD -150");
+    expect(items[1].textContent).toContain("USD +30");
   });
 
   it("offers a focusable definition button", () => {
@@ -76,8 +76,8 @@ describe("DashboardAttributionPanel", () => {
   it("masks amounts and percentages in Privacy Mode but keeps coverage text", () => {
     localStorage.setItem("opes_privacy_mode", "true");
     renderPanel(data);
-    expect(screen.queryByText("+$170")).toBeNull();
-    expect(screen.queryByText(/\$150/)).toBeNull();
+    expect(screen.queryByText("USD +170")).toBeNull();
+    expect(screen.queryByText(/USD 150/)).toBeNull();
     expect(screen.queryByText(/42\.5%/)).toBeNull();
     expect(screen.getAllByText("••••••••").length).toBeGreaterThan(0);
     expect(screen.getByText("Based on 2 of 3 foreign-currency holdings.")).toBeTruthy();

@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState } from "react";
 import { CheckCircle2, ChevronDown, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -208,7 +209,7 @@ export function RetirementSimulator({
   const money = (n: number) => {
     try {
       return maskValue(
-        new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }).format(n),
+        moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }).format(n),
       );
     } catch {
       return maskValue(n.toLocaleString(intlLocale, { maximumFractionDigits: 0 }));

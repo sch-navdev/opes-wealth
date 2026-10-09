@@ -1,5 +1,8 @@
 "use client";
 
+import { useLanguage } from "@/context/language-context";
+import { formatPercentPoints } from "@/lib/money-parts";
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -44,8 +47,9 @@ export function ScpiSettings({
   displayAsset: AssetDetail;
   today: string;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
 }) {
+  const { intlLocale } = useLanguage();
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -91,13 +95,13 @@ export function ScpiSettings({
                   value={money(scpiReceived(scpi))} />
                 <DetailField
                   label={t("scpi_realised_yield")}
-                  value={trailing != null ? `${trailing.toFixed(2)}%` : null} />
+                  value={trailing != null ? formatPercentPoints(trailing, intlLocale, { digits: 2 }) : null} />
                 <DetailField
                   label={t("scpi_target_yield")}
                   value={scpi.target_yield_pct != null ? `${scpi.target_yield_pct}%` : null} />
                 <DetailField
                   label={t("scpi_average_yield")}
-                  value={average != null ? `${average.toFixed(2)}%` : null} />
+                  value={average != null ? formatPercentPoints(average, intlLocale, { digits: 2 }) : null} />
               </div>
               {scpi.yield_history.length > 0 && (
                 <p className="text-xs text-muted-foreground">

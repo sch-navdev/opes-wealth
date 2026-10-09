@@ -1,5 +1,8 @@
 "use client";
 
+import { formatDecimal } from "@/lib/money-parts";
+import { useLanguage } from "@/context/language-context";
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -40,9 +43,10 @@ export function PrivateEquityCommitmentSettings({
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
   privateEquityMetadata: PrivateEquityMetadata;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   today: string;
 }) {
+  const { intlLocale } = useLanguage();
   return (
     <Card className="border-border bg-card">
       <CardHeader>
@@ -83,7 +87,7 @@ export function PrivateEquityCommitmentSettings({
                 <div className="space-y-1">
                   <ProgressBar percent={calledPct} colorClassName="bg-primary" />
                   <p className="text-xs text-muted-foreground">
-                    {t("pe_called_progress", { pct: calledPct.toFixed(1) })}
+                    {t("pe_called_progress", { pct: formatDecimal(calledPct, intlLocale, 1) })}
                   </p>
                 </div>
               )}

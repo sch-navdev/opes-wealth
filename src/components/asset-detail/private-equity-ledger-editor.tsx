@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -77,7 +78,7 @@ export function PrivateEquityLedgerEditor({
   const md: PrivateEquityMetadata = useMemo(() => parsePrivateEquityMetadata(asset.metadata), [asset.metadata]);
   const rows = useMemo(() => ledgerRows(md), [md]);
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: asset.currency, maximumFractionDigits: 2 }),
+    () => moneyFormatter(intlLocale, asset.currency, { maximumFractionDigits: 2 }),
     [intlLocale, asset.currency],
   );
 

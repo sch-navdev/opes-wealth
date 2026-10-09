@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,7 +52,7 @@ export function ExoticAssetCard({
   const [message, setMessage] = useState<string | null>(null);
 
   const metadata = parseExoticMetadata(rawMetadata);
-  const money = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
+  const money = moneyFormatter(intlLocale, currency);
   const unitValue = quantity > 0 ? currentValue / quantity : currentValue;
   const gain = exoticGain(unitValue, metadata.purchase_price);
   const KindIcon = EXOTIC_KIND_ICONS[metadata.kind];
@@ -126,7 +128,7 @@ export function ExoticAssetCard({
               <p className={cn("text-sm font-medium tabular-nums", gain.amount >= 0 ? "text-success" : "text-destructive")}>
                 {gain.amount >= 0 ? "+" : "-"}
                 {maskValue(money.format(Math.abs(gain.amount)))}
-                {gain.percent != null && ` (${gain.percent >= 0 ? "+" : ""}${gain.percent.toFixed(1)}%)`}
+                {gain.percent != null && ` (${formatPercentPoints(gain.percent, intlLocale, { digits: 1, signDisplay: gain.percent >= 0 ? "always" : "auto" })})`}
               </p>
             ) : (
               <p className="text-sm text-foreground">—</p>

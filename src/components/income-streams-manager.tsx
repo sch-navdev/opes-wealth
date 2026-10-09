@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useTransition } from "react";
 import { Pencil, Plus, Trash2, WalletCards } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,12 +59,12 @@ export function IncomeStreamsManager({
   const [pending, startTransition] = useTransition();
 
   const base = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
   const native = (amount: number, currency: string) => {
     try {
-      return new Intl.NumberFormat(intlLocale, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+      return moneyFormatter(intlLocale, currency, { maximumFractionDigits: 2 }).format(amount);
     } catch {
       return `${currency} ${amount.toFixed(2)}`;
     }

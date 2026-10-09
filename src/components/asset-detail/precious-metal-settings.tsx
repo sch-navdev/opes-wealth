@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -28,7 +29,7 @@ export function PreciousMetalSettings({
   metalMetadata: PreciousMetalMetadata;
   displayAsset: AssetDetail;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   formatLastPricedAt: (iso: string | null) => string | null;
 }) {
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter, type MoneyFormatter } from "@/lib/money-parts";
 import {
   useId,
   useMemo,
@@ -96,10 +97,10 @@ function storeMethod(method: LotMethod) {
   methodListeners.forEach((listener) => listener());
 }
 
-function currencyFormatter(locale: string, currency: string, signed: boolean): Intl.NumberFormat {
+function currencyFormatter(locale: string, currency: string, signed: boolean): MoneyFormatter {
   const sign: Intl.NumberFormatOptions = signed ? { signDisplay: "exceptZero" } : {};
   try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency, ...sign });
+    return moneyFormatter(locale, currency, { ...sign });
   } catch {
     // Unknown currency code: plain two-decimal numbers rather than a crash.
     return new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2, ...sign });

@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown, Info, Scale, Target, TrendingUp, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,7 +129,7 @@ function useExpertFormatters(baseCurrency: string) {
   const { maskValue } = usePrivacy();
 
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
   const ratio = useMemo(

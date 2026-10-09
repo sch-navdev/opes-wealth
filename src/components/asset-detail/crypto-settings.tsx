@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -30,7 +31,7 @@ export function CryptoSettings({
   isWalletHolding: boolean;
   formatLastPricedAt: (iso: string | null) => string | null;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
 }) {
   return (
     <Card className="border-border bg-card">

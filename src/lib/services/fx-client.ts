@@ -137,12 +137,15 @@ async function callFxProvider(base: string): Promise<FxRatesData> {
  * table no matter what (e.g. rendering the dashboard) decide their own
  * fallback, same as `lib/fx.ts`'s `getExchangeRatesFromUsd` does below.
  */
-export async function getFxRates(base: string): Promise<FxRatesResult> {
+export async function getFxRates(
+  base: string,
+  options: { bypassCache?: boolean } = {},
+): Promise<FxRatesResult> {
   if (!base) {
     return { ok: false, code: "invalid_request", error: "A base currency is required." };
   }
 
-  const cached = cache.get(base);
+  const cached = options.bypassCache ? undefined : cache.get(base);
   if (cached && cached.expiresAt > Date.now()) {
     return { ok: true, isMock: isMockMode(), ...cached.data };
   }

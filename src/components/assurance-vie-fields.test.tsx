@@ -231,3 +231,44 @@ describe("AssuranceVieFields: beneficiaries", () => {
     expect(screen.getByText("Each beneficiary share must be between 0 and 100%.")).toBeInTheDocument();
   });
 });
+
+describe("AssuranceVieFields: contract holdings", () => {
+  it("adds a typed row, derives the percentages and locks the manual inputs", async () => {
+    const spy = vi.fn();
+    const user = setup({ spy, assetValue: 1000 });
+    await user.selectOptions(screen.getByLabelText("Type of holding to add"), "euro_fund");
+    await user.click(screen.getByRole("button", { name: "Add holding" }));
+    expect(screen.getAllByTestId("av-hold-row")).toHaveLength(1);
+    await user.type(screen.getByLabelText("Name, holding 1"), "Fonds Euro Demo");
+    await user.type(screen.getByLabelText("Value, holding 1"), "700");
+    await user.click(screen.getByRole("button", { name: "Add holding" }));
+    await user.selectOptions(screen.getByLabelText("Type, holding 2"), "etf");
+    await user.type(screen.getByLabelText("Name, holding 2"), "World ETF Demo");
+    await user.type(screen.getByLabelText("Units, holding 2"), "3");
+    await user.type(screen.getByLabelText("Unit price, holding 2"), "100");
+    expect(screen.getByLabelText("Value, holding 2")).toHaveValue(300);
+    expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ euro_fund_pct: 70, uc_pct: 30 }));
+    expect(screen.getByLabelText("Euro fund (Fonds en euros)")).toHaveAttribute("readonly");
+    expect(screen.getByTestId("av-alloc-locked")).toBeInTheDocument();
+    expect(screen.getByTestId("av-hold-recon")).toHaveAttribute("data-state", "match");
+  });
+
+  it("reconciliation difference never blocks and holds a neutral note", async () => {
+    const user = setup({ assetValue: 5000 });
+    await user.click(screen.getByRole("button", { name: "Add holding" }));
+    await user.type(screen.getByLabelText("Name, holding 1"), "Fund");
+    await user.type(screen.getByLabelText("Value, holding 1"), "100");
+    expect(screen.getByTestId("av-hold-recon")).toHaveAttribute("data-state", "under");
+    expect(screen.getByText(/A difference is normal/)).toBeInTheDocument();
+  });
+
+  it("flags a missing name and removes a row", async () => {
+    const user = setup();
+    await user.click(screen.getByRole("button", { name: "Add holding" }));
+    await user.type(screen.getByLabelText("Value, holding 1"), "10");
+    expect(await screen.findByText("Give each holding a name, or remove the row.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Remove holding 1" }));
+    expect(screen.queryAllByTestId("av-hold-row")).toHaveLength(0);
+    expect(screen.getByLabelText("Euro fund (Fonds en euros)")).not.toHaveAttribute("readonly");
+  });
+});

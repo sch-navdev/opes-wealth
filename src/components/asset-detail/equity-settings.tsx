@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -33,7 +34,7 @@ export function EquitySettings({
   displayAsset: AssetDetail;
   intlLocale: string;
   avgCostBasis: number | null;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   formatLastPricedAt: (iso: string | null) => string | null;
 }) {
   return (

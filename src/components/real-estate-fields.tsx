@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useAddFormText } from "@/components/add-form-text";
 import { useLanguage } from "@/context/language-context";
 import { getCurrencySymbol } from "@/lib/currencies";
 import {
@@ -161,6 +162,7 @@ export function RealEstateFields({
 }) {
   const currencySymbol = getCurrencySymbol(currency);
   const { t, intlLocale } = useLanguage();
+  const tf = useAddFormText();
   function set<K extends keyof RealEstateMetadata>(
     key: K,
     next: RealEstateMetadata[K],
@@ -276,12 +278,12 @@ export function RealEstateFields({
   return (
     <div className="w-full min-w-0 space-y-6 border-t border-border pt-6">
       <h3 className="text-sm font-medium text-foreground">
-        Real Estate Details
+        {tf("af_re_details", "Real Estate Details")}
       </h3>
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="min-w-0 space-y-2 sm:col-span-2">
-          <Label htmlFor="re_address">Address</Label>
+          <Label htmlFor="re_address">{tf("address", "Address")}</Label>
           <Input
             id="re_address"
             value={value.address}
@@ -289,13 +291,13 @@ export function RealEstateFields({
           />
         </div>
         <div className="min-w-0 space-y-2">
-          <Label>Type</Label>
+          <Label>{tf("type", "Type")}</Label>
           <Select
             value={value.propertyType}
             onValueChange={(next) => set("propertyType", next)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a type" />
+              <SelectValue placeholder={tf("af_re_select_type", "Select a type")} />
             </SelectTrigger>
             <SelectContent>
               {PROPERTY_TYPES.map((type) => (
@@ -328,31 +330,31 @@ export function RealEstateFields({
 
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-foreground">
-          Characteristics
+          {tf("af_re_characteristics", "Characteristics")}
         </h4>
         <div className="grid w-full min-w-0 grid-cols-2 gap-4 sm:grid-cols-4">
           <ToggleField
-            label="Automatic Estimation"
+            label={tf("af_re_auto_estimation", "Automatic Estimation")}
             checked={value.automaticEstimation}
             onChange={(next) => set("automaticEstimation", next)}
           />
           <ToggleField
-            label="Elevator"
+            label={tf("af_re_elevator", "Elevator")}
             checked={value.elevator}
             onChange={(next) => set("elevator", next)}
           />
           <ToggleField
-            label="New Construction"
+            label={tf("af_re_new_construction", "New Construction")}
             checked={value.newConstruction}
             onChange={(next) => set("newConstruction", next)}
           />
           <ToggleField
-            label="Furnished"
+            label={tf("af_re_furnished", "Furnished")}
             checked={value.furnished}
             onChange={(next) => set("furnished", next)}
           />
           <ToggleField
-            label="Off-Plan Property"
+            label={tf("af_re_offplan_property", "Off-Plan Property")}
             checked={value.is_offplan}
             onChange={(next) => set("is_offplan", next)}
           />
@@ -362,12 +364,12 @@ export function RealEstateFields({
       {value.is_offplan && (
         <div className="w-full min-w-0 space-y-4 border border-border p-4">
           <h4 className="text-sm font-medium text-foreground">
-            Off-Plan Payment Tracking
+            {tf("af_re_offplan_tracking", "Off-Plan Payment Tracking")}
           </h4>
 
           <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
             <NumberField
-              label="Contract Price (SPA)"
+              label={tf("af_re_contract_price_spa", "Contract Price (SPA)")}
               value={value.contract_price}
               onChange={setContractPrice}
               currency={currency}
@@ -376,7 +378,7 @@ export function RealEstateFields({
 
           <div className="w-full min-w-0 space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Payment Schedule</Label>
+              <Label>{tf("af_re_payment_schedule", "Payment Schedule")}</Label>
             </div>
 
             <div className="w-full min-w-0 space-y-3">
@@ -386,9 +388,9 @@ export function RealEstateFields({
                   className="grid w-full min-w-0 grid-cols-2 gap-2 border border-border p-3 sm:grid-cols-6 sm:items-end"
                 >
                   <div className="min-w-0 space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Milestone</Label>
+                    <Label className="text-xs">{tf("milestone", "Milestone")}</Label>
                     <Input
-                      placeholder="e.g. Down Payment"
+                      placeholder={tf("af_re_milestone_placeholder", "e.g. Down Payment")}
                       value={milestone.milestone}
                       onChange={(e) =>
                         updateMilestone(index, { milestone: e.target.value })
@@ -396,7 +398,7 @@ export function RealEstateFields({
                     />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <Label className="text-xs">Due Date</Label>
+                    <Label className="text-xs">{tf("due_date", "Due Date")}</Label>
                     <Input
                       type="date"
                       className="w-full min-w-0"
@@ -407,7 +409,7 @@ export function RealEstateFields({
                     />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <Label className="text-xs">Amount</Label>
+                    <Label className="text-xs">{tf("amount", "Amount")}</Label>
                     <Input
                       type="number"
                       step="any"
@@ -421,7 +423,7 @@ export function RealEstateFields({
                     />
                   </div>
                   <div className="min-w-0 space-y-1">
-                    <Label className="text-xs">Percentage</Label>
+                    <Label className="text-xs">{tf("af_re_percentage", "Percentage")}</Label>
                     <Input
                       type="number"
                       step="any"
@@ -437,7 +439,7 @@ export function RealEstateFields({
                   </div>
                   <div className="flex min-w-0 items-end gap-2">
                     <div className="min-w-0 flex-1 space-y-1">
-                      <Label className="text-xs">Status</Label>
+                      <Label className="text-xs">{tf("status", "Status")}</Label>
                       <Select
                         value={milestone.status}
                         onValueChange={(next) =>
@@ -450,8 +452,8 @@ export function RealEstateFields({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="paid">Paid</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="paid">{tf("paid", "Paid")}</SelectItem>
+                          <SelectItem value="pending">{tf("pending", "Pending")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -461,7 +463,7 @@ export function RealEstateFields({
                       size="icon-sm"
                       className="shrink-0"
                       onClick={() => removeMilestone(index)}
-                      aria-label="Remove milestone"
+                      aria-label={tf("af_re_remove_milestone", "Remove milestone")}
                     >
                       <Minus className="size-4" />
                     </Button>
@@ -476,14 +478,14 @@ export function RealEstateFields({
               size="sm"
               onClick={addMilestone}
             >
-              + Add Milestone
+              {tf("af_re_add_milestone", "+ Add Milestone")}
             </Button>
           </div>
 
           <div className="grid w-full min-w-0 grid-cols-2 gap-4 border-t border-border pt-4">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
-                Total Paid to Date
+                {tf("af_re_total_paid", "Total Paid to Date")}
               </p>
               <p className="text-sm font-medium text-success">
                 {value.paid_to_date.toLocaleString(intlLocale)}
@@ -491,7 +493,7 @@ export function RealEstateFields({
             </div>
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">
-                Outstanding Balance
+                {tf("af_re_outstanding_balance", "Outstanding Balance")}
               </p>
               <p className="text-sm font-medium text-destructive">
                 {value.outstanding_balance.toLocaleString(intlLocale)}
@@ -706,19 +708,19 @@ export function RealEstateFields({
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <NumberField
-          label="Purchase Price"
+          label={tf("purchase_price", "Purchase Price")}
           value={value.purchasePrice}
           onChange={(next) => set("purchasePrice", next)}
           currency={currency}
         />
         <NumberField
-          label="Agency Fees"
+          label={tf("agency_fees", "Agency Fees")}
           value={value.agencyFees}
           onChange={(next) => set("agencyFees", next)}
           currency={currency}
         />
         <div className="min-w-0 space-y-2">
-          <Label>Registration Fee</Label>
+          <Label>{tf("af_re_registration_fee", "Registration Fee")}</Label>
           <div className="flex w-full min-w-0 gap-2">
             <Select
               value={value.registration_fee_type}
@@ -758,13 +760,13 @@ export function RealEstateFields({
           </div>
         </div>
         <NumberField
-          label="Renovation Fees"
+          label={tf("renovation_fees", "Renovation Fees")}
           value={value.renovationFees}
           onChange={(next) => set("renovationFees", next)}
           currency={currency}
         />
         <NumberField
-          label="Furnishing Fees"
+          label={tf("furnishing_fees", "Furnishing Fees")}
           value={value.furnishingFees}
           onChange={(next) => set("furnishingFees", next)}
           currency={currency}
@@ -827,22 +829,22 @@ export function RealEstateFields({
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
         <NumberField
-          label="Internal Area (m²)"
+          label={tf("af_re_internal_area", "Internal Area (m²)")}
           value={value.internal_area}
           onChange={setInternalArea}
         />
         <NumberField
-          label="Terrace/Balcony Area (m²)"
+          label={tf("af_re_terrace_area", "Terrace/Balcony Area (m²)")}
           value={value.terrace_area}
           onChange={setTerraceArea}
         />
         <NumberField
-          label="Garden Area (m²)"
+          label={tf("af_re_garden_area", "Garden Area (m²)")}
           value={value.gardenArea}
           onChange={(next) => set("gardenArea", next)}
         />
         <div className="min-w-0 space-y-2">
-          <Label>Total Area (m²)</Label>
+          <Label>{tf("af_re_total_area", "Total Area (m²)")}</Label>
           <Input
             type="number"
             value={calculateTotalArea(value.internal_area, value.terrace_area)}
@@ -854,19 +856,19 @@ export function RealEstateFields({
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-3">
         <Stepper
-          label="Floors"
+          label={tf("af_re_floors", "Floors")}
           value={value.floors}
           onChange={(next) => set("floors", next)}
           min={1}
         />
         <Stepper
-          label="Rooms"
+          label={tf("af_re_rooms", "Rooms")}
           value={value.rooms}
           onChange={(next) => set("rooms", next)}
           min={1}
         />
         <Stepper
-          label="Garage / Parking"
+          label={tf("af_re_garage", "Garage / Parking")}
           value={value.garageCount}
           onChange={(next) => set("garageCount", next)}
         />
@@ -874,13 +876,13 @@ export function RealEstateFields({
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="min-w-0 space-y-2">
-          <Label>Year of Construction</Label>
+          <Label>{tf("year_of_construction", "Year of Construction")}</Label>
           <Select
             value={value.yearOfConstruction}
             onValueChange={(next) => set("yearOfConstruction", next)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a year" />
+              <SelectValue placeholder={tf("af_re_select_year", "Select a year")} />
             </SelectTrigger>
             <SelectContent>
               {CONSTRUCTION_YEARS.map((year) => (
@@ -892,13 +894,13 @@ export function RealEstateFields({
           </Select>
         </div>
         <div className="min-w-0 space-y-2">
-          <Label>EPC Rating</Label>
+          <Label>{tf("epc_rating", "EPC Rating")}</Label>
           <Select
             value={value.epcRating}
             onValueChange={(next) => set("epcRating", next)}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a rating" />
+              <SelectValue placeholder={tf("af_re_select_rating", "Select a rating")} />
             </SelectTrigger>
             <SelectContent>
               {EPC_RATINGS.map((rating) => (
@@ -912,15 +914,15 @@ export function RealEstateFields({
       </div>
 
       <div className="space-y-4">
-        <h4 className="text-sm font-medium text-foreground">Condition</h4>
+        <h4 className="text-sm font-medium text-foreground">{tf("af_re_condition", "Condition")}</h4>
         <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
           {(
             [
-              ["kitchen", "Kitchen"],
-              ["bathrooms", "Bathrooms"],
-              ["flooring", "Flooring"],
-              ["windows", "Windows"],
-              ["general", "General"],
+              ["kitchen", tf("kitchen", "Kitchen")],
+              ["bathrooms", tf("bathrooms", "Bathrooms")],
+              ["flooring", tf("flooring", "Flooring")],
+              ["windows", tf("windows", "Windows")],
+              ["general", tf("general", "General")],
             ] as const
           ).map(([key, label]) => (
             <div key={key} className="min-w-0 space-y-2">
@@ -930,7 +932,7 @@ export function RealEstateFields({
                 onValueChange={(next) => setCondition(key, next)}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a condition" />
+                  <SelectValue placeholder={tf("af_re_select_condition", "Select a condition")} />
                 </SelectTrigger>
                 <SelectContent>
                   {CONDITION_RATINGS.map((rating) => (
@@ -947,7 +949,7 @@ export function RealEstateFields({
 
       <div className="w-full min-w-0 space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-foreground">Ownership</h4>
+          <h4 className="text-sm font-medium text-foreground">{tf("ownership", "Ownership")}</h4>
           <p
             className={
               ownershipTotal === 100
@@ -955,7 +957,7 @@ export function RealEstateFields({
                 : "text-xs text-destructive"
             }
           >
-            Total: {ownershipTotal}%
+            {tf("af_re_owner_total", "Total: {total}%", { total: ownershipTotal })}
           </p>
         </div>
 
@@ -963,7 +965,7 @@ export function RealEstateFields({
           {value.ownership.map((owner, index) => (
             <div key={index} className="flex w-full min-w-0 items-center gap-2">
               <Input
-                placeholder="Owner name"
+                placeholder={tf("af_re_owner_name", "Owner name")}
                 value={owner.name}
                 onChange={(e) =>
                   updateOwner(index, { name: e.target.value })
@@ -998,7 +1000,7 @@ export function RealEstateFields({
         </div>
 
         <Button type="button" variant="outline" size="sm" onClick={addOwner}>
-          Add Owner
+          {tf("af_re_add_owner", "Add Owner")}
         </Button>
       </div>
     </div>

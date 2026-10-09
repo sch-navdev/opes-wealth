@@ -10,6 +10,8 @@ import { BankingOverview, type BankingAccountRow } from "@/components/banking-ov
 import { T } from "@/components/translated-text";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
+import { pickBalanceDate } from "@/lib/bank-staleness";
+import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
 
 type CashRow = {
@@ -18,6 +20,7 @@ type CashRow = {
   currency: string;
   current_value: number;
   metadata: Record<string, unknown> | null;
+  updated_at: string | null;
 };
 
 type LinkRow = {
@@ -61,7 +64,7 @@ export default async function BankingPage({
   const { data: cash } = cashCategory
     ? await supabase
         .from("assets")
-        .select("id, name, currency, current_value, metadata")
+        .select("id, name, currency, current_value, metadata, updated_at")
         .eq("profile_id", user.id)
         .eq("status", "active")
         .eq("category_id", cashCategory.id)
@@ -78,6 +81,13 @@ export default async function BankingPage({
     )
     .eq("profile_id", user.id)
     .returns<LinkRow[]>();
+
+  // "Balance as of": newest history date, else newest transaction date, else the asset's updated date.
+  const dateSources = await loadBalanceDateSources(
+    supabase,
+    (cash ?? []).map((a) => a.id),
+  );
+  const today = new Date().toISOString().slice(0, 10);
 
   const linkByAsset = new Map((links ?? []).filter((l) => l.asset_id).map((l) => [l.asset_id as string, l]));
   const rows: BankingAccountRow[] = [];
@@ -99,6 +109,7 @@ export default async function BankingPage({
       lastSyncedAt: link?.last_synced_at ?? link?.bank_connections?.last_synced_at ?? null,
       lastError: link?.last_sync_error ?? null,
       assetId: a.id,
+      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at }),
     });
   }
 
@@ -145,6 +156,7 @@ export default async function BankingPage({
         rows={rows}
         baseCurrency={baseCurrency}
         mode={getBankSyncMode()}
+        today={today}
         statementAccounts={accounts}
         connectableCash={accounts.map((a) => ({ id: a.id, name: a.name, isLinked: linkByAsset.has(a.id) }))}
       />

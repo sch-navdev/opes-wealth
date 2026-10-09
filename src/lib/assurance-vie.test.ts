@@ -193,7 +193,7 @@ describe("parseAssuranceVieMetadata", () => {
     for (const garbage of [null, undefined, 5, "x", [], true, () => 1]) {
       const md = parseAssuranceVieMetadata(garbage);
       expect(md).toEqual(EMPTY_ASSURANCE_VIE_METADATA);
-      expect(md.version).toBe(1);
+      expect(md.version).toBe(2);
     }
   });
 
@@ -222,7 +222,7 @@ describe("parseAssuranceVieMetadata", () => {
       extra: "ignored",
     });
     expect(md).toMatchObject({
-      version: 1,
+      version: 2,
       insurer: "Insurer",
       contract_name: "",
       opened_on: "",

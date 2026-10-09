@@ -204,6 +204,41 @@ export function getBank(key: string): BankDef | undefined {
   return BANKS.find((b) => b.key === key);
 }
 
+/** A bank we can name and show a logo for, but that is not a connectable bank in `BANKS`. */
+export type LogoBank = { key: string; name: string; domain: string };
+
+/**
+ * PDF-only statement profiles (see `pdfOnly` in `csv-profiles.ts`) have no entry in `BANKS` (they cannot
+ * be connected), but their institution name still heads a group on the Banking page and they need a logo.
+ * `key` is the profile id, `name` the profile's display name.
+ */
+export const PROFILE_LOGO_BANKS: LogoBank[] = [
+  { key: "hsbc_uae", name: "HSBC UAE", domain: "hsbc.ae" },
+  { key: "hsbc_uae_card", name: "HSBC UAE credit card", domain: "hsbc.ae" },
+  { key: "cbi", name: "Commercial Bank International (CBI)", domain: "cbi.ae" },
+  { key: "cbd", name: "Commercial Bank of Dubai (CBD)", domain: "cbd.ae" },
+  { key: "fab_card", name: "First Abu Dhabi Bank credit card", domain: "bankfab.com" },
+  { key: "banque_populaire_card", name: "Banque Populaire card", domain: "www.banquepopulaire.fr" },
+];
+
+/** Display names (CSV profile names) that differ from the `BANKS` name of the same bank. */
+const NAME_ALIASES: Record<string, string> = {
+  "First Abu Dhabi Bank (FAB)": "fab",
+};
+
+/** The logo domain of a registry key: a connectable bank first, then a PDF-only profile. */
+export function bankLogoDomain(key: string): string | undefined {
+  return getBank(key)?.domain ?? PROFILE_LOGO_BANKS.find((b) => b.key === key)?.domain;
+}
+
+/** The logo key + domain behind an institution display name (connectable banks, profile-name aliases, PDF-only profiles). */
+export function logoBankByName(name: string): { key: string; domain: string } | undefined {
+  const bank = bankByName(name) ?? (NAME_ALIASES[name] ? getBank(NAME_ALIASES[name]) : undefined);
+  if (bank) return { key: bank.key, domain: bank.domain };
+  const extra = PROFILE_LOGO_BANKS.find((b) => b.name === name);
+  return extra ? { key: extra.key, domain: extra.domain } : undefined;
+}
+
 export const banksByCountry = (country: BankCountry): BankDef[] =>
   BANKS.filter((b) => b.country === country);
 

@@ -41,11 +41,11 @@ describe("AttributionCard", () => {
     renderCard(ok());
     expect(screen.getByText("Performance attribution")).toBeTruthy();
     // capital: (1500-1000)*1.08 = 540, +50.0%; currency: 1500*0.02 = 30, +1.9%; total 570, +52.8%
-    expect(screen.getByTestId("attr-capital-amount").textContent).toBe("+$540.00");
+    expect(screen.getByTestId("attr-capital-amount").textContent).toBe("USD +540.00");
     expect(screen.getByTestId("attr-capital-pct").textContent).toBe("+50.0%");
-    expect(screen.getByTestId("attr-currency-amount").textContent).toBe("+$30.00");
+    expect(screen.getByTestId("attr-currency-amount").textContent).toBe("USD +30.00");
     expect(screen.getByTestId("attr-currency-pct").textContent).toBe("+1.9%");
-    expect(screen.getByTestId("attr-total-amount").textContent).toBe("+$570.00");
+    expect(screen.getByTestId("attr-total-amount").textContent).toBe("USD +570.00");
     expect(screen.getByTestId("attr-total-pct").textContent).toBe("+52.8%");
   });
 
@@ -54,7 +54,7 @@ describe("AttributionCard", () => {
     renderCard(ok({ value: 1200, fxAtCost: 1.2, fxNow: 1.08 }));
     expect(screen.getByTestId("attr-capital-amount").className).toContain("text-success");
     expect(screen.getByTestId("attr-currency-amount").className).toContain("text-destructive");
-    expect(screen.getByTestId("attr-currency-amount").textContent).toMatch(/^-\$|^−\$/);
+    expect(screen.getByTestId("attr-currency-amount").textContent).toMatch(/^USD [-−]/);
     expect(screen.getByTestId("attr-currency-pct").className).toContain("text-destructive");
   });
 
@@ -68,8 +68,8 @@ describe("AttributionCard", () => {
     const bar = screen.getByRole("img");
     const labelId = bar.getAttribute("aria-labelledby") as string;
     const text = document.getElementById(labelId)?.textContent ?? "";
-    expect(text).toContain("+$540.00");
-    expect(text).toContain("+$30.00");
+    expect(text).toContain("USD +540.00");
+    expect(text).toContain("USD +30.00");
     expect(document.getElementById(labelId)?.className).toContain("sr-only");
   });
 
@@ -92,7 +92,7 @@ describe("AttributionCard", () => {
   it("masks amounts and percentages in Privacy Mode but keeps the rates", () => {
     localStorage.setItem("opes_privacy_mode", "true");
     renderCard(ok());
-    expect(screen.queryByText("+$540.00")).toBeNull();
+    expect(screen.queryByText("USD +540.00")).toBeNull();
     expect(screen.queryByText("+50.0%")).toBeNull();
     expect(screen.getByTestId("attr-total-amount").textContent).toBe("••••••••");
     expect(document.body.textContent).not.toContain("540");

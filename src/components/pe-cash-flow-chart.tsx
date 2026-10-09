@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { cumulativeCashFlowSeries, type PrivateEquityMetadata } from "@/lib/private-equity";
@@ -30,11 +31,7 @@ export function PeCashFlowChart({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  });
+  const formatter = moneyFormatter(intlLocale, currency, { maximumFractionDigits: 0 });
 
   const data = cumulativeCashFlowSeries(metadata).map((p) => ({
     date: p.date,

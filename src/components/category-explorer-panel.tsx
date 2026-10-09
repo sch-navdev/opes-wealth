@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
@@ -68,7 +69,7 @@ export function CategoryExplorerPanel({
   const [showInvested, setShowInvested] = useState(true);
 
   const formatter = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    () => moneyFormatter(intlLocale, currency),
     [intlLocale, currency],
   );
   const money = (n: number) => maskValue(formatter.format(n));

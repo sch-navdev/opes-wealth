@@ -57,7 +57,7 @@ export function isSectionVisible(section: DashboardSection, tier: ExpertiseLevel
  * a link either follows a dashboard section (so the link and the card it leads
  * to always appear together) or has its own plain minimum tier.
  */
-export type NavLinkId = "dashboard" | "dataQuality" | "banking" | "companies" | "planning" | "compare" | "cashFlowPage" | "settings" | "security";
+export type NavLinkId = "dashboard" | "dataQuality" | "banking" | "brokerage" | "companies" | "planning" | "compare" | "cashFlowPage" | "settings" | "security";
 
 type NavLinkRule = { section: DashboardSection } | { min: ExpertiseLevel };
 
@@ -65,6 +65,7 @@ export const NAV_LINK_TIERS: Record<NavLinkId, NavLinkRule> = {
   dashboard: { min: "basic" },
   dataQuality: { min: "standard" },
   banking: { section: "cashFlow" },
+  brokerage: { min: "standard" },
   companies: { min: "professional" },
   planning: { section: "futureProjects" },
   compare: { min: "professional" },

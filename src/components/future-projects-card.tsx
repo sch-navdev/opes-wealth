@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Eye, EyeOff, Telescope } from "lucide-react";
@@ -49,7 +50,7 @@ export function FutureProjectsCard({
 
   const money = (n: number) => {
     try {
-      return maskValue(new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }).format(n));
+      return maskValue(moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }).format(n));
     } catch {
       return maskValue(n.toLocaleString(intlLocale, { maximumFractionDigits: 0 }));
     }

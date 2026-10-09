@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/refresh-prices",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/fx-rates",
+      "schedule": "0 20 * * *"
     }
   ]
 }

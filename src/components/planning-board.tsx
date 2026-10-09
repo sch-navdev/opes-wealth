@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, HelpCircle, Pencil, Plus, XCircle } from "lucide-react";
@@ -71,7 +72,7 @@ export function PlanningBoard({
 
   const money = (n: number) => {
     try {
-      return maskValue(new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }).format(n));
+      return maskValue(moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }).format(n));
     } catch {
       return maskValue(n.toLocaleString(intlLocale, { maximumFractionDigits: 0 }));
     }

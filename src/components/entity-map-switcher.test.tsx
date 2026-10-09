@@ -90,7 +90,7 @@ describe("EntityLookthroughViews", () => {
     expect(screen.getByTestId("ent-view-map")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("entity-map-skeleton")).toBeInTheDocument();
     expect(screen.queryByTestId("ent-node-trust")).not.toBeInTheDocument();
-    expect(screen.getByTestId("ent-map-reconciliation")).toHaveTextContent("$1,350.00");
+    expect(screen.getByTestId("ent-map-reconciliation")).toHaveTextContent("USD 1,350.00");
     const props = mocks.canvasProps.mock.calls.at(-1)![0] as {
       map: { nodes: unknown[]; summary: { entities: number } };
       baseCurrency: string;

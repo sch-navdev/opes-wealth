@@ -132,7 +132,7 @@ describe("AssuranceVieDetailCards", () => {
     expect(screen.getByTestId("av-beneficiaries")).toHaveTextContent("Bob or his children");
     expect(screen.getByTestId("av-bene-total")).toHaveTextContent("Shares total: 90%");
     expect(within(screen.getByTestId("av-beneficiaries")).getByRole("status")).toHaveTextContent("not 100%");
-    expect(screen.getByTestId("av-scope-note")).toHaveTextContent("Unit-linked holdings, ISINs and live pricing are not tracked");
+    expect(screen.getByTestId("av-scope-note")).toHaveTextContent("there is no live pricing");
   });
 
   it("masks every money value in privacy mode but leaves labels and percentages", () => {
@@ -199,5 +199,43 @@ describe("AssuranceVieEstateCard", () => {
     const card = screen.getByTestId("av-estate");
     expect(card).toHaveTextContent("€152,500");
     expect(card.textContent).not.toMatch(/777,000|88,000/);
+  });
+});
+
+describe("AssuranceVieHoldingsCard", () => {
+  const holdings = [
+    { id: "a", type: "euro_fund" as const, name: "Fonds Euro Demo", isin: "", ticker: "", units: null, unit_price: null, value: 600, as_of: "" },
+    { id: "b", type: "etf" as const, name: "World ETF Demo", isin: "IE00B4L5Y983", ticker: "IWDA", units: 4, unit_price: 100, value: 400, as_of: "2026-09-30" },
+  ];
+
+  it("renders nothing without holdings", () => {
+    wrap(<AssuranceVieDetailCards metadata={md()} assetValue={1000} currency="EUR" />);
+    expect(screen.queryByTestId("av-holdings")).toBeNull();
+  });
+
+  it("shows the breakdown by type, the list and a matching reconciliation", () => {
+    wrap(<AssuranceVieDetailCards metadata={md({ holdings })} assetValue={1000} currency="EUR" />);
+    const rows = screen.getAllByTestId("av-hold-type-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Euro fund");
+    expect(rows[0]).toHaveTextContent("60%");
+    expect(screen.getAllByTestId("av-hold-item")).toHaveLength(2);
+    expect(screen.getByTestId("av-hold-recon")).toHaveAttribute("data-state", "match");
+    expect(screen.getByTestId("av-scope-note")).toHaveTextContent("no live pricing");
+  });
+
+  it("shows the difference with a neutral note when the totals differ", () => {
+    wrap(<AssuranceVieDetailCards metadata={md({ holdings })} assetValue={1250} currency="EUR" />);
+    expect(screen.getByTestId("av-hold-recon")).toHaveAttribute("data-state", "under");
+    expect(screen.getByTestId("av-hold-recon-line")).toHaveTextContent("€250.00 below");
+    expect(screen.getByText(/A difference is normal/)).toBeInTheDocument();
+  });
+
+  it("masks amounts in privacy mode but not names", () => {
+    localStorage.setItem("opes_privacy_mode", "true");
+    wrap(<AssuranceVieDetailCards metadata={md({ holdings })} assetValue={1000} currency="EUR" />);
+    const card = screen.getByTestId("av-holdings");
+    expect(card).toHaveTextContent("World ETF Demo");
+    expect(card.textContent).not.toMatch(/600|400/);
   });
 });

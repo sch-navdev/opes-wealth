@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useTransition } from "react";
 import { setEntityHeldAssets } from "@/app/dashboard/companies/actions";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,7 @@ export function ManageHoldingsDialog({
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
-  const money = useMemo(() => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency }), [intlLocale, baseCurrency]);
+  const money = useMemo(() => moneyFormatter(intlLocale, baseCurrency), [intlLocale, baseCurrency]);
 
   const label = (o: HoldingOption) => {
     const key = PILL_LABEL_KEYS[o.category];

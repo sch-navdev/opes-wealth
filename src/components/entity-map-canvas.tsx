@@ -9,6 +9,7 @@
  * hidden from assistive technology and the container carries a summary label. The Tree view has the same
  * information as text and is the accessible default.
  */
+import { moneyFormatter } from "@/lib/money-parts";
 import "@xyflow/react/dist/style.css";
 import { useMemo, type CSSProperties } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps } from "@xyflow/react";
@@ -28,7 +29,7 @@ function MapNode({ data, targetPosition, sourcePosition }: NodeProps<FlowNode>) 
   const t = useTx();
   const { t: tStrict, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = useMemo(() => new Intl.NumberFormat(intlLocale, { style: "currency", currency: data.currency }), [intlLocale, data.currency]);
+  const formatter = useMemo(() => moneyFormatter(intlLocale, data.currency), [intlLocale, data.currency]);
   const fmt = (n: number | null) => formatMapValue(n, (v) => maskValue(formatter.format(v)));
 
   let title = data.name;

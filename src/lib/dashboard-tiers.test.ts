@@ -25,6 +25,7 @@ describe("isNavLinkVisible", () => {
     settings: [true, true, true, true],
     security: [true, true, true, true],
     banking: [false, true, true, true],
+    brokerage: [false, true, true, true],
     dataQuality: [false, true, true, true],
     companies: [false, false, true, true],
     planning: [false, false, true, true],

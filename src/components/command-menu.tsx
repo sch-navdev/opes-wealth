@@ -17,7 +17,7 @@ import {
 import { useUiTier } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { useUiTierStore } from "@/stores/useUiTierStore";
-import { visibleNavItems } from "@/lib/nav-items";
+import { navLabel, visibleNavItems } from "@/lib/nav-items";
 import {
   OPEN_COMMAND_MENU_EVENT,
   openCommandMenu,
@@ -195,9 +195,9 @@ function Palette({
 
         <CommandGroup heading={t("cmdk_group_pages")}>
           {pages.map(({ id, href, labelKey, icon: Icon }) => (
-            <CommandItem key={id} value={`page ${id}`} keywords={[t(labelKey)]} onSelect={() => go(href)}>
+            <CommandItem key={id} value={`page ${id}`} keywords={[navLabel(t, labelKey)]} onSelect={() => go(href)}>
               <Icon aria-hidden />
-              <span className="truncate">{t(labelKey)}</span>
+              <span className="truncate">{navLabel(t, labelKey)}</span>
             </CommandItem>
           ))}
         </CommandGroup>

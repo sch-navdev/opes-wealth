@@ -56,7 +56,7 @@ describe("TaxLotsCard", () => {
     expect(radios.map((r) => r.textContent)).toEqual(["FIFO", "LIFO", "HIFO", "Average cost"]);
     expect(within(group).getByRole("radio", { name: "FIFO" })).toHaveAttribute("aria-checked", "true");
     expect(group).toHaveAccessibleDescription(/First in, first out/);
-    expect(summary()).toEqual({ remaining: "$1,950.00", unrealised: "+$1,050.00", realised: "+$650.00" });
+    expect(summary()).toEqual({ remaining: "USD 1,950.00", unrealised: "USD +1,050.00", realised: "USD +650.00" });
     expect(screen.getByTestId("lots-unrealised").className).toContain("text-success");
     expect(screen.getByText(/crypto holdings have no trade ledger/)).toBeTruthy();
     expect(
@@ -72,15 +72,15 @@ describe("TaxLotsCard", () => {
     await user.click(screen.getByRole("radio", { name: "LIFO" }));
     expect(screen.getByRole("radio", { name: "LIFO" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("radio", { name: "FIFO" })).toHaveAttribute("aria-checked", "false");
-    expect(summary()).toEqual({ remaining: "$1,750.00", unrealised: "+$1,250.00", realised: "+$450.00" });
+    expect(summary()).toEqual({ remaining: "USD 1,750.00", unrealised: "USD +1,250.00", realised: "USD +450.00" });
     expect(screen.getByText(/Last in, first out/)).toBeTruthy();
     expect(localStorage.getItem(TAX_LOT_METHOD_STORAGE_KEY)).toBe("lifo");
 
     await user.click(screen.getByRole("radio", { name: "HIFO" }));
-    expect(summary()).toEqual({ remaining: "$1,600.00", unrealised: "+$1,400.00", realised: "+$300.00" });
+    expect(summary()).toEqual({ remaining: "USD 1,600.00", unrealised: "USD +1,400.00", realised: "USD +300.00" });
 
     await user.click(screen.getByRole("radio", { name: "Average cost" }));
-    expect(summary()).toEqual({ remaining: "$1,850.00", unrealised: "+$1,150.00", realised: "+$550.00" });
+    expect(summary()).toEqual({ remaining: "USD 1,850.00", unrealised: "USD +1,150.00", realised: "USD +550.00" });
     expect(localStorage.getItem(TAX_LOT_METHOD_STORAGE_KEY)).toBe("average");
   });
 
@@ -88,7 +88,7 @@ describe("TaxLotsCard", () => {
     localStorage.setItem(TAX_LOT_METHOD_STORAGE_KEY, "hifo");
     const { unmount } = renderCard();
     expect(screen.getByRole("radio", { name: "HIFO" })).toHaveAttribute("aria-checked", "true");
-    expect(summary().realised).toBe("+$300.00");
+    expect(summary().realised).toBe("USD +300.00");
     unmount();
 
     localStorage.setItem(TAX_LOT_METHOD_STORAGE_KEY, "specific-id");
@@ -130,7 +130,7 @@ describe("TaxLotsCard", () => {
     expect(screen.getByRole("radio", { name: "FIFO" })).toHaveAttribute("aria-checked", "true");
     await user.click(screen.getByRole("radio", { name: "LIFO" }));
     expect(screen.getByRole("radio", { name: "LIFO" })).toHaveAttribute("aria-checked", "true");
-    expect(summary().realised).toBe("+$450.00");
+    expect(summary().realised).toBe("USD +450.00");
   });
 
   it("lists open lots with per-share unit costs, held days and a neutral 12-month marker", () => {
@@ -141,9 +141,9 @@ describe("TaxLotsCard", () => {
     expect(rows).toHaveLength(2);
     // b2: 5 left @ 150, held 2023-03-15 -> 2024-03-20 = 371 days (12+ months)
     expect(within(rows[0]).getByRole("rowheader").textContent).toBe("Mar 15, 2023");
-    expect(within(rows[0]).getByText("$150.00")).toBeTruthy();
-    expect(within(rows[0]).getByText("$750.00")).toBeTruthy();
-    expect(within(rows[0]).getByText("+$250.00")).toBeTruthy();
+    expect(within(rows[0]).getByText("USD 150.00")).toBeTruthy();
+    expect(within(rows[0]).getByText("USD 750.00")).toBeTruthy();
+    expect(within(rows[0]).getByText("USD +250.00")).toBeTruthy();
     expect(within(rows[0]).getByText("Held 12+ months")).toBeTruthy();
     expect(within(rows[0]).getByText("371")).toBeTruthy();
     // b3: 10 left @ 120, 293 days, no marker
@@ -155,13 +155,13 @@ describe("TaxLotsCard", () => {
     renderCard();
     const years = screen.getByRole("table", { name: "Grouped by the calendar year of each sale, in USD." });
     expect(within(years).getByRole("rowheader", { name: "2024" })).toBeTruthy();
-    expect(within(years).getByText("$2,400.00")).toBeTruthy();
-    expect(within(years).getByText("$1,750.00")).toBeTruthy();
+    expect(within(years).getByText("USD 2,400.00")).toBeTruthy();
+    expect(within(years).getByText("USD 1,750.00")).toBeTruthy();
     const matches = screen.getByRole("table", { name: "Each sale matched to the purchase lots it used, in USD." });
     const rows = within(matches).getAllByTestId("lots-match-row");
     expect(rows).toHaveLength(2);
     expect(within(rows[0]).getByText("Jan 10, 2023")).toBeTruthy();
-    expect(within(rows[0]).getByText("+$600.00")).toBeTruthy();
+    expect(within(rows[0]).getByText("USD +600.00")).toBeTruthy();
     expect(within(rows[0]).getByText("387")).toBeTruthy();
   });
 
@@ -184,12 +184,12 @@ describe("TaxLotsCard", () => {
   it("scales amounts and quantities to the viewer's share, never the unit cost", () => {
     renderCard({ ownerFactor: 0.5 });
     expect(screen.getByTestId("owner-share-note")).toBeTruthy();
-    expect(summary()).toEqual({ remaining: "$975.00", unrealised: "+$525.00", realised: "+$325.00" });
+    expect(summary()).toEqual({ remaining: "USD 975.00", unrealised: "USD +525.00", realised: "USD +325.00" });
     const table = screen.getByRole("table", { name: "Shares still held, by purchase lot, in USD." });
     const [first] = within(table).getAllByTestId("lots-open-row");
     expect(within(first).getByText("2.5")).toBeTruthy(); // 5 shares x 50%
-    expect(within(first).getByText("$150.00")).toBeTruthy(); // unit cost unchanged
-    expect(within(first).getByText("$375.00")).toBeTruthy(); // 750 x 50%
+    expect(within(first).getByText("USD 150.00")).toBeTruthy(); // unit cost unchanged
+    expect(within(first).getByText("USD 375.00")).toBeTruthy(); // 750 x 50%
   });
 
   it("masks amounts and quantities and drops the gain colours in privacy mode", () => {
@@ -197,7 +197,7 @@ describe("TaxLotsCard", () => {
     renderCard();
     expect(summary()).toEqual({ remaining: "••••••••", unrealised: "••••••••", realised: "••••••••" });
     expect(screen.getByTestId("lots-unrealised").className).not.toContain("text-success");
-    expect(screen.queryByText("$150.00")).toBeNull();
+    expect(screen.queryByText("USD 150.00")).toBeNull();
   });
 
   it("lists data warnings: oversold sale, other-currency trade, invalid trade, quantity mismatch", () => {
@@ -224,6 +224,6 @@ describe("TaxLotsCard", () => {
     expect(screen.getByText("No current price available.")).toBeTruthy();
     // buy-only ledger: both sales sections say so
     expect(screen.getAllByText("No sales recorded yet.")).toHaveLength(2);
-    expect(summary().realised).toBe("$0.00");
+    expect(summary().realised).toBe("USD 0.00");
   });
 });

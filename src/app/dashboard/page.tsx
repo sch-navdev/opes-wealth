@@ -11,6 +11,9 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { AddLiabilityDialog } from "@/components/add-liability-dialog";
 import { CashBankCard, type CashAccount } from "@/components/cash-bank-card";
 import { AddInvestmentsDialog } from "@/components/add-investments-dialog";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { convertOnDate } from "@/lib/fx-history";
+import { loadFxRateTable, loadFxStatus } from "@/lib/fx-history-server";
 import { DashboardHeaderControls } from "@/components/dashboard-header-controls";
 import {
   DashboardMetricCards,
@@ -268,14 +271,26 @@ export default async function DashboardPage({
     );
   }
 
+  // Each history point is converted at the rate of ITS day (daily table `fx_rates_daily`, migration 0039;
+  // nearest earlier day when one is missing). Today and later, or while the table is empty / not applied,
+  // use the current rates, i.e. the previous behaviour.
+  const fxCurrencies = [...new Set([...(assets ?? []).map((a) => a.currency), displayCurrency])];
+  const firstHistoryDate = allHistory.reduce<string>((min, h) => (h.recorded_date < min ? h.recorded_date : min), today);
+  const fxFrom = new Date(Date.parse(`${firstHistoryDate}T00:00:00Z`) - 10 * 86_400_000).toISOString().slice(0, 10);
+  const [{ table: fxTable }, fxRatesStatus] = await Promise.all([
+    loadFxRateTable(supabase as unknown as SupabaseClient, fxCurrencies, fxFrom),
+    loadFxStatus(supabase as unknown as SupabaseClient),
+  ]);
+  const convertAt = (amount: number, currency: string, date: string) =>
+    date >= today
+      ? convertToBaseCurrency(amount, currency, displayCurrency, rates)
+      : convertOnDate(amount, currency, displayCurrency, date, fxTable, rates);
+
   const baseHistory = (asset: AssetRow) =>
     (historyByAsset.get(asset.id) ?? []).map((h) => ({
       recorded_date: h.recorded_date,
-      value: convertToBaseCurrency(h.value, asset.currency, displayCurrency, rates),
-      net_equity:
-        h.net_equity != null
-          ? convertToBaseCurrency(h.net_equity, asset.currency, displayCurrency, rates)
-          : null,
+      value: convertAt(h.value, asset.currency, h.recorded_date),
+      net_equity: h.net_equity != null ? convertAt(h.net_equity, asset.currency, h.recorded_date) : null,
     }));
 
   const performanceSeries = buildNetWorthSeries(
@@ -437,7 +452,7 @@ export default async function DashboardPage({
       quantity: asset.quantity,
     })?.map(([date, amount]): [string, number] => [
       date,
-      convertToBaseCurrency(amount, asset.currency, displayCurrency, rates),
+      convertAt(amount, asset.currency, date),
     ]),
   }));
 
@@ -696,6 +711,7 @@ export default async function DashboardPage({
             baseCurrency={displayCurrency}
             pendingApprovals={pendingApprovals}
             notifications={notifications}
+            fxStatus={fxRatesStatus}
           />
         </div>
       </header>

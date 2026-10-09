@@ -120,7 +120,9 @@ High-net-worth individuals
 - [[UHNW-Modules-Plan|UHNW Modules Plan]] — proposal (not built): wealth node map, private-market liquidity ledger, governance vault
 - [[Entity-Structures|Entity Structures & Look-through]] — trusts, foundations, SPVs, holdings held through entities, net-worth look-through
 - [[Personal-Cash-Flow|Personal Cash Flow]] — private income streams and the income calendar earned layer (step 1); waterfall and emergency fund to come
-- [[Governance-Vault|Governance Vault]] — private document vault per asset: signed URLs, MFA step-up, expiry reminders (migration 0038 drafted, not applied)
+- [[Governance-Vault|Governance Vault]] — private document vault per asset: signed URLs, MFA step-up, expiry reminders (migration 0038 APPLIED by Steve 2026-10-09: tables, 10 policies, private bucket verified read-only; the upload / view / delete round trip is still untested)
+- [[Assurance-Vie-Holdings|Assurance-Vie Holdings]] — what a contract can hold (sourced research) and the contract-holdings editor
+- [[Emergency-Fund|Emergency Fund]] — target 3 to 6 months of essential expenses + planned liabilities, diversion rule, sourcing caveats
 - [[Changelog|Changelog]] — full chronological history
 
 ## Folder Structure

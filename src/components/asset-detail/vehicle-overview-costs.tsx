@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import type { MoneyFormatter } from "@/lib/money-parts";
 import { Badge } from "@/components/ui/badge";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,7 +23,7 @@ export function VehicleOverviewCosts({
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
   vehicleTotalCost: number | null;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   vehicleMetadata: VehicleMetadata;
   intlLocale: string;
   vehicleChange: { amount: number; percent: number | null; } | null;
@@ -80,8 +82,7 @@ export function VehicleOverviewCosts({
                   ? "whitespace-nowrap bg-success px-2 py-0.5 text-success-foreground"
                   : "whitespace-nowrap bg-destructive px-2 py-0.5 text-destructive-foreground"}
               >
-                {vehicleChange.percent >= 0 ? "+" : "-"}
-                {Math.abs(vehicleChange.percent).toFixed(1)}%
+                {formatPercentPoints(vehicleChange.percent, intlLocale, { digits: 1, signDisplay: "always" })}
               </Badge>
             )}
           </div>

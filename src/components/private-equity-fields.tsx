@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -56,7 +58,7 @@ export function PrivateEquityFields({
   currency: string;
 }) {
   const { t, intlLocale } = useLanguage();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
+  const formatter = moneyFormatter(intlLocale, currency);
 
   // Schedule generator inputs (not persisted — only the resulting calls are).
   const [percentPerCall, setPercentPerCall] = useState("10");
@@ -563,7 +565,7 @@ export function PrivateEquityFields({
           <p className="text-xs text-muted-foreground">
             {t("pe_returns_summary", {
               multiple: returns.multiple != null ? `${returns.multiple.toFixed(2)}x` : "—",
-              irr: returns.irr != null ? `${(returns.irr * 100).toFixed(1)}%` : "—",
+              irr: returns.irr != null ? formatPercentPoints(returns.irr * 100, intlLocale, { digits: 1 }) : "—",
               source: manual ? t("pe_returns_manual") : t("pe_returns_computed"),
             })}
           </p>

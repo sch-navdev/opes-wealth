@@ -76,9 +76,9 @@ describe("EntityLookthrough", () => {
   it("shows the reconciliation line, entity badges, ownership, subtotal and nested entities", () => {
     renderView();
     const rec = screen.getByTestId("ent-reconciliation").textContent ?? "";
-    expect(rec).toMatch(/Held through structures\s*\$900\.00/);
-    expect(rec).toMatch(/Held personally\s*\$50\.00/);
-    expect(rec).toMatch(/Net worth\s*\$950\.00/);
+    expect(rec).toMatch(/Held through structures\s*USD 900\.00/);
+    expect(rec).toMatch(/Held personally\s*USD 50\.00/);
+    expect(rec).toMatch(/Net worth\s*USD 950\.00/);
 
     const trust = screen.getByTestId("ent-node-trust");
     expect(within(trust).getAllByText("Trust").length).toBeGreaterThan(0);
@@ -86,7 +86,7 @@ describe("EntityLookthrough", () => {
     const spv = within(trust).getByTestId("ent-node-spv");
     expect(within(spv).getByText("Special purpose vehicle (SPV)")).toBeTruthy();
     expect(within(trust).getByRole("link", { name: "Villa" })).toHaveAttribute("href", "/dashboard/assets/villa");
-    expect(within(trust).getAllByText("-$400.00").length).toBeGreaterThan(0);
+    expect(within(trust).getAllByText("USD -400.00").length).toBeGreaterThan(0);
   });
 
   it("shows the double-count note and the missing-link warning in neutral wording", () => {

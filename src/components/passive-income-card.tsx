@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, HandCoins } from "lucide-react";
@@ -52,7 +53,7 @@ export function PassiveIncomeCard({
   const [filter, setFilter] = useState<PassiveIncomeSource | null>(null);
 
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
   const pct = (n: number | null) =>

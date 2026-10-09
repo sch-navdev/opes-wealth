@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, type ComponentProps } from "react";
 import dynamic from "next/dynamic";
 import { EntityLookthrough } from "@/components/entity-lookthrough";
@@ -35,7 +36,7 @@ export function EntityLookthroughViews(props: ComponentProps<typeof EntityLookth
   const [view, setView] = useState<View>("tree");
   const { data } = props;
   const map = useMemo(() => buildEntityMap(data, { rtl: dir === "rtl" }), [data, dir]);
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: data.baseCurrency });
+  const formatter = moneyFormatter(intlLocale, data.baseCurrency);
   const fmt = (n: number) => maskValue(formatter.format(n));
 
   const option = (v: View, label: string) => (

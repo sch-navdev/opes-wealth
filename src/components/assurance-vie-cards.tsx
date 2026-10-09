@@ -2,6 +2,9 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AllocationDial } from "@/components/allocation-dial";
+import { HOLDING_TYPE_KEYS } from "@/components/assurance-vie-holdings-editor";
+import { PartitionBar } from "@/components/partition-bar";
 import { useAssuranceVieText } from "@/components/assurance-vie-text";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -12,7 +15,10 @@ import {
   computeMilestone,
   estateAllowanceInfo,
   hasPremiumAgeSplit,
+  holdingsByType,
   impliedAllocationAmounts,
+  reconcileHoldings,
+  type AvHolding,
   scheduledAnnualAmount,
   type AssuranceVieMetadata,
   type AvFrequency,
@@ -232,6 +238,109 @@ export function AssuranceVieEstateCard({ metadata }: { metadata: Pick<AssuranceV
   );
 }
 
+const HOLDING_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+
+/**
+ * Read-only breakdown of the contract holdings by type (dial on wide screens, flat bar on phones, exact figures in the
+ * legend) plus the holdings list and the reconciliation line. Renders nothing when there are no holdings. Money is masked
+ * in privacy mode; shares, unit counts and ISINs are not amounts.
+ */
+export function AssuranceVieHoldingsCard({
+  holdings,
+  contractValue,
+  currency,
+}: {
+  holdings: AvHolding[];
+  /** The asset value shown on the page (a co-owner sees their share). */
+  contractValue: number;
+  currency: string;
+}) {
+  const t = useAssuranceVieText();
+  const { intlLocale } = useLanguage();
+  const { maskValue } = usePrivacy();
+  const formatDate = useDateFormatter();
+  const list = Array.isArray(holdings) ? holdings : [];
+  const byType = holdingsByType(list);
+  if (byType.length === 0) return null;
+
+  const money = (n: number) => {
+    try {
+      return maskValue(new Intl.NumberFormat(intlLocale, { style: "currency", currency }).format(n));
+    } catch {
+      return maskValue(String(n));
+    }
+  };
+  const recon = reconcileHoldings(list, contractValue);
+  const slices = byType.map((row, i) => ({ key: row.type, share: row.share, color: HOLDING_COLORS[i % HOLDING_COLORS.length] }));
+  const colorOf = new Map(slices.map((sl) => [sl.key, sl.color]));
+  const shown = list.filter((h) => typeof h.value === "number" && h.value > 0).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+  return (
+    <Card className="border-border bg-card" data-testid="av-holdings">
+      <CardHeader>
+        <CardTitle className="text-foreground">{t("av_hold_title")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <AllocationDial slices={slices} size={140} centerValue={String(shown.length)} centerLabel={t("av_hold_center")} className="hidden shrink-0 sm:block" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <PartitionBar className="sm:hidden" segments={slices} />
+            <p className="text-xs text-muted-foreground">{t("av_hold_by_type")}</p>
+            <ul className="divide-y divide-border border border-border" data-testid="av-hold-types">
+              {byType.map((row) => (
+                <li key={row.type} className="flex items-center justify-between gap-3 px-3 py-2" data-testid="av-hold-type-row" data-type={row.type}>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-3 shrink-0" style={{ backgroundColor: colorOf.get(row.type) }} aria-hidden="true" />
+                    <span className="break-words text-sm text-foreground">{t(HOLDING_TYPE_KEYS[row.type])}</span>
+                  </span>
+                  <span className="shrink-0 text-end text-sm text-foreground tabular-nums">
+                    <span className="font-semibold">{fmtPct(row.share * 100)}%</span>
+                    <span className="ms-3 text-muted-foreground">{money(row.total)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="space-y-1" data-testid="av-hold-list">
+          <p className="text-xs text-muted-foreground">{t("av_hold_list")}</p>
+          <ul className="divide-y divide-border border border-border">
+            {shown.map((h) => (
+              <li key={h.id} className="flex flex-wrap items-start justify-between gap-2 px-3 py-2" data-testid="av-hold-item">
+                <div className="min-w-0">
+                  <p className="break-words text-sm text-foreground">{h.name || "—"}</p>
+                  <p className="break-words text-xs text-muted-foreground">
+                    {[t(HOLDING_TYPE_KEYS[h.type]), h.isin, h.ticker, h.units !== null ? String(h.units) : "", h.as_of ? t("av_hold_as_of_on", { date: formatDate(h.as_of) }) : ""]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold text-foreground tabular-nums">{money(h.value ?? 0)}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {recon.state !== "none" && recon.difference !== null && recon.contractValue !== null && (
+          <div className="space-y-1 border border-border bg-muted/40 p-3" data-testid="av-hold-recon" data-state={recon.state}>
+            <p className="text-sm font-medium text-foreground">{t("av_hold_recon_title")}</p>
+            <p className="text-sm text-foreground" data-testid="av-hold-recon-line">
+              {t(recon.state === "match" ? "av_hold_recon_match" : recon.state === "under" ? "av_hold_recon_under" : "av_hold_recon_over", {
+                holdings: money(recon.holdingsTotal),
+                contract: money(recon.contractValue),
+                difference: money(Math.abs(recon.difference)),
+              })}
+            </p>
+            {recon.state !== "match" && <p className="text-xs text-muted-foreground">{t("av_hold_recon_note")}</p>}
+            {recon.state !== "match" && <p className="text-xs text-muted-foreground">{t("av_hold_card_note")}</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Detail-page cards for an Assurance-Vie contract. Money values follow privacy-mode masking. */
 export function AssuranceVieDetailCards({
   metadata,
@@ -306,6 +415,8 @@ export function AssuranceVieDetailCards({
           </div>
         </CardContent>
       </Card>
+
+      <AssuranceVieHoldingsCard holdings={metadata.holdings} contractValue={assetValue} currency={currency} />
 
       <Card className="border-border bg-card" data-testid="av-deposits">
         <CardHeader>
@@ -391,7 +502,7 @@ export function AssuranceVieDetailCards({
       <AssuranceVieEstateCard metadata={metadata} />
 
       <p className="text-xs text-muted-foreground" data-testid="av-scope-note">
-        {t("av_scope_note")}
+        {t("av_hold_scope_note")}
       </p>
     </div>
   );

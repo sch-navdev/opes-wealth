@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ChevronDown, Landmark, RefreshCw, Upload } from "lucide-react";
@@ -116,7 +117,7 @@ export function CashBankCard({
     });
   }
   const { maskValue } = usePrivacy();
-  const baseFormatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
+  const baseFormatter = moneyFormatter(intlLocale, baseCurrency);
   const [isOpen, setIsOpen] = useState(false);
   const total = accounts.reduce((sum, a) => sum + a.baseValue, 0);
 
@@ -139,10 +140,7 @@ export function CashBankCard({
   });
 
   const renderAccount = (account: CashAccount) => {
-              const native = new Intl.NumberFormat(intlLocale, {
-                style: "currency",
-                currency: account.currency,
-              });
+              const native = moneyFormatter(intlLocale, account.currency);
               return (
                 <li
                   key={account.id}

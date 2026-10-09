@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { CategoryIcon } from "@/components/category-icon";
@@ -163,10 +164,7 @@ export function PortfolioGroups({
     });
   }
 
-  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency: displayCurrency,
-  });
+  const currencyFormatter = moneyFormatter(intlLocale, displayCurrency);
 
   if (assets.length === 0) {
     return (

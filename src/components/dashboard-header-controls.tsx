@@ -7,6 +7,8 @@ import { ApprovalsBell } from "@/components/approvals-bell";
 import { NotificationsBell } from "@/components/notifications-bell";
 import type { NotificationItem } from "@/lib/notifications";
 import type { PendingApproval } from "@/lib/shared-assets/server";
+import { FxRatesStatus } from "@/components/fx-rates-status";
+import type { FxStatusView } from "@/lib/fx-history";
 import { CurrencySwitcher } from "@/components/currency-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { PrivacyToggleButton } from "@/components/privacy-toggle-button";
@@ -19,6 +21,7 @@ export function DashboardHeaderControls({
   baseCurrency,
   pendingApprovals = [],
   notifications = [],
+  fxStatus,
 }: {
   totalNetWorth: number;
   baseCurrency: string;
@@ -26,6 +29,8 @@ export function DashboardHeaderControls({
   pendingApprovals?: PendingApproval[];
   /** Outcomes of changes the signed-in user proposed (see `notifications-bell.tsx`). */
   notifications?: NotificationItem[];
+  /** State of the stored daily exchange rates (see `fx-rates-status.tsx`); omitted = no indicator. */
+  fxStatus?: FxStatusView;
 }) {
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
@@ -53,6 +58,7 @@ export function DashboardHeaderControls({
       <ThemeToggle />
       <ComfortModeToggle />
       <DashboardCustomizeButton />
+      {fxStatus ? <FxRatesStatus status={fxStatus} className="basis-full justify-end" /> : null}
     </div>
   );
 }

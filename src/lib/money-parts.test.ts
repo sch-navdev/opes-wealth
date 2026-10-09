@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedPositionsFromRight, moneyParts } from "./money-parts";
+import { changedPositionsFromRight, formatDecimal, formatMoneyText, formatPercentPoints, moneyFormatter, moneyParts } from "./money-parts";
 
 describe("moneyParts", () => {
   it("splits code, whole part and decimals", () => {
@@ -45,5 +45,41 @@ describe("changedPositionsFromRight", () => {
 
   it("marks every place when the figure grows a digit", () => {
     expect([...changedPositionsFromRight("999", "1,000")].sort()).toEqual([0, 1, 2, 3, 4]);
+  });
+});
+
+describe("formatMoneyText / moneyFormatter (one inline currency style)", () => {
+  it("puts the ISO code first in every language", () => {
+    expect(formatMoneyText(1234.5, "EUR", "en-US")).toBe("EUR 1,234.50");
+    const fr = formatMoneyText(1077934.09, "USD", "fr-FR");
+    expect(fr.startsWith("USD ")).toBe(true);
+    expect(fr.endsWith(",09")).toBe(true);
+    expect(formatMoneyText(-5, "AED", "en-US", { maximumFractionDigits: 0 })).toBe("AED -5");
+  });
+  it("supports an explicit plus and a drop-in format()", () => {
+    expect(formatMoneyText(30, "USD", "en-US", { signDisplay: "exceptZero" })).toBe("USD +30.00");
+    expect(formatMoneyText(0, "USD", "en-US", { signDisplay: "exceptZero" })).toBe("USD 0.00");
+    expect(moneyFormatter("en-US", "usd", { maximumFractionDigits: 0 }).format(1500)).toBe("USD 1,500");
+  });
+});
+
+describe("formatPercentPoints / formatDecimal", () => {
+  it("formats in English with a dot", () => {
+    expect(formatPercentPoints(4.9, "en-US", { digits: 1 })).toBe("4.9%");
+    expect(formatPercentPoints(12.345, "en-US")).toBe("12.35%");
+  });
+  it("uses the French comma and spacing", () => {
+    const s = formatPercentPoints(4.9, "fr-FR", { digits: 1 });
+    expect(s).toMatch(/^4,9\s%$/);
+    expect(formatDecimal(4.9, "fr-FR", 1)).toBe("4,9");
+  });
+  it("uses Arabic numerals/marks and keeps the sign on request", () => {
+    expect(formatPercentPoints(4.9, "ar-AE", { digits: 1 })).toMatch(/(4|٤)[.٫](9|٩)/);
+    expect(formatPercentPoints(2.5, "en-US", { digits: 1, signDisplay: "always" })).toBe("+2.5%");
+    expect(formatPercentPoints(-2.5, "en-US", { digits: 1 })).toBe("-2.5%");
+  });
+  it("renders non-finite input as an en dash", () => {
+    expect(formatPercentPoints(Number.NaN, "en-US")).toBe("–");
+    expect(formatDecimal(Number.POSITIVE_INFINITY, "en-US")).toBe("–");
   });
 });

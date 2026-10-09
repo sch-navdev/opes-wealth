@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Minus } from "lucide-react";
@@ -30,7 +31,7 @@ export function VehicleBlueBookLog({ assetId, assetCurrency, rows, editable }: {
 
   const fmt = (n: number, currency: string) => {
     try {
-      return maskValue(new Intl.NumberFormat(intlLocale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n));
+      return maskValue(moneyFormatter(intlLocale, currency, { maximumFractionDigits: 0 }).format(n));
     } catch {
       return maskValue(`${n.toLocaleString(intlLocale)} ${currency}`);
     }

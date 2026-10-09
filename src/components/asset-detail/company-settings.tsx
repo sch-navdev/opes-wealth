@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -26,7 +27,7 @@ export function CompanySettings({
   t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
   asset: AssetDetail;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
 }) {
   return (
     <Card className="border-border bg-card">

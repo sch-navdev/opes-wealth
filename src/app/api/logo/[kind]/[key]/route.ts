@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBank } from "@/lib/banking/institutions";
+import { bankLogoDomain } from "@/lib/banking/institutions";
 import { BROKER_REGISTRY, type BrokerId } from "@/lib/parsers/broker-registry";
 import { getDirectoryBroker } from "@/lib/brokers/directory";
 
@@ -21,7 +21,7 @@ export async function GET(
   const { kind, key } = await params;
 
   let domain: string | undefined;
-  if (kind === "bank") domain = getBank(key)?.domain;
+  if (kind === "bank") domain = bankLogoDomain(key);
   else if (kind === "broker") {
     domain = BROKER_REGISTRY[key as BrokerId]?.domain ?? getDirectoryBroker(key)?.domain;
   }

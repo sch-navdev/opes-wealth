@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDecimal } from "@/lib/money-parts";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CategoryIcon } from "@/components/category-icon";
 import { Money } from "@/components/money";
@@ -149,7 +150,7 @@ export function DashboardBento({
               <div
                 className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
                 role="img"
-                aria-label={t("bento_share", { pct: share.toFixed(0) })}
+                aria-label={t("bento_share", { pct: formatDecimal(share, intlLocale, 0) })}
               >
                 <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
               </div>
@@ -161,7 +162,7 @@ export function DashboardBento({
                       ? t("bento_holdings_one")
                       : t("bento_holdings", { n: tile.count })}
                 </span>
-                {tile.count > 0 && <span className="tabular-nums">{t("bento_share", { pct: share.toFixed(0) })}</span>}
+                {tile.count > 0 && <span className="tabular-nums">{t("bento_share", { pct: formatDecimal(share, intlLocale, 0) })}</span>}
               </div>
             </div>
           </Card>

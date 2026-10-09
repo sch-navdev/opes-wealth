@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDecimal } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +56,7 @@ export function ScpiFields({
   currency: string;
 }) {
   const { t, intlLocale } = useLanguage();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency });
+  const formatter = moneyFormatter(intlLocale, currency);
 
   function set<K extends keyof ScpiMetadata>(key: K, next: ScpiMetadata[K]) {
     onChange({ ...value, [key]: next });
@@ -369,7 +371,7 @@ export function ScpiFields({
         )}
         {trailing != null && (
           <p className="text-xs text-muted-foreground">
-            {t("scpi_trailing_yield", { pct: trailing.toFixed(2) })}
+            {t("scpi_trailing_yield", { pct: formatDecimal(trailing, intlLocale, 2) })}
           </p>
         )}
       </div>

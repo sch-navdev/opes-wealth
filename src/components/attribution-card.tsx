@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useId } from "react";
 import { Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,12 +59,7 @@ export function AttributionCard({
   }
 
   const { result, base, currency, rates } = attribution;
-  let moneyFmt: Intl.NumberFormat;
-  try {
-    moneyFmt = new Intl.NumberFormat(intlLocale, { style: "currency", currency: base, signDisplay: "exceptZero" });
-  } catch {
-    moneyFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", signDisplay: "exceptZero" });
-  }
+  const moneyFmt = moneyFormatter(intlLocale, base, { signDisplay: "exceptZero" });
   const rateFmt = new Intl.NumberFormat(intlLocale, { maximumSignificantDigits: 5 });
   const money = (n: number) => maskValue(moneyFmt.format(n));
   const pct = (p: number | null) => {

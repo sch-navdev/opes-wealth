@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -180,7 +181,7 @@ export function EntityLookthrough({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: data.baseCurrency });
+  const formatter = moneyFormatter(intlLocale, data.baseCurrency);
   const fmt: Fmt = (n) => maskValue(formatter.format(n));
   const manageable = new Set(manageableEntityIds);
 

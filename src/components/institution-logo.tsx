@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { bankByName } from "@/lib/banking/institutions";
+import { logoBankByName } from "@/lib/banking/institutions";
 import { cn } from "@/lib/utils";
 
 function initials(name: string): string {
@@ -40,7 +40,7 @@ export function InstitutionLogo({
 
 /** Logo for a bank known only by its display name (e.g. the institution name stored on a connection). */
 export function BankLogoByName({ name, size, className }: { name: string; size?: "default" | "sm" | "lg"; className?: string }) {
-  const bank = bankByName(name);
+  const bank = logoBankByName(name);
   return bank ? (
     <InstitutionLogo kind="bank" id={bank.key} name={name} size={size} className={className} />
   ) : null;

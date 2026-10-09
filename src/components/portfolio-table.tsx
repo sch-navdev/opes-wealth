@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPercentPoints } from "@/lib/money-parts";
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { CategoryIcon, categoryIconFor } from "@/components/category-icon";
@@ -155,10 +157,7 @@ export function PortfolioTable({
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
 
-  const currencyFormatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency: displayCurrency,
-  });
+  const currencyFormatter = moneyFormatter(intlLocale, displayCurrency);
 
   const density = useSyncExternalStore(subscribeDensity, getDensitySnapshot, getServerDensitySnapshot);
   const densityClasses = TABLE_DENSITY_CLASSES[density];
@@ -560,7 +559,7 @@ export function PortfolioTable({
                         </span>
                         <span className={cn("text-sm", gainColorClass)}>
                           {maskValue(
-                            `${gainPercent >= 0 ? "+" : "-"}${Math.abs(gainPercent).toFixed(2)}%`,
+                            formatPercentPoints(gainPercent, intlLocale, { digits: 2, signDisplay: gainPercent >= 0 ? "always" : "auto" }),
                           )}
                         </span>
                       </div>

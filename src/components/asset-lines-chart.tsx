@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import {
   Area,
   AreaChart,
@@ -70,11 +71,7 @@ export function AssetLinesChart({
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
-  const formatter = new Intl.NumberFormat(intlLocale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  });
+  const formatter = moneyFormatter(intlLocale, currency, { maximumFractionDigits: 0 });
 
   if (series.points.length === 0 || series.lines.length === 0) {
     return <p className="text-sm text-muted-foreground">{t("explorer_no_data")}</p>;

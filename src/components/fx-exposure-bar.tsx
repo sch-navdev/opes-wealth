@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useId, useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Globe2, Info } from "lucide-react";
 import { CurrencySwitcher, useSetDisplayCurrency } from "@/components/currency-switcher";
@@ -85,7 +86,7 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
   const fx = useMemo(() => buildFxExposure(rows, { baseCurrency, groupPeg }), [rows, baseCurrency, groupPeg]);
 
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: fx.baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, fx.baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, fx.baseCurrency],
   );
   const percent = useMemo(() => new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 1 }), [intlLocale]);

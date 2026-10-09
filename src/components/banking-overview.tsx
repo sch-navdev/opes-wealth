@@ -12,6 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertTriangle } from "lucide-react";
+import { BalanceAsOf } from "@/components/balance-as-of";
+import { useBankingText } from "@/components/banking-text";
+import { countStaleBalances } from "@/lib/bank-staleness";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import {
@@ -39,6 +43,8 @@ export type BankingAccountRow = {
   lastSyncedAt: string | null;
   lastError: string | null;
   assetId?: string;
+  /** ISO date (YYYY-MM-DD) the balance is as of; absent for sandbox rows (not part of net worth). */
+  balanceAsOf?: string | null;
 };
 
 type Filter = "real" | "sandbox" | "all";
@@ -56,14 +62,18 @@ export function BankingOverview({
   mode,
   statementAccounts,
   connectableCash,
+  today = new Date().toISOString().slice(0, 10),
 }: {
   rows: BankingAccountRow[];
   baseCurrency: string;
   mode: BankSyncMode;
   statementAccounts: StatementTargetAccount[];
   connectableCash: { id: string; name: string; isLinked: boolean }[];
+  /** ISO date used to age the balances (server-provided so tests and SSR agree). */
+  today?: string;
 }) {
   const { t, intlLocale } = useLanguage();
+  const tx = useBankingText();
   const { maskValue } = usePrivacy();
   const [filter, setFilter] = useState<Filter>("real");
   const syncTime = new Intl.DateTimeFormat(intlLocale, {
@@ -177,11 +187,14 @@ export function BankingOverview({
         </CardContent>
       </Card>
 
+      <p className="text-xs text-muted-foreground">{tx("bank_asof_legend")}</p>
+
       {ordered.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("banking_no_accounts")}</p>
       ) : (
         ordered.map(([institution, accounts]) => {
           const total = accounts.reduce((s, r) => s + r.baseBalance, 0);
+          const staleCount = countStaleBalances(accounts, today);
           return (
             <Card key={institution} className="border-border bg-card">
               <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -189,8 +202,16 @@ export function BankingOverview({
                   <BankLogoByName name={institution} />
                   {institution}
                 </CardTitle>
-                <span className="text-sm font-medium tabular-nums text-foreground">
-                  {maskValue(base.format(total))}
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {staleCount > 0 && (
+                    <Badge variant="destructive" className="gap-1">
+                      <AlertTriangle className="size-3" aria-hidden="true" />
+                      {tx("bank_asof_group_stale", { n: staleCount })}
+                    </Badge>
+                  )}
+                  <span className="text-sm font-medium tabular-nums text-foreground">
+                    {maskValue(base.format(total))}
+                  </span>
                 </span>
               </CardHeader>
               <CardContent className="p-0">
@@ -265,6 +286,7 @@ export function BankingOverview({
                               {maskValue(base.format(a.baseBalance))}
                             </p>
                           )}
+                          {a.kind !== "sandbox" && <BalanceAsOf asOf={a.balanceAsOf} today={today} />}
                         </div>
                       </li>
                     );

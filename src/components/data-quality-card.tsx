@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import Link from "next/link";
 import { ArrowRight, CircleCheck, ListChecks, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,7 @@ export function useIssueText() {
   const formatMoney = (amount: number, currency: string) => {
     let text: string;
     try {
-      text = new Intl.NumberFormat(intlLocale, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+      text = moneyFormatter(intlLocale, currency, { maximumFractionDigits: 2 }).format(amount);
     } catch {
       text = `${amount.toFixed(2)} ${currency}`;
     }

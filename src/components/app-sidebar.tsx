@@ -11,7 +11,7 @@ import { useUiTier } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { logout } from "@/app/auth/actions";
 import type { TranslationKey } from "@/lib/i18n";
-import { visibleNavItems } from "@/lib/nav-items";
+import { navLabel, visibleNavItems } from "@/lib/nav-items";
 import {
   EXPERTISE_LEVELS,
   useUiTierStore,
@@ -102,7 +102,7 @@ export function NavList({
             <Link
               key={href}
               href={href}
-              title={t(labelKey)}
+              title={navLabel(t, labelKey)}
               aria-current={active ? "page" : undefined}
               onClick={onNavigate}
               className={cn(
@@ -114,7 +114,7 @@ export function NavList({
             >
               <Icon className="size-5 shrink-0" />
               <span className={cn("truncate", label)}>
-                {t(labelKey)}
+                {navLabel(t, labelKey)}
               </span>
             </Link>
           );

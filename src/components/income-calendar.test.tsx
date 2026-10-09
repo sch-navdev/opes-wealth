@@ -51,8 +51,8 @@ beforeEach(() => localStorage.clear());
 describe("IncomeCalendar", () => {
   it("shows the summary figures", () => {
     renderIt(data());
-    expect(screen.getAllByText("$1,500").length).toBeGreaterThan(0);
-    expect(screen.getByText("$125")).toBeTruthy();
+    expect(screen.getAllByText("USD 1,500").length).toBeGreaterThan(0);
+    expect(screen.getByText("USD 125")).toBeTruthy();
     expect(screen.getByText("7.5%")).toBeTruthy();
     expect(screen.getByText("5.0%")).toBeTruthy();
     // best month shown in the summary and again in the sr-only table
@@ -62,7 +62,7 @@ describe("IncomeCalendar", () => {
   it("renders one labelled bar per month, scaled to the best month with stacked sources", () => {
     const { container } = renderIt(data());
     expect(screen.getAllByRole("img")).toHaveLength(12);
-    expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("$1,000");
+    expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("USD 1,000");
     const segs = container.querySelectorAll<HTMLElement>('[data-source]');
     const rental = [...segs].find((s) => s.dataset.source === "rental");
     const stocks = [...segs].find((s) => s.dataset.source === "stocks");
@@ -127,10 +127,10 @@ describe("IncomeCalendar earned-income layer", () => {
     expect(screen.getByText("Salary")).toBeInTheDocument();
     expect(screen.getByText("Bonus")).toBeInTheDocument();
     expect(screen.getByText("Other earned")).toBeInTheDocument();
-    // Passive stats keep their value: the annual card still reads the passive $1,500.
-    expect(screen.getAllByText("$1,500").length).toBeGreaterThan(0);
+    // Passive stats keep their value: the annual card still reads the passive USD 1,500.
+    expect(screen.getAllByText("USD 1,500").length).toBeGreaterThan(0);
     // Month total in its label includes earned: 1,000 passive + 3,000 salary.
-    expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("$4,000");
+    expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("USD 4,000");
     // The first month's detail lists the salary payment.
     await userEvent.click(screen.getAllByRole("button", { pressed: false })[0]);
     expect(screen.getAllByText("Main job").length).toBeGreaterThan(0);

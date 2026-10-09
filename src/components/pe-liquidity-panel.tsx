@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, type CSSProperties } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +63,7 @@ export function PeLiquidityPanel({
   const { maskValue } = usePrivacy();
 
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
   const ratio = useMemo(() => new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), [intlLocale]);

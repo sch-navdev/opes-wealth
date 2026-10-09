@@ -4,9 +4,10 @@
  * Private Equity; migration 0036 only seeds the category row).
  *
  * The asset value (`assets.current_value`) is the TOTAL contract value as an ordinary
- * asset value. There is no live pricing and no unit-of-account (unité de compte) line
- * items / ISINs in this phase: the fund allocation is a pair of percentages and the
- * amounts shown in the UI are IMPLIED from the asset value.
+ * asset value. There is no live pricing. Metadata v2 adds an optional list of CONTRACT HOLDINGS
+ * (see `assurance-vie-holdings.ts`): when it is present the euro-fund / unit-linked percentages are
+ * DERIVED from it; when it is empty the manual percentages are kept and the amounts shown in the UI are
+ * IMPLIED from the asset value. Metadata v1 (no holdings) loads unchanged.
  *
  * Everything here is pure and defensive: stored metadata is never trusted
  * (`parseAssuranceVieMetadata` sanitises anything it is given), and form state is
@@ -16,9 +17,17 @@
  * year/month/day numbers and UTC day counts, never on local-time `Date` instants, so the
  * result does not depend on the viewer's time zone. `today` is injectable everywhere.
  *
- * NOT in scope (deliberately): tax computation, estate-tax computation, unit-of-account
- * holdings and pricing, scheduling programmed premiums into the income calendar.
+ * NOT in scope (deliberately): tax computation, estate-tax computation, live pricing of holdings, scheduling programmed premiums into the income calendar.
  */
+
+import {
+  deriveAllocationFromHoldings,
+  getHoldingsErrors,
+  parseHoldings,
+  type AvHolding,
+} from "@/lib/assurance-vie-holdings";
+
+export * from "@/lib/assurance-vie-holdings";
 
 /** The one place the tax constants live. Update here when the rules change. */
 export const ASSURANCE_VIE_CONFIG = {
@@ -44,7 +53,8 @@ export const ASSURANCE_VIE_CONFIG = {
   },
 } as const;
 
-export const AV_METADATA_VERSION = 1;
+/** v2 adds `holdings`. v1 records (no `holdings`) are still read and simply have none. */
+export const AV_METADATA_VERSION = 2;
 export const AV_MAX_BENEFICIARIES = 20;
 /** Tolerance when checking that percentages total 100. */
 export const AV_PCT_EPSILON = 0.01;
@@ -97,6 +107,8 @@ export type AssuranceVieMetadata = {
   premiums_before_70: number | null;
   premiums_after_70: number | null;
   beneficiaries: AvBeneficiary[];
+  /** Optional list of what the contract holds. When it has a total, it drives `euro_fund_pct` / `uc_pct`. */
+  holdings: AvHolding[];
 };
 
 export const EMPTY_ASSURANCE_VIE_METADATA: AssuranceVieMetadata = {
@@ -118,6 +130,7 @@ export const EMPTY_ASSURANCE_VIE_METADATA: AssuranceVieMetadata = {
   premiums_before_70: null,
   premiums_after_70: null,
   beneficiaries: [],
+  holdings: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -217,7 +230,7 @@ function parseBeneficiary(raw: unknown, index: number): AvBeneficiary | null {
  * allocation is repaired so it always totals 100 (euro share wins when both are present).
  */
 export function parseAssuranceVieMetadata(raw: unknown): AssuranceVieMetadata {
-  if (!isRecord(raw)) return { ...EMPTY_ASSURANCE_VIE_METADATA, beneficiaries: [] };
+  if (!isRecord(raw)) return { ...EMPTY_ASSURANCE_VIE_METADATA, beneficiaries: [], holdings: [] };
 
   const pct = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100 ? round2(v) : null);
   const euroIn = pct(raw.euro_fund_pct);
@@ -243,6 +256,13 @@ export function parseAssuranceVieMetadata(raw: unknown): AssuranceVieMetadata {
     .map(parseBeneficiary)
     .filter((b): b is AvBeneficiary => b !== null);
 
+  const holdings = parseHoldings(raw.holdings);
+  const derived = deriveAllocationFromHoldings(holdings);
+  if (derived) {
+    euro = derived.euro_fund_pct;
+    uc = derived.uc_pct;
+  }
+
   return {
     version: AV_METADATA_VERSION,
     insurer: clean(raw.insurer, 120),
@@ -263,6 +283,7 @@ export function parseAssuranceVieMetadata(raw: unknown): AssuranceVieMetadata {
     premiums_before_70: amount(raw.premiums_before_70),
     premiums_after_70: amount(raw.premiums_after_70),
     beneficiaries,
+    holdings,
   };
 }
 
@@ -278,6 +299,17 @@ export function linkAllocation(changed: "euro" | "uc", value: number | null): { 
   const v = typeof value === "number" && Number.isFinite(value) ? Math.min(100, Math.max(0, round2(value))) : 0;
   const rest = round2(100 - v);
   return changed === "euro" ? { euro_fund_pct: v, uc_pct: rest } : { euro_fund_pct: rest, uc_pct: v };
+}
+
+/** True when the holdings have a total: the percentages are then computed from them, not typed. */
+export function allocationIsDerived(md: Pick<AssuranceVieMetadata, "holdings">): boolean {
+  return deriveAllocationFromHoldings(Array.isArray(md.holdings) ? md.holdings : []) !== null;
+}
+
+/** Form-state helper: when the holdings have a total, overwrite the two percentages with the derived ones. */
+export function withDerivedAllocation<T extends Pick<AssuranceVieMetadata, "holdings" | "euro_fund_pct" | "uc_pct">>(md: T): T {
+  const derived = deriveAllocationFromHoldings(Array.isArray(md.holdings) ? md.holdings : []);
+  return derived ? { ...md, ...derived } : md;
 }
 
 export function allocationTotal(md: Pick<AssuranceVieMetadata, "euro_fund_pct" | "uc_pct">): number {
@@ -389,6 +421,7 @@ export function getAssuranceVieMetadataErrors(raw: unknown, today?: string | Dat
     else if (raw.opened_on > todayIso) errors.push("av_err_opened_future");
   }
 
+  const holdingsErrors = getHoldingsErrors(raw.holdings, todayIso);
   const euro = raw.euro_fund_pct;
   const uc = raw.uc_pct;
   const inRange = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100;
@@ -429,6 +462,7 @@ export function getAssuranceVieMetadataErrors(raw: unknown, today?: string | Dat
   }
   if (nameMissing) errors.push("av_err_bene_name");
   if (shareBad) errors.push("av_err_bene_share");
+  errors.push(...holdingsErrors);
 
   return errors;
 }

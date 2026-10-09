@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight, TrendingDown, TrendingUp, Wallet } from "lucide-react";
@@ -111,7 +112,7 @@ function BreakdownDialog({
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const formatter = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency }),
+    () => moneyFormatter(intlLocale, currency),
     [intlLocale, currency],
   );
 

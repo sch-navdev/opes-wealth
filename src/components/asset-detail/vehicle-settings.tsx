@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoneyFormatter } from "@/lib/money-parts";
 import {
   Card,
   CardContent,
@@ -42,7 +43,7 @@ export function VehicleSettings({
   vehicleMetadata: VehicleMetadata;
   intlLocale: string;
   maskValue: (value: string | number) => string;
-  currencyFormatter: Intl.NumberFormat;
+  currencyFormatter: MoneyFormatter;
   ownershipStatus: OwnershipStatus | null;
   asset: AssetDetail;
   ratesFromUsd: Record<string, number>;

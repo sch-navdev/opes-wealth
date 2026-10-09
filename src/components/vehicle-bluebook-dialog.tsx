@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
+import { formatMoneyText } from "@/lib/money-parts";
 import { currencies } from "@/lib/currencies";
 import type { TranslationKey } from "@/lib/i18n";
 import type { BlueBookCandidate } from "@/lib/bluebook-parser";
@@ -41,7 +42,7 @@ export function VehicleBlueBookDialog({
   /** Value from the depreciation model, in the asset's currency; a clearly labelled starting point. */
   estimate: number | null;
 }) {
-  const { t } = useLanguage();
+  const { t, intlLocale } = useLanguage();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -175,7 +176,7 @@ export function VehicleBlueBookDialog({
                       if (c.currency) setCurrency(knownCurrency(c.currency, currency));
                     }}
                   >
-                    {c.value.toLocaleString()} {c.currency ?? ""}
+                    {c.currency ? formatMoneyText(c.value, c.currency, intlLocale, { maximumFractionDigits: 2 }) : c.value.toLocaleString(intlLocale)}
                   </Button>
                 ))}
               </div>

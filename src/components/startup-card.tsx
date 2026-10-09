@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useState, useTransition } from "react";
 import { Plus, Rocket, Trash2 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -65,7 +66,7 @@ export function StartupCard({
   const [postMoney, setPostMoney] = useState("");
 
   const metadata = parseStartupMetadata(rawMetadata);
-  const money = new Intl.NumberFormat(intlLocale, { style: "currency", currency, maximumFractionDigits: 2 });
+  const money = moneyFormatter(intlLocale, currency, { maximumFractionDigits: 2 });
   const rounds = sortedRounds(metadata.funding_rounds);
   const latest = latestRound(metadata);
   const value = startupValuation(metadata, shares);

@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter } from "@/lib/money-parts";
 import { useMemo, useState } from "react";
 import { CalendarClock, CalendarDays } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +61,7 @@ export function IncomeCalendar({
   const combined = (m: IncomeCalendarData["months"][number]) => m.total + earnedOf(m);
 
   const money = useMemo(
-    () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
+    () => moneyFormatter(intlLocale, baseCurrency, { maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
   const monthLabel = useMemo(() => {
