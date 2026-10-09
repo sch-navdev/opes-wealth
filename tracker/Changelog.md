@@ -267,3 +267,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-08: Allocation dial is interactive: pointing at an arc highlights it and its legend row, clicking opens that category's explorer - [[Portfolio-Dashboard|Portfolio Dashboard]]
 - 2026-10-08: Help chat fixes (mock login accepted in dev, provider errors logged and explained to the user) and the theme now really starts on Device (new storage key) - [[Architecture|Architecture]]
 - 2026-10-09: Help chat model switched to Groq's qwen/qwen3.8-27b (the old Llama model no longer exists on the account) and made a setting (`AI_MODEL`); reasoning text is hidden - [[Architecture|Architecture]]
+- 2026-10-09: Help chat now has a real product knowledge base and per-request device, page and language context (no more Cmd+K for Windows users, co-ownership sharing is known) - [[Architecture|Architecture]]

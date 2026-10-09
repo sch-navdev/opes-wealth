@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-09 10:15 (Gulf Standard Time, UTC+4). Help chat root cause found and fixed (model retired); pushed. Steve must set a fresh GROQ_API_KEY (the old one was pasted in chat and revoked) and re-test.**
+**Last updated: 2026-10-09 10:30 (Gulf Standard Time, UTC+4). Help chat works (Qwen via Groq) and now has a product knowledge base; pushed.**
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Where things stand (read this first)
@@ -107,6 +107,7 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 76. **Interactive allocation dial (19:05 GST):** hovering an arc or legend row highlights that category (arc thickens, others dim, centre shows its share, row tinted); clicking opens that category's explorer (event `opes:open-category`, listener in `DashboardAnalytics`; Standard and up). Basic highlights only. Verified by dispatching events in the browser; not with a real mouse.
 77. **Help chat fix + theme default fix (19:08 GST):** the chat showed the generic error locally (dev mock login has no Supabase session; now accepted in dev only) and on the deployed app (cause unknown: Vercel logs unreadable, 403). The route now logs provider errors and the widget explains session vs provider failures (2 new keys x9). A new test drives the real AI SDK against a fake OpenAI-compatible server. The theme now uses storage key `opes-theme-v2` so browsers holding an old explicit `dark` start on Device. Gates: 138 files / 2329 tests, tsc, eslint, build green.
 78. **Help chat root cause (2026-10-09 10:15 GST):** with a valid key, Groq answered 404 `model_not_found` for `llama-3.3-70b-versatile`. Default model is now `qwen/qwen3.8-27b` (Steve's choice; listed by his account along with `openai/gpt-oss-120b` and `-20b`), overridable with the `AI_MODEL` env var; `<think>` text is hidden in the widget. Steve pasted a key into chat: it was to be revoked and replaced in Vercel. Not verified: a real reply through the app.
+79. **Help chat knowledge (2026-10-09 10:30 GST):** Steve confirmed the chat works, but it told a Windows user to press Cmd+K and said assets cannot be shared with family. New `lib/assistant/chat-knowledge.ts` (knowledge base incl. co-ownership, Experience levels, imports, "Not available" list) plus `buildChatSystemPrompt`: device from the User-Agent, current page and app language are added per request (page validated as a plain path). **Maintenance rule: update that file whenever a feature changes.** 13 new tests; gates green.
 
 ## Caveats
 - Tax estimate (Expert) is illustrative only: user-typed rate (default 0) on per-asset positive unrealised gains, no loss offsetting, not saved, not tax advice.

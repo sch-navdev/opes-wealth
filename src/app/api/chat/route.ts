@@ -2,6 +2,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { convertToModelMessages, createUIMessageStreamResponse, streamText, toUIMessageStream, type UIMessage } from "ai";
 import { NextResponse } from "next/server";
 import { getMockUserId, isMockAuthEnabled } from "@/utils/supabase/mock-auth";
+import { buildChatSystemPrompt } from "@/lib/assistant/chat-knowledge";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { createClient } from "@/utils/supabase/server";
 
@@ -23,12 +24,17 @@ const provider = createOpenAI({
  */
 const MODEL = process.env.AI_MODEL || "qwen/qwen3.8-27b";
 
-const SYSTEM_PROMPT = `You are the Opes Wealth Support Assistant. Your job is to help high-net-worth users navigate the platform. Platform Knowledge:
-
-* Tiers: Users can switch between Basic, Standard, Professional, and Expert views in Settings. Expert view reveals FX exposure, IRR comparisons, and tax-lot accounting.
-* Adding Assets: Users can add Real Estate, Vehicles, Private Equity, and Assurance-Vie via the Quick Actions menu (Cmd+K) or the Dashboard.
-* Bank Uploads: Users can upload CSV or PDF bank statements in the 'Cash' category. OCR is supported for image-only PDFs.
-* Navigation: The sidebar contains Dashboard, Banking, Companies (Entity Look-through), and Planning (Retirement Simulator). Rules: Keep answers concise, professional, and directly address the UI steps needed to accomplish the user's goal. Never offer financial advice.`;
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English",
+  fr: "French",
+  es: "Spanish",
+  it: "Italian",
+  de: "German",
+  ar: "Arabic",
+  ru: "Russian",
+  hi: "Hindi",
+  zh: "Simplified Chinese",
+};
 
 // Best-effort per-user throttle (per server instance; a real limiter would need shared storage).
 const recent = new Map<string, number[]>();
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
   }
   if (throttled(userId)) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
 
-  let body: { messages?: unknown };
+  let body: { messages?: unknown; page?: unknown; locale?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -94,10 +100,15 @@ export async function POST(request: Request) {
   const messages = sanitize(body.messages);
   if (!messages) return NextResponse.json({ error: "invalid" }, { status: 400 });
 
+  // Context for the prompt: where the user is, what device they use (so shortcuts fit) and the app language.
+  const page = typeof body.page === "string" && /^\/[A-Za-z0-9/_-]{0,120}$/.test(body.page) ? body.page : undefined;
+  const language = typeof body.locale === "string" ? LANGUAGE_NAMES[body.locale] : undefined;
+  const system = buildChatSystemPrompt({ page, language, userAgent: request.headers.get("user-agent") ?? undefined });
+
   const result = streamText({
     // `.chat()`: Groq implements the Chat Completions endpoint, not OpenAI's newer Responses API.
     model: provider.chat(MODEL),
-    system: SYSTEM_PROMPT,
+    system,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 1000,
     // The provider's real answer (bad key, unknown model, rate limit) only ever reaches the server log.

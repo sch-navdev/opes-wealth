@@ -6,6 +6,7 @@ import { LanguageProvider } from "@/context/language-context";
 const sendMessage = vi.fn();
 let chat: { messages: unknown[]; status: string; error?: Error };
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
 vi.mock("@ai-sdk/react", () => ({ useChat: () => ({ ...chat, sendMessage }) }));
 
 function open() {
@@ -29,7 +30,7 @@ describe("HelpChatWidget (useChat)", () => {
     const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "How do I add a car?" } });
     fireEvent.submit(input.closest("form")!);
-    expect(sendMessage).toHaveBeenCalledWith({ text: "How do I add a car?" });
+    expect(sendMessage).toHaveBeenCalledWith({ text: "How do I add a car?" }, { body: { page: "/dashboard", locale: "en" } });
     expect(input.value).toBe("");
   });
 

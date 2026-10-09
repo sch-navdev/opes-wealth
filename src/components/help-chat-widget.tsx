@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { LifeBuoy, Send, X } from "lucide-react";
@@ -41,7 +42,8 @@ function errorKey(error: Error): TranslationKey {
  * inside the dashboard, not a reload).
  */
 export function HelpChatWidget() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const { messages, sendMessage, status, error } = useChat({ transport });
@@ -55,7 +57,7 @@ export function HelpChatWidget() {
   function handleSend() {
     const text = input.trim();
     if (!text || pending) return;
-    void sendMessage({ text });
+    void sendMessage({ text }, { body: { page: pathname, locale } });
     setInput("");
   }
 
