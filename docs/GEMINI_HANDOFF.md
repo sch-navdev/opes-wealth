@@ -1,12 +1,13 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-09 10:30 (Gulf Standard Time, UTC+4). Help chat works (Qwen via Groq) and now has a product knowledge base; pushed.**
+**Last updated: 2026-10-09 11:00 (Gulf Standard Time, UTC+4). OW11 session 2 is finished and pushed; the first prompt for OW12 is written (`docs/OW12_FIRST_PROMPT.md`).**
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Where things stand (read this first)
-- **Repo:** everything is committed and pushed (HEAD 4539fb5), working tree clean. Gates: 136 test files / 2303 tests, tsc, eslint, build all green.
-- **Latest work (items 69-74 at the bottom of "History"):** allocation dial on every tier; Basic, Standard/Professional and Expert luxury passes; Groq help chat (`/api/chat`); UHNW modules plan (proposal only, nothing built).
-- **Waiting on Steve:** re-test the help chat after redeploying (set `GROQ_API_KEY`; if it still fails, the Vercel function log line `chat upstream error <status>` says why; I could not read Vercel logs from here); the older infra items under "Open items".
+- **Repo:** everything is committed and pushed (HEAD 9fa04e7), working tree clean. Gates: 139 test files / 2340 tests, tsc, eslint, build all green.
+- **Latest work (items 69-79 at the bottom of "History"):** interactive allocation dial on every tier; Basic, Standard/Professional and Expert luxury passes; Groq help chat (`/api/chat`, Qwen, product knowledge base); theme starts on Device; UHNW plan approved, PE ledger foundation built (no UI yet).
+- **Next session (OW12):** PE ledger editor + Expert liquidity panel, then the entity node map (phase A), then the Governance Vault. The full first prompt is in `docs/OW12_FIRST_PROMPT.md`.
+- **Waiting on Steve:** confirm the new `GROQ_API_KEY` (and optionally `AI_MODEL`) is set in Vercel; the older infra items under "Open items".
 - **Not yet checked live:** a real Groq reply, the net-worth count-up, a real mouse hover on the gold borders, Expert FX sparklines on live data, RTL/other languages.
 
 ## Project
@@ -109,6 +110,8 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 78. **Help chat root cause (2026-10-09 10:15 GST):** with a valid key, Groq answered 404 `model_not_found` for `llama-3.3-70b-versatile`. Default model is now `qwen/qwen3.8-27b` (Steve's choice; listed by his account along with `openai/gpt-oss-120b` and `-20b`), overridable with the `AI_MODEL` env var; `<think>` text is hidden in the widget. Steve pasted a key into chat: it was to be revoked and replaced in Vercel. Not verified: a real reply through the app.
 79. **Help chat knowledge (2026-10-09 10:30 GST):** Steve confirmed the chat works, but it told a Windows user to press Cmd+K and said assets cannot be shared with family. New `lib/assistant/chat-knowledge.ts` (knowledge base incl. co-ownership, Experience levels, imports, "Not available" list) plus `buildChatSystemPrompt`: device from the User-Agent, current page and app language are added per request (page validated as a plain path). **Maintenance rule: update that file whenever a feature changes.** 13 new tests; gates green.
 
+80. **OW12 prepared (2026-10-09 11:00 GST):** wrote `docs/OW12_FIRST_PROMPT.md` (rules, state, task order: PE ledger editor and Expert liquidity panel, entity node map phase A, then the Governance Vault). No code change.
+
 ## Caveats
 - Tax estimate (Expert) is illustrative only: user-typed rate (default 0) on per-asset positive unrealised gains, no loss offsetting, not saved, not tax advice.
 - "Cash flow tracking" reuses the existing passive-income and cash cards; no new cash-flow model.
@@ -133,4 +136,4 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 Commit and push are separate, confirmed each time. Never retry denied production DB operations: give the SQL instead. Update the matching `tracker/*.md` note and add exactly one Changelog line after each unit of work. Use Write/Edit rather than shell quoting for code. Keep this handoff file updated after every unit of work, and stamp the "Last updated" line at the top with the date and time (Gulf Standard Time, UTC+4) so Steve can see it is the latest.
 
 ## Push status
-Pushed 2026-10-08 18:35 GST: everything through 3a4ad55 (allocation dial on every tier, Basic/Standard/Professional/Expert luxury passes, Groq help chat, UHNW plan) is on origin/master. GROQ_API_KEY is not set anywhere yet.
+Pushed 2026-10-09 10:30 GST: everything through 9fa04e7 is on origin/master. The handoff update and the OW12 prompt (this change) are not committed yet.
