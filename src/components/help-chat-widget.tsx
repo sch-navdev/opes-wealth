@@ -12,6 +12,14 @@ import { cn } from "@/lib/utils";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
+/**
+ * Reasoning models (Qwen, gpt-oss) may send their thinking inside <think> tags; only the answer is shown.
+ * An unclosed tag (the reply is still streaming) hides everything after it.
+ */
+export function visibleReply(text: string): string {
+  return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "").trim();
+}
+
 /** The route answers with JSON { error } on refusal; the hook puts that body in the error message. */
 function errorKey(error: Error): TranslationKey {
   let code = "";
@@ -72,7 +80,8 @@ export function HelpChatWidget() {
           <div className="flex-1 space-y-3 overflow-y-auto p-3 text-sm">
             {messages.length === 0 && <p className="text-muted-foreground">{t("help_chat_welcome")}</p>}
             {messages.map((m) => {
-              const text = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+              const raw = m.parts.map((p) => (p.type === "text" ? p.text : "")).join("");
+              const text = m.role === "assistant" ? visibleReply(raw) : raw;
               if (!text) return null;
               return (
                 <div key={m.id} className={cn("flex flex-col gap-1", m.role === "user" ? "items-end" : "items-start")}>

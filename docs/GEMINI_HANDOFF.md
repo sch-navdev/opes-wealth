@@ -1,6 +1,6 @@
 # Opes Wealth — handoff summary for Gemini
 
-**Last updated: 2026-10-08 19:10 (Gulf Standard Time, UTC+4). Steve approved the UHNW plan decisions; module 2 (PE ledger) unit 1 built. Dial interactivity, chat fixes and the theme default fix are done. Committed locally; push pending Steve's go-ahead.**
+**Last updated: 2026-10-09 10:15 (Gulf Standard Time, UTC+4). Help chat root cause found and fixed (model retired); pushed. Steve must set a fresh GROQ_API_KEY (the old one was pasted in chat and revoked) and re-test.**
 Paste this whole file into Gemini as project context. It contains no secrets: only variable names and status. The assistant keeps this file current after every unit of work; re-copy it each time.
 
 ## Where things stand (read this first)
@@ -106,6 +106,7 @@ Node 24.19 locally (no `nvm`). Vitest 5.0.3, `@types/node` ^22.0.0, config `vite
 75. **UHNW decisions + PE ledger unit 1 (19:00 GST):** Steve agreed to all four decisions (node map phase A, PE ledger in metadata with actuals only, vault limits/co-owner default/Professional+, React Flow accepted); recorded in `tracker/UHNW-Modules-Plan.md`. Built the foundation of module 2: dated `distributions` and `paid_date` in the PE metadata (`lib/private-equity.ts`) and `lib/pe-liquidity.ts` (paid-in, unfunded, DPI, RVPI, TVPI, net IRR, portfolio roll-up, upcoming calls). No UI or migration yet; next are the ledger editor, then the Expert panel.
 76. **Interactive allocation dial (19:05 GST):** hovering an arc or legend row highlights that category (arc thickens, others dim, centre shows its share, row tinted); clicking opens that category's explorer (event `opes:open-category`, listener in `DashboardAnalytics`; Standard and up). Basic highlights only. Verified by dispatching events in the browser; not with a real mouse.
 77. **Help chat fix + theme default fix (19:08 GST):** the chat showed the generic error locally (dev mock login has no Supabase session; now accepted in dev only) and on the deployed app (cause unknown: Vercel logs unreadable, 403). The route now logs provider errors and the widget explains session vs provider failures (2 new keys x9). A new test drives the real AI SDK against a fake OpenAI-compatible server. The theme now uses storage key `opes-theme-v2` so browsers holding an old explicit `dark` start on Device. Gates: 138 files / 2329 tests, tsc, eslint, build green.
+78. **Help chat root cause (2026-10-09 10:15 GST):** with a valid key, Groq answered 404 `model_not_found` for `llama-3.3-70b-versatile`. Default model is now `qwen/qwen3.8-27b` (Steve's choice; listed by his account along with `openai/gpt-oss-120b` and `-20b`), overridable with the `AI_MODEL` env var; `<think>` text is hidden in the widget. Steve pasted a key into chat: it was to be revoked and replaced in Vercel. Not verified: a real reply through the app.
 
 ## Caveats
 - Tax estimate (Expert) is illustrative only: user-typed rate (default 0) on per-asset positive unrealised gains, no loss offsetting, not saved, not tax advice.

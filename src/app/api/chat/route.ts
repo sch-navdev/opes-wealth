@@ -17,6 +17,12 @@ const provider = createOpenAI({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+/**
+ * Groq retires models without notice (llama-3.3-70b-versatile stopped existing for Steve's account), so the name
+ * is a setting: AI_MODEL in Vercel overrides this default without a code change.
+ */
+const MODEL = process.env.AI_MODEL || "qwen/qwen3.8-27b";
+
 const SYSTEM_PROMPT = `You are the Opes Wealth Support Assistant. Your job is to help high-net-worth users navigate the platform. Platform Knowledge:
 
 * Tiers: Users can switch between Basic, Standard, Professional, and Expert views in Settings. Expert view reveals FX exposure, IRR comparisons, and tax-lot accounting.
@@ -90,7 +96,7 @@ export async function POST(request: Request) {
 
   const result = streamText({
     // `.chat()`: Groq implements the Chat Completions endpoint, not OpenAI's newer Responses API.
-    model: provider.chat("llama-3.3-70b-versatile"),
+    model: provider.chat(MODEL),
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 1000,

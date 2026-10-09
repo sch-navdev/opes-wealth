@@ -52,13 +52,13 @@ describe("POST /api/chat", () => {
     expect((await POST(req({ messages: [msg("hi"), msg("hello", "assistant")] }))).status).toBe(400);
   });
 
-  it("streams from Groq's llama model with the Opes Wealth system prompt", async () => {
+  it("streams from Groq's default Qwen model with the Opes Wealth system prompt", async () => {
     const res = await POST(req({ messages: [msg("How do I add a car?")] }));
     expect(res.status).toBe(200);
     const call = streamText.mock.calls[0][0];
     expect(call.system).toContain("You are the Opes Wealth Support Assistant");
     expect(call.system).toContain("Never offer financial advice.");
-    expect(call.model.modelId).toBe("llama-3.3-70b-versatile");
+    expect(call.model.modelId).toBe("qwen/qwen3.8-27b");
     expect(call.messages.at(-1).role).toBe("user");
   });
 

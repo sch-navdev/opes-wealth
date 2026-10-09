@@ -59,7 +59,7 @@ describe("POST /api/chat against an OpenAI-compatible server", () => {
     const text = await res.text();
     expect(text).toContain("Open Quick Actions ");
     expect(text).toContain("with Cmd+K.");
-    expect(lastBody.model).toBe("llama-3.3-70b-versatile");
+    expect(lastBody.model).toBe("qwen/qwen3.8-27b");
     expect(lastBody.stream).toBe(true);
     expect(Object.keys(lastBody)).toContain("stream_options");
     expect(lastBody.messages?.[0].role).toBe("system");
