@@ -36,6 +36,10 @@ export const PrivateEquityCommitmentSettings = dynamic(
     import("@/components/asset-detail/private-equity-commitment-settings").then((m) => m.PrivateEquityCommitmentSettings),
   { loading: SectionSkeleton },
 );
+export const PrivateEquityLedgerEditor = dynamic(
+  () => import("@/components/asset-detail/private-equity-ledger-editor").then((m) => m.PrivateEquityLedgerEditor),
+  { loading: SectionSkeleton },
+);
 export const EquitySettings = dynamic(
   () => import("@/components/asset-detail/equity-settings").then((m) => m.EquitySettings),
   { loading: SectionSkeleton },
@@ -46,5 +50,9 @@ export const PreciousMetalSettings = dynamic(
 );
 export const CryptoSettings = dynamic(
   () => import("@/components/asset-detail/crypto-settings").then((m) => m.CryptoSettings),
+  { loading: SectionSkeleton },
+);
+export const VaultDocuments = dynamic(
+  () => import("@/components/vault/vault-documents").then((m) => m.VaultDocuments),
   { loading: SectionSkeleton },
 );

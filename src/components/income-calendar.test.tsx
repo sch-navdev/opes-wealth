@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IncomeCalendar } from "@/components/income-calendar";
 import { LanguageProvider } from "@/context/language-context";
@@ -90,5 +91,48 @@ describe("IncomeCalendar", () => {
     renderIt(data({ annualTotal: 0, monthlyAverage: 0, peakMonth: null, yieldOnCostPct: null, currentYieldPct: null, months: keys.map((month) => ({ month, total: 0, bySource: { ...zero }, items: [] })) }));
     expect(screen.getByText(/No projected income yet/)).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
+  });
+});
+
+describe("IncomeCalendar earned-income layer", () => {
+  function withEarned() {
+    const d = data();
+    d.months[0] = {
+      ...d.months[0],
+      earned: { salary: 3000, bonus: 0, other: 0 },
+      earnedItems: [{ streamId: "s", name: "Main job", group: "salary", amount: 3000, date: "2025-11-25" }],
+    };
+    d.months[4] = {
+      ...d.months[4],
+      earned: { salary: 0, bonus: 1000, other: 250 },
+      earnedItems: [],
+    };
+    return d;
+  }
+
+  it("has no toggle when there are no earned streams, and passive figures are untouched", () => {
+    renderIt(data());
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("is off by default, and the toggle adds separate earned segments and legend entries", async () => {
+    const { container } = renderIt(withEarned());
+    const toggle = screen.getByRole("switch", { name: "Include earned income" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(container.querySelectorAll("[data-earned]")).toHaveLength(0);
+    expect(screen.queryByText("Salary")).toBeNull();
+
+    await userEvent.click(toggle);
+    expect(container.querySelectorAll("[data-earned]")).toHaveLength(3);
+    expect(screen.getByText("Salary")).toBeInTheDocument();
+    expect(screen.getByText("Bonus")).toBeInTheDocument();
+    expect(screen.getByText("Other earned")).toBeInTheDocument();
+    // Passive stats keep their value: the annual card still reads the passive $1,500.
+    expect(screen.getAllByText("$1,500").length).toBeGreaterThan(0);
+    // Month total in its label includes earned: 1,000 passive + 3,000 salary.
+    expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("$4,000");
+    // The first month's detail lists the salary payment.
+    await userEvent.click(screen.getAllByRole("button", { pressed: false })[0]);
+    expect(screen.getAllByText("Main job").length).toBeGreaterThan(0);
   });
 });

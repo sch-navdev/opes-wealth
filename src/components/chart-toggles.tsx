@@ -19,6 +19,14 @@ import {
 export const PROJECTION_HORIZONS = [5, 10, 20] as const;
 
 /** Historical Valuation ⇄ Forward-Looking Projections. */
+const RANGE_LABEL_KEY = {
+  "1M": "range_1m",
+  "6M": "range_6m",
+  "1Y": "range_1y",
+  "5Y": "range_5y",
+  all: "range_all",
+} as const;
+
 export function TimelineToggle({
   value,
   onChange,
@@ -64,7 +72,7 @@ export function RangeSelector({
         <TabsList aria-label={t("range_label")}>
           {CHART_RANGES.map((range) => (
             <TabsTrigger key={range} value={range}>
-              {range === "all" ? t("range_all") : range}
+              {t(RANGE_LABEL_KEY[range])}
             </TabsTrigger>
           ))}
         </TabsList>

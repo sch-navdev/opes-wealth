@@ -184,10 +184,15 @@ import {
   PreciousMetalSettings,
   PrivateEquityCommitmentSettings,
   PrivateEquityDetailsSettings,
+  PrivateEquityLedgerEditor,
   RealEstateSettings,
   ScpiSettings,
+  VaultDocuments,
   VehicleSettings,
 } from "@/components/asset-detail/lazy";
+import { useUiTier } from "@/components/tier-gate";
+import { useVaultText } from "@/components/vault/vault-text";
+import { tierRank } from "@/stores/useUiTierStore";
 import { VehicleOverviewCosts } from "@/components/asset-detail/vehicle-overview-costs";
 import { TaxLotsCard } from "@/components/tax-lots-card";
 
@@ -304,6 +309,9 @@ export function AssetDetailView({
   const router = useRouter();
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
+  // Governance Vault "Documents" tab: Professional tier and up (a UI preference; access is enforced server-side).
+  const vt = useVaultText();
+  const showVault = tierRank(useUiTier()) >= tierRank("professional");
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshValue, setRefreshValue] = useState("");
   const [refreshCurrency, setRefreshCurrency] = useState(asset.currency);
@@ -1788,6 +1796,7 @@ export function AssetDetailView({
             {isVehicle && (
               <TabsTrigger value="expenses">{t("tab_vehicle_expenses")}</TabsTrigger>
             )}
+            {showVault && <TabsTrigger value="documents">{vt("vault_tab")}</TabsTrigger>}
             <TabsTrigger value="settings">{t("tab_settings")}</TabsTrigger>
           </TabsList>
 
@@ -2763,6 +2772,12 @@ export function AssetDetailView({
             </TabsContent>
           )}
 
+          {showVault && (
+            <TabsContent value="documents" className="space-y-6">
+              <VaultDocuments assetId={asset.id} />
+            </TabsContent>
+          )}
+
           <TabsContent value="settings" className="space-y-6">
             <Card className="border-border bg-card">
               <CardHeader>
@@ -2870,6 +2885,10 @@ export function AssetDetailView({
                 currencyFormatter={currencyFormatter}
                 today={today}
               />
+            )}
+
+            {isPrivateEquity && privateEquityMetadata && (
+              <PrivateEquityLedgerEditor asset={toEditPayload(asset)} shareFactor={ownerFactor} />
             )}
 
             {isPrivateEquity &&

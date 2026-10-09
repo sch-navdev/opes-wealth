@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -255,10 +255,33 @@ function EditableBlock({
     transition: reduced ? null : { duration: motion.durationMs, easing: "cubic-bezier(0.25, 1, 0.5, 1)" },
   });
 
+  const handleRef = useRef<HTMLButtonElement | null>(null);
+  const refocus = useRef(false);
+  // A moved block's DOM node is re-inserted, which drops focus: put it back on the handle after an arrow-key move.
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    handleRef.current?.focus();
+  }, [index]);
+
   const block = getBlock(id);
   const label = text(blockLabelKey(id));
   const active = !isHidden(layout, id);
   const size = sizeOf(layout, id);
+
+  /** Arrow keys on the focused handle move the block one place (Space or Enter still starts a drag). */
+  function onHandleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (attributes["aria-pressed"]) return; // a keyboard drag is running: dnd-kit handles the keys
+    const rtl = document.documentElement.dir === "rtl";
+    const step: Record<string, number> = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: rtl ? 1 : -1, ArrowRight: rtl ? -1 : 1 };
+    const delta = step[event.key];
+    if (delta === undefined) return;
+    event.preventDefault();
+    if (index + delta < 0 || index + delta > total - 1) return;
+    refocus.current = true;
+    moveBy(id, delta);
+    onAnnounce(text("dlayout_ann_over", { label, position: index + 1 + delta, total }));
+  }
 
   return (
     <div
@@ -281,9 +304,16 @@ function EditableBlock({
       <div className="relative z-10 flex flex-wrap items-center gap-2 border-b border-border/60 bg-card px-2 py-1.5">
         <button
           type="button"
-          ref={setActivatorNodeRef}
+          ref={(node) => {
+            setActivatorNodeRef(node);
+            handleRef.current = node;
+          }}
           {...attributes}
           {...listeners}
+          onKeyDown={(event) => {
+            onHandleKeyDown(event);
+            if (!event.defaultPrevented) listeners?.onKeyDown?.(event);
+          }}
           aria-label={text("dlayout_drag_aria", { label })}
           className="inline-flex size-8 shrink-0 cursor-grab touch-none items-center justify-center border border-border bg-background text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 active:cursor-grabbing"
         >

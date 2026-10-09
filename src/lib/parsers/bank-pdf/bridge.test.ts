@@ -68,6 +68,7 @@ describe("statementToParseResult", () => {
     ["hsbc_uae", "HSBC UAE"],
     ["hsbc_uae_card", "HSBC UAE credit card"],
     ["fab_card", "First Abu Dhabi Bank credit card"],
+    ["banque_populaire_card", "Banque Populaire card"],
     ["cbi", "Commercial Bank International (CBI)"],
   ] as const)("maps the OCR-only bank %s to its PDF-only profile", (bank, name) => {
     const r = statementToParseResult({ ...statement, bank, source: "ocr" });

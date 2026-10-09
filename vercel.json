@@ -1,8 +1,24 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["bom1"],
+  "regions": [
+    "bom1"
+  ],
   "crons": [
-    { "path": "/api/cron/bug-reports", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/expire-changes", "schedule": "30 6 * * *" }
+    {
+      "path": "/api/cron/bug-reports",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/expire-changes",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/document-expiry",
+      "schedule": "45 6 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-prices",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

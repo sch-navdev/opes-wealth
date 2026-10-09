@@ -13,6 +13,7 @@ import { FxExposureBar, FX_PEG_STORAGE_KEY } from "@/components/fx-exposure-bar"
 import { LanguageProvider } from "@/context/language-context";
 import { PrivacyProvider } from "@/context/privacy-context";
 import type { FxExposureInput } from "@/lib/fx-exposure";
+import { FX_TARGET_STORAGE_KEY } from "@/lib/fx-target";
 
 const heavyUsd: FxExposureInput[] = [
   { currency: "EUR", assets: 300, liabilities: 0 },
@@ -242,6 +243,103 @@ describe("edge cases", () => {
     const net = within(screen.getByTestId("fx-row-USD")).getAllByRole("cell")[2].textContent!;
     expect(net).toMatch(/300/);
     expect(net).toMatch(/-|−/);
+  });
+});
+
+describe("target mix and drift", () => {
+  const mix: FxExposureInput[] = [
+    { currency: "EUR", assets: 500, liabilities: 0 },
+    { currency: "USD", assets: 300, liabilities: 0 },
+    { currency: "AED", assets: 200, liabilities: 0 },
+  ];
+  const stored = (targets: Record<string, number>, tolerance?: number) =>
+    localStorage.setItem(FX_TARGET_STORAGE_KEY, JSON.stringify({ v: 1, targets, ...(tolerance === undefined ? {} : { tolerance }) }));
+
+  it("is invisible until a target is set: no drift list, no ticks, editor only in the details", async () => {
+    renderBar(mix);
+    expect(screen.queryByTestId("fx-drift")).toBeNull();
+    expect(screen.queryByTestId(/fx-target-tick/)).toBeNull();
+    expect(screen.queryByTestId("fx-target-editor")).toBeNull();
+    await userEvent.click(disclosure());
+    expect(screen.getByTestId("fx-target-editor")).toBeTruthy();
+    expect(screen.queryByTestId("fx-target-total")).toBeNull();
+    expect(screen.queryByTestId("fx-drift")).toBeNull();
+  });
+
+  it("shows signed drift in points with neutral over / under / within wording", () => {
+    stored({ EUR: 40, USD: 30, AED: 28 });
+    renderBar(mix);
+    const drift = screen.getByTestId("fx-drift");
+    expect(screen.getByTestId("fx-drift-EUR").textContent).toMatch(/EUR: 50 % now, target 40 %, \+10 points/);
+    expect(screen.getByTestId("fx-drift-EUR").textContent).toMatch(/over target/);
+    expect(screen.getByTestId("fx-drift-EUR")).toHaveAttribute("data-status", "over");
+    expect(screen.getByTestId("fx-drift-USD").textContent).toMatch(/30 % now, target 30 %, 0 points.*within tolerance/);
+    expect(screen.getByTestId("fx-drift-AED").textContent).toMatch(/−8 points/);
+    expect(screen.getByTestId("fx-drift-AED").textContent).toMatch(/under target/);
+    expect(drift.textContent).toMatch(/Tolerance band: \+\/- 5 points/);
+    expect(drift.textContent).not.toMatch(/rebalance|should|recommend|buy|sell|reduce|increase/i);
+  });
+
+  it("draws target ticks on the ruler only when the targets cover every segment and add up to 100", () => {
+    stored({ EUR: 40, USD: 30 });
+    const { unmount } = renderBar(mix);
+    expect(screen.queryByTestId(/fx-target-tick/)).toBeNull();
+    expect(screen.getByTestId("fx-drift")).toBeTruthy();
+    unmount();
+
+    stored({ EUR: 40, USD: 30, AED: 30 });
+    renderBar(mix);
+    expect(screen.getByTestId("fx-target-tick-EUR").getAttribute("style")).toMatch(/40%/);
+    expect(screen.getByTestId("fx-target-tick-USD").getAttribute("style")).toMatch(/70%/);
+    expect(screen.queryByTestId("fx-target-tick-AED")).toBeNull();
+  });
+
+  it("honours a custom tolerance band", () => {
+    stored({ EUR: 40 }, 12);
+    renderBar(mix);
+    expect(screen.getByTestId("fx-drift-EUR")).toHaveAttribute("data-status", "within");
+    expect(screen.getByTestId("fx-drift").textContent).toMatch(/\+\/- 12 points/);
+  });
+
+  it("saves targets typed in the editor to localStorage, shows the drift, and clears them", async () => {
+    const user = userEvent.setup();
+    renderBar(mix);
+    await user.click(disclosure());
+    await user.type(screen.getByRole("spinbutton", { name: "Target share for EUR (%)" }), "35");
+    expect(JSON.parse(localStorage.getItem(FX_TARGET_STORAGE_KEY)!).targets).toEqual({ EUR: 35 });
+    expect(screen.getByTestId("fx-drift-EUR").textContent).toMatch(/\+15 points/);
+    expect(screen.getByTestId("fx-target-total").textContent).toMatch(/35 %/);
+    expect(screen.getByTestId("fx-target-mark-EUR").getAttribute("style")).toMatch(/35%/);
+
+    await user.click(screen.getByRole("button", { name: "Clear targets" }));
+    expect(JSON.parse(localStorage.getItem(FX_TARGET_STORAGE_KEY)!).targets).toEqual({});
+    expect(screen.queryByTestId("fx-drift")).toBeNull();
+    expect((screen.getByRole("spinbutton", { name: "Target share for EUR (%)" }) as HTMLInputElement).value).toBe("");
+  });
+
+  it("keeps percentages visible and money masked in privacy mode", () => {
+    localStorage.setItem("opes_privacy_mode", "true");
+    stored({ EUR: 40 });
+    renderBar(mix);
+    expect(screen.getByTestId("fx-net-worth").textContent).toBe("••••••••");
+    expect(screen.getByTestId("fx-drift-EUR").textContent).toMatch(/\+10 points/);
+  });
+
+  it("ignores a corrupt stored value and works when localStorage throws", () => {
+    localStorage.setItem(FX_TARGET_STORAGE_KEY, "{oops");
+    const { unmount } = renderBar(mix);
+    expect(screen.queryByTestId("fx-drift")).toBeNull();
+    unmount();
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    try {
+      renderBar(mix);
+      expect(screen.queryByTestId("fx-drift")).toBeNull();
+      expect(screen.getByTestId("fx-exposure-bar")).toBeTruthy();
+    } finally {
+      getItem.mockRestore();
+    }
   });
 });
 

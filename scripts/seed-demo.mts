@@ -831,6 +831,48 @@ equities.forEach((e, idx) => {
   });
 }
 
+// ---- Assurance-Vie (src/lib/assurance-vie.ts) ----------------------------------
+//
+// A French life-insurance contract (invented insurer and people): 70% euro fund / 30% unit-linked, free
+// deposits, premiums split by the holder's age, two named beneficiaries. The value is the total contract value;
+// the retirement simulator counts this category as investable by default, which is what lets the demo show an
+// "on track" result. Needs the "Assurance-Vie" category (migration 0036).
+{
+  const opened = "2016-05-10";
+  const value = 92000;
+  addAsset({
+    category: "Assurance-Vie",
+    name: "Horizon Patrimoine (Assurance-Vie)",
+    currentValue: value,
+    currency: "EUR",
+    purchaseDate: opened,
+    metadata: {
+      version: 1,
+      insurer: "Mutuelle Horizon (fictional)",
+      contract_name: "Horizon Patrimoine",
+      contract_number: "DEMO-AV-0001",
+      opened_on: opened,
+      household: "couple",
+      euro_fund_pct: 70,
+      uc_pct: 30,
+      deposit_type: "free",
+      premiums_paid_total: 70000,
+      scheduled_amount: null,
+      scheduled_frequency: "monthly",
+      scheduled_day: null,
+      scheduled_start_on: "",
+      scheduled_end_on: "",
+      premiums_before_70: 70000,
+      premiums_after_70: null,
+      beneficiaries: [
+        { id: "demo-b1", name: "Avery Demo", relationship: "Spouse", share_pct: 60, clause: "standard", clause_text: "" },
+        { id: "demo-b2", name: "Jordan Demo", relationship: "Child", share_pct: 40, clause: "standard", clause_text: "" },
+      ],
+    },
+    history: path(opened, TODAY, 20000, value, 0.01, 131),
+  });
+}
+
 // ---- Vehicles --------------------------------------------------------------
 
 type VehicleDef = {

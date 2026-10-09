@@ -159,6 +159,23 @@ describe("edit mode", () => {
     expect(domOrder()).toEqual(before);
   });
 
+  it("the arrow keys on a focused drag handle move the block and keep the focus there", async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await user.click(customize());
+    const before = domOrder();
+    const handle = () => screen.getByRole("button", { name: /Drag to move .*Quick add/i });
+    handle().focus();
+    await user.keyboard("{ArrowDown}");
+    const after = domOrder();
+    expect(after[2]).toBe(before[3]);
+    expect(after[3]).toBe(before[2]);
+    expect(handle()).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(domOrder()).toEqual(before);
+    expect(handle()).toHaveFocus();
+  });
+
   it("disables moving past either end", async () => {
     const user = userEvent.setup();
     renderDashboard();

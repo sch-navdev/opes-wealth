@@ -11,7 +11,7 @@
 
 import type { OcrDocument } from "./ocr-types";
 
-export type PdfBankId = "fab" | "wio" | "banque_populaire" | "hsbc_uae" | "cbi" | "cbd" | "hsbc_uae_card" | "fab_card";
+export type PdfBankId = "fab" | "wio" | "banque_populaire" | "banque_populaire_card" | "hsbc_uae" | "cbi" | "cbd" | "hsbc_uae_card" | "fab_card";
 
 /**
  * One transaction as read from a statement. Named after the app's transaction-dedupe concept
@@ -101,6 +101,8 @@ export type PdfFailureCode =
   | "image_only"
   /** The file has a text layer but no known bank layout matched. */
   | "unsupported"
+  /** A document of a recognised bank that is not an account or card statement (transfer notice, fee summary...). */
+  | "not_account_statement"
   /** A known bank layout matched but no transaction rows were found. */
   | "no_transactions"
   /** The file is not a readable PDF (corrupt, wrong type, empty). */

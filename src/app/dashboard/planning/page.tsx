@@ -7,7 +7,8 @@ import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
 import { loadSimulations, summariseHoldings, toProjectInput } from "@/lib/planning-data";
 import { PlanningBoard } from "@/components/planning-board";
 import { RetirementSimulator } from "@/components/retirement-simulator";
-import { buildInvestableBreakdown } from "@/lib/retirement-assets";
+import { buildInvestableBreakdown, investableTotal } from "@/lib/retirement-assets";
+import { demoRetirementPreset } from "@/lib/retirement-demo";
 import { DEMO_MONTHLY_INCOME, isDemoUser } from "@/lib/demo-mode";
 
 type HoldingRow = {
@@ -82,7 +83,11 @@ export default async function PlanningPage() {
       }))}
     />
     <div className="w-full px-4 pb-10 sm:px-6 lg:px-8">
-      <RetirementSimulator baseCurrency={base} breakdown={investable} />
+      <RetirementSimulator
+        baseCurrency={base}
+        breakdown={investable}
+        preset={isDemoUser(user.id) ? (demoRetirementPreset(investableTotal(investable, null)) ?? undefined) : undefined}
+      />
     </div>
     </>
   );

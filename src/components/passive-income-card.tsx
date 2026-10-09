@@ -55,7 +55,8 @@ export function PassiveIncomeCard({
     () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
     [intlLocale, baseCurrency],
   );
-  const pct = (n: number | null) => (n == null ? "—" : `${n.toFixed(1)}%`);
+  const pct = (n: number | null) =>
+    n == null ? "—" : `${new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)}%`;
 
   const rows = filter ? summary.rows.filter((r) => r.source === filter) : summary.rows;
   const rowsLastYear = rows.reduce((s, r) => s + r.lastYear, 0);

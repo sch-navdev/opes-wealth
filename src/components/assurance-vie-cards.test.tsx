@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AssuranceVieDetailCards, AssuranceVieMilestoneCard } from "@/components/assurance-vie-cards";
+import { AssuranceVieDetailCards, AssuranceVieEstateCard, AssuranceVieMilestoneCard } from "@/components/assurance-vie-cards";
 import { LanguageProvider } from "@/context/language-context";
 import { PrivacyProvider } from "@/context/privacy-context";
 import { EMPTY_ASSURANCE_VIE_METADATA, type AssuranceVieMetadata } from "@/lib/assurance-vie";
@@ -149,5 +149,55 @@ describe("AssuranceVieDetailCards", () => {
     expect(screen.getByText("No beneficiaries recorded.")).toBeInTheDocument();
     expect(screen.getByTestId("av-milestone-unset")).toBeInTheDocument();
     expect(screen.queryByTestId("av-scheduled-annual")).toBeNull();
+  });
+});
+
+describe("AssuranceVieEstateCard", () => {
+  const people = [
+    { id: "a", name: "Alice", relationship: "spouse", share_pct: 50, clause: "standard" as const, clause_text: "" },
+    { id: "b", name: "Bob", relationship: "son", share_pct: 50, clause: "standard" as const, clause_text: "" },
+  ];
+
+  it("shows both allowances and the disclaimer, and asks for beneficiaries when none is named", () => {
+    wrap(<AssuranceVieEstateCard metadata={md()} />);
+    const card = screen.getByTestId("av-estate");
+    expect(screen.getByTestId("av-estate-before70")).toHaveTextContent("before age 70 (article 990 I)");
+    expect(screen.getByTestId("av-estate-before70")).toHaveTextContent("€152,500 per beneficiary");
+    expect(screen.getByTestId("av-estate-after70")).toHaveTextContent("after age 70 (article 757 B)");
+    expect(screen.getByTestId("av-estate-after70")).toHaveTextContent("€30,500");
+    expect(screen.getByTestId("av-estate-after70")).toHaveTextContent("gains they produced are outside it");
+    expect(screen.getByTestId("av-estate-no-bene")).toBeInTheDocument();
+    expect(screen.queryByTestId("av-estate-arith-before")).toBeNull();
+    expect(screen.queryByTestId("av-estate-arith-after")).toBeNull();
+    const disclaimer = screen.getByTestId("av-estate-disclaimer");
+    expect(disclaimer).toHaveTextContent("Informational, not tax advice");
+    expect(disclaimer).toHaveTextContent("UAE residents are treated differently");
+    expect(disclaimer).toHaveTextContent("Check current rules");
+    expect(disclaimer).toHaveTextContent("Figures as of October 7, 2026");
+    expect(disclaimer).toHaveTextContent("no tax amount is computed");
+    expect(card.textContent).not.toMatch(/you owe|tax due|payable/i);
+  });
+
+  it("shows the arithmetic for the named beneficiaries", () => {
+    wrap(<AssuranceVieEstateCard metadata={md({ beneficiaries: people })} />);
+    expect(screen.getByTestId("av-estate-arith-before")).toHaveTextContent("Named beneficiaries: 2. €152,500 x 2 = €305,000");
+    expect(screen.getByTestId("av-estate-arith-after")).toHaveTextContent("€30,500 / 2 = €15,250.00 each if split equally");
+    expect(screen.getByTestId("av-estate-arith-after")).toHaveTextContent("allowance is overall, not per person");
+    expect(screen.queryByTestId("av-estate-no-bene")).toBeNull();
+  });
+
+  it("is part of the detail cards, ignores premium amounts and stays visible in privacy mode", () => {
+    localStorage.setItem("opes_privacy_mode", "true");
+    wrap(
+      <AssuranceVieDetailCards
+        metadata={md({ beneficiaries: people, premiums_before_70: 777_000, premiums_after_70: 88_000 })}
+        assetValue={50_000}
+        currency="EUR"
+        today="2026-10-07"
+      />,
+    );
+    const card = screen.getByTestId("av-estate");
+    expect(card).toHaveTextContent("€152,500");
+    expect(card.textContent).not.toMatch(/777,000|88,000/);
   });
 });

@@ -10,7 +10,7 @@
   --card-foreground: #0C1A30;
   --popover: #FFFFFF;
   --popover-foreground: #0C1A30;
-  --primary: #8E6A1C;
+  --primary: #876418;
   --primary-foreground: #FFFFFF;
   --secondary: #E3E8EF;
   --secondary-foreground: #0C1A30;
@@ -24,12 +24,12 @@
   --success-foreground: #FFFFFF;
   --border: #CBD3DF;
   --input: #CBD3DF;
-  --ring: #8E6A1C;
+  --ring: #876418;
 
   /* Categorical series colors for charts (e.g. Portfolio Performance's
      stacked area chart, grouped by exchange) — distinct hues at varying
      lightness so they stay tolerant of colorblindness, not just hue-separated. */
-  --chart-1: #8E6A1C;
+  --chart-1: #876418;
   --chart-2: #3E5F92;
   --chart-3: #2F7A58;
   --chart-4: #8F5E3E;
@@ -315,5 +315,27 @@
   .spark-draw {
     stroke-dasharray: 1;
     animation: spark-draw 700ms ease-out both;
+  }
+}
+
+/* ==========================================================================
+   Landing page (components/landing-field.tsx, app/page.tsx): hero field,
+   slow dial and rosette. The turning is decoration only and is switched off
+   under prefers-reduced-motion.
+   ========================================================================== */
+.landing-field {
+  background-image:
+    radial-gradient(70% 90% at 15% 0%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 65%),
+    linear-gradient(to bottom, transparent 70%, var(--background));
+}
+@keyframes landing-turn {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .landing-dial-turn {
+    animation: landing-turn 300s linear infinite;
+  }
+  .landing-rosette-turn {
+    animation: landing-turn 480s linear infinite reverse;
   }
 }

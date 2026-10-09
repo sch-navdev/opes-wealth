@@ -9,6 +9,7 @@ import {
   beneficiarySharesTotal,
   computeMilestone,
   emptyBeneficiary,
+  estateAllowanceInfo,
   getAssuranceVieMetadataErrors,
   getAssuranceVieWarnings,
   hasPremiumAgeSplit,
@@ -378,5 +379,40 @@ describe("getAssuranceVieWarnings", () => {
     expect(getAssuranceVieWarnings(valid({ premiums_paid_total: 100, premiums_before_70: 80, premiums_after_70: 30 }))).toEqual(["av_warn_premium_split"]);
     expect(getAssuranceVieWarnings(valid({ premiums_paid_total: 100, premiums_before_70: 80, premiums_after_70: 20 }))).toEqual([]);
     expect(getAssuranceVieWarnings(valid({ premiums_paid_total: null, premiums_before_70: 80 }))).toEqual([]);
+  });
+});
+
+describe("estateAllowanceInfo", () => {
+  const person = (id: string, name: string) => ({ ...emptyBeneficiary(id), name });
+
+  it("keeps every estate figure in the one config object with the as-of date", () => {
+    expect(ASSURANCE_VIE_CONFIG.estate.before70PerBeneficiary).toBe(152_500);
+    expect(ASSURANCE_VIE_CONFIG.estate.after70Overall).toBe(30_500);
+    expect(ASSURANCE_VIE_CONFIG.estate.ageThreshold).toBe(70);
+    expect(ASSURANCE_VIE_CONFIG.asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("without named beneficiaries only the allowances are returned, no arithmetic", () => {
+    const info = estateAllowanceInfo({ beneficiaries: [] });
+    expect(info).toMatchObject({ before70PerBeneficiary: 152_500, after70Overall: 30_500, namedBeneficiaries: 0, before70Combined: null, after70EqualShare: null });
+    expect(info.asOf).toBe(ASSURANCE_VIE_CONFIG.asOf);
+  });
+
+  it("multiplies the per-beneficiary allowance and splits the overall one equally, counting named people only", () => {
+    const info = estateAllowanceInfo({ beneficiaries: [person("a", "Alice"), person("b", "Bob"), person("c", "Cleo"), emptyBeneficiary("d")] });
+    expect(info.namedBeneficiaries).toBe(3);
+    expect(info.before70Combined).toBe(457_500);
+    expect(info.after70EqualShare).toBe(10_166.67);
+  });
+
+  it("ignores whitespace-only names and tolerates a missing list", () => {
+    expect(estateAllowanceInfo({ beneficiaries: [person("a", "   ")] }).namedBeneficiaries).toBe(0);
+    expect(estateAllowanceInfo({ beneficiaries: undefined as never }).namedBeneficiaries).toBe(0);
+  });
+
+  it("does not depend on premiums or contract value (no tax amount is derived)", () => {
+    const a = estateAllowanceInfo(valid({ beneficiaries: [person("a", "Alice")], premiums_before_70: 1_000_000, premiums_after_70: 5 }));
+    const b = estateAllowanceInfo(valid({ beneficiaries: [person("a", "Alice")] }));
+    expect(a).toEqual(b);
   });
 });

@@ -56,3 +56,6 @@ A second section on `/dashboard/planning`, below the board: "how much must I sav
 - [[Design-System|Design System]] — tokens, tier motion and the sidebar tier gating used by the simulator
 - [[Database-Schema|Database Schema]] — migration 0031
 - [[Co-Ownership|Co-Ownership]] — shared loaders now filter on status
+
+### Retirement "on track" demo preset (2026-10-09)
+`lib/retirement-demo.ts` `demoRetirementPreset(portfolioTotal)` (42 to 60, 5 %, 2 % inflation, 4 % withdrawal, desired income sized so the target is about 70 % of grown assets, rounded down to 500) is passed to the simulator for the DEMO user only (`planning/page.tsx`; saved local edits still win). `scripts/seed-demo.mts` gained one invented Assurance-Vie asset (EUR 92,000, 70/30, two named beneficiaries): the seed was NOT run (needs migration 0036's category). The on-track state is covered by component and unit tests and was never seen rendered.

@@ -3,6 +3,7 @@
  * (extraction is server-side); output is a `PdfParseOutcome`.
  */
 import { banquePopulaireProfile } from "./banque-populaire";
+import { banquePopulaireCardProfile } from "./banque-populaire-card";
 import type { TranslationKey } from "@/lib/i18n";
 import { cbdProfile } from "./cbd";
 import { cbiProfile } from "./cbi";
@@ -20,7 +21,7 @@ export { classifyPdfText } from "./classify";
 export type { PdfTextKind } from "./classify";
 
 /** Detection order matters: the first profile whose `detect` is true wins. */
-export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabCardProfile, fabProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
+export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabCardProfile, fabProfile, banquePopulaireCardProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
 
 export const PDF_FAILURE_MESSAGE_KEYS = {
   encrypted: "bank_pdf_error_encrypted",
@@ -28,6 +29,7 @@ export const PDF_FAILURE_MESSAGE_KEYS = {
   scanned: "bank_pdf_error_scanned",
   image_only: "bank_pdf_error_image_only",
   unsupported: "bank_pdf_error_unsupported",
+  not_account_statement: "bank_pdf_error_not_account_statement",
   no_transactions: "bank_pdf_error_no_transactions",
   unreadable: "bank_pdf_error_unreadable",
   too_large: "bank_pdf_error_too_large",
@@ -58,6 +60,16 @@ export function parseBankStatementPdfText(
 
   const profile = opts?.bank ? PDF_BANK_PROFILES.find((p) => p.id === opts.bank) : detectBankPdf(text);
   if (!profile) {
+    if (/banque populaire/i.test(text)) {
+      return {
+        ok: false,
+        failure: {
+          code: "not_account_statement",
+          bank: "banque_populaire",
+          message: "This Banque Populaire document is not an account or card statement (transfer notice, fee summary...).",
+        },
+      };
+    }
     return {
       ok: false,
       failure: { code: "unsupported", message: "No supported bank statement layout was recognised in this PDF." },

@@ -20,6 +20,7 @@ import { DetailField, ProgressBar } from "@/components/asset-detail/shared";
 
 import {
   calledCapital,
+  distributedCapital,
   isOverdue,
   pendingCapitalCallsTotal,
   PrivateEquityMetadata,
@@ -71,8 +72,8 @@ export function PrivateEquityCommitmentSettings({
                   value={maskValue(currencyFormatter.format(unfunded))} />
                 <DetailField
                   label={t("pe_distributions")}
-                  value={pe.distributions_to_date != null
-                    ? maskValue(currencyFormatter.format(pe.distributions_to_date))
+                  value={pe.distributions.length > 0 || pe.distributions_to_date != null
+                    ? maskValue(currencyFormatter.format(distributedCapital(pe)))
                     : null} />
                 <DetailField
                   label={t("pe_liability_counted")}

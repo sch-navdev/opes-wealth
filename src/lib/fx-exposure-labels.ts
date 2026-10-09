@@ -32,7 +32,20 @@ export const FXBAR_EN = {
   "fxbar_hedge_text": "A liability in a currency offsets assets held in that same currency, so the net position can be smaller than the assets alone. This is information, not a recommendation.",
   "fxbar_gross_note": "Net worth is zero or negative, so shares are based on gross exposure (assets plus liabilities).",
   "fxbar_no_liabilities": "No liabilities recorded: the net position equals the assets in every currency.",
-  "fxbar_empty": "No holdings to show yet."
+  "fxbar_empty": "No holdings to show yet.",
+  "fxbar_target_title": "Target mix (optional)",
+  "fxbar_target_desc": "Set your own reference share for each currency. The bar then shows how far the current mix is from it. It is a reference you choose, not a recommendation.",
+  "fxbar_target_input_aria": "Target share for {segment} (%)",
+  "fxbar_target_tolerance": "Tolerance (+/- points)",
+  "fxbar_target_total": "The targets you set add up to {total} %.",
+  "fxbar_target_clear": "Clear targets",
+  "fxbar_target_storage": "Saved on this device only.",
+  "fxbar_drift_title": "Distance from your target mix",
+  "fxbar_drift_row": "{segment}: {share} now, target {target}, {drift} points",
+  "fxbar_drift_over": "over target",
+  "fxbar_drift_under": "under target",
+  "fxbar_drift_within": "within tolerance",
+  "fxbar_drift_band": "Tolerance band: +/- {tolerance} points. Differences are in percentage points of net worth."
 } as const;
 
 export type FxBarKey = keyof typeof FXBAR_EN;

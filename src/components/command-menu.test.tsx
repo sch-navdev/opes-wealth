@@ -151,7 +151,7 @@ describe("CommandMenu", () => {
     renderMenu("professional");
     open();
     const pages = within(screen.getByRole("group", { name: "Pages" }));
-    expect(pages.getAllByRole("option")).toHaveLength(8);
+    expect(pages.getAllByRole("option")).toHaveLength(9);
     await userEvent.click(pages.getByText(/^(Compare returns|irr_nav_compare)/));
     expect(push).toHaveBeenCalledWith("/dashboard/compare");
   });

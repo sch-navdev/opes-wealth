@@ -23,7 +23,7 @@ export function LandingSpecimen() {
   const [whole, decimals] = number.format(4286410.52).split(/(?=[.,]\d\d$)/);
   const percent = new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 0 });
   return (
-    <figure className="w-full max-w-md border border-border bg-card p-6">
+    <figure className="card-glow w-full max-w-md border border-border bg-card p-6">
       <figcaption className="flex items-center justify-between gap-3">
         <span className="font-index text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{t("net_worth")}</span>
         <span className="text-xs text-muted-foreground">{t("landing_example_note")}</span>

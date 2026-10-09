@@ -9,6 +9,7 @@ import {
   type PassiveIncomeSource,
 } from "@/lib/passive-income";
 import { calledCapital, parsePrivateEquityMetadata } from "@/lib/private-equity";
+import { earnedGroupOf, expandIncomeStreams, type EarnedGroup, type IncomeStream } from "@/lib/income-streams";
 import { calculateTotalCost, parseRealEstateMetadata } from "@/lib/real-estate";
 import { parseScpiMetadata, scpiInvested } from "@/lib/scpi";
 
@@ -58,12 +59,25 @@ export type IncomeCalendarItem = {
   basis: IncomeCalendarBasis;
 };
 
+/** One earned-income payment (a salary, a bonus...) in a month. Never part of the passive totals. */
+export type EarnedCalendarItem = {
+  streamId: string;
+  name: string;
+  group: EarnedGroup;
+  /** Base Currency, NET. */
+  amount: number;
+  date: string;
+};
+
 export type IncomeCalendarMonth = {
   /** "YYYY-MM". */
   month: string;
   total: number;
   bySource: Record<PassiveIncomeSource, number>;
   items: IncomeCalendarItem[];
+  /** Earned-income layer (only present when `streams` were given). NOT included in `total`. */
+  earned?: Record<EarnedGroup, number>;
+  earnedItems?: EarnedCalendarItem[];
 };
 
 export type IncomeCalendar = {
@@ -88,6 +102,8 @@ export type IncomeCalendarInput = {
   baseCurrency: string;
   /** ISO date (YYYY-MM-DD); the calendar starts with this date's month. */
   startDate: string;
+  /** Optional earned-income streams (salary, bonus...) for the separate earned-income layer. */
+  streams?: IncomeStream[];
 };
 
 const MONTHS = 12;
@@ -256,6 +272,21 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
     costBasis += cost;
     marketValue += toBase(grossAssetValue(p.asset), p.asset.currency);
     costedIncome += p.annual;
+  }
+
+  // Earned-income layer: attached to the months but kept out of every passive figure above.
+  if (input.streams && input.streams.length > 0) {
+    for (const m of months) {
+      m.earned = { salary: 0, bonus: 0, other: 0 };
+      m.earnedItems = [];
+    }
+    for (const o of expandIncomeStreams(input.streams, keys[0], rates, baseCurrency, MONTHS)) {
+      const bucket = months[keys.indexOf(o.month)];
+      if (!bucket?.earned || !bucket.earnedItems) continue;
+      const group = earnedGroupOf(o.kind);
+      bucket.earned[group] += o.baseAmount;
+      bucket.earnedItems.push({ streamId: o.streamId, name: o.label, group, amount: o.baseAmount, date: o.date });
+    }
   }
 
   return {

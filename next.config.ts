@@ -25,7 +25,8 @@ allowedDevOrigins: ["16.171.172.83"],
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "5mb",
+      // 16 MB: the Governance Vault accepts files up to 15 MB through a server action (re-checked in code).
+      bodySizeLimit: "16mb",
     },
   },
 };

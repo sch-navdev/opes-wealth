@@ -35,8 +35,11 @@ import {
 import { DashboardLayoutGrid, type DashboardBlockContent } from "@/components/dashboard-layout-grid";
 import { DashboardLayoutProvider } from "@/components/dashboard-layout-provider";
 import { loadDashboardLayouts } from "@/lib/dashboard-layout-server";
+import { loadIncomeStreams } from "@/lib/income-streams-server";
 import { buildAllocation, topAssets } from "@/lib/dashboard-tiers";
 import { buildExpertPanelsData } from "@/lib/dashboard-expert";
+import { buildPeLiquidityData } from "@/lib/pe-liquidity-data";
+import { ExpertLiquidityBlock } from "@/components/pe-liquidity-panel";
 import { cookies } from "next/headers";
 import { UI_TIER_COOKIE, parseExpertiseLevel } from "@/stores/useUiTierStore";
 import { collectAttributionCandidates } from "@/lib/dashboard-attribution";
@@ -484,11 +487,14 @@ export default async function DashboardPage({
 
   // Forward 12-month income calendar (Professional/Expert): same share-scaled
   // `assets` the passive-income card uses, spread over the real payment schedule.
+  // The earned-income layer (private income streams, migration 0037; [] until applied) is optional.
+  const { streams: incomeStreams } = await loadIncomeStreams(supabase, user.id);
   const incomeCalendar = buildIncomeCalendar({
     assets: assets ?? [],
     rates,
     baseCurrency: displayCurrency,
     startDate: today,
+    streams: incomeStreams,
   });
 
   // Bento header: net contribution + holding count for the three headline
@@ -510,6 +516,7 @@ export default async function DashboardPage({
   const basicAllocation = buildAllocation(breakdowns.assets);
   const basicTopAssets = topAssets(breakdowns.netWorth, 5);
   const expertData = buildExpertPanelsData(assets ?? [], displayCurrency, rates, today);
+  const peLiquidity = buildPeLiquidityData(assets ?? [], displayCurrency, rates, today);
   // Currency vs capital attribution (Expert panel): foreign-currency holdings with a cost basis.
   // Historical FX is fetched once, in parallel per currency, and never throws: a provider failure
   // only lowers the panel's coverage. Skipped entirely when there is nothing foreign to attribute.
@@ -645,6 +652,7 @@ export default async function DashboardPage({
       attributionCandidates.length > 0 ? (
         <StreamedAttribution candidates={attributionCandidates} baseCurrency={displayCurrency} rates={rates} />
       ) : undefined,
+    expertLiquidity: <ExpertLiquidityBlock data={peLiquidity} baseCurrency={displayCurrency} />,
     export: (
       <ExportReportsCard
         savedDcc={savedDccRow?.data ?? null}

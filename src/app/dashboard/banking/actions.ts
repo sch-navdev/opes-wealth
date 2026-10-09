@@ -464,3 +464,118 @@ export async function rememberCashAccountBank(
   revalidatePath("/dashboard", "layout");
   return { ok: true };
 }
+
+/**
+ * Creates an empty manual Cash account for a statement group that has no account yet (balance 0; the
+ * import then records the statement's history and balance). Own profile only, never the demo account.
+ */
+export async function createStatementCashAccount(input: {
+  name: string;
+  currency: string;
+  bankProfile: string;
+  institutionName: string;
+  accountRef: string;
+}): Promise<{ ok: true; id: string } | Fail> {
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+
+  const name = input.name.trim().slice(0, 120);
+  const currency = input.currency.trim().toUpperCase();
+  if (!name) return { ok: false, code: "invalid", error: "Name is required." };
+  if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, code: "invalid", error: "Invalid currency." };
+  const accountRef = input.accountRef.replace(/\s+/g, "").slice(0, 40);
+
+  const { data: category } = await auth.userClient
+    .from("asset_categories")
+    .select("id")
+    .eq("name", "Cash")
+    .single<{ id: string }>();
+  if (!category) return { ok: false, code: "db_error", error: 'The "Cash" category is missing from this project.' };
+
+  const { data: inserted, error } = await auth.userClient
+    .from("assets")
+    .insert({
+      profile_id: auth.userId,
+      category_id: category.id,
+      name,
+      quantity: 1,
+      current_value: 0,
+      currency,
+      is_liability: false,
+      metadata: {
+        institution_name: input.institutionName.slice(0, 100),
+        account_type: "current",
+        bank_profile: input.bankProfile.slice(0, 40),
+        ...(accountRef ? { account_ref: accountRef } : {}),
+      } as never,
+      images: [],
+      ticker_symbol: null,
+      purchase_date: new Date().toISOString().slice(0, 10),
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (error || !inserted) return { ok: false, code: "db_error", error: error?.message ?? "Could not create the account." };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, id: inserted.id };
+}
+
+/**
+ * Records dated balances (a statement's balance brought forward / closing balance) for a Cash account
+ * that has no transactions in the statement. A date that already has a history row is left alone (so
+ * nothing is overwritten); the account's current value only follows the newest point when no later
+ * history row exists.
+ */
+export async function recordBalanceSnapshots(
+  assetId: string,
+  points: { date: string; value: number }[],
+): Promise<{ ok: true; added: number; skipped: number } | Fail> {
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+
+  const clean = points.filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date) && Number.isFinite(p.value));
+  if (clean.length === 0 || clean.length > 4) return { ok: false, code: "invalid", error: "No valid balance to record." };
+
+  const { data: asset } = await auth.userClient
+    .from("assets")
+    .select("id, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId)
+    .single<{ id: string; asset_categories: { name: string } | null }>();
+  if (!asset || asset.asset_categories?.name !== "Cash") {
+    return { ok: false, code: "invalid", error: "Cash account not found." };
+  }
+
+  const { data: existing, error: readError } = await auth.userClient
+    .from("asset_history")
+    .select("recorded_date")
+    .eq("asset_id", assetId)
+    .returns<{ recorded_date: string }[]>();
+  if (readError) return { ok: false, code: "db_error", error: readError.message };
+  const have = new Set((existing ?? []).map((r) => r.recorded_date));
+  const latestExisting = (existing ?? []).reduce((m, r) => (r.recorded_date > m ? r.recorded_date : m), "");
+
+  const fresh = clean.filter((p) => !have.has(p.date));
+  const skipped = clean.length - fresh.length;
+  if (fresh.length > 0) {
+    const write = (source: AssetHistorySource) =>
+      auth.userClient.from("asset_history").insert(
+        fresh.map((p) => ({ asset_id: assetId, recorded_date: p.date, value: p.value, net_equity: p.value, source })),
+      );
+    let { error } = await write("csv_import");
+    if (error?.code === "23514") ({ error } = await write("manual"));
+    if (error) return { ok: false, code: "db_error", error: error.message };
+
+    const newest = fresh.reduce((m, p) => (p.date > m.date ? p : m));
+    if (newest.date >= latestExisting) {
+      const { error: updateError } = await auth.userClient
+        .from("assets")
+        .update({ current_value: newest.value })
+        .eq("id", assetId)
+        .eq("profile_id", auth.userId);
+      if (updateError) return { ok: false, code: "db_error", error: updateError.message };
+    }
+  }
+  revalidatePath("/dashboard", "layout");
+  revalidatePath(`/dashboard/assets/${assetId}`);
+  return { ok: true, added: fresh.length, skipped };
+}

@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 import { CalendarClock, CalendarDays } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { useCashFlowText } from "@/components/cash-flow-text";
+import type { CashFlowKey } from "@/lib/cash-flow-labels";
+import type { EarnedGroup } from "@/lib/income-streams";
 import { useTierMotion } from "@/components/tier-gate";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
@@ -18,6 +22,16 @@ const SOURCES: { source: PassiveIncomeSource; label: TranslationKey; bar: string
   { source: "reit", label: "passive_source_reit", bar: "bg-chart-3" },
   { source: "private_equity", label: "passive_source_private_equity", bar: "bg-chart-4" },
 ];
+
+/** Earned-income layer (salary, bonus, other earned): separate legend entries, shown only when the toggle is on. */
+const EARNED: { group: EarnedGroup; label: CashFlowKey; bar: string }[] = [
+  { group: "salary", label: "cf_cal_salary", bar: "bg-chart-5" },
+  { group: "bonus", label: "cf_cal_bonus", bar: "bg-primary" },
+  { group: "other", label: "cf_cal_other", bar: "bg-muted-foreground" },
+];
+
+const earnedSum = (m: IncomeCalendarData["months"][number]) =>
+  m.earned ? m.earned.salary + m.earned.bonus + m.earned.other : 0;
 
 /**
  * Forward 12-month passive-income calendar (see `lib/income-calendar.ts`): one
@@ -37,6 +51,13 @@ export function IncomeCalendar({
   const { maskValue } = usePrivacy();
   const motion = useTierMotion();
   const [selected, setSelected] = useState<string | null>(null);
+  const tt = useCashFlowText();
+  const [includeEarned, setIncludeEarned] = useState(false);
+  const hasEarned = calendar.months.some((m) => m.earned !== undefined);
+  const showEarned = includeEarned && hasEarned;
+  const earnedOf = (m: IncomeCalendarData["months"][number]) => (showEarned ? earnedSum(m) : 0);
+  const earnedAnnual = calendar.months.reduce((s, m) => s + earnedSum(m), 0);
+  const combined = (m: IncomeCalendarData["months"][number]) => m.total + earnedOf(m);
 
   const money = useMemo(
     () => new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency, maximumFractionDigits: 0 }),
@@ -48,10 +69,11 @@ export function IncomeCalendar({
     const date = (key: string) => new Date(`${key}-01T00:00:00Z`);
     return { short: (k: string) => short.format(date(k)), long: (k: string) => long.format(date(k)) };
   }, [intlLocale]);
-  const pct = (n: number | null) => (n == null ? "—" : `${n.toFixed(1)}%`);
+  const pct = (n: number | null) =>
+    n == null ? "—" : `${new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)}%`;
 
-  const max = Math.max(0, ...calendar.months.map((m) => m.total));
-  const empty = calendar.annualTotal <= 0;
+  const max = Math.max(0, ...calendar.months.map(combined));
+  const empty = calendar.annualTotal <= 0 && !(showEarned && earnedAnnual > 0);
   const open = calendar.months.find((m) => m.month === selected) ?? null;
   const usedSources = SOURCES.filter((s) => calendar.months.some((m) => m.bySource[s.source] > 0));
 
@@ -84,7 +106,18 @@ export function IncomeCalendar({
             <h2 className="text-sm font-medium text-foreground">{t("ical_title")}</h2>
             <p className="text-xs text-muted-foreground">{t("ical_desc", { currency: baseCurrency })}</p>
           </div>
+          {hasEarned && (
+            <label className="ms-auto flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch size="sm" checked={includeEarned} onCheckedChange={setIncludeEarned} aria-label={tt("cf_cal_toggle")} />
+              {tt("cf_cal_toggle")}
+            </label>
+          )}
         </div>
+        {showEarned && (
+          <p className="text-xs tabular-nums text-muted-foreground">
+            {tt("cf_cal_earned_total", { amount: maskValue(money.format(earnedAnnual)) })}
+          </p>
+        )}
 
         {empty ? (
           <p className="text-sm text-muted-foreground">{t("ical_empty")}</p>
@@ -108,7 +141,7 @@ export function IncomeCalendar({
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
               {calendar.months.map((m) => {
                 const active = selected === m.month;
-                const label = t("ical_bar_label", { month: monthLabel.long(m.month), total: money.format(m.total) });
+                const label = t("ical_bar_label", { month: monthLabel.long(m.month), total: money.format(combined(m)) });
                 return (
                   <li key={m.month}>
                     <button
@@ -139,9 +172,22 @@ export function IncomeCalendar({
                             />
                           );
                         })}
+                        {showEarned &&
+                          EARNED.map((e) => {
+                            const v = m.earned?.[e.group] ?? 0;
+                            if (!(v > 0) || max <= 0) return null;
+                            return (
+                              <span
+                                key={e.group}
+                                data-earned={e.group}
+                                className={cn("block w-full", e.bar)}
+                                style={{ height: `${(v / max) * 100}%` }}
+                              />
+                            );
+                          })}
                       </span>
                       <span aria-hidden="true" className="text-xs tabular-nums text-muted-foreground">
-                        {maskValue(money.format(m.total))}
+                        {maskValue(money.format(combined(m)))}
                       </span>
                     </button>
                   </li>
@@ -156,6 +202,13 @@ export function IncomeCalendar({
                   {t(s.label)}
                 </li>
               ))}
+              {showEarned &&
+                EARNED.filter((e) => calendar.months.some((m) => (m.earned?.[e.group] ?? 0) > 0)).map((e) => (
+                  <li key={e.group} className="flex items-center gap-1.5">
+                    <span className={cn("size-2.5 rounded-sm", e.bar)} aria-hidden="true" />
+                    {tt(e.label)}
+                  </li>
+                ))}
             </ul>
 
             <div aria-live="polite" className="rounded-md border border-border">
@@ -164,7 +217,22 @@ export function IncomeCalendar({
                   <p className="text-sm font-medium text-foreground">
                     {t("ical_month_detail", { month: monthLabel.long(open.month) })}
                   </p>
-                  {open.items.length === 0 ? (
+                  {showEarned && (open.earnedItems?.length ?? 0) > 0 && (
+                    <ul className="divide-y divide-border" aria-label={tt("cf_cal_earned_label")}>
+                      {open.earnedItems?.map((item, i) => (
+                        <li key={`${item.streamId}-${i}`} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                          <span className="min-w-0 text-foreground">
+                            <span className="truncate">{item.name}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {tt(EARNED.find((e) => e.group === item.group)?.label ?? "cf_cal_other")} · {item.date}
+                            </span>
+                          </span>
+                          <span className="shrink-0 tabular-nums text-success">{maskValue(money.format(item.amount))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {open.items.length === 0 && !(showEarned && (open.earnedItems?.length ?? 0) > 0) ? (
                     <p className="text-sm text-muted-foreground">{t("ical_no_items")}</p>
                   ) : (
                     <ul className="divide-y divide-border">
@@ -205,7 +273,7 @@ export function IncomeCalendar({
                 {calendar.months.map((m) => (
                   <tr key={m.month}>
                     <th scope="row">{monthLabel.long(m.month)}</th>
-                    <td>{money.format(m.total)}</td>
+                    <td>{money.format(combined(m))}</td>
                   </tr>
                 ))}
               </tbody>

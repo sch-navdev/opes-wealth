@@ -25,6 +25,7 @@ import {
   type WithdrawalMethod,
 } from "@/lib/retirement";
 import { investableTotal, isIncludedByDefault, type CategoryAmount } from "@/lib/retirement-assets";
+import type { RetirementPreset } from "@/lib/retirement-demo";
 import type { RetKey } from "@/lib/retirement-labels";
 import { useStored } from "@/lib/use-stored";
 import { cn } from "@/lib/utils";
@@ -63,8 +64,8 @@ export const RETIREMENT_DEFAULTS: Stored = {
 
 const TEXT_KEYS = ["age", "retAge", "income", "ret", "inflation", "swr", "assets", "saving"] as const;
 
-function readStored(raw: string): Stored {
-  const out: Stored = { ...RETIREMENT_DEFAULTS };
+function readStored(raw: string, preset?: Partial<RetirementPreset>): Stored {
+  const out: Stored = { ...RETIREMENT_DEFAULTS, ...preset };
   if (!raw) return out;
   try {
     const data = JSON.parse(raw) as Record<string, unknown>;
@@ -185,8 +186,11 @@ const SEGMENT_COLORS = {
 export function RetirementSimulator({
   baseCurrency,
   breakdown,
+  preset,
 }: {
   baseCurrency: string;
+  /** Starting inputs that replace the built-in defaults (used by the demo account); the visitor's saved edits still win. */
+  preset?: Partial<RetirementPreset>;
   /** Portfolio value per category, in `baseCurrency` (see `lib/retirement-assets.ts`). */
   breakdown: CategoryAmount[];
 }) {
@@ -198,7 +202,7 @@ export function RetirementSimulator({
   const [raw, setRaw] = useStored(RETIREMENT_STORAGE_KEY);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
 
-  const state = useMemo(() => readStored(raw), [raw]);
+  const state = useMemo(() => readStored(raw, preset), [raw, preset]);
   const set = (patch: Partial<Stored>) => setRaw(JSON.stringify({ ...state, ...patch }));
 
   const money = (n: number) => {
@@ -301,7 +305,7 @@ export function RetirementSimulator({
             />
             <RangeField
               id="ret-income"
-              label={`${r("ret_income")} (${baseCurrency})`}
+              label={`${r("ret_income")} ⁦(${baseCurrency})⁩`}
               text={state.income}
               onText={(v) => set({ income: v })}
               min={0}

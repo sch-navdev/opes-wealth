@@ -92,6 +92,14 @@ export const AV_EN = {
   "av_age70_note": "Premiums paid before and after age 70 can fall under different allowance regimes. No amounts are computed here.",
   "av_bene_title": "Beneficiaries",
   "av_bene_none": "No beneficiaries recorded.",
+  "av_estate_title": "Estate transfer: allowances by age at payment",
+  "av_estate_intro": "French rules treat life-insurance premiums differently depending on the age of the insured when each premium was paid. These figures are shown for context only.",
+  "av_estate_before70": "Premiums paid before age 70 (article 990 I): an allowance of {amount} per beneficiary, across all of the insured's contracts together.",
+  "av_estate_after70": "Premiums paid after age 70 (article 757 B): one overall allowance of {amount}, shared by all beneficiaries, across all of the insured's contracts together. Only the premiums count against it; the gains they produced are outside it.",
+  "av_estate_no_bene": "Name the beneficiaries above to see how many people share these allowances.",
+  "av_estate_arith_before": "Named beneficiaries: {count}. {per} x {count} = {total} of allowance in total (one per beneficiary).",
+  "av_estate_arith_after": "Named beneficiaries: {count}. {overall} / {count} = {share} each if split equally. Illustration only: the allowance is overall, not per person.",
+  "av_estate_disclaimer": "Informational, not tax advice. It depends on the contract and on tax residency (UAE residents are treated differently). Check current rules. Figures as of {asOf}. Nothing is claimed here and no tax amount is computed.",
   "av_scope_note": "The asset value is the total contract value. Unit-linked holdings, ISINs and live pricing are not tracked.",
 } as const;
 

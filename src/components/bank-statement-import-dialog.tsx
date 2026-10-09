@@ -38,7 +38,7 @@ import { checkExistingTransactions, importBankTransactions } from "@/app/dashboa
 import { cn } from "@/lib/utils";
 import { identicalWithinList, occurrenceIndexes } from "@/lib/transaction-keys";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
-import { rememberCashAccountBank } from "@/app/dashboard/banking/actions";
+import { createStatementCashAccount, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import {
   detectProfile,
   getBankProfile,
@@ -67,6 +67,8 @@ import { detailFromFingerprint, detailFromNormalized, type TransactionDetail } f
 import { computeRunningBalance, type ParsedBankCsvRow, type ParsedTransactionRow } from "@/lib/bank-csv";
 
 const NONE = "__none__";
+/** Target value meaning "create a new Cash account for this group when importing". */
+const NEW = "__new__";
 const PREVIEW_ROWS = 8;
 
 export type StatementTargetAccount = RoutableAccount & { nativeValue: number };
@@ -438,9 +440,20 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   }
 
   /** Everything the preview and the import need to know about one group's selection and duplicate check. */
+  /** Suggested name for a Cash account created from a statement group, e.g. "HSBC UAE AED ···2001". */
+  function newAccountName(group: StatementGroup): string {
+    const tail = group.accountRef.replace(/[^0-9A-Za-z]/g, "").slice(-4);
+    return [getBankProfile(profileId || "")?.name ?? "", group.currency, tail ? "···" + tail : ""].filter(Boolean).join(" ");
+  }
+
   function groupPlan(group: StatementGroup, index: number) {
     const state = groupState[index] ?? { target: NONE, remember: true };
-    const account = state.target === NONE ? undefined : accounts.find((a) => a.id === state.target);
+    const account =
+      state.target === NONE
+        ? undefined
+        : state.target === NEW
+          ? { id: NEW, name: newAccountName(group), currency: group.currency, nativeValue: 0 }
+          : accounts.find((a) => a.id === state.target);
     const mismatch = !!account && account.currency.toUpperCase() !== group.currency.toUpperCase();
     const check = checks[index];
     const flags = check?.status === "ready" ? check.existing : null;
@@ -450,7 +463,9 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     const isSelected = (j: number) => !fullyImported && (selected[j] ?? true);
     const selectedCount = group.rows.reduce((n, _r, j) => n + (isSelected(j) ? 1 : 0), 0);
     const routed = !!account && !mismatch;
-    return { state, account, mismatch, check, flags, alreadyCount, fullyImported, isSelected, selectedCount, routed };
+    /** A PDF account with no transactions but printed balances: importing records those balances. */
+    const balanceOnly = group.rows.length === 0 && (group.balances?.length ?? 0) > 0;
+    return { state, account, mismatch, check, flags, alreadyCount, fullyImported, isSelected, selectedCount, routed, balanceOnly };
   }
 
   function setRowSelected(index: number, count: number, j: number, value: boolean) {
@@ -478,7 +493,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
           out.push({ label, ok: false, text: t("stmt_skipped") });
           continue;
         }
-        const account = plan.account;
+        let account = plan.account;
         if (!account) continue;
         if (plan.mismatch) {
           out.push({ label, ok: false, text: t("stmt_currency_mismatch", { file: group.currency, account: account.currency }) });
@@ -486,6 +501,37 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
         }
         if (plan.fullyImported) {
           out.push({ label, ok: false, text: t("stmt_result_all_imported") });
+          continue;
+        }
+        if (state.target === NEW) {
+          if (plan.selectedCount === 0 && !plan.balanceOnly) {
+            out.push({ label, ok: false, text: t("stmt_result_none_selected") });
+            continue;
+          }
+          const created = await createStatementCashAccount({
+            name: account.name,
+            currency: group.currency,
+            bankProfile: profileId || "",
+            institutionName: getBankProfile(profileId || "")?.name ?? "",
+            accountRef: group.accountRef,
+          });
+          if (!created.ok) {
+            out.push({ label, ok: false, text: t("stmt_result_create_failed", { error: created.error }) });
+            continue;
+          }
+          account = { ...account, id: created.id };
+        }
+        if (plan.balanceOnly) {
+          const snap = await recordBalanceSnapshots(
+            account.id,
+            (group.balances ?? []).map((b) => ({ date: b.date, value: b.balance })),
+          );
+          if (!snap.ok) {
+            out.push({ label, ok: false, text: snap.error });
+            continue;
+          }
+          if (profileId) await rememberCashAccountBank(account.id, profileId, group.accountRef);
+          out.push({ label, ok: true, text: t("stmt_balance_recorded", { account: account.name, added: snap.added, skipped: snap.skipped }) });
           continue;
         }
         if (plan.selectedCount === 0) {
@@ -555,7 +601,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
   const plans = parsed ? parsed.groups.map((g, i) => groupPlan(g, i)) : [];
   const importable = groupState.some((g) => g.target !== NONE);
   const routedPlans = plans.filter((pl) => pl.routed);
-  const importCount = routedPlans.reduce((n, pl) => n + pl.selectedCount, 0);
+  const importCount = routedPlans.reduce((n, pl) => n + (pl.balanceOnly ? 1 : pl.selectedCount), 0);
   const checking = plans.some((pl) => pl.check?.status === "loading");
   /** Why the Import button is disabled (shown beside it). */
   const importHint = isPending
@@ -773,6 +819,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={NONE}>{t("stmt_dont_import")}</SelectItem>
+                            <SelectItem value={NEW}>{t("stmt_create_account", { name: newAccountName(group) })}</SelectItem>
                             {accounts.map((a) => (
                               <SelectItem key={a.id} value={a.id}>
                                 {a.name} ({a.currency})
@@ -784,6 +831,16 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                     </div>
                     {needsAccount && (
                       <p className="text-xs font-medium text-destructive">{t("stmt_account_needed")}</p>
+                    )}
+                    {state.target === NEW && (
+                      <p className="text-xs text-muted-foreground">{t("stmt_new_account_note")}</p>
+                    )}
+                    {plan.balanceOnly && group.balances && (
+                      <p className="text-xs text-muted-foreground" role="status">
+                        {t("stmt_balance_only", {
+                          balances: group.balances.map((b) => `${fmt.format(b.balance)} (${b.date})`).join(", "),
+                        })}
+                      </p>
                     )}
                     {state.autoPicked && state.target !== NONE && (
                       <p className="text-xs text-muted-foreground">{t("stmt_autopick_note", { currency: group.currency })}</p>

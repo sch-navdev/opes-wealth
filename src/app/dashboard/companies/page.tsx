@@ -11,7 +11,7 @@ import { AddAssetDialog } from "@/components/add-asset-dialog";
 import { Button } from "@/components/ui/button";
 import { CompaniesStructure } from "@/components/companies-structure";
 import { CompaniesSummary } from "@/components/companies-summary";
-import { EntityLookthrough } from "@/components/entity-lookthrough";
+import { EntityLookthroughViews } from "@/components/entity-map-switcher";
 import { T } from "@/components/translated-text";
 import { buildHoldingStructure, parseCompanyMetadata } from "@/lib/companies";
 import {
@@ -160,7 +160,7 @@ export default async function CompaniesPage({
             baseValues={baseValues}
             baseCurrency={baseCurrency}
           />
-          <EntityLookthrough
+          <EntityLookthroughViews
             data={lookthrough}
             options={holdingOptions}
             manageableEntityIds={manageableEntityIds}

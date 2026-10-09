@@ -57,6 +57,7 @@ export const DLAYOUT_EN = {
   "dlayout_block_expertExposure": "Currency exposure",
   "dlayout_block_expertRatios": "Financial ratios",
   "dlayout_block_expertAttribution": "Currency vs capital",
+  "dlayout_block_expertLiquidity": "Private-market liquidity",
   "dlayout_block_export": "Reports and export"
 } as const;
 

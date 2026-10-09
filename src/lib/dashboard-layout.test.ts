@@ -87,7 +87,7 @@ describe("registry", () => {
     expect(old.sizes.dataQuality).toBe("m");
   });
 
-  it("splits the expert panels into six tiles with the old arrangement", () => {
+  it("splits the expert panels into seven tiles with the old arrangement", () => {
     const tiles = BLOCKS.filter((b) => b.section === "expertPanels");
     expect(tiles.map((b) => [b.id, b.defaultSize])).toEqual([
       ["expertRaw", "m"],
@@ -96,6 +96,7 @@ describe("registry", () => {
       ["expertExposure", "m"],
       ["expertRatios", "full"],
       ["expertAttribution", "full"],
+      ["expertLiquidity", "full"],
     ]);
   });
 });
@@ -123,6 +124,7 @@ describe("defaultLayout", () => {
       "expertExposure",
       "expertRatios",
       "expertAttribution",
+      "expertLiquidity",
       "export",
     ]);
     expect(visibleBlocks(layout, "expert")).toEqual(layout.order);

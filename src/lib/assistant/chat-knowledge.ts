@@ -19,7 +19,7 @@ Opes Wealth is a private wealth-tracking web app for high-net-worth people: real
 - Basic: net worth, the allocation dial, and the largest holdings.
 - Standard: adds the net-worth highlights, key figures, allocation, Data quality, cash flow, category cards and the performance chart, the portfolio, and export.
 - Professional: adds the Global exposure (currency) bar, the income calendar, Future Projects, Companies and Compare returns.
-- Expert: adds dense raw-data tables, the private-equity panel (commitment, called, unfunded, NAV, DPI, TVPI), the tax estimate, the currency heat-map, financial ratios, and the currency-versus-capital performance attribution.
+- Expert: adds dense raw-data tables, the private-equity panel (commitment, called, unfunded, NAV, DPI, TVPI), the Private-market liquidity block (paid-in, unfunded, DPI, RVPI, TVPI and net IRR per fund and for the whole portfolio, plus the capital calls due in the next 12 months), the tax estimate, the currency heat-map, financial ratios, and the currency-versus-capital performance attribution.
 - The Customize button (top bar) lets the user hide, reorder and resize the dashboard blocks; the layout is saved separately for each level. Tax-lot accounting is not tied to a level: see the asset page below.
 
 ## Adding things
@@ -27,8 +27,15 @@ Opes Wealth is a private wealth-tracking web app for high-net-worth people: real
 - Broker trades: Add Investments, then Upload from broker (Saxo Bank or Sharesight, .xlsx or .csv), or CSV file and map the columns. Re-uploading an overlapping export only adds trades not already imported.
 - An asset's own page has tabs: Overview, Analysis, Settings (plus Tenancy for property and Expenses for vehicles). For equities, the Analysis tab has tax lots (FIFO, LIFO, HIFO or average cost; informational only, not tax advice). Settings holds the details, value history and import of valuations, and the ownership section.
 
+## Document vault (asset page, Documents tab, Professional and up)
+- Each asset page has a Documents tab at the Professional and Expert levels. It keeps private documents with the asset (title deed, insurance, trust deed, tax, valuation, ID, contract, other): PDF, PNG or JPEG, up to 15 MB each, with an optional expiry date.
+- Files are stored in a private store and opened only through a link that expires after 60 seconds (View opens it in a new tab; Download saves it). Every view, download, upload and delete is recorded in an access log that the document's owner can read. Opening or uploading needs the signed-in session to have passed two-factor verification, and the read-only demo account cannot upload.
+- Co-owners of the asset can see a document by default. The person who uploaded it can tick "Owner only" to hide it from co-owners (for a passport, say), and only that person can edit or delete it.
+- When a document has an expiry date, the notification bell shows a reminder 60, 30 and 7 days before and once it has expired.
+- Documents are never sent to this assistant or to any third party. The vault may show "not available yet" until it has been switched on. There is no malware scan and no customer-managed encryption key.
+
 ## Bank statements and cash
-- Banking page: all bank accounts grouped by bank, and Import statement. CSV statements are supported through bank profiles (auto-detected when possible; check the preview). PDF statements work for text-based PDFs from supported banks (currently FAB, Wio, Banque Populaire and CBD); image-only PDFs need OCR, which may not be switched on yet, so say so if it fails.
+- Banking page: all bank accounts grouped by bank, and Import statement. CSV statements are supported through bank profiles (auto-detected when possible; check the preview). PDF statements work for text-based PDFs from supported banks (currently FAB, Wio, Banque Populaire account extracts and Relevé CB card statements, and CBD); image-only PDFs need OCR, which may not be switched on yet, so say so if it fails.
 - Imported transactions go to Cash accounts. Cash accounts are also available under the Cash & bank card on the dashboard (Standard and up).
 - Live bank sync (UAE Open Finance, French PSD2) is NOT available yet; only sample connections exist. Use CSV or PDF import.
 
@@ -37,18 +44,21 @@ Opes Wealth is a private wealth-tracking web app for high-net-worth people: real
 - Each person's dashboard counts only their own share of a co-owned asset. There is no whole-portfolio "share link" that is known to this assistant; do not invent one. Export (Excel or PDF) is the way to give someone a static copy.
 
 ## Structures (Companies page, Professional and up)
-- Companies: holdings in companies, plus trusts, foundations and SPVs. The look-through view regroups net worth by the structure it sits in (assets held through each entity versus held personally); it is a reporting view and never changes any value. "Manage" on an entity links the assets it holds.
+- Companies: holdings in companies, plus trusts, foundations and SPVs. The look-through view regroups net worth by the structure it sits in (assets held through each entity versus held personally); it is a reporting view and never changes any value. "Manage" on an entity links the assets it holds. The look-through has a Tree view (the default, fully keyboard and screen-reader friendly) and a Map view: a pan-and-zoom diagram of you, your entities, what each holds and loans, with the same amounts; use the zoom buttons or drag to pan. Unknown amounts show as an en dash, and Privacy mode hides amounts on the map too.
 
 ## Other pages
 - Data quality: lists stale valuations, missing exchange rates, missing cost basis, cash mismatches, overdue capital calls and possible duplicates, each with where to fix it.
 - Compare returns (Professional and up): IRR comparison between holdings.
-- Future Projects (Professional and up): planning tools including the retirement simulator.
+- Future Projects (Professional and up): planning tools including the retirement simulator. The simulator shows an "Already on track" state (with the projected surplus and no extra saving needed) when the current investable assets, grown at the chosen return, already reach the target capital; it is an illustration with the user's own assumptions, not a forecast or advice. The public demo account starts the simulator on a preset that shows this state; anything the visitor edits is kept in their own browser.
+- Assurance-Vie contract page: besides the 8-year milestone, an "Estate transfer: allowances by age at payment" card shows the commonly cited French allowances for context only (152,500 EUR per beneficiary for premiums paid before age 70, article 990 I; 30,500 EUR shared by all beneficiaries for premiums paid after age 70, article 757 B, with gains outside it) and, once beneficiaries are named, the simple arithmetic of how many people share them. It is informational, not tax advice, depends on the contract and on tax residency (UAE residents are treated differently), carries an "as of" date, and never computes a tax amount or claims anything. Unit-linked holdings and live pricing are not tracked; only the euro-fund versus unit-linked percentages.
+- Global exposure bar, optional target mix (Professional and up): in "Show details" the user can type an optional target share per currency (and a tolerance, default 5 points). Once a target is set the bar shows, per currency, the actual share, the target and the signed difference in percentage points with the neutral wording "over target", "under target" or "within tolerance", and draws target ticks on the ruler when every currency has a target adding up to 100%. It is a personal reference, never advice; it is saved in this browser only (not synced across devices), and "Clear targets" removes it.
 - Profile Settings: profile, Base Currency, language, display options. Security: passkeys, two-factor authentication, signed-in devices (a device can be revoked).
 - Export: an Excel workbook and a bilingual PDF summary.
 
 ## How numbers are calculated
 - Net worth = assets minus liabilities, every amount converted to the Base Currency.
 - An asset's value is its latest recorded value (manual, imported, market price). Equity holdings = net quantity x latest price.
+- Private equity cash-flow ledger: on a private equity asset, open the Settings tab and use the Cash-flow ledger card to add, edit or remove the capital calls you have paid (with the date paid) and the distributions you have received (with date and kind: income, return of capital or gain). Only actual cash flows go there, never forecasts. On a co-owned fund the change is sent to the co-owners for approval like any other edit of the asset. Missing figures show as a dash, never as zero. Net IRR needs every flow to be dated; with undated flows it shows a dash.
 - Private equity: capital calls still to pay count as liabilities; projected distributions and expected multiples are estimates and never change net worth. DPI = distributions / paid-in capital; TVPI = (current value + distributions) / paid-in capital.
 - Charts: Historical uses recorded values; Projection extends forward from the last value using the asset's settings.
 

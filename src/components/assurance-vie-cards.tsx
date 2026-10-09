@@ -10,6 +10,7 @@ import {
   beneficiarySharesState,
   beneficiarySharesTotal,
   computeMilestone,
+  estateAllowanceInfo,
   hasPremiumAgeSplit,
   impliedAllocationAmounts,
   scheduledAnnualAmount,
@@ -156,6 +157,75 @@ export function AssuranceVieMilestoneCard({ metadata, today }: { metadata: Assur
 
         <p className="text-xs text-muted-foreground" data-testid="av-milestone-disclaimer">
           {t("av_ms_disclaimer", { asOf: formatDate(ASSURANCE_VIE_CONFIG.asOf) })}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Estate-transfer allowances by the insured's age when premiums were paid. Strictly informational: it shows the
+ * configured allowances and how many NAMED beneficiaries they would be spread over, with the arithmetic. It reads
+ * no premium or contract amount and produces no tax figure.
+ */
+export function AssuranceVieEstateCard({ metadata }: { metadata: Pick<AssuranceVieMetadata, "beneficiaries"> }) {
+  const t = useAssuranceVieText();
+  const { intlLocale } = useLanguage();
+  const formatDate = useDateFormatter();
+  const info = estateAllowanceInfo(metadata);
+  const eur = (value: number) => {
+    try {
+      return new Intl.NumberFormat(intlLocale, { style: "currency", currency: info.currency, maximumFractionDigits: 0 }).format(value);
+    } catch {
+      return `${value} ${info.currency}`;
+    }
+  };
+  const share = (value: number) => {
+    try {
+      return new Intl.NumberFormat(intlLocale, { style: "currency", currency: info.currency, maximumFractionDigits: 2 }).format(value);
+    } catch {
+      return `${value} ${info.currency}`;
+    }
+  };
+
+  return (
+    <Card className="border-border bg-card" data-testid="av-estate">
+      <CardHeader>
+        <CardTitle className="text-foreground">{t("av_estate_title")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">{t("av_estate_intro")}</p>
+        <div className="space-y-1 border border-border bg-muted/40 p-3" data-testid="av-estate-before70">
+          <p className="text-sm text-foreground">{t("av_estate_before70", { amount: eur(info.before70PerBeneficiary) })}</p>
+          {info.before70Combined !== null && (
+            <p className="text-xs text-muted-foreground" data-testid="av-estate-arith-before">
+              {t("av_estate_arith_before", {
+                count: info.namedBeneficiaries,
+                per: eur(info.before70PerBeneficiary),
+                total: eur(info.before70Combined),
+              })}
+            </p>
+          )}
+        </div>
+        <div className="space-y-1 border border-border bg-muted/40 p-3" data-testid="av-estate-after70">
+          <p className="text-sm text-foreground">{t("av_estate_after70", { amount: eur(info.after70Overall) })}</p>
+          {info.after70EqualShare !== null && (
+            <p className="text-xs text-muted-foreground" data-testid="av-estate-arith-after">
+              {t("av_estate_arith_after", {
+                count: info.namedBeneficiaries,
+                overall: eur(info.after70Overall),
+                share: share(info.after70EqualShare),
+              })}
+            </p>
+          )}
+        </div>
+        {info.namedBeneficiaries === 0 && (
+          <p className="text-xs text-muted-foreground" data-testid="av-estate-no-bene">
+            {t("av_estate_no_bene")}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground" data-testid="av-estate-disclaimer">
+          {t("av_estate_disclaimer", { asOf: formatDate(info.asOf) })}
         </p>
       </CardContent>
     </Card>
@@ -317,6 +387,8 @@ export function AssuranceVieDetailCards({
           )}
         </CardContent>
       </Card>
+
+      <AssuranceVieEstateCard metadata={metadata} />
 
       <p className="text-xs text-muted-foreground" data-testid="av-scope-note">
         {t("av_scope_note")}

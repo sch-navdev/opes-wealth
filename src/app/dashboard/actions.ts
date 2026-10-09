@@ -68,6 +68,13 @@ import {
   type WalletChain,
 } from "@/lib/market-data/wallet-balance";
 import { parseCryptoMetadata } from "@/lib/crypto";
+import {
+  parseQuoteResponse,
+  persistQuoteWith,
+  upsertHistoryRowsWithFallback,
+  type HistoryUpsertRow,
+  type LiveQuote,
+} from "@/lib/market-data/cron-refresh";
 import { parsePrivateEquityMetadata, pendingCapitalCallsTotal } from "@/lib/private-equity";
 import type { Json } from "@/types/supabase";
 import { syncAssetHistory } from "@/lib/asset-history-sync";
@@ -1236,18 +1243,6 @@ export async function refreshMarketPrice(
   return { success: true as const, ...persisted };
 }
 
-/** A live Finnhub quote (via the `refresh-market-price` Edge Function), in the listing's trading currency. */
-type LiveQuote = {
-  unitPrice: number;
-  currency: string;
-  asOf: string;
-  source: AssetHistorySource;
-  openPrice?: number;
-  previousClose?: number;
-  dayChangePct?: number;
-  exchange?: string;
-};
-
 async function fetchLiveEquityQuote(
   supabase: SupabaseClient,
   assetId: string,
@@ -1255,52 +1250,21 @@ async function fetchLiveEquityQuote(
   currency: string,
   hints?: { exchange?: string; isin?: string },
 ): Promise<{ ok: true; quote: LiveQuote } | { ok: false; code: string; error: string }> {
-  const { data, error } = await supabase.functions.invoke("refresh-market-price", {
-    body: {
-      assetId,
-      category: "equities",
-      symbol,
-      currency,
-      // Lets the Edge Function send non-US listings to Yahoo Finance.
-      exchange: hints?.exchange,
-      isin: hints?.isin,
-    },
-  });
-
-  if (error) {
-    // A non-2xx Edge Function response surfaces as a generic transport error;
-    // the real { error: { code, message } } body is on `error.context`.
-    try {
-      const body = await (error as { context?: Response }).context?.json();
-      if (body?.error) {
-        return { ok: false, code: body.error.code ?? "network_error", error: body.error.message };
-      }
-    } catch {
-      // fall through
-    }
-    return { ok: false, code: "network_error", error: error.message };
-  }
-
-  if (data?.error) {
-    return { ok: false, code: data.error.code ?? "network_error", error: data.error.message };
-  }
-  if (typeof data?.unitPrice !== "number" || !(data.unitPrice > 0)) {
-    return { ok: false, code: "invalid_response", error: "Received an unexpected quote response." };
-  }
-
-  return {
-    ok: true,
-    quote: {
-      unitPrice: data.unitPrice,
-      currency: String(data.currency ?? currency).toUpperCase(),
-      asOf: data.asOf ?? new Date().toISOString(),
-      source: (data.source ?? "finnhub") as AssetHistorySource,
-      openPrice: data.openPrice,
-      previousClose: data.previousClose,
-      dayChangePct: data.dayChangePct,
-      exchange: data.exchange,
-    },
-  };
+  return parseQuoteResponse(
+    await supabase.functions.invoke("refresh-market-price", {
+      body: {
+        assetId,
+        category: "equities",
+        symbol,
+        currency,
+        // Lets the Edge Function send non-US listings to Yahoo Finance.
+        exchange: hints?.exchange,
+        isin: hints?.isin,
+      },
+    }),
+    currency,
+    "finnhub",
+  );
 }
 
 /**
@@ -1318,48 +1282,7 @@ async function persistQuote(
   quote: LiveQuote,
   rates: Record<string, number>,
 ): Promise<{ error: string } | { unitPrice: number; totalValue: number; asOf: string }> {
-  const toAssetCurrency = (n: number) => convertAmount(n, quote.currency, asset.currency, rates);
-  const unitPrice = toAssetCurrency(quote.unitPrice);
-  const quantity = asset.quantity ?? 1;
-  const totalValue = quantity * unitPrice;
-
-  const existingMetadata =
-    asset.metadata && typeof asset.metadata === "object" && !Array.isArray(asset.metadata)
-      ? (asset.metadata as Record<string, Json>)
-      : {};
-
-  const nextMetadata: Record<string, Json> = {
-    ...existingMetadata,
-    last_unit_price: unitPrice,
-    last_priced_at: quote.asOf,
-    last_price_source: quote.source,
-  };
-  if (quote.openPrice != null) nextMetadata.open_price = toAssetCurrency(quote.openPrice);
-  if (quote.previousClose != null) {
-    nextMetadata.previous_close = toAssetCurrency(quote.previousClose);
-  }
-  if (quote.dayChangePct != null) nextMetadata.day_change_pct = quote.dayChangePct;
-  if (quote.exchange) nextMetadata.exchange = normalizeExchange(quote.exchange);
-
-  const { error: updateError } = await supabase
-    .from("assets")
-    .update({ current_value: totalValue, metadata: nextMetadata })
-    .eq("id", asset.id)
-    .eq("profile_id", userId);
-  if (updateError) return { error: updateError.message };
-
-  const historyError = await upsertHistoryRows(supabase, [
-    {
-      asset_id: asset.id,
-      recorded_date: quote.asOf.slice(0, 10),
-      value: totalValue,
-      net_equity: totalValue,
-      source: quote.source,
-    },
-  ]);
-  if (historyError) return { error: historyError.message };
-
-  return { unitPrice, totalValue, asOf: quote.asOf };
+  return persistQuoteWith(supabase, userId, asset, quote, rates);
 }
 
 export type RefreshBrokerageQuotesResult = {
@@ -1493,14 +1416,6 @@ export type ImportBrokerTradesResult = {
   history?: "market" | "cost";
 };
 
-type HistoryUpsertRow = {
-  asset_id: string;
-  recorded_date: string;
-  value: number;
-  net_equity: number | null;
-  source: AssetHistorySource;
-};
-
 /**
  * The one place `asset_history` rows are upserted (on asset + date).
  * Returns the error instead of dropping it — the importer used to ignore it,
@@ -1512,23 +1427,7 @@ type HistoryUpsertRow = {
  * allowed — so the data still lands; provenance stays on the asset's metadata.
  */
 async function upsertHistoryRows(supabase: SupabaseClient, rows: HistoryUpsertRow[]) {
-  if (rows.length === 0) return null;
-  const write = (batch: HistoryUpsertRow[]) =>
-    supabase.from("asset_history").upsert(batch, { onConflict: "asset_id,recorded_date" });
-
-  // Daily market-value history can be thousands of rows: write in chunks.
-  const CHUNK = 500;
-  for (let i = 0; i < rows.length; i += CHUNK) {
-    const chunk = rows.slice(i, i + CHUNK);
-    let { error } = await write(chunk);
-    if (error?.code === "23514") {
-      ({ error } = await write(
-        chunk.map((r) => ({ ...r, source: "manual" as AssetHistorySource })),
-      ));
-    }
-    if (error) return error;
-  }
-  return null;
+  return upsertHistoryRowsWithFallback(supabase, rows);
 }
 
 type HistoryJob = {
@@ -2479,36 +2378,13 @@ async function fetchLiveCryptoQuote(
   coingeckoId: string,
   currency: string,
 ): Promise<{ ok: true; quote: LiveQuote } | { ok: false; code: string; error: string }> {
-  const { data, error } = await supabase.functions.invoke("refresh-market-price", {
-    body: { assetId, category: "crypto", coingeckoId, currency },
-  });
-
-  if (error) {
-    try {
-      const body = await (error as { context?: Response }).context?.json();
-      if (body?.error) {
-        return { ok: false, code: body.error.code ?? "network_error", error: body.error.message };
-      }
-    } catch {
-      // fall through
-    }
-    return { ok: false, code: "network_error", error: error.message };
-  }
-  if (data?.error) {
-    return { ok: false, code: data.error.code ?? "network_error", error: data.error.message };
-  }
-  if (typeof data?.unitPrice !== "number" || !(data.unitPrice > 0)) {
-    return { ok: false, code: "invalid_response", error: "Received an unexpected quote response." };
-  }
-  return {
-    ok: true,
-    quote: {
-      unitPrice: data.unitPrice,
-      currency: String(data.currency ?? currency).toUpperCase(),
-      asOf: data.asOf ?? new Date().toISOString(),
-      source: (data.source ?? "coingecko") as AssetHistorySource,
-    },
-  };
+  return parseQuoteResponse(
+    await supabase.functions.invoke("refresh-market-price", {
+      body: { assetId, category: "crypto", coingeckoId, currency },
+    }),
+    currency,
+    "coingecko",
+  );
 }
 
 /**
@@ -2748,7 +2624,7 @@ export async function addBankAccount(formData: FormData) {
 
   const currency = String(formData.get("currency") ?? "") || "USD";
   const asOf = String(formData.get("purchase_date") ?? "") || new Date().toISOString().slice(0, 10);
-  const accountRef = String(formData.get("account_ref") ?? "").replace(/s+/g, "").slice(0, 40);
+  const accountRef = String(formData.get("account_ref") ?? "").replace(/\s+/g, "").slice(0, 40);
   const limitRaw = String(formData.get("credit_limit") ?? "").trim();
   const creditLimit = limitRaw === "" ? null : Number(limitRaw);
   if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {

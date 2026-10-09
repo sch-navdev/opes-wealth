@@ -163,3 +163,8 @@ All in nine languages, machine-translated, no native review: dq_* (56, Data qual
 - [[Market-Data-Integration|Market Data Integration]] — the Refresh from DARI dialog that consumes an earlier batch of keys
 - [[Live-Pricing|Live Pricing]] — the Equities/Crypto ticker fields and Refresh Market Price flow that consume an earlier batch of keys
 - [[Broker-Trade-Import|Broker Trade Import]] — the Add Investments dialog and Portfolio Performance chart that consume the newest keys
+
+## Polish pass 2026-10-09 (browser findings)
+- Add/Edit Asset dialog trigger, title, submit and pending labels now use keys (`asset_dialog_add`, `_edit`, `_edit_aria`, `_adding`, `_save_changes`; existing `saving`), nine languages. The rest of the dialog's field labels are still hard-coded English (not done).
+- Percentages in the income calendar, passive-income card and category-card share use `Intl.NumberFormat(intlLocale)` (French comma). Other `toFixed(n)}%` sites remain (asset detail, brokerage table, portfolio table, vehicle expenses).
+- Not fixed: English range buttons (1M 6M 1Y 5Y) and truncated legend labels in the performance chart, "(USD)" bidi isolate in Arabic planning labels, mixed "USD 1 077 934,09" vs "1 077 934 $US" currency styles.

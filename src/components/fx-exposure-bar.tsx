@@ -6,12 +6,27 @@ import { CurrencySwitcher, useSetDisplayCurrency } from "@/components/currency-s
 import { useFxBarText } from "@/components/fx-exposure-text";
 import { useTierMotion } from "@/components/tier-gate";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { InfoTooltip } from "@/components/ui/tooltip";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import { buildFxExposure, type FxExposureInput, type FxExposureRow } from "@/lib/fx-exposure";
+import {
+  EMPTY_FX_TARGETS,
+  FX_TARGET_STORAGE_KEY,
+  clampTolerance,
+  computeFxDrift,
+  hasTargets,
+  parseFxTargets,
+  serializeFxTargets,
+  targetBoundaries,
+  targetsTotal,
+  withTarget,
+  type FxTargets,
+} from "@/lib/fx-target";
+import { useStored } from "@/lib/use-stored";
 import { cn } from "@/lib/utils";
 
 /** The quick base-currency chips; every other currency stays in the full switcher beside them. */
@@ -76,6 +91,20 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
   const percent = useMemo(() => new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 1 }), [intlLocale]);
   const fmtMoney = (n: number) => maskValue(money.format(n));
   const fmtShare = (n: number) => `${percent.format(n)} %`;
+  /** Signed percentage points: "+3.2", "−3.2", "0". */
+  const fmtPoints = (n: number) => {
+    const rounded = Math.round(n * 10) / 10;
+    const body = percent.format(Math.abs(rounded));
+    return rounded > 0 ? `+${body}` : rounded < 0 ? `−${body}` : body;
+  };
+
+  // Optional target mix: a UI preference in localStorage (no DB column / migration), invisible until set.
+  const [rawTargets, setRawTargets] = useStored(FX_TARGET_STORAGE_KEY);
+  const targets = useMemo(() => parseFxTargets(rawTargets), [rawTargets]);
+  const saveTargets = (next: FxTargets) => setRawTargets(serializeFxTargets(next));
+  const [targetFormKey, setTargetFormKey] = useState(0);
+  const drift = useMemo(() => computeFxDrift(fx, targets), [fx, targets]);
+  const boundaries = useMemo(() => (drift.complete ? targetBoundaries(fx.rows, targets) : []), [drift.complete, fx.rows, targets]);
 
   const positive = fx.rows.filter((r) => r.share > 0);
   const positiveTotal = positive.reduce((s, r) => s + r.share, 0);
@@ -167,7 +196,18 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
                     />
                   ))}
                 </div>
-                <div aria-hidden="true" className="tick-rule mt-1" />
+                <div className="relative mt-1" data-testid="fx-ruler">
+                  <div aria-hidden="true" className="tick-rule" />
+                  {boundaries.map((b) => (
+                    <span
+                      key={b.key}
+                      aria-hidden="true"
+                      data-testid={`fx-target-tick-${b.key}`}
+                      className="absolute -top-1 h-3.5 w-0.5 bg-foreground"
+                      style={{ insetInlineStart: `${b.at}%` }}
+                    />
+                  ))}
+                </div>
                 <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden="true">
                   {positive.map((r) => (
                     <li key={r.key} className="inline-flex items-center gap-1.5">
@@ -178,6 +218,36 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* drift from the optional target mix (only when a target is set) */}
+            {drift.active && (
+              <div className="px-5" data-testid="fx-drift">
+                <h3 className="text-xs font-medium text-muted-foreground">{text("fxbar_drift_title")}</h3>
+                <ul className="mt-1 space-y-1">
+                  {drift.rows.map((d) => (
+                    <li
+                      key={d.key}
+                      className="flex flex-wrap items-center gap-x-2 text-xs text-foreground"
+                      data-testid={`fx-drift-${d.key}`}
+                      data-status={d.status}
+                    >
+                      <span className="tabular-nums">
+                        {text("fxbar_drift_row", {
+                          segment: d.label,
+                          share: fmtShare(d.share),
+                          target: fmtShare(d.target),
+                          drift: fmtPoints(d.drift),
+                        })}
+                      </span>
+                      <span className="border border-border bg-muted px-1.5 py-0.5 font-medium">
+                        {text(d.status === "over" ? "fxbar_drift_over" : d.status === "under" ? "fxbar_drift_under" : "fxbar_drift_within")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-muted-foreground">{text("fxbar_drift_band", { tolerance: percent.format(drift.tolerance) })}</p>
               </div>
             )}
 
@@ -257,15 +327,86 @@ export function FxExposureBar({ rows, baseCurrency }: { rows: FxExposureInput[];
                         {fmtMoney(r.net)} <span className="text-muted-foreground">· {fmtShare(r.share)}</span>
                       </span>
                     </div>
-                    <div className="mt-1 h-1.5 w-full bg-muted" aria-hidden="true">
+                    <div className="relative mt-1 h-1.5 w-full bg-muted" aria-hidden="true">
                       <div
                         className="h-full transition-[width] duration-300 motion-reduce:transition-none"
                         style={{ width: `${Math.min(100, Math.max(0, r.share))}%`, backgroundColor: colorOf(r) }}
                       />
+                      {targets.targets[r.key] !== undefined && (
+                        <span
+                          data-testid={`fx-target-mark-${r.key}`}
+                          className="absolute -top-1 h-3.5 w-0.5 bg-foreground"
+                          style={{ insetInlineStart: `${targets.targets[r.key]}%` }}
+                        />
+                      )}
                     </div>
                   </li>
                 ))}
               </ul>
+            </div>
+
+            {/* optional target mix editor */}
+            <div data-testid="fx-target-editor">
+              <h3 className="text-sm font-semibold text-foreground">{text("fxbar_target_title")}</h3>
+              <p className="text-xs text-muted-foreground">{text("fxbar_target_desc")}</p>
+              <div key={targetFormKey} className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {fx.rows.map((r) => (
+                  <label key={r.key} className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <span>{r.label}</span>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      className="h-8 text-sm"
+                      aria-label={text("fxbar_target_input_aria", { segment: r.label })}
+                      data-testid={`fx-target-input-${r.key}`}
+                      defaultValue={targets.targets[r.key] ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value.trim();
+                        saveTargets(withTarget(targets, r.key, v === "" ? null : Number(v)));
+                      }}
+                    />
+                  </label>
+                ))}
+                <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                  <span>{text("fxbar_target_tolerance")}</span>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={50}
+                    step={0.5}
+                    className="h-8 text-sm"
+                    aria-label={text("fxbar_target_tolerance")}
+                    data-testid="fx-target-tolerance"
+                    defaultValue={targets.tolerance}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      saveTargets({ ...targets, tolerance: v === "" ? EMPTY_FX_TARGETS.tolerance : clampTolerance(Number(v)) });
+                    }}
+                  />
+                </label>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {hasTargets(targets) && (
+                  <span data-testid="fx-target-total">{text("fxbar_target_total", { total: percent.format(targetsTotal(targets)) })}</span>
+                )}
+                <span>{text("fxbar_target_storage")}</span>
+                {hasTargets(targets) && (
+                  <button
+                    type="button"
+                    className="font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => {
+                      saveTargets({ ...EMPTY_FX_TARGETS });
+                      setTargetFormKey((k) => k + 1);
+                    }}
+                  >
+                    {text("fxbar_target_clear")}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* assets vs liabilities per currency */}

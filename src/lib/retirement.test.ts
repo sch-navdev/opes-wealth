@@ -189,3 +189,34 @@ describe("parseNumberInput", () => {
     expect(parseNumberInput("abc")).toBeNaN();
   });
 });
+
+describe("on-track boundary and the on-track result shape", () => {
+  const needed = 900_000 / Math.pow(1.05, 20); // assets whose growth exactly meets the 900,000 target
+
+  it("flips to on track as soon as the grown assets reach the target", () => {
+    const below = ok({ ...base, startingAssets: needed - 1 });
+    expect(below.onTrack).toBe(false);
+    expect(below.requiredMonthly).toBeGreaterThan(0);
+    expect(below.surplus).toBe(0);
+    const above = ok({ ...base, startingAssets: needed + 1 });
+    expect(above.onTrack).toBe(true);
+    expect(above.requiredMonthly).toBe(0);
+    expect(above.gap).toBe(0);
+    expect(above.surplus).toBeGreaterThan(0);
+  });
+
+  it("an on-track result carries no deposits and a consistent breakdown", () => {
+    const r = ok({ ...base, startingAssets: 1_000_000 });
+    expect(r.totalContributions).toBe(0);
+    expect(r.contributionGrowth).toBeCloseTo(0, 6);
+    const parts = projectionBreakdown(1_000_000, r);
+    expect(parts.find((p) => p.id === "contributions")!.amount).toBe(0);
+    expect(parts.reduce((s, p) => s + p.amount, 0)).toBeCloseTo(r.assetsGrown, 4);
+  });
+
+  it("is on track with the returns-only method when the capital already earns the income", () => {
+    const r = ok({ ...base, method: "returns", startingAssets: 600_000 }); // target = 36,000 / 0.05 = 720,000
+    expect(r.onTrack).toBe(true);
+    expect(r.surplus).toBeCloseTo(600_000 * Math.pow(1.05, 20) - 720_000, 2);
+  });
+});

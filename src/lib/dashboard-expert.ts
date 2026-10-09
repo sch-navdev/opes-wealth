@@ -5,6 +5,7 @@ import { parseLiabilityMetadata } from "@/lib/liability";
 import { buildPassiveIncome } from "@/lib/passive-income";
 import {
   calledCapital,
+  distributedCapital,
   fundReturns,
   parsePrivateEquityMetadata,
   unfundedCommitment,
@@ -240,7 +241,7 @@ export function buildExpertPanelsData(
       const md = parsePrivateEquityMetadata(a.metadata);
       const called = toBase(calledCapital(md), a.currency);
       const nav = toBase(a.current_value, a.currency);
-      const distributions = toBase(positive(md.distributions_to_date), a.currency);
+      const distributions = toBase(distributedCapital(md), a.currency);
       const returns = fundReturns(md);
       privateEquity.push({
         id: a.id,

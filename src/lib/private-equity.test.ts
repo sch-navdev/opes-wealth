@@ -406,3 +406,33 @@ describe("cumulativeCashFlowSeries", () => {
     expect(s[s.length - 1].cumulative).toBeCloseTo(80000, 6);
   });
 });
+
+describe("ledger validation (editor)", () => {
+  const paid = (paid_date: string | undefined): CapitalCall => ({ ...call("2024-01-01", 10), paid_date });
+  const actual = (date: string, amount: number, kind = "income") =>
+    ({ id: `a-${date}`, date, amount, kind }) as PrivateEquityMetadata["distributions"][number];
+
+  it("accepts real paid dates and an empty one, rejects impossible days", () => {
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid("2024-02-29")] }))).toEqual([]);
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid(undefined)] }))).toEqual([]);
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid("")] }))).toEqual([]);
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid("2023-02-30")] }))).toContain("pe_paid_date_invalid");
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid("2024-13-01")] }))).toContain("pe_paid_date_invalid");
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: [paid("24-01-01")] }))).toContain("pe_paid_date_invalid");
+  });
+
+  it("an actual distribution needs a real date, a positive finite amount and a known kind", () => {
+    expect(getPrivateEquityMetadataErrors(meta({ distributions: [actual("2024-03-01", 5)] }))).toEqual([]);
+    for (const bad of [actual("", 5), actual("2024-03-01", 0), actual("2024-03-01", -1), actual("2024-03-01", Number.NaN), actual("2024-02-31", 5), actual("2024-03-01", 5, "bonus")]) {
+      expect(getPrivateEquityMetadataErrors(meta({ distributions: [bad] }))).toContain("pe_actual_distribution_invalid");
+    }
+  });
+
+  it("caps each ledger list at 200 rows", () => {
+    const calls = Array.from({ length: 201 }, (_, i) => call(`2020-01-${String((i % 28) + 1).padStart(2, "0")}`, 1));
+    const dists = Array.from({ length: 201 }, () => actual("2024-03-01", 1));
+    expect(getPrivateEquityMetadataErrors(meta({ capital_calls: calls }))).toContain("pe_ledger_too_long");
+    expect(getPrivateEquityMetadataErrors(meta({ distributions: dists }))).toContain("pe_ledger_too_long");
+    expect(getPrivateEquityMetadataErrors(meta({ distributions: dists.slice(0, 200) }))).not.toContain("pe_ledger_too_long");
+  });
+});

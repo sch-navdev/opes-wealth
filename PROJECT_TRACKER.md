@@ -119,6 +119,8 @@ High-net-worth individuals
 - [[Data-Quality|Data Quality]] — stale valuations, missing FX rates, cost-basis and balance checks, dashboard card and page
 - [[UHNW-Modules-Plan|UHNW Modules Plan]] — proposal (not built): wealth node map, private-market liquidity ledger, governance vault
 - [[Entity-Structures|Entity Structures & Look-through]] — trusts, foundations, SPVs, holdings held through entities, net-worth look-through
+- [[Personal-Cash-Flow|Personal Cash Flow]] — private income streams and the income calendar earned layer (step 1); waterfall and emergency fund to come
+- [[Governance-Vault|Governance Vault]] — private document vault per asset: signed URLs, MFA step-up, expiry reminders (migration 0038 drafted, not applied)
 - [[Changelog|Changelog]] — full chronological history
 
 ## Folder Structure

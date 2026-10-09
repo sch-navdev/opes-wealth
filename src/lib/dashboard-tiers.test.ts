@@ -29,6 +29,7 @@ describe("isNavLinkVisible", () => {
     companies: [false, false, true, true],
     planning: [false, false, true, true],
     compare: [false, false, true, true],
+    cashFlowPage: [false, false, true, true],
   };
 
   it("covers every link", () => {

@@ -15,11 +15,13 @@ import {
   markNotificationRead,
 } from "@/app/dashboard/ownership-actions";
 import {
+  notificationDocParams,
   notificationMessageKey,
   notificationParams,
   relativeTime,
   type NotificationItem,
 } from "@/lib/notifications";
+import { VAULT_EN, fillVault, isVaultKey } from "@/lib/vault-labels";
 
 /**
  * Header bell for the OUTCOME of changes the signed-in user proposed to a co-owned asset
@@ -132,7 +134,13 @@ export function NotificationsBell({ items }: { items: NotificationItem[] }) {
                             : "text-muted-foreground"
                         }
                       >
-                        {t(notificationMessageKey(n.kind), params)}
+                        {(() => {
+                          const key = notificationMessageKey(n.kind, n.data);
+                          const vars = { ...params, ...notificationDocParams(n.data, t("notif_asset_fallback")) };
+                          const text = t(key, vars);
+                          // Vault reminders: English fallback until the dictionaries carry the keys.
+                          return text === key && isVaultKey(key) ? fillVault(VAULT_EN[key], vars) : text;
+                        })()}
                       </span>
                     </span>
                     <span className="mt-1 block text-xs text-muted-foreground">

@@ -57,6 +57,7 @@ const REGISTRY = [
   { id: "expertExposure", section: "expertPanels", defaultSize: "m", allowedSizes: M_UP },
   { id: "expertRatios", section: "expertPanels", defaultSize: "full", allowedSizes: M_UP },
   { id: "expertAttribution", section: "expertPanels", defaultSize: "full", allowedSizes: M_UP },
+  { id: "expertLiquidity", section: "expertPanels", defaultSize: "full", allowedSizes: M_UP },
   { id: "export", section: "export", defaultSize: "full", allowedSizes: M_UP },
 ] as const satisfies readonly Omit<BlockDef, "labelKey">[];
 

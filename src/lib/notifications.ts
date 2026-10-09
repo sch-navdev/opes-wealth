@@ -5,7 +5,7 @@
  */
 import type { TranslationKey } from "@/lib/i18n";
 
-export const NOTIFICATION_KINDS = ["change_approved", "change_rejected", "change_auto_applied"] as const;
+export const NOTIFICATION_KINDS = ["change_approved", "change_rejected", "change_auto_applied", "document_expiry"] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export type NotificationData = {
@@ -13,6 +13,9 @@ export type NotificationData = {
   /** Display name of the co-owner who decided (absent for an automatic application). */
   responderName?: string;
   responderId?: string;
+  /** document_expiry (Governance Vault, migration 0038): which reminder band this is. */
+  documentTitle?: string;
+  threshold?: "60" | "30" | "7" | "expired";
 };
 
 export type NotificationItem = {
@@ -29,6 +32,8 @@ const KIND_KEYS: Record<NotificationKind, TranslationKey> = {
   change_approved: "notif_change_approved",
   change_rejected: "notif_change_rejected",
   change_auto_applied: "notif_change_auto_applied",
+  // Vault keys are typed locally (see lib/vault-labels.ts); the bell falls back to English if the dictionary lacks them.
+  document_expiry: "vault_notif_expiry" as unknown as TranslationKey,
 };
 
 export function isNotificationKind(v: unknown): v is NotificationKind {
@@ -36,8 +41,14 @@ export function isNotificationKind(v: unknown): v is NotificationKind {
 }
 
 /** Which dictionary key renders a notification of this kind. */
-export function notificationMessageKey(kind: NotificationKind): TranslationKey {
+export function notificationMessageKey(kind: NotificationKind, data?: NotificationData): TranslationKey {
+  if (kind === "document_expiry" && data?.threshold === "expired") return "vault_notif_expired" as unknown as TranslationKey;
   return KIND_KEYS[kind];
+}
+
+/** Extra placeholders for document reminders ({doc}, {days}); harmless for the other kinds. */
+export function notificationDocParams(data: NotificationData, fallbackDoc: string): { doc: string; days: string } {
+  return { doc: data.documentTitle?.trim() || fallbackDoc, days: data.threshold && data.threshold !== "expired" ? data.threshold : "" };
 }
 
 /** Placeholder values for the message; `fallbackName` / `fallbackAsset` are already-translated defaults. */
@@ -62,7 +73,17 @@ export function toNotificationItem(row: Record<string, unknown>): NotificationIt
     kind: row.kind,
     assetId: typeof row.asset_id === "string" ? row.asset_id : null,
     requestId: typeof row.request_id === "string" ? row.request_id : null,
-    data: { assetName: str(raw.assetName), responderName: str(raw.responderName), responderId: str(raw.responderId) },
+    data: {
+      assetName: str(raw.assetName),
+      responderName: str(raw.responderName),
+      responderId: str(raw.responderId),
+      ...(row.kind === "document_expiry"
+        ? {
+            documentTitle: str(raw.documentTitle),
+            threshold: (["60", "30", "7", "expired"] as const).find((x) => x === raw.threshold),
+          }
+        : {}),
+    },
     readAt: typeof row.read_at === "string" ? row.read_at : null,
     createdAt: row.created_at,
   };

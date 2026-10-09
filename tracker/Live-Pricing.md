@@ -99,3 +99,11 @@ No new tables — same `assets.metadata` jsonb-per-category pattern as every oth
 - [[Portfolio-Dashboard|Portfolio Dashboard]] — where live equity/crypto prices surface
 - [[Localization|Localization]] — new EN/FR keys for this feature
 - [[Database-Schema|Database Schema]] — `assets.ticker_symbol`, the `asset_history_source_check` constraint gap
+
+## Daily price refresh cron (2026-10-09)
+- **Why:** prices were only refreshed by the two buttons (single asset, brokerage "Refresh prices"); no schedule existed, so history stopped on 2026-09-30 (last `finnhub`/`yahoo`/`broker_import` rows; confirmed read-only in `asset_history`).
+- **What:** `GET /api/cron/refresh-prices` (`src/app/api/cron/refresh-prices/route.ts`, `vercel.json` schedule `0 5 * * *`, `maxDuration = 300`), logic in `src/lib/market-data/cron-refresh.ts` (+ test). Bearer `CRON_SECRET` like the sibling crons (401 wrong secret; 503 when `CRON_SECRET` or the service-role env is missing). Service-role client, non-demo users, active Equities with a ticker and Crypto with a `coingecko_id`, skips assets already priced today (UTC), oldest `last_priced_at` first, one row per asset (co-owned assets updated once).
+- **Writes:** the same code as the buttons (`persistQuoteWith`, extracted from `persistQuote` in `dashboard/actions.ts`; `upsertHistoryRowsWithFallback` for the CHECK 23514 fallback to `manual`). A failed or empty quote writes nothing, so a holding keeps its last price; `no_data` counts as skipped; `invalid_api_key`/`provider_not_configured`/`rate_limited` stop the equity calls for the run.
+- **Pacing:** sequential, 1.1 s after each equity call (Finnhub free tier 60/min), 2.5 s after each crypto call, stops cleanly after 240 s; assets not reached are first in line next run. Response and log carry counts only (`refreshed, skipped, failed, stopped_early`).
+- **NOT verified:** never run (no live call, no database write from here); whether `refresh-market-price` (`verify_jwt: true`) accepts an invocation with the service-role key; real throughput (about 200 equities per run at ~1.1 s each).
+- **Needs Steve:** `SUPABASE_SERVICE_ROLE_KEY` must be a working value in Vercel (the handoff still lists re-pasting it as pending), `CRON_SECRET` set, and a manual first invocation checked. Related: [[Deployment|Deployment]].

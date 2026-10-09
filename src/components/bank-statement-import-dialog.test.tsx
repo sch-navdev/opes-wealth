@@ -22,7 +22,12 @@ vi.mock("@/app/dashboard/transaction-import-actions", () => ({
   importBankTransactions: imports.importBankTransactions,
   checkExistingTransactions: imports.checkExistingTransactions,
 }));
-vi.mock("@/app/dashboard/banking/actions", () => ({ rememberCashAccountBank: vi.fn() }));
+const banking = vi.hoisted(() => ({
+  rememberCashAccountBank: vi.fn(),
+  createStatementCashAccount: vi.fn(),
+  recordBalanceSnapshots: vi.fn(),
+}));
+vi.mock("@/app/dashboard/banking/actions", () => banking);
 
 import { BankStatementImportDialog, type StatementTargetAccount } from "@/components/bank-statement-import-dialog";
 
@@ -111,6 +116,8 @@ const sentForm = (call: number) => action.readBankStatementPdf.mock.calls[call][
 beforeEach(() => {
   action.readBankStatementPdf.mockReset();
   imports.importBankCsvHistory.mockReset().mockResolvedValue({ success: true });
+  banking.createStatementCashAccount.mockReset().mockResolvedValue({ ok: true, id: "new1" });
+  banking.recordBalanceSnapshots.mockReset().mockResolvedValue({ ok: true, added: 2, skipped: 0 });
   imports.importBankTransactions.mockReset().mockResolvedValue({ success: true, inserted: 1, duplicates: 0 });
   imports.checkExistingTransactions.mockReset().mockResolvedValue({ success: true, existing: [false, false] });
   try {
@@ -281,8 +288,8 @@ describe("BankStatementImportDialog bank picker, PDF success", () => {
     expect(screen.getByTestId("stmt-country-select")).toHaveTextContent("United Arab Emirates");
     await choose("stmt-country-select", "France");
     const fr = await openSelect("stmt-bank-select");
-    expect(fr).toHaveLength(1);
-    expect(fr[0]).toMatch(/Banque Populaire/);
+    expect(fr).toHaveLength(2);
+    expect(fr.every((name) => /Banque Populaire/.test(name))).toBe(true);
   });
 });
 
@@ -606,5 +613,43 @@ describe("BankStatementImportDialog identical rows in one file", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].description).toBe("COFFEE");
     expect(sent[0].occurrence).toBe(1);
+  });
+});
+
+describe("BankStatementImportDialog, no matching Cash account", () => {
+  it("offers to create a new account, enables Import and creates it before importing", async () => {
+    action.readBankStatementPdf.mockResolvedValue({ ok: true, statement: wioStatement });
+    await openAndUpload(undefined, []);
+    await screen.findByText("WIO SHOP");
+    expect(screen.getByRole("button", { name: "Import" }).hasAttribute("disabled")).toBe(true);
+    const options = await openSelect("stmt-target-0");
+    expect(options.some((n) => /Create new account/.test(n))).toBe(true);
+    await userEvent.click(screen.getByRole("option", { name: /Create new account/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Import 1 transaction/ }));
+    await screen.findAllByText(/1 new transaction/);
+    expect(banking.createStatementCashAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: "AED", bankProfile: "wio", accountRef: "0123456789" }),
+    );
+    expect(imports.importBankCsvHistory.mock.calls[0][0]).toBe("new1");
+    expect(imports.importBankTransactions.mock.calls[0][0]).toBe("new1");
+  });
+
+  it("records the printed balances of an account without transactions", async () => {
+    const empty: PdfStatement = {
+      ...wioStatement,
+      accounts: [{ ...wioStatement.accounts[0], transactions: [], openingBalance: 392.12, closingBalance: 392.12, periodStart: "2025-12-22", periodEnd: "2026-01-02" }],
+    };
+    action.readBankStatementPdf.mockResolvedValue({ ok: true, statement: empty });
+    await openAndUpload(undefined, []);
+    expect(await screen.findByText(/No transactions in this statement/)).toBeTruthy();
+    await userEvent.click(await screen.findByTestId("stmt-target-0"));
+    await userEvent.click(await screen.findByRole("option", { name: /Create new account/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Import/ }));
+    await screen.findByText(/Balance recorded for/);
+    expect(banking.recordBalanceSnapshots).toHaveBeenCalledWith("new1", [
+      { date: "2025-12-22", value: 392.12 },
+      { date: "2026-01-02", value: 392.12 },
+    ]);
+    expect(imports.importBankTransactions).not.toHaveBeenCalled();
   });
 });

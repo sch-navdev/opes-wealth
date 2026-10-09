@@ -53,6 +53,13 @@ export const MAX_PE_LEDGER_ROWS = 200;
 
 const ISO_DAY = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/;
 
+/** A real calendar day in ISO form (rejects 2022-13-01 and 2023-02-30, which the bare pattern would let through). */
+export function isValidIsoDay(value: unknown): value is string {
+  if (typeof value !== "string" || !ISO_DAY.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 /** A projected (future) distribution back to the investor. */
 export type ProjectedDistribution = {
   id: string;
@@ -159,7 +166,7 @@ function parseActualDistributions(raw: unknown): ActualDistribution[] {
   for (const row of raw.slice(0, MAX_PE_LEDGER_ROWS)) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
-    if (typeof r.date !== "string" || !ISO_DAY.test(r.date)) continue;
+    if (!isValidIsoDay(r.date)) continue;
     if (typeof r.amount !== "number" || !Number.isFinite(r.amount) || !(r.amount > 0)) continue;
     out.push({
       id: typeof r.id === "string" && r.id ? r.id.slice(0, 64) : `dist-${out.length}`,
@@ -205,11 +212,20 @@ export function getPrivateEquityMetadataErrors(
   if (metadata.capital_calls.some((c) => !c.due_date || !(c.amount > 0))) {
     errors.push("pe_call_invalid");
   }
-  if (metadata.capital_calls.some((c) => c.paid_date != null && c.paid_date !== "" && !ISO_DAY.test(c.paid_date))) {
+  if (metadata.capital_calls.some((c) => c.paid_date != null && c.paid_date !== "" && !isValidIsoDay(c.paid_date))) {
     errors.push("pe_paid_date_invalid");
   }
-  if (metadata.distributions.length > MAX_PE_LEDGER_ROWS) errors.push("pe_ledger_too_long");
-  if (metadata.distributions.some((d) => !ISO_DAY.test(d.date) || !(d.amount > 0))) {
+  if (metadata.distributions.length > MAX_PE_LEDGER_ROWS || metadata.capital_calls.length > MAX_PE_LEDGER_ROWS) {
+    errors.push("pe_ledger_too_long");
+  }
+  if (
+    metadata.distributions.some(
+      (d) =>
+        !isValidIsoDay(d.date) ||
+        !(typeof d.amount === "number" && Number.isFinite(d.amount) && d.amount > 0) ||
+        !(DISTRIBUTION_KINDS as readonly unknown[]).includes(d.kind),
+    )
+  ) {
     errors.push("pe_actual_distribution_invalid");
   }
   if (metadata.projected_distributions.some((d) => !d.due_date || !(d.amount > 0))) {

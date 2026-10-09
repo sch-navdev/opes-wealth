@@ -110,3 +110,6 @@ Components retrieved from 21st.dev for reference (patterns only, restyled): Anim
 - [[Codebase-Audits|Codebase Audits]] — radius-token and destructive-color drift fixes, champagne-gold outline variant
 - [[Portfolio-Dashboard|Portfolio Dashboard]], [[Profile-Settings|Profile & Settings]], [[Authentication-Security|Authentication & Security]] — all consume this theme via shadcn/ui components
 - [[Broker-Trade-Import|Broker Trade Import]] — the new `--chart-*` tokens' first consumer
+
+## Light-theme gold contrast (2026-10-09)
+Light `--primary`/`--ring`/`--chart-1` darkened from `#8E6A1C` to `#876418` (4.38 -> 4.79:1 on the silver background `#EEF1F5`, 5.43:1 on white). Dark theme unchanged.

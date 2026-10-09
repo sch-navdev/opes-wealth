@@ -47,7 +47,8 @@ export type BankProfileId =
   | "cbi"
   | "cbd"
   | "hsbc_uae_card"
-  | "fab_card";
+  | "fab_card"
+  | "banque_populaire_card";
 
 export type BankProfile = {
   id: BankProfileId;
@@ -432,6 +433,15 @@ export const BANK_PROFILES: BankProfile[] = [
     columns: { date: [], description: [] },
     signature: [],
   }),
+  profile({
+    id: "banque_populaire_card",
+    name: "Banque Populaire card",
+    country: "FR",
+    defaultCurrency: "EUR",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
+    signature: [],
+  }),
 ];
 
 export function getBankProfile(id: string): BankProfile | undefined {
@@ -573,6 +583,8 @@ export type StatementGroup = {
   accountRef: string;
   currency: string;
   rows: NormalizedTx[];
+  /** PDF accounts with NO transactions: dated balances printed on the statement (balance brought forward, closing), recorded as history when imported. */
+  balances?: { date: string; balance: number }[];
 };
 
 export type StatementParseResult = {

@@ -40,7 +40,6 @@ export function DashboardBasicOverview({
   const { maskValue } = usePrivacy();
   const motion = useTierMotion();
   const formatter = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
-  const percent = new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 0 });
   const categoryLabel = (category: string) => {
     const key = CATEGORY_NAME_KEYS[category];
     return key ? t(key) : category;

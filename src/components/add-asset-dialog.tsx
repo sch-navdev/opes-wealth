@@ -492,19 +492,19 @@ export function AddAssetDialog({
             <Button
               variant="outline"
               size="icon-sm"
-              aria-label="Edit asset"
+              aria-label={t("asset_dialog_edit_aria")}
               onClick={(e) => e.stopPropagation()}
             >
               <Edit className="size-4" />
             </Button>
           ) : (
-            <Button>Add Asset</Button>
+            <Button>{t("asset_dialog_add")}</Button>
           ))}
       </DialogTrigger>
       <DialogContent className="w-[95vw] max-w-2xl border-border bg-card p-6 max-h-[85vh] overflow-y-auto overflow-x-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            {isEditMode ? "Edit Asset" : "Add Asset"}
+            {isEditMode ? t("asset_dialog_edit") : t("asset_dialog_add")}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {isEditMode
@@ -819,11 +819,11 @@ export function AddAssetDialog({
             <Button type="submit" disabled={isPending}>
               {isPending
                 ? isEditMode
-                  ? "Saving…"
-                  : "Adding…"
+                  ? t("saving")
+                  : t("asset_dialog_adding")
                 : isEditMode
-                  ? "Save Changes"
-                  : "Add Asset"}
+                  ? t("asset_dialog_save_changes")
+                  : t("asset_dialog_add")}
             </Button>
           </DialogFooter>
         </form>

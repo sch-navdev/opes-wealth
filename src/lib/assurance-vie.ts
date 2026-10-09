@@ -29,6 +29,19 @@ export const ASSURANCE_VIE_CONFIG = {
   /** Date the figures above were last recorded in the app. Not a claim about later legislation. */
   asOf: "2026-10-07",
   source: "French tax code, article 125-0 A (annual allowance on life-insurance withdrawals after 8 years)",
+  /**
+   * Estate-transfer framing, by the insured's age when each premium was paid. INFORMATIONAL: the app shows
+   * these allowances and never computes an estate-tax amount. Same `asOf` as above.
+   */
+  estate: {
+    currency: "EUR",
+    ageThreshold: 70,
+    /** Article 990 I: premiums paid BEFORE age 70, allowance PER BENEFICIARY (all of the insured's contracts together). */
+    before70PerBeneficiary: 152_500,
+    /** Article 757 B: premiums paid AFTER age 70, ONE allowance shared by all beneficiaries; the gains are outside it. */
+    after70Overall: 30_500,
+    source: "French tax code, articles 990 I and 757 B (life-insurance death benefits, by age at payment of premiums)",
+  },
 } as const;
 
 export const AV_METADATA_VERSION = 1;
@@ -314,6 +327,40 @@ export function beneficiarySharesState(list: Pick<AvBeneficiary, "share_pct">[])
   const anyShare = list.some((b) => typeof b.share_pct === "number" && Number.isFinite(b.share_pct));
   if (!anyShare) return "none";
   return Math.abs(beneficiarySharesTotal(list) - 100) <= AV_PCT_EPSILON ? "complete" : "mismatch";
+}
+
+export type EstateAllowanceInfo = {
+  currency: string;
+  asOf: string;
+  /** Allowance per beneficiary for premiums paid before the age threshold. */
+  before70PerBeneficiary: number;
+  /** One overall allowance for premiums paid after the age threshold. */
+  after70Overall: number;
+  /** Beneficiaries with a name entered (a blank share or relationship does not count as a person). */
+  namedBeneficiaries: number;
+  /** before70PerBeneficiary x named beneficiaries; null when none is named. Allowance, never a tax amount. */
+  before70Combined: number | null;
+  /** after70Overall / named beneficiaries (equal split, illustration only); null when none is named. */
+  after70EqualShare: number | null;
+};
+
+/**
+ * The estate-transfer allowances from `ASSURANCE_VIE_CONFIG.estate`, and how many named beneficiaries
+ * they would be spread over. Pure arithmetic on the allowances: nothing here looks at premium amounts,
+ * the contract value or gains, and no estate-tax figure is produced.
+ */
+export function estateAllowanceInfo(md: Pick<AssuranceVieMetadata, "beneficiaries">): EstateAllowanceInfo {
+  const { estate, asOf } = ASSURANCE_VIE_CONFIG;
+  const named = (Array.isArray(md.beneficiaries) ? md.beneficiaries : []).filter((b) => typeof b?.name === "string" && b.name.trim() !== "").length;
+  return {
+    currency: estate.currency,
+    asOf,
+    before70PerBeneficiary: estate.before70PerBeneficiary,
+    after70Overall: estate.after70Overall,
+    namedBeneficiaries: named,
+    before70Combined: named > 0 ? estate.before70PerBeneficiary * named : null,
+    after70EqualShare: named > 0 ? round2(estate.after70Overall / named) : null,
+  };
 }
 
 export function emptyBeneficiary(id: string): AvBeneficiary {

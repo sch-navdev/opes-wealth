@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RETIREMENT_STORAGE_KEY, RetirementSimulator } from "@/components/retirement-simulator";
 import { LanguageProvider } from "@/context/language-context";
 import { PrivacyProvider } from "@/context/privacy-context";
-import type { CategoryAmount } from "@/lib/retirement-assets";
+import { investableTotal, type CategoryAmount } from "@/lib/retirement-assets";
+import { demoRetirementPreset, type RetirementPreset } from "@/lib/retirement-demo";
 
 const breakdown: CategoryAmount[] = [
   { category: "Real Estate", amount: 500_000 },
@@ -13,11 +14,11 @@ const breakdown: CategoryAmount[] = [
   { category: "Vehicles", amount: 30_000 },
 ];
 
-function renderSim(rows: CategoryAmount[] = breakdown) {
+function renderSim(rows: CategoryAmount[] = breakdown, preset?: Partial<RetirementPreset>) {
   return render(
     <LanguageProvider>
       <PrivacyProvider>
-        <RetirementSimulator baseCurrency="USD" breakdown={rows} />
+        <RetirementSimulator baseCurrency="USD" breakdown={rows} preset={preset} />
       </PrivacyProvider>
     </LanguageProvider>,
   );
@@ -162,6 +163,65 @@ describe("on track", () => {
     expect(required()).toBe("$0");
     expect(screen.getByTestId("ret-live").textContent).toMatch(/on track/i);
     expect(screen.getByTestId("ret-gap").textContent).toBe("$0");
+  });
+});
+
+describe("on track with the demo preset (invented numbers)", () => {
+  // Shaped like the demo portfolio: liquid and market categories on, the home and the car off by default.
+  const demoLike: CategoryAmount[] = [
+    { category: "Real Estate", amount: 2_000_000 },
+    { category: "Cash", amount: 800_000 },
+    { category: "SCPI", amount: 150_000 },
+    { category: "Equities", amount: 120_000 },
+    { category: "Assurance-Vie", amount: 100_000 },
+    { category: "Vehicles", amount: 60_000 },
+  ];
+  const preset = demoRetirementPreset(investableTotal(demoLike, null))!;
+
+  it("derives a preset from the investable total only (the home and the car are not counted)", () => {
+    expect(investableTotal(demoLike, null)).toBe(1_170_000);
+    expect(preset).toEqual({ age: "42", retAge: "60", income: "4500", ret: "5", inflation: "2", swr: "4" });
+  });
+
+  it("starts on the preset inputs and shows the on-track state with a surplus and no saving needed", () => {
+    renderSim(demoLike, preset);
+    expect((field("current age") as HTMLInputElement).value).toBe("42");
+    expect((field("desired") as HTMLInputElement).value).toBe("4500");
+
+    const onTrack = screen.getByTestId("ret-on-track");
+    expect(onTrack.textContent).toMatch(/Already on track/);
+    expect(onTrack.textContent).toMatch(/No extra saving is needed/);
+    expect(onTrack.textContent).toMatch(/\$2,8\d\d,\d{3}/); // 1,170,000 grown 18 years at 5 %
+    expect(onTrack.textContent).toMatch(/\$1,9\d\d,\d{3}/); // target capital
+    expect(required()).toBe("$0");
+    expect(screen.getByTestId("ret-gap").textContent).toBe("$0");
+    expect(screen.getByTestId("ret-live").textContent).toMatch(/On track/);
+    expect(document.body.textContent).not.toMatch(/NaN|Infinity/);
+  });
+
+  it("masks the on-track amounts in privacy mode but keeps the state visible", () => {
+    localStorage.setItem("opes_privacy_mode", "true");
+    renderSim(demoLike, preset);
+    const onTrack = screen.getByTestId("ret-on-track");
+    expect(onTrack.textContent).toMatch(/Already on track/);
+    expect(onTrack.textContent).toMatch(/••••••••/);
+    expect(onTrack.textContent).not.toMatch(/2,8\d\d,\d{3}/);
+    localStorage.removeItem("opes_privacy_mode");
+  });
+
+  it("a visitor's saved edits win over the preset, and a larger income leaves the on-track state", () => {
+    localStorage.setItem(RETIREMENT_STORAGE_KEY, JSON.stringify({ income: "9000" }));
+    renderSim(demoLike, preset);
+    expect((field("desired") as HTMLInputElement).value).toBe("9000");
+    expect((field("current age") as HTMLInputElement).value).toBe("42"); // untouched fields keep the preset
+    expect(screen.queryByTestId("ret-on-track")).toBeNull();
+    expect(required()).not.toBe("$0");
+  });
+
+  it("without a preset the normal defaults apply", () => {
+    renderSim(demoLike);
+    expect((field("current age") as HTMLInputElement).value).toBe("40");
+    expect((field("desired") as HTMLInputElement).value).toBe("3000");
   });
 });
 

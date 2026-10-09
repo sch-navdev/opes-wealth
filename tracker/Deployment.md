@@ -149,3 +149,6 @@ Then have a real invite sent to the Hotmail address, open **View message source*
 - [[Database-Schema|Database Schema]] — migrations to apply to the production database
 - [[Live-Pricing|Live Pricing]] — `FINNHUB_API_KEY` secret set and functions deployed (2026-09-30)
 - [[Authentication-Security|Authentication & Security]] — `NEXT_PUBLIC_SITE_URL`
+
+### Price refresh cron (2026-10-09)
+`/api/cron/refresh-prices` runs daily at 05:00 UTC (before `bug-reports` 06:00 and `expire-changes` 06:30). It needs `CRON_SECRET` and a working `SUPABASE_SERVICE_ROLE_KEY` in Vercel; Hobby plans allow daily crons only. First run should be triggered manually and its count-only JSON checked. See [[Live-Pricing|Live Pricing]].

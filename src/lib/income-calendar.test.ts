@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildIncomeCalendar } from "@/lib/income-calendar";
 import type { PassiveIncomeAsset } from "@/lib/passive-income";
+import type { IncomeStream } from "@/lib/income-streams";
 
 // Calendar window for this start date: 2025-11 .. 2026-10 (index 0..11).
 const START = "2025-11-15";
@@ -198,5 +199,46 @@ describe("buildIncomeCalendar", () => {
       rental({ is_liability: true }),
     ]);
     expect(cal.annualTotal).toBe(0);
+  });
+});
+
+describe("buildIncomeCalendar earned-income layer", () => {
+  const streams: IncomeStream[] = [
+    {
+      id: "sal", kind: "salary", label: "Job", source_name: "", amount: 1000, currency: "USD", frequency: "monthly",
+      pay_day: 25, pay_month: null, start_date: "2020-01-01", end_date: null, notes: "",
+    },
+    {
+      id: "bon", kind: "bonus", label: "Bonus", source_name: "", amount: 4000, currency: "EUR", frequency: "annual",
+      pay_day: 15, pay_month: 3, start_date: "2020-01-01", end_date: null, notes: "",
+    },
+    {
+      id: "fl", kind: "freelance", label: "Gig", source_name: "", amount: 500, currency: "USD", frequency: "one_off",
+      pay_day: 1, pay_month: 12, start_date: "2025-01-01", end_date: null, notes: "",
+    },
+  ];
+
+  it("changes nothing without streams and keeps passive figures identical with them", () => {
+    const without = build([rental()]);
+    const withLayer = buildIncomeCalendar({
+      assets: [rental()], rates: { USD: 1, EUR: 0.5 }, baseCurrency: "USD", startDate: START, streams,
+    });
+    expect(without.months.every((m) => m.earned === undefined && m.earnedItems === undefined)).toBe(true);
+    expect(withLayer.annualTotal).toBe(without.annualTotal);
+    expect(withLayer.months.map((m) => m.total)).toEqual(without.months.map((m) => m.total));
+    expect(withLayer.yieldOnCostPct).toBe(without.yieldOnCostPct);
+    expect(withLayer.months.map((m) => m.items)).toEqual(without.months.map((m) => m.items));
+  });
+
+  it("buckets earned income by month and group, converted to the base currency", () => {
+    const cal = buildIncomeCalendar({
+      assets: [], rates: { USD: 1, EUR: 0.5 }, baseCurrency: "USD", startDate: START, streams,
+    });
+    expect(cal.annualTotal).toBe(0);
+    const dec = cal.months[1]; // 2025-12: salary + one-off freelance
+    expect(dec.earned).toEqual({ salary: 1000, bonus: 0, other: 500 });
+    const mar = cal.months[4]; // 2026-03: salary + bonus (4000 EUR = 8000 USD)
+    expect(mar.earned).toEqual({ salary: 1000, bonus: 8000, other: 0 });
+    expect(mar.earnedItems?.map((i) => i.date)).toEqual(["2026-03-15", "2026-03-25"]);
   });
 });

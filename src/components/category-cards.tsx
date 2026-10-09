@@ -98,7 +98,7 @@ export function CategoryCards({
                       <span className="text-primary">
                         <CategoryIcon name={category} />
                       </span>
-                      <span className="truncate">{label}</span>
+                      <span className="min-w-0 break-words leading-tight">{label}</span>
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">({count})</span>
                   </div>
@@ -113,7 +113,7 @@ export function CategoryCards({
                   </p>
                   {share != null && (
                     <p className="text-xs text-muted-foreground">
-                      {t("category_cards_share", { pct: share.toFixed(1) })}
+                      {t("category_cards_share", { pct: new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(share) })}
                     </p>
                   )}
                 </CardContent>

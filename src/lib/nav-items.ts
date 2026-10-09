@@ -1,4 +1,4 @@
-import { Factory, GitCompareArrows, Landmark, LayoutDashboard, ListChecks, Settings, ShieldCheck, Telescope } from "lucide-react";
+import { Factory, GitCompareArrows, HandCoins, Landmark, LayoutDashboard, ListChecks, Settings, ShieldCheck, Telescope } from "lucide-react";
 import type { TranslationKey } from "@/lib/i18n";
 import { isNavLinkVisible, type NavLinkId } from "@/lib/dashboard-tiers";
 import type { ExpertiseLevel } from "@/stores/useUiTierStore";
@@ -22,6 +22,8 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "planning", href: "/dashboard/planning", labelKey: "nav_planning", icon: Telescope },
   // `irr_nav_compare` lives in the pending i18n merge (.tmp-irr-keys.json): until then t() returns the key.
   { id: "compare", href: "/dashboard/compare", labelKey: "irr_nav_compare" as TranslationKey, icon: GitCompareArrows },
+  // `cf_nav` lives in the pending i18n merge (tmp-i18n-cashflow.json): until then t() returns the key.
+  { id: "cashFlowPage", href: "/dashboard/cash-flow", labelKey: "cf_nav" as TranslationKey, icon: HandCoins },
   { id: "settings", href: "/dashboard/settings", labelKey: "profile_settings", icon: Settings },
   { id: "security", href: "/dashboard/security", labelKey: "nav_security", icon: ShieldCheck },
 ];

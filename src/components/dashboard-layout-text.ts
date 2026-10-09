@@ -9,7 +9,7 @@ type Vars = Record<string, string | number>;
 
 function fill(text: string, vars?: Vars): string {
   let out = text;
-  if (vars) for (const [name, val] of Object.entries(vars)) out = out.replace(`{${name}}`, String(val));
+  if (vars) for (const [name, val] of Object.entries(vars)) out = out.split(`{${name}}`).join(String(val));
   return out;
 }
 
