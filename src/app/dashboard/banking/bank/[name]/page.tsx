@@ -94,7 +94,7 @@ export default async function BankDetailPage({
       currency: a.currency,
       balance: a.current_value,
       baseBalance: convertToBaseCurrency(a.current_value, a.currency, baseCurrency, rates),
-      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at }),
+      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at, statementThrough: typeof a.metadata?.statement_through === "string" ? a.metadata.statement_through : null }),
       closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
     };
   });

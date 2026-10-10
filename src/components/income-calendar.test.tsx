@@ -11,9 +11,10 @@ const keys = [
   "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
 ];
 const zero = { reit: 0, stocks: 0, rental: 0, private_equity: 0 };
+const L = { liabilities: { mortgage: 0, loan: 0, off_plan: 0, private_equity: 0, credit_card: 0, other: 0 }, liabilityTotal: 0, liabilityItems: [] };
 
 function data(over: Partial<Data> = {}): Data {
-  const months: Data["months"] = keys.map((month) => ({ month, total: 0, bySource: { ...zero }, items: [] }));
+  const months: Data["months"] = keys.map((month) => ({ month, total: 0, bySource: { ...zero }, items: [], ...L }));
   months[0] = {
     month: "2025-11",
     total: 1000,
@@ -22,11 +23,13 @@ function data(over: Partial<Data> = {}): Data {
       { assetId: "a", name: "Flat", source: "rental", amount: 600, date: "2025-11-01", basis: "contract" },
       { assetId: "b", name: "ACME", source: "stocks", amount: 400, basis: "estimate" },
     ],
+    ...L,
   };
-  months[3] = { month: "2026-02", total: 500, bySource: { ...zero, reit: 500 }, items: [] };
+  months[3] = { month: "2026-02", total: 500, bySource: { ...zero, reit: 500 }, items: [], ...L };
   return {
     months,
     annualTotal: 1500,
+    liabilityAnnual: 0,
     monthlyAverage: 125,
     peakMonth: "2025-11",
     yieldOnCostPct: 7.5,
@@ -75,7 +78,7 @@ describe("IncomeCalendar", () => {
   it("expands a month to its items and flags estimates", () => {
     renderIt(data());
     expect(screen.queryByText("Flat")).toBeNull();
-    fireEvent.click(screen.getAllByRole("button", { pressed: false })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /[0-9]{4}: / })[0]);
     expect(screen.getByText("Flat")).toBeTruthy();
     expect(screen.getByText("ACME")).toBeTruthy();
     expect(screen.getAllByText("Estimate")).toHaveLength(1);
@@ -88,7 +91,7 @@ describe("IncomeCalendar", () => {
   });
 
   it("shows the empty state when nothing is projected", () => {
-    renderIt(data({ annualTotal: 0, monthlyAverage: 0, peakMonth: null, yieldOnCostPct: null, currentYieldPct: null, months: keys.map((month) => ({ month, total: 0, bySource: { ...zero }, items: [] })) }));
+    renderIt(data({ annualTotal: 0, monthlyAverage: 0, peakMonth: null, yieldOnCostPct: null, currentYieldPct: null, months: keys.map((month) => ({ month, total: 0, bySource: { ...zero }, items: [], ...L })) }));
     expect(screen.getByText(/No projected income yet/)).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
   });
@@ -143,7 +146,22 @@ describe("IncomeCalendar earned-income layer", () => {
     // Month total in its label includes earned: 1,000 passive + 3,000 salary.
     expect(screen.getAllByRole("img")[0].getAttribute("aria-label")).toContain("USD 4,000");
     // The first month's detail lists the salary payment.
-    await userEvent.click(screen.getAllByRole("button", { pressed: false })[0]);
+    await userEvent.click(screen.getAllByRole("button", { name: /[0-9]{4}: / })[0]);
     expect(screen.getAllByText("Main job").length).toBeGreaterThan(0);
+  });
+});
+
+describe("IncomeCalendar views", () => {
+  it("switches between gross, liabilities and net", async () => {
+    const calendar = data({ liabilityAnnual: 300 });
+    calendar.months[0] = { ...calendar.months[0], liabilityTotal: 300, liabilities: { ...calendar.months[0].liabilities, mortgage: 300 }, liabilityItems: [{ assetId: "m", name: "Home loan", kind: "mortgage", amount: 300, date: "2025-11-01" }] };
+    renderIt(calendar);
+    await userEvent.click(screen.getByRole("button", { name: /Liabilities/ }));
+    expect(document.querySelector('[data-liability="mortgage"]')).not.toBeNull();
+    expect(document.querySelector("[data-source]")).toBeNull();
+    await userEvent.click(screen.getAllByRole("button", { name: /\d{4}: / })[0]);
+    expect(screen.getAllByText("Home loan").length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole("button", { name: /Net income/ }));
+    expect(document.querySelector('[data-net="positive"]')).not.toBeNull();
   });
 });

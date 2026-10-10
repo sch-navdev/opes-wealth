@@ -61,6 +61,8 @@ export type BankingAccountRow = {
   country?: string;
   /** ISO date the account was closed (a statement said so): hidden unless "Show closed accounts" is on. */
   closedOn?: string | null;
+  /** How the account's data got in (a PDF statement, a CSV file, a bank link or by hand). */
+  importSource?: "synced" | "pdf" | "csv" | "manual";
   /** Name of the company this account belongs to (Cash account with metadata.company_id): shown under "Company accounts". */
   companyName?: string;
 };
@@ -325,7 +327,13 @@ export function BankingOverview({
                                     : t("bank_status_synced")}
                               </Badge>
                             ) : (
-                              <Badge variant="outline">{t("bank_status_manual")}</Badge>
+                              <Badge variant="outline">
+                                {a.importSource === "pdf"
+                                  ? tx("bank_source_pdf")
+                                  : a.importSource === "csv"
+                                    ? tx("bank_source_csv")
+                                    : t("bank_status_manual")}
+                              </Badge>
                             )}
                             {a.kind !== "manual" && (
                               <span className="text-xs text-muted-foreground">

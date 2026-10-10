@@ -299,10 +299,10 @@ export function BankDetailView({
               <AlertDialogTitle className="text-foreground">{tx("bank_delete_all_title", { bank: bankName, n: accounts.length })}</AlertDialogTitle>
               <AlertDialogDescription className="text-muted-foreground">{tx("bank_delete_all_body")}</AlertDialogDescription>
             </AlertDialogHeader>
-            <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label={bankName} placeholder={bankName} />
+            <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} aria-label={bankName} placeholder={tx("bank_delete_all_placeholder")} />
             <AlertDialogFooter>
               <AlertDialogCancel>{tx("tx_cancel")}</AlertDialogCancel>
-              <AlertDialogAction disabled={confirmText.trim() !== bankName} onClick={runDeleteAll}>
+              <AlertDialogAction disabled={confirmText.trim().toLowerCase() !== bankName.trim().toLowerCase()} onClick={runDeleteAll}>
                 {tx("bank_delete_all_confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>

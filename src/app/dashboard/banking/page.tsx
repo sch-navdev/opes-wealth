@@ -13,9 +13,11 @@ import { getBankProfile } from "@/lib/banking/csv-profiles";
 import { parseRefHistory } from "@/lib/banking/rollover";
 import { accountCountry, bankGroupName, bankKey, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
 import { companyIdOf } from "@/lib/company-cash";
-import { pickBalanceDate } from "@/lib/bank-staleness";
+import { importSourceOf, pickBalanceDate } from "@/lib/bank-staleness";
 import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
+
+const stringOf = (v: unknown) => (typeof v === "string" ? v : null);
 
 type CashRow = {
   id: string;
@@ -133,7 +135,8 @@ export default async function BankingPage({
       lastSyncedAt: link?.last_synced_at ?? link?.bank_connections?.last_synced_at ?? null,
       lastError: link?.last_sync_error ?? null,
       assetId: a.id,
-      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at }),
+      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at, statementThrough: stringOf(a.metadata?.statement_through) }),
+      importSource: importSourceOf(dateSources.get(a.id)?.importSource, link),
       companyName: companyNameById.get(companyIdOf(a.metadata)),
       closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
     });

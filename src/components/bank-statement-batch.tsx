@@ -17,7 +17,7 @@ import { useBatchText } from "@/components/batch-import-text";
 import { useLanguage } from "@/context/language-context";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
-import { createStatementCashAccount, markCashAccountClosed, mergeAccountRefs, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
+import { createStatementCashAccount, markCashAccountClosed, mergeAccountRefs, recordBalanceSnapshots, recordStatementCoverage, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import { readSkippedAccounts, setAccountSkipped, skipKey } from "@/lib/banking/skipped-accounts";
 import { findRolloverChains, type RefHistoryEntry } from "@/lib/banking/rollover";
 import { checkExistingTransactions, importBankTransactions } from "@/app/dashboard/transaction-import-actions";
@@ -687,6 +687,9 @@ export function BankStatementBatch({
           continue;
         }
         if (plan.fullyImported) {
+          // Nothing new, but the statement still proves the account is open as of its end date.
+          const through = group.periodEnd ?? groupPeriod(group)?.end;
+          if (through && plan.state.target !== NEW) await recordStatementCoverage(plan.account.id, through);
           push(job, line("skip", t("stmt_result_all_imported")), { dup: group.rows.length });
           continue;
         }
@@ -722,6 +725,11 @@ export function BankStatementBatch({
         refEntries.set(accountId, list);
       };
       // A closure only closes the account when nothing renewed it: in a renewed chain only the LAST account's closure counts.
+      // The statement's period end proves the account is still reported on: dated as of it even with no transaction.
+      const markCovered = async (accountId: string, group: StatementGroup) => {
+        const through = group.periodEnd ?? groupPeriod(group)?.end;
+        if (through) await recordStatementCoverage(accountId, through);
+      };
       const closeIfDue = async (accountId: string, job: { it: BatchItem; gi: number; group: StatementGroup }) => {
         if (!job.group.closedOn) return;
         const chain = mergedChain(`${job.it.id}:${job.gi}`);
@@ -768,6 +776,7 @@ export function BankStatementBatch({
           }
           if (it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
           addRefHistory(account.id, job);
+          await markCovered(account.id, group);
           await closeIfDue(account.id, job);
           push(job, line("ok", t("stmt_balance_recorded", { account: account.name, added: snap.added, skipped: snap.skipped })));
           continue;
@@ -781,6 +790,7 @@ export function BankStatementBatch({
         }
         if (plan.state.remember && it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
         addRefHistory(account.id, job);
+        await markCovered(account.id, group);
         await closeIfDue(account.id, job);
         const all = toImportTx(group);
         const occurrences = occurrenceIndexes(all);

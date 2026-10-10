@@ -128,7 +128,7 @@ export default async function CompaniesPage({
       nativeValue: a.current_value,
       baseValue: convertToBaseCurrency(a.current_value, a.currency, baseCurrency, rates),
       institutionName: typeof a.metadata?.institution_name === "string" ? a.metadata.institution_name : undefined,
-      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id) }),
+      balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), statementThrough: typeof a.metadata?.statement_through === "string" ? a.metadata.statement_through : null }),
     })),
   }));
   const totalCompanyCash = companyCashTotal(cashGroups.flatMap((g) => g.accounts));

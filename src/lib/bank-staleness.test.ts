@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANK_STALE_DAYS, balanceAgeDays, countStaleBalances, isBalanceStale, pickBalanceDate } from "./bank-staleness";
+import { BANK_STALE_DAYS, balanceAgeDays, countStaleBalances, importSourceOf, isBalanceStale, pickBalanceDate } from "./bank-staleness";
 
 describe("pickBalanceDate", () => {
   it("prefers the newest history date, then the transaction date, then the updated date", () => {
@@ -49,5 +49,21 @@ describe("countStaleBalances", () => {
   it("counts the stale rows", () => {
     const rows = [{ balanceAsOf: "2026-01-01" }, { balanceAsOf: "2026-10-08" }, { balanceAsOf: null }, {}];
     expect(countStaleBalances(rows, "2026-10-09")).toBe(1);
+  });
+});
+
+describe("statement coverage and import source", () => {
+  it("dates a quiet open account as of the newest statement that covers it", () => {
+    expect(pickBalanceDate({ historyDate: "2026-02-10", transactionDate: "2026-02-10", statementThrough: "2026-09-30" })).toBe("2026-09-30");
+    expect(isBalanceStale(pickBalanceDate({ historyDate: "2026-02-10", statementThrough: "2026-09-30" }), "2026-10-10")).toBe(false);
+  });
+  it("still flags an account no statement has covered recently", () => {
+    expect(isBalanceStale(pickBalanceDate({ historyDate: "2026-02-10" }), "2026-10-10")).toBe(true);
+  });
+  it("tells PDF, CSV, linked and manual accounts apart", () => {
+    expect(importSourceOf("pdf_import", null)).toBe("pdf");
+    expect(importSourceOf("csv_import", null)).toBe("csv");
+    expect(importSourceOf("manual", null)).toBe("manual");
+    expect(importSourceOf("pdf_import", {})).toBe("synced");
   });
 });

@@ -87,7 +87,7 @@ describe("BankDetailView: merge accounts and delete the whole bank", () => {
     await userEvent.click(screen.getByRole("button", { name: "Delete this bank and its accounts" }));
     const confirm = await screen.findByRole("button", { name: "Delete everything" });
     expect(confirm).toBeDisabled();
-    await userEvent.type(screen.getByPlaceholderText("First Abu Dhabi Bank (FAB)"), "First Abu Dhabi Bank (FAB)");
+    await userEvent.type(screen.getByLabelText("First Abu Dhabi Bank (FAB)"), "First Abu Dhabi Bank (FAB)");
     expect(confirm).toBeEnabled();
     await userEvent.click(confirm);
     await vi.waitFor(() => expect(act.batchDeleteAssets).toHaveBeenCalledWith(["a1", "a2", "a3"]));

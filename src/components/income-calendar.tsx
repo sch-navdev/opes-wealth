@@ -13,6 +13,7 @@ import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import type { IncomeCalendar as IncomeCalendarData } from "@/lib/income-calendar";
+import type { LiabilityKind } from "@/lib/income-calendar-liabilities";
 import type { PassiveIncomeSource } from "@/lib/passive-income";
 import type { TranslationKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,21 @@ const EARNED: { group: EarnedGroup; label: CashFlowKey; bar: string }[] = [
   { group: "bonus", label: "cf_cal_bonus", bar: "bg-primary" },
   { group: "gratuity", label: "cf_cal_gratuity", bar: "bg-foreground/60" },
   { group: "other", label: "cf_cal_other", bar: "bg-muted-foreground" },
+];
+
+type View = "gross" | "liabilities" | "net";
+const VIEWS: { view: View; label: CashFlowKey; tone: string }[] = [
+  { view: "gross", label: "cf_cal_view_gross", tone: "text-success" },
+  { view: "liabilities", label: "cf_cal_view_liabilities", tone: "text-destructive" },
+  { view: "net", label: "cf_cal_view_net", tone: "text-foreground" },
+];
+const LIABILITY_BARS: { kind: LiabilityKind; label: CashFlowKey; bar: string }[] = [
+  { kind: "mortgage", label: "cf_cal_liab_mortgage", bar: "bg-chart-1" },
+  { kind: "loan", label: "cf_cal_liab_loan", bar: "bg-chart-2" },
+  { kind: "off_plan", label: "cf_cal_liab_off_plan", bar: "bg-chart-3" },
+  { kind: "private_equity", label: "cf_cal_liab_private_equity", bar: "bg-chart-4" },
+  { kind: "credit_card", label: "cf_cal_liab_credit_card", bar: "bg-chart-5" },
+  { kind: "other", label: "cf_cal_liab_other", bar: "bg-muted-foreground" },
 ];
 
 const earnedSum = (m: IncomeCalendarData["months"][number]) =>
@@ -53,6 +69,7 @@ export function IncomeCalendar({
   const { maskValue } = usePrivacy();
   const motion = useTierMotion();
   const [selected, setSelected] = useState<string | null>(null);
+  const [view, setView] = useState<View>("gross");
   const tt = useCashFlowText();
   // Salary is earned, not passive, but it IS income: it is counted by default (in its own colour) and can be switched off.
   const [includeEarned, setIncludeEarned] = useState(true);
@@ -75,8 +92,12 @@ export function IncomeCalendar({
   const pct = (n: number | null) =>
     n == null ? "—" : `${new Intl.NumberFormat(intlLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n)}%`;
 
-  const max = Math.max(0, ...calendar.months.map(combined));
-  const empty = calendar.annualTotal <= 0 && !(showEarned && earnedAnnual > 0);
+  const netOf = (m: IncomeCalendarData["months"][number]) => combined(m) - m.liabilityTotal;
+  const shown = (m: IncomeCalendarData["months"][number]) => (view === "gross" ? combined(m) : view === "liabilities" ? m.liabilityTotal : Math.abs(netOf(m)));
+  const max = Math.max(0, ...calendar.months.map(shown));
+  const grossAnnual = calendar.annualTotal + (showEarned ? earnedAnnual : 0);
+  const netAnnual = grossAnnual - calendar.liabilityAnnual;
+  const empty = calendar.annualTotal <= 0 && !(showEarned && earnedAnnual > 0) && calendar.liabilityAnnual <= 0;
   const open = calendar.months.find((m) => m.month === selected) ?? null;
   const usedSources = SOURCES.filter((s) => calendar.months.some((m) => m.bySource[s.source] > 0));
 
@@ -132,6 +153,28 @@ export function IncomeCalendar({
                 avg: money.format(calendar.monthlyAverage),
               })}
             </p>
+            <div role="group" aria-label={tt("cf_cal_view_label")} className="grid grid-cols-3 gap-3">
+              {VIEWS.map((v) => {
+                const amount = v.view === "gross" ? grossAnnual : v.view === "liabilities" ? calendar.liabilityAnnual : netAnnual;
+                return (
+                  <button
+                    key={v.view}
+                    type="button"
+                    aria-pressed={view === v.view}
+                    onClick={() => setView(v.view)}
+                    className={cn(
+                      "rounded-md border p-3 text-start outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                      view === v.view ? "border-primary bg-primary/5" : "border-border bg-muted/30",
+                    )}
+                  >
+                    <span className="block text-xs text-muted-foreground">{tt(v.label)}</span>
+                    <span className={cn("block text-base font-semibold tabular-nums", v.view === "net" && amount < 0 ? "text-destructive" : v.tone)}>
+                      {maskValue(money.format(v.view === "liabilities" ? -amount : amount))}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
               {stats.map((s) => (
                 <div key={s.label} className="rounded-md border border-border bg-muted/30 p-3">
@@ -144,10 +187,10 @@ export function IncomeCalendar({
             <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6 lg:grid-cols-12">
               {calendar.months.map((m) => {
                 const active = selected === m.month;
-                const label = t("ical_bar_label", { month: monthLabel.long(m.month), total: money.format(combined(m)) });
+                const label = t("ical_bar_label", { month: monthLabel.long(m.month), total: money.format(view === "net" ? netOf(m) : shown(m)) });
                 return (
                   <li key={m.month} className="group relative">
-                    <MonthBreakdown month={m} showEarned={showEarned} money={money} maskValue={maskValue} earnedLabel={(g) => tt(EARNED.find((e) => e.group === g)?.label ?? "cf_cal_other")} passiveLabel={tt("cf_cal_hover_passive")} />
+                    <MonthBreakdown view={view} month={m} showEarned={showEarned} money={money} maskValue={maskValue} tt={tt} t={t} />
                     <button
                       type="button"
                       aria-pressed={active}
@@ -164,7 +207,20 @@ export function IncomeCalendar({
                         aria-label={label}
                         className="flex h-20 flex-col-reverse overflow-hidden rounded-sm bg-muted"
                       >
-                        {SOURCES.map((s) => {
+                        {view === "net" && max > 0 && (
+                          <span
+                            data-net={netOf(m) < 0 ? "negative" : "positive"}
+                            className={cn("block w-full", netOf(m) < 0 ? "bg-destructive" : "bg-success")}
+                            style={{ height: `${(Math.abs(netOf(m)) / max) * 100}%` }}
+                          />
+                        )}
+                        {view === "liabilities" &&
+                          LIABILITY_BARS.map((l) => {
+                            const v = m.liabilities[l.kind];
+                            if (!(v > 0) || max <= 0) return null;
+                            return <span key={l.kind} data-liability={l.kind} className={cn("block w-full", l.bar)} style={{ height: `${(v / max) * 100}%` }} />;
+                          })}
+                        {view === "gross" && SOURCES.map((s) => {
                           const v = m.bySource[s.source];
                           if (!(v > 0) || max <= 0) return null;
                           return (
@@ -176,7 +232,7 @@ export function IncomeCalendar({
                             />
                           );
                         })}
-                        {showEarned &&
+                        {view === "gross" && showEarned &&
                           EARNED.map((e) => {
                             const v = m.earned?.[e.group] ?? 0;
                             if (!(v > 0) || max <= 0) return null;
@@ -191,7 +247,7 @@ export function IncomeCalendar({
                           })}
                       </span>
                       <span aria-hidden="true" className="text-xs tabular-nums text-muted-foreground">
-                        {maskValue(money.format(combined(m)))}
+                        {maskValue(money.format(view === "net" ? netOf(m) : view === "liabilities" ? -m.liabilityTotal : combined(m)))}
                       </span>
                     </button>
                   </li>
@@ -200,13 +256,26 @@ export function IncomeCalendar({
             </ul>
 
             <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {usedSources.map((s) => (
+              {view === "liabilities" &&
+                LIABILITY_BARS.filter((l) => calendar.months.some((m) => m.liabilities[l.kind] > 0)).map((l) => (
+                  <li key={l.kind} className="flex items-center gap-1.5">
+                    <span className={cn("size-2.5 rounded-sm", l.bar)} aria-hidden="true" />
+                    {tt(l.label)}
+                  </li>
+                ))}
+              {view === "net" && (
+                <li className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-sm bg-success" aria-hidden="true" />
+                  {tt("cf_cal_net_note")}
+                </li>
+              )}
+              {view === "gross" && usedSources.map((s) => (
                 <li key={s.source} className="flex items-center gap-1.5">
                   <span className={cn("size-2.5 rounded-sm", s.bar)} aria-hidden="true" />
                   {t(s.label)}
                 </li>
               ))}
-              {showEarned &&
+              {view === "gross" && showEarned &&
                 EARNED.filter((e) => calendar.months.some((m) => (m.earned?.[e.group] ?? 0) > 0)).map((e) => (
                   <li key={e.group} className="flex items-center gap-1.5">
                     <span className={cn("size-2.5 rounded-sm", e.bar)} aria-hidden="true" />
@@ -221,7 +290,32 @@ export function IncomeCalendar({
                   <p className="text-sm font-medium text-foreground">
                     {t("ical_month_detail", { month: monthLabel.long(open.month) })}
                   </p>
-                  {showEarned && (open.earnedItems?.length ?? 0) > 0 && (
+                  {view === "liabilities" && (
+                    open.liabilityItems.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{tt("cf_cal_liab_none")}</p>
+                    ) : (
+                      <ul className="divide-y divide-border">
+                        {open.liabilityItems.map((item, i) => (
+                          <li key={`${item.assetId}-${i}`} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                            <span className="min-w-0 text-foreground">
+                              <span className="truncate">{item.name}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {tt(LIABILITY_BARS.find((l) => l.kind === item.kind)?.label ?? "cf_cal_liab_other")}
+                                {item.date ? ` · ${item.date}` : ""}
+                              </span>
+                            </span>
+                            <span className="shrink-0 tabular-nums text-destructive">{maskValue(money.format(-item.amount))}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  )}
+                  {view === "net" && (
+                    <p className="text-sm tabular-nums text-foreground">
+                      {tt("cf_cal_hover_gross")} {maskValue(money.format(combined(open)))} − {tt("cf_cal_hover_liabilities")} {maskValue(money.format(open.liabilityTotal))} = {maskValue(money.format(netOf(open)))}
+                    </p>
+                  )}
+                  {view !== "liabilities" && showEarned && (open.earnedItems?.length ?? 0) > 0 && (
                     <ul className="divide-y divide-border" aria-label={tt("cf_cal_earned_label")}>
                       {open.earnedItems?.map((item, i) => (
                         <li key={`${item.streamId}-${i}`} className="flex items-center justify-between gap-3 py-1.5 text-sm">
@@ -236,7 +330,7 @@ export function IncomeCalendar({
                       ))}
                     </ul>
                   )}
-                  {open.items.length === 0 && !(showEarned && (open.earnedItems?.length ?? 0) > 0) ? (
+                  {view === "liabilities" ? null : open.items.length === 0 && !(showEarned && (open.earnedItems?.length ?? 0) > 0) ? (
                     <p className="text-sm text-muted-foreground">{t("ical_no_items")}</p>
                   ) : (
                     <ul className="divide-y divide-border">
@@ -295,69 +389,117 @@ export function IncomeCalendar({
 }
 
 /**
- * Hover / keyboard-focus breakdown of one month: each earned group (salary, bonus, gratuity...) as ONE line
- * with the employers that make it up listed under it, then the passive total. Purely visual (aria-hidden):
- * the month's button carries its total, and clicking the month opens the full list below the chart.
+ * Hover / keyboard-focus breakdown of one month, for the selected view. Gross: earned income (each group as ONE
+ * line with its employers under it) apart from passive income (one line per source). Liabilities: one line per
+ * kind (mortgage, loan, off-plan, capital calls, cards...) with the items under it. Net: gross minus liabilities.
+ * Purely visual (aria-hidden): the month's button carries its total and clicking it opens the full list.
  */
 function MonthBreakdown({
+  view,
   month,
   showEarned,
   money,
   maskValue,
-  earnedLabel,
-  passiveLabel,
+  tt,
+  t,
 }: {
+  view: View;
   month: IncomeCalendarData["months"][number];
   showEarned: boolean;
   money: { format: (n: number) => string };
   maskValue: (v: string) => string;
-  earnedLabel: (group: EarnedGroup) => string;
-  passiveLabel: string;
+  tt: (key: CashFlowKey) => string;
+  t: (key: TranslationKey) => string;
 }) {
+  const m = (n: number) => maskValue(money.format(n));
   const earnedGroups = showEarned
     ? EARNED.flatMap((e) => {
-        const items = (month.earnedItems ?? []).filter((i) => i.group === e.group);
         const total = month.earned?.[e.group] ?? 0;
         if (!(total > 0)) return [];
         // One line per employer (several payments from the same employer in a month are added up).
         const byEmployer = new Map<string, number>();
-        for (const i of items) byEmployer.set(i.source || i.name, (byEmployer.get(i.source || i.name) ?? 0) + i.amount);
+        for (const i of (month.earnedItems ?? []).filter((x) => x.group === e.group)) {
+          byEmployer.set(i.source || i.name, (byEmployer.get(i.source || i.name) ?? 0) + i.amount);
+        }
         return [{ group: e.group, bar: e.bar, total, employers: [...byEmployer.entries()] }];
       })
     : [];
-  if (earnedGroups.length === 0 && !(month.total > 0)) return null;
+  const earnedTotal = earnedGroups.reduce((s, g) => s + g.total, 0);
+  const passive = SOURCES.filter((s) => month.bySource[s.source] > 0);
+  const liabilities = LIABILITY_BARS.filter((l) => month.liabilities[l.kind] > 0);
+  const gross = month.total + earnedTotal;
+  if (gross <= 0 && month.liabilityTotal <= 0) return null;
+
+  const row = (label: string, amount: number, bar?: string, strong = false) => (
+    <p className={cn("flex items-center justify-between gap-2", strong && "font-medium")}>
+      <span className="flex items-center gap-1.5">
+        {bar && <span className={cn("size-2 rounded-sm", bar)} />}
+        {label}
+      </span>
+      <span className="tabular-nums">{m(amount)}</span>
+    </p>
+  );
+
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none invisible absolute bottom-full start-1/2 z-20 mb-1 w-56 -translate-x-1/2 border border-border bg-popover p-2 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 rtl:translate-x-1/2"
+      className="pointer-events-none invisible absolute bottom-full start-1/2 z-20 mb-1 w-60 -translate-x-1/2 space-y-1.5 border border-border bg-popover p-2 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 rtl:translate-x-1/2"
     >
-      {earnedGroups.map((g) => (
-        <div key={g.group} className="mb-1.5">
-          <p className="flex items-center justify-between gap-2 font-medium">
-            <span className="flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-sm", g.bar)} />
-              {earnedLabel(g.group)}
-            </span>
-            <span className="tabular-nums">{maskValue(money.format(g.total))}</span>
-          </p>
-          {g.employers.length > 1 || (g.employers.length === 1 && g.employers[0][0]) ? (
-            <ul className="ms-3.5 text-muted-foreground">
-              {g.employers.map(([name, amount]) => (
-                <li key={name} className="flex justify-between gap-2">
-                  <span className="truncate">{name}</span>
-                  <span className="tabular-nums">{maskValue(money.format(amount))}</span>
-                </li>
+      {view !== "liabilities" && (
+        <>
+          {earnedGroups.length > 0 && (
+            <div className="space-y-1">
+              {row(tt("cf_cal_hover_earned"), earnedTotal, undefined, true)}
+              {earnedGroups.map((g) => (
+                <div key={g.group}>
+                  {row(tt(EARNED.find((e) => e.group === g.group)?.label ?? "cf_cal_other"), g.total, g.bar)}
+                  {g.employers.length > 1 || (g.employers.length === 1 && g.employers[0][0]) ? (
+                    <ul className="ms-3.5 text-muted-foreground">
+                      {g.employers.map(([name, amount]) => (
+                        <li key={name} className="flex justify-between gap-2">
+                          <span className="truncate">{name}</span>
+                          <span className="tabular-nums">{m(amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ))}
-            </ul>
-          ) : null}
-        </div>
-      ))}
-      {month.total > 0 && (
-        <p className="flex items-center justify-between gap-2 font-medium">
-          <span>{passiveLabel}</span>
-          <span className="tabular-nums">{maskValue(money.format(month.total))}</span>
-        </p>
+            </div>
+          )}
+          {month.total > 0 && (
+            <div className="space-y-1">
+              {row(tt("cf_cal_hover_passive"), month.total, undefined, true)}
+              {passive.map((s) => (
+                <div key={s.source}>{row(t(s.label), month.bySource[s.source], s.bar)}</div>
+              ))}
+            </div>
+          )}
+          {view === "gross" && row(tt("cf_cal_hover_gross"), gross, undefined, true)}
+        </>
       )}
+      {(view === "liabilities" || view === "net") && month.liabilityTotal > 0 && (
+        <div className="space-y-1">
+          {view === "net" ? row(tt("cf_cal_hover_liabilities"), -month.liabilityTotal, undefined, true) : null}
+          {liabilities.map((l) => (
+            <div key={l.kind}>
+              {row(tt(l.label), -month.liabilities[l.kind], l.bar)}
+              <ul className="ms-3.5 text-muted-foreground">
+                {month.liabilityItems
+                  .filter((i) => i.kind === l.kind)
+                  .map((i, k) => (
+                    <li key={`${i.assetId}-${k}`} className="flex justify-between gap-2">
+                      <span className="truncate">{i.name}</span>
+                      <span className="tabular-nums">{m(-i.amount)}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          ))}
+          {view === "liabilities" && row(tt("cf_cal_hover_liabilities"), -month.liabilityTotal, undefined, true)}
+        </div>
+      )}
+      {view === "net" && row(tt("cf_cal_hover_net"), gross - month.liabilityTotal, undefined, true)}
     </div>
   );
 }

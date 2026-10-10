@@ -624,6 +624,38 @@ export async function markCashAccountClosed(assetId: string, closedOn: string): 
 }
 
 /**
+ * Remembers that an imported statement covers the account up to `through` (the period end it prints), even when it
+ * lists no transaction: an open account that simply had no activity is then dated as of that statement, not flagged
+ * out of date. Only ever moves the date forward.
+ */
+export async function recordStatementCoverage(assetId: string, through: string): Promise<{ ok: true } | Fail> {
+  if (!/^d{4}-d{2}-d{2}$/.test(through)) return { ok: false, code: "invalid", error: "Invalid statement date." };
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+
+  const { data: asset } = await auth.userClient
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId)
+    .single<{ id: string; metadata: Record<string, unknown> | null; asset_categories: { name: string } | null }>();
+  if (!asset || asset.asset_categories?.name !== "Cash") {
+    return { ok: false, code: "invalid", error: "Cash account not found." };
+  }
+  const current = asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {};
+  if (typeof current.statement_through === "string" && current.statement_through >= through) return { ok: true };
+
+  const { error } = await auth.userClient
+    .from("assets")
+    .update({ metadata: { ...current, statement_through: through } as never })
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId);
+  if (error) return { ok: false, code: "db_error", error: error.message };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+/**
  * Creates an empty manual Cash account for a statement group that has no account yet (balance 0; the
  * import then records the statement's history and balance). Own profile only, never the demo account.
  */

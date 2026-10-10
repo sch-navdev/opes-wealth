@@ -16,11 +16,11 @@ export async function loadBalanceDateSources(
       const [history, transaction] = await Promise.all([
         supabase
           .from("asset_history")
-          .select("recorded_date")
+          .select("recorded_date, source")
           .eq("asset_id", id)
           .order("recorded_date", { ascending: false })
           .limit(1)
-          .returns<{ recorded_date: string }[]>(),
+          .returns<{ recorded_date: string; source: string | null }[]>(),
         supabase
           .from("transactions")
           .select("booked_date")
@@ -33,6 +33,7 @@ export async function loadBalanceDateSources(
         id,
         {
           historyDate: history.data?.[0]?.recorded_date ?? null,
+          importSource: history.data?.[0]?.source ?? null,
           transactionDate: transaction.data?.[0]?.booked_date ?? null,
         },
       ];

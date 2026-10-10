@@ -185,3 +185,5 @@ Commit and push are separate, confirmed each time. Never retry denied production
 
 ## Push status
 Pushed 2026-10-10: everything through bed29d0 (the push hung for a while on a credential prompt and then completed). Only this handoff/tracker documentation update after it may be uncommitted: Steve confirms commit and push separately.
+
+115. **Action plan 2 (OW13)**: income calendar Gross/Liabilities/Net views; import source badge (PDF/CSV) + migration 0043 (`supabase/migrations/0043_backfill_pdf_import_source.sql`, NOT yet applied); `recordStatementCoverage` / `metadata.statement_through` makes quiet open accounts non-stale (existing accounts need one re-import of a covering statement); delete-bank placeholder clarified. Liability schedule ignores co-ownership share (uses stored payments).

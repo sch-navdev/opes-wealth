@@ -306,3 +306,9 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-10: Income: salary counted by default in the income calendar in its own colour, hover breakdown by employer, one stream per employer linked to a company (migration 0042 drafted, NOT applied) and a gratuity type - [[Personal-Cash-Flow|Personal Cash Flow]]
 - 2026-10-10: Landing page second pass: full-screen hero, layered slow background (drifting gold light, sweeping seconds hand, sheen, motes), foil headline, staged entrance - [[Design-System|Design System]]
 - 2026-10-10: Every statement import (one file or many) uses the same review; bank grouping by one key so a bank's card sits under it; Merge accounts and Delete this bank on the bank page; chart time range (all time, 1/3/6 months, 1 year, custom dates) with a per-device default - [[CSV-Bank-Uploads|CSV Bank Uploads]]
+
+## OW13 (Action plan 2)
+- Income calendar: three views, Gross income / Liabilities / Net income (`lib/income-calendar-liabilities.ts`). Gross hover separates earned (salary, bonus, gratuity per employer) from passive (per source); Liabilities hover splits mortgage, loan, off-plan milestones, private-equity capital calls, credit card, other; Net = gross - liabilities.
+- Banking: each manual account shows how its data came in (PDF statement / CSV import / Manual). Migration 0043 re-tags earlier imports (all PDF) without re-uploading.
+- Stale vs quiet: an imported statement records `metadata.statement_through` (its period end) even with no transaction, so an open account with no activity is dated as of that statement instead of flagged out of date. Re-import the statement once to set it for existing accounts.
+- Bank page: the "Delete everything" field now says what to type (the grey bank name was a placeholder); the match ignores capitals.

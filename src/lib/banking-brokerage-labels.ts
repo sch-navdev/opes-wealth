@@ -55,6 +55,9 @@ export const BANKING_EN = {
   bank_show_closed: "Show closed accounts ({n})",
   bank_hide_closed: "Hide closed accounts",
   bank_closed_badge: "Closed {date}",
+  bank_delete_all_placeholder: "Type the bank name here to unlock the button",
+  bank_source_pdf: "PDF statement",
+  bank_source_csv: "CSV import",
   bank_asof_legend:
     "Each balance shows the date it is as of. A balance more than one month (31 days) old is shown in red and marked Stale: import a newer statement or refresh the account.",
   brokerage_page_title: "Brokerage",

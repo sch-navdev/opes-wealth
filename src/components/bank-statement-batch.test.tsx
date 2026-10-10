@@ -26,6 +26,7 @@ const banking = vi.hoisted(() => ({
   rememberCashAccountBank: vi.fn(),
   createStatementCashAccount: vi.fn(),
   recordBalanceSnapshots: vi.fn(),
+  recordStatementCoverage: vi.fn().mockResolvedValue({ ok: true }),
   markCashAccountClosed: vi.fn(),
   mergeAccountRefs: vi.fn(),
 }));

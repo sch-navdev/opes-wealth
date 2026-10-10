@@ -12,6 +12,9 @@ import { calledCapital, parsePrivateEquityMetadata } from "@/lib/private-equity"
 import { earnedGroupOf, expandIncomeStreams, type EarnedGroup, type IncomeStream } from "@/lib/income-streams";
 import { calculateTotalCost, parseRealEstateMetadata } from "@/lib/real-estate";
 import { parseScpiMetadata, scpiInvested } from "@/lib/scpi";
+import { buildLiabilitySchedule, emptyByKind, type LiabilityCalendarItem, type LiabilityKind } from "@/lib/income-calendar-liabilities";
+
+export type { LiabilityCalendarItem, LiabilityKind };
 
 /**
  * Forward 12-month passive-income calendar. It reuses `buildPassiveIncome`
@@ -80,11 +83,17 @@ export type IncomeCalendarMonth = {
   /** Earned-income layer (only present when `streams` were given). NOT included in `total`. */
   earned?: Record<EarnedGroup, number>;
   earnedItems?: EarnedCalendarItem[];
+  /** Payments due this month (mortgage / loan instalments, off-plan milestones, capital calls, cards...), Base Currency. */
+  liabilities: Record<LiabilityKind, number>;
+  liabilityTotal: number;
+  liabilityItems: LiabilityCalendarItem[];
 };
 
 export type IncomeCalendar = {
   months: IncomeCalendarMonth[];
   annualTotal: number;
+  /** Payments due over the 12 months (see `liabilities` of each month). */
+  liabilityAnnual: number;
   monthlyAverage: number;
   /** Month with the highest total; null when nothing is projected. */
   peakMonth: string | null;
@@ -180,6 +189,9 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
     total: 0,
     bySource: emptyBySource(),
     items: [],
+    liabilities: emptyByKind(),
+    liabilityTotal: 0,
+    liabilityItems: [],
   }));
   const keys = months.map((m) => m.month);
   const windowFrom = monthBounds(keys[0]).from;
@@ -255,6 +267,15 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
     if (annual > 0) producing.push({ asset, source: row.source, annual });
   }
 
+  buildLiabilitySchedule(assets, keys, toBase).forEach((items, i) => {
+    for (const item of items) {
+      months[i].liabilityItems.push(item);
+      months[i].liabilities[item.kind] += item.amount;
+      months[i].liabilityTotal += item.amount;
+    }
+  });
+  const liabilityAnnual = months.reduce((s, m) => s + m.liabilityTotal, 0);
+
   const annualTotal = months.reduce((s, m) => s + m.total, 0);
   let peakMonth: string | null = null;
   let peak = 0;
@@ -294,6 +315,7 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
   return {
     months,
     annualTotal,
+    liabilityAnnual,
     monthlyAverage: annualTotal / MONTHS,
     peakMonth,
     yieldOnCostPct: costBasis > 0 ? (costedIncome / costBasis) * 100 : null,
