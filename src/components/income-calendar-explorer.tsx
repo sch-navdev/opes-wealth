@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "lucide-react";
@@ -12,6 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { useCashFlowText } from "@/components/cash-flow-text";
 import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
+import { IncomeCalendarDays } from "@/components/income-calendar-days";
+import { IncomeCalendarSimulator, type SimAsset } from "@/components/income-calendar-simulator";
+import { buildDays } from "@/lib/income-calendar-daily";
+import { SIM_STORAGE_KEY, expandSimulations, parseSimEntries, type SimEntry } from "@/lib/income-calendar-simulation";
 import { analyseIncomeCalendar } from "@/lib/income-calendar-analysis";
 import type { IncomeCalendar } from "@/lib/income-calendar";
 import { LIABILITY_KINDS, type LiabilityKind } from "@/lib/income-calendar-liabilities";
@@ -22,14 +26,16 @@ import { cn } from "@/lib/utils";
 
 const PRESETS = [12, 24, 36, 60, 120] as const;
 
-const SOURCE_LABEL: Record<PassiveIncomeSource | "earned", string> = {
+const SOURCE_LABEL: Record<PassiveIncomeSource | "earned" | "simulated", string> = {
+  simulated: "What-if income",
   earned: "Earned income (salary, bonus...)",
   rental: "Rental income",
   stocks: "Stocks & ETFs",
   reit: "SCPI / REIT",
   private_equity: "Private equity",
 };
-const SOURCE_COLOR: Record<PassiveIncomeSource | "earned", string> = {
+const SOURCE_COLOR: Record<PassiveIncomeSource | "earned" | "simulated", string> = {
+  simulated: "var(--color-primary)",
   earned: "var(--color-chart-5)",
   rental: "var(--color-chart-1)",
   stocks: "var(--color-chart-2)",
@@ -66,6 +72,9 @@ export function IncomeCalendarExplorer({
   months,
   hasEarned,
   backHref,
+  openingCash = 0,
+  assets = [],
+  selectedMonth,
 }: {
   calendar: IncomeCalendar;
   baseCurrency: string;
@@ -73,12 +82,41 @@ export function IncomeCalendarExplorer({
   months: number;
   hasEarned: boolean;
   backHref: string;
+  /** Cash on hand today (Base Currency): the starting point of the position line. */
+  openingCash?: number;
+  /** Assets a what-if entry can be linked to. */
+  assets?: SimAsset[];
+  /** Month ("YYYY-MM") to open in the day-by-day view. */
+  selectedMonth?: string;
 }) {
   const router = useRouter();
   const tt = useCashFlowText();
   const { intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
   const [includeEarned, setIncludeEarned] = useState(true);
+  const [includeCash, setIncludeCash] = useState(openingCash > 0);
+  const [sims, setSims] = useState<SimEntry[]>([]);
+  const [showSims, setShowSims] = useState(true);
+  const [pickedMonth, setPickedMonth] = useState<string>(
+    selectedMonth && calendar.months.some((x) => x.month === selectedMonth) ? selectedMonth : calendar.months[0].month,
+  );
+  // What-ifs live on this device only.
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSims(parseSimEntries(JSON.parse(window.localStorage.getItem(SIM_STORAGE_KEY) ?? "[]")));
+    } catch {
+      /* none saved */
+    }
+  }, []);
+  const changeSims = (next: SimEntry[]) => {
+    setSims(next);
+    try {
+      window.localStorage.setItem(SIM_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* not remembered */
+    }
+  };
   const [customFrom, setCustomFrom] = useState(from);
   const [customMonths, setCustomMonths] = useState(String(months));
 
@@ -95,7 +133,22 @@ export function IncomeCalendarExplorer({
   const pct = (n: number | null) => (n == null ? "—" : `${n.toFixed(1)}%`);
   const m = (n: number) => maskValue(money.format(n));
 
-  const a = useMemo(() => analyseIncomeCalendar(calendar, includeEarned && hasEarned), [calendar, includeEarned, hasEarned]);
+  const simByMonth = useMemo(() => expandSimulations(showSims ? sims : [], calendar.months.map((x) => x.month)), [sims, showSims, calendar]);
+  const startCash = includeCash ? openingCash : 0;
+  const a = useMemo(
+    () => analyseIncomeCalendar(calendar, includeEarned && hasEarned, { sims: simByMonth, openingCash: startCash }),
+    [calendar, includeEarned, hasEarned, simByMonth, startCash],
+  );
+  const pickedIndex = Math.max(0, calendar.months.findIndex((x) => x.month === pickedMonth));
+  const days = useMemo(
+    () =>
+      buildDays(calendar.months[pickedIndex], {
+        includeEarned: includeEarned && hasEarned,
+        sims: simByMonth[pickedIndex],
+        startPosition: pickedIndex === 0 ? startCash : a.rows[pickedIndex - 1].position,
+      }),
+    [calendar, pickedIndex, includeEarned, hasEarned, simByMonth, startCash, a],
+  );
 
   const chartData = a.rows.map((r) => ({
     label: monthLabel(r.month),
@@ -105,6 +158,9 @@ export function IncomeCalendarExplorer({
     stocks: r.bySource.stocks,
     reit: r.bySource.reit,
     private_equity: r.bySource.private_equity,
+    simulated: r.simIncome,
+    l_sim: -r.simPayments,
+    position: r.position,
     // Liabilities hang below the axis.
     ...Object.fromEntries(LIABILITY_KINDS.map((k) => [`l_${k}`, -r.byKind[k]])),
     net: r.net,
@@ -120,7 +176,7 @@ export function IncomeCalendarExplorer({
   const tooltipStyle = { background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-foreground)", fontSize: 12 };
   const tick = { fill: "var(--color-muted-foreground)", fontSize: 11 };
   const usedKinds = LIABILITY_KINDS.filter((k) => a.byKind[k] > 0);
-  const usedSources = (Object.keys(SOURCE_LABEL) as (PassiveIncomeSource | "earned")[]).filter((s) => a.bySource[s] > 0);
+  const usedSources = (Object.keys(SOURCE_LABEL) as (PassiveIncomeSource | "earned" | "simulated")[]).filter((s) => a.bySource[s] > 0);
   const empty = a.totals.gross <= 0 && a.totals.liabilities <= 0;
 
   return (
@@ -163,6 +219,12 @@ export function IncomeCalendarExplorer({
               Apply
             </Button>
           </div>
+          {openingCash > 0 && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Switch size="sm" checked={includeCash} onCheckedChange={setIncludeCash} aria-label="Start from the cash I hold today" />
+              Start from the cash I hold today ({m(openingCash)})
+            </label>
+          )}
           {hasEarned && (
             <label className="ms-auto flex items-center gap-2 text-xs text-muted-foreground">
               <Switch size="sm" checked={includeEarned} onCheckedChange={setIncludeEarned} aria-label={tt("cf_cal_toggle")} />
@@ -171,6 +233,16 @@ export function IncomeCalendarExplorer({
           )}
         </CardContent>
       </Card>
+
+      <IncomeCalendarSimulator
+        entries={sims}
+        onChange={changeSims}
+        assets={assets}
+        defaultStart={from}
+        baseCurrency={baseCurrency}
+        show={showSims}
+        onShow={setShowSims}
+      />
 
       {empty ? (
         <p className="text-sm text-muted-foreground">Nothing is projected in this period. Add tenancy contracts, income streams or liabilities with a payment, or choose another period.</p>
@@ -181,39 +253,67 @@ export function IncomeCalendarExplorer({
             <Tile label={tt("cf_cal_view_liabilities")} value={m(-a.totals.liabilities)} tone="text-destructive" sub={`${m(a.monthlyAverage.liabilities)} / month`} />
             <Tile label={tt("cf_cal_view_net")} value={m(a.totals.net)} tone={a.totals.net < 0 ? "text-destructive" : "text-foreground"} sub={`${m(a.monthlyAverage.net)} / month`} />
             <Tile label="Net margin" value={pct(a.netMarginPct)} tone="text-foreground" sub="net as a share of gross" />
+            <Tile label="Position at the end" value={m(a.endPosition)} tone={a.endPosition < 0 ? "text-destructive" : "text-foreground"} sub={a.lowestPosition ? `lowest ${m(a.lowestPosition.value)} in ${longMonth(a.lowestPosition.month)}` : ""} />
             <Tile label="Income covers liabilities" value={a.coverage == null ? "—" : `${a.coverage.toFixed(2)}×`} tone="text-foreground" sub={a.coverage == null ? "no payment due" : a.coverage >= 1 ? "gross exceeds payments" : "payments exceed gross"} />
           </dl>
 
           <Card className="border-border bg-card">
             <CardContent className="space-y-2 py-4">
-              <h2 className="text-sm font-medium text-foreground">Month by month: gross income above, liabilities below, net as the line</h2>
+              <h2 className="text-sm font-medium text-foreground">Month by month: gross income above, liabilities below, net as the line, your position on the right axis</h2>
+              <p className="text-xs text-muted-foreground">Click a month on the chart to see it day by day.</p>
               <div className="h-80 w-full" role="img" aria-label="Monthly gross income, liabilities and net income">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} stackOffset="sign" margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <ComposedChart
+                    data={chartData}
+                    stackOffset="sign"
+                    margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+                    onClick={(state: unknown) => {
+                      const i = Number((state as { activeTooltipIndex?: number | string } | null)?.activeTooltipIndex);
+                      if (Number.isInteger(i) && calendar.months[i]) setPickedMonth(calendar.months[i].month);
+                    }}
+                  >
                     <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="label" tick={tick} interval="preserveStartEnd" minTickGap={16} />
-                    <YAxis tick={tick} tickFormatter={(v: number) => compact.format(v)} width={56} />
-                    <ReferenceLine y={0} stroke="var(--color-muted-foreground)" />
+                    <YAxis yAxisId="flow" tick={tick} tickFormatter={(v: number) => compact.format(v)} width={56} />
+                    <YAxis yAxisId="pos" orientation="right" tick={tick} tickFormatter={(v: number) => compact.format(v)} width={56} />
+                    <ReferenceLine yAxisId="flow" y={0} stroke="var(--color-muted-foreground)" />
                     <Tooltip contentStyle={tooltipStyle} formatter={(v) => m(Number(v))} labelFormatter={(_l, p) => longMonth(String(p?.[0]?.payload?.month ?? ""))} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    {includeEarned && hasEarned && <Bar dataKey="earned" name={SOURCE_LABEL.earned} stackId="s" fill={SOURCE_COLOR.earned} />}
+                    {includeEarned && hasEarned && <Bar yAxisId="flow" dataKey="earned" name={SOURCE_LABEL.earned} stackId="s" fill={SOURCE_COLOR.earned} />}
+                    {a.simulated.income > 0 && <Bar yAxisId="flow" dataKey="simulated" name={SOURCE_LABEL.simulated} stackId="s" fill={SOURCE_COLOR.simulated} fillOpacity={0.6} />}
+                    {a.simulated.payments > 0 && <Bar yAxisId="flow" dataKey="l_sim" name="What-if payments" stackId="s" fill="var(--color-destructive)" fillOpacity={0.35} />}
                     {(["rental", "stocks", "reit", "private_equity"] as const).map((s) => (
-                      <Bar key={s} dataKey={s} name={SOURCE_LABEL[s]} stackId="s" fill={SOURCE_COLOR[s]} />
+                      <Bar key={s} yAxisId="flow" dataKey={s} name={SOURCE_LABEL[s]} stackId="s" fill={SOURCE_COLOR[s]} />
                     ))}
                     {usedKinds.map((k) => (
-                      <Bar key={k} dataKey={`l_${k}`} name={tt(KIND_LABEL[k])} stackId="s" fill={KIND_COLOR[k]} fillOpacity={0.55} />
+                      <Bar key={k} yAxisId="flow" dataKey={`l_${k}`} name={tt(KIND_LABEL[k])} stackId="s" fill={KIND_COLOR[k]} fillOpacity={0.55} />
                     ))}
-                    <Line dataKey="net" name={tt("cf_cal_view_net")} stroke="var(--color-foreground)" strokeWidth={2} dot={false} />
+                    <Line yAxisId="flow" dataKey="net" name={tt("cf_cal_view_net")} stroke="var(--color-foreground)" strokeWidth={2} dot={false} />
+                    <Line yAxisId="pos" dataKey="position" name="Position (right axis)" stroke="var(--color-primary)" strokeWidth={2} strokeDasharray="5 3" dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
           </Card>
 
+          <Card className="border-border bg-card" data-testid="income-day-card">
+            <CardContent className="space-y-3 py-4">
+              <h2 className="text-sm font-medium text-foreground">Day by day: {longMonth(pickedMonth)}</h2>
+              <div role="group" aria-label="Month" className="flex flex-wrap gap-1">
+                {calendar.months.map((x) => (
+                  <Button key={x.month} type="button" size="xs" variant={x.month === pickedMonth ? "default" : "outline"} aria-pressed={x.month === pickedMonth} onClick={() => setPickedMonth(x.month)}>
+                    {monthLabel(x.month)}
+                  </Button>
+                ))}
+              </div>
+              <IncomeCalendarDays days={days} monthLabel={longMonth(pickedMonth)} money={money} mask={maskValue} startPosition={pickedIndex === 0 ? startCash : a.rows[pickedIndex - 1].position} />
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="border-border bg-card">
               <CardContent className="space-y-2 py-4">
-                <h2 className="text-sm font-medium text-foreground">Running net income</h2>
+                <h2 className="text-sm font-medium text-foreground">Your position (cumulative cash flow)</h2>
                 <p className="text-xs text-muted-foreground">
                   {a.firstShortfall ? `The running net goes below zero in ${longMonth(a.firstShortfall)}: payments outrun income from then on unless something changes.` : "The running net stays at or above zero over this period."}
                 </p>
@@ -225,7 +325,7 @@ export function IncomeCalendarExplorer({
                       <YAxis tick={tick} tickFormatter={(v: number) => compact.format(v)} width={56} />
                       <ReferenceLine y={0} stroke="var(--color-muted-foreground)" />
                       <Tooltip contentStyle={tooltipStyle} formatter={(v) => m(Number(v))} labelFormatter={(_l, p) => longMonth(String(p?.[0]?.payload?.month ?? ""))} />
-                      <Area dataKey="cumulative" name="Running net" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} />
+                      <Area dataKey="position" name="Position" stroke="var(--color-primary)" fill="var(--color-primary)" fillOpacity={0.15} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -268,6 +368,16 @@ export function IncomeCalendarExplorer({
                   </li>
                 )}
                 {a.earnedSharePct != null && hasEarned && includeEarned && <li>Earned income is {pct(a.earnedSharePct)} of gross; passive income is {pct(100 - a.earnedSharePct)}.</li>}
+                {a.lowestPosition && (
+                  <li>
+                    Your position is lowest in {longMonth(a.lowestPosition.month)} ({m(a.lowestPosition.value)}){a.lowestPosition.value < 0 ? ": you would need to cover that gap." : "."}
+                  </li>
+                )}
+                {(a.simulated.income > 0 || a.simulated.payments > 0) && (
+                  <li>
+                    The what-if entries add {m(a.simulated.income)} of income and {m(a.simulated.payments)} of payments; they are included in every figure on this page.
+                  </li>
+                )}
                 {a.firstShortfall && <li>The running net first drops below zero in {longMonth(a.firstShortfall)}.</li>}
               </ul>
               <p className="text-xs text-muted-foreground">
@@ -325,7 +435,7 @@ export function IncomeCalendarExplorer({
                   </thead>
                   <tbody className="divide-y divide-border tabular-nums">
                     {a.rows.map((r) => (
-                      <tr key={r.month}>
+                      <tr key={r.month} className="cursor-pointer hover:bg-muted/40" onClick={() => setPickedMonth(r.month)}>
                         <th scope="row" className="py-1.5 pe-3 text-start font-normal">{longMonth(r.month)}</th>
                         <td className="py-1.5 pe-3 text-end text-success">{m(r.gross)}</td>
                         <td className="py-1.5 pe-3 text-end text-destructive">{m(-r.liabilities)}</td>

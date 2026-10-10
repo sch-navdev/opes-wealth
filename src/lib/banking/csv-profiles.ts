@@ -48,6 +48,7 @@ export type BankProfileId =
   | "cbd"
   | "hsbc_uae_card"
   | "fab_card"
+  | "wio_card"
   | "banque_populaire_card";
 
 export type BankProfile = {
@@ -434,6 +435,15 @@ export const BANK_PROFILES: BankProfile[] = [
     signature: [],
   }),
   profile({
+    id: "wio_card",
+    name: "Wio Bank credit card",
+    country: "AE",
+    defaultCurrency: "AED",
+    pdfOnly: true,
+    columns: { date: [], description: [] },
+    signature: [],
+  }),
+  profile({
     id: "banque_populaire_card",
     name: "Banque Populaire card",
     country: "FR",
@@ -585,6 +595,9 @@ export type StatementGroup = {
   rows: NormalizedTx[];
   /** PDF accounts with NO transactions: dated balances printed on the statement (balance brought forward, closing), recorded as history when imported. */
   balances?: { date: string; balance: number }[];
+  /** Balances printed on the statement (PDF, accounts whose rows carry no running balance): they anchor the balance history, so a new account is not stuck on 0. */
+  openingBalance?: number | null;
+  closingBalance?: number | null;
   /** The statement says this account was closed on that date (ISO). */
   closedOn?: string;
   /** Name of a savings space / deposit as printed (Wio). Accounts of one bank with the same name may be one account renewed. */

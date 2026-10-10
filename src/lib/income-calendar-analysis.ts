@@ -1,6 +1,7 @@
 import type { IncomeCalendar } from "@/lib/income-calendar";
 import { LIABILITY_KINDS, type LiabilityKind } from "@/lib/income-calendar-liabilities";
 import type { PassiveIncomeSource } from "@/lib/passive-income";
+import type { SimItem } from "@/lib/income-calendar-simulation";
 
 /**
  * Numbers behind the full-page income calendar: one row per month (gross split into earned and passive sources,
@@ -18,6 +19,11 @@ export type CalendarRow = {
   net: number;
   /** Net accumulated from the first month of the window up to this one. */
   cumulative: number;
+  /** What-if income / payments added for this month (already part of gross / liabilities). */
+  simIncome: number;
+  simPayments: number;
+  /** Where you stand at the end of the month: the opening cash (when given) plus the running net. */
+  position: number;
 };
 
 export type YearRow = { year: string; gross: number; liabilities: number; net: number; months: number };
@@ -39,21 +45,34 @@ export type CalendarAnalysis = {
   /** First month the running net goes below zero, if it does. */
   firstShortfall: string | null;
   topLiability: { kind: LiabilityKind; amount: number; sharePct: number } | null;
-  topSource: { source: PassiveIncomeSource | "earned"; amount: number; sharePct: number } | null;
-  bySource: Record<PassiveIncomeSource | "earned", number>;
+  topSource: { source: PassiveIncomeSource | "earned" | "simulated"; amount: number; sharePct: number } | null;
+  bySource: Record<PassiveIncomeSource | "earned" | "simulated", number>;
   byKind: Record<LiabilityKind, number>;
+  /** Lowest position over the window and when. */
+  lowestPosition: { month: string; value: number } | null;
+  endPosition: number;
+  simulated: { income: number; payments: number };
 };
 
 const SOURCES: PassiveIncomeSource[] = ["rental", "stocks", "reit", "private_equity"];
 
-export function analyseIncomeCalendar(calendar: IncomeCalendar, includeEarned: boolean): CalendarAnalysis {
+export function analyseIncomeCalendar(
+  calendar: IncomeCalendar,
+  includeEarned: boolean,
+  opts: { sims?: readonly (readonly SimItem[])[]; openingCash?: number } = {},
+): CalendarAnalysis {
   let running = 0;
-  const rows: CalendarRow[] = calendar.months.map((m) => {
+  const opening = opts.openingCash ?? 0;
+  const rows: CalendarRow[] = calendar.months.map((m, i) => {
     const earned = includeEarned && m.earned ? m.earned.salary + m.earned.bonus + m.earned.gratuity + m.earned.other : 0;
-    const gross = m.total + earned;
-    const net = gross - m.liabilityTotal;
+    const simItems = opts.sims?.[i] ?? [];
+    const simIncome = simItems.filter((s) => s.kind === "income").reduce((s, x) => s + x.amount, 0);
+    const simPayments = simItems.filter((s) => s.kind === "payment").reduce((s, x) => s + x.amount, 0);
+    const gross = m.total + earned + simIncome;
+    const liabilities = m.liabilityTotal + simPayments;
+    const net = gross - liabilities;
     running += net;
-    return { month: m.month, earned, passive: m.total, bySource: m.bySource, gross, liabilities: m.liabilityTotal, byKind: m.liabilities, net, cumulative: running };
+    return { month: m.month, earned, passive: m.total, bySource: m.bySource, gross, liabilities, byKind: m.liabilities, net, cumulative: running, simIncome, simPayments, position: opening + running };
   });
 
   const sum = (pick: (r: CalendarRow) => number) => rows.reduce((s, r) => s + pick(r), 0);
@@ -71,16 +90,19 @@ export function analyseIncomeCalendar(calendar: IncomeCalendar, includeEarned: b
     yearMap.set(y, cur);
   }
 
-  const bySource = { rental: 0, stocks: 0, reit: 0, private_equity: 0, earned: totals.earned } as CalendarAnalysis["bySource"];
+  const simulated = { income: sum((r) => r.simIncome), payments: sum((r) => r.simPayments) };
+  const bySource = { rental: 0, stocks: 0, reit: 0, private_equity: 0, earned: totals.earned, simulated: simulated.income } as CalendarAnalysis["bySource"];
   for (const r of rows) for (const s of SOURCES) bySource[s] += r.bySource[s];
   const byKind = Object.fromEntries(LIABILITY_KINDS.map((k) => [k, rows.reduce((s, r) => s + r.byKind[k], 0)])) as Record<LiabilityKind, number>;
 
   const sorted = [...rows].sort((a, b) => a.net - b.net);
   const topKind = LIABILITY_KINDS.reduce<LiabilityKind | null>((best, k) => (byKind[k] > (best ? byKind[best] : 0) ? k : best), null);
-  const topSrc = (Object.keys(bySource) as (PassiveIncomeSource | "earned")[]).reduce<PassiveIncomeSource | "earned" | null>(
+  const topSrc = (Object.keys(bySource) as (PassiveIncomeSource | "earned" | "simulated")[]).reduce<PassiveIncomeSource | "earned" | "simulated" | null>(
     (best, k) => (bySource[k] > (best ? bySource[best] : 0) ? k : best),
     null,
   );
+
+  const lowest = rows.length ? rows.reduce((lo, r) => (r.position < lo.position ? r : lo), rows[0]) : null;
 
   return {
     rows,
@@ -98,5 +120,8 @@ export function analyseIncomeCalendar(calendar: IncomeCalendar, includeEarned: b
     topSource: topSrc ? { source: topSrc, amount: bySource[topSrc], sharePct: (bySource[topSrc] / totals.gross) * 100 } : null,
     bySource,
     byKind,
+    lowestPosition: lowest ? { month: lowest.month, value: lowest.position } : null,
+    endPosition: rows.length ? rows[rows.length - 1].position : opening,
+    simulated,
   };
 }

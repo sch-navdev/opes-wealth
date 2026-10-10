@@ -317,3 +317,9 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - Income calendar card shows gross, liabilities and net for every month at once; the heading opens `/dashboard/income-calendar`: any start month and 1 to 120 months, charts (monthly gross/liabilities/net, running net, composition), year-by-year table, analysis and the full monthly table.
 - Banque Populaire cards settled on the same account (printed `VOTRE COMPTE N°`) under different card numbers are one replaced card: one import question in a batch, and `metadata.parent_ref` routes later statements of a new card to the saved account, renamed after the latest number.
 - Fixed `recordStatementCoverage` (date regex lost its backslashes in 0ea55cb).
+
+## OW13 (Action plan 2, part 3)
+- Wio: credit card parser (`wio-card.ts`), accounts listed only in the summary are kept on their printed balance (fixes quiet accounts such as EUR 0795), space names match regardless of case/word order/digits, an account seen in several statements follows one rollover chain.
+- Banque Populaire (and any PDF whose rows have no running balance): the printed closing balance anchors the history, so a new account no longer sits on 0; re-importing a fully imported statement recomputes the stored history.
+- Banking page: banks collapsed to name + total, click to open, drag to reorder banks and accounts (remembered per device).
+- Income calendar: position (cumulative cash flow, optional opening cash), day-by-day month view, what-if income/payments linked to an asset or a simulated asset (device-local).

@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, GripVertical } from "lucide-react";
 import { BalanceAsOf } from "@/components/balance-as-of";
 import { CompanyAccountsSection } from "@/components/company-accounts-section";
 import { useBankingText } from "@/components/banking-text";
@@ -69,6 +69,28 @@ export type BankingAccountRow = {
 
 type Filter = "real" | "sandbox" | "all";
 
+const EXPANDED_KEY = "opes-banking-expanded";
+const ORDER_KEY = "opes-banking-order";
+type Order = { banks: string[]; accounts: Record<string, string[]> };
+
+/** The list in the saved order: ids not in the order keep their place after the ordered ones. */
+function inOrder<T>(list: T[], order: string[] | undefined, idOf: (x: T) => string): T[] {
+  if (!order || order.length === 0) return list;
+  const rank = (x: T) => {
+    const i = order.indexOf(idOf(x));
+    return i < 0 ? order.length : i;
+  };
+  return [...list].sort((a, b) => rank(a) - rank(b));
+}
+
+/** `ids` with `from` dropped just before `to`. */
+function moveBefore(ids: string[], from: string, to: string): string[] {
+  if (from === to) return ids;
+  const rest = ids.filter((x) => x !== from);
+  const at = rest.indexOf(to);
+  return at < 0 ? ids : [...rest.slice(0, at), from, ...rest.slice(at)];
+}
+
 /**
  * Consolidated banking view: every bank account in one place, grouped by
  * bank. Real accounts (manual/CSV and live-synced Cash accounts) make up the
@@ -98,6 +120,49 @@ export function BankingOverview({
   const [filter, setFilter] = useState<Filter>("real");
   const [showClosed, setShowClosed] = useState(false);
   const ebk = useEditBankText();
+  // Banks show their name and total only; a click opens the accounts. Both the open banks and the order of banks and
+  // accounts (dragged with the mouse) are remembered per device.
+  const [expanded, setExpanded] = useState<string[]>([]);
+  const [order, setOrder] = useState<Order>({ banks: [], accounts: {} });
+  const [dragging, setDragging] = useState<{ kind: "bank" | "account"; id: string; bank?: string } | null>(null);
+  useEffect(() => {
+    try {
+      const e = JSON.parse(window.localStorage.getItem(EXPANDED_KEY) ?? "[]");
+      const o = JSON.parse(window.localStorage.getItem(ORDER_KEY) ?? "null");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(e)) setExpanded(e.filter((x): x is string => typeof x === "string"));
+      if (o && Array.isArray(o.banks) && o.accounts && typeof o.accounts === "object") setOrder(o as Order);
+    } catch {
+      /* storage unavailable or malformed: the defaults stay */
+    }
+  }, []);
+  const save = (key: string, value: unknown) => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* not remembered */
+    }
+  };
+  const toggleBank = (name: string) =>
+    setExpanded((cur) => {
+      const next = cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name];
+      save(EXPANDED_KEY, next);
+      return next;
+    });
+  const dropBank = (list: string[], to: string) => {
+    if (dragging?.kind !== "bank") return;
+    const next = { ...order, banks: moveBefore([...new Set([...order.banks, ...list])], dragging.id, to) };
+    setOrder(next);
+    save(ORDER_KEY, next);
+    setDragging(null);
+  };
+  const dropAccount = (bank: string, list: string[], to: string) => {
+    if (dragging?.kind !== "account" || dragging.bank !== bank) return;
+    const next = { ...order, accounts: { ...order.accounts, [bank]: moveBefore([...new Set([...(order.accounts[bank] ?? []), ...list])], dragging.id, to) } };
+    setOrder(next);
+    save(ORDER_KEY, next);
+    setDragging(null);
+  };
   // Country filter chip, remembered per device (read after mount so the server and client markup agree).
   const [countryFilter, setCountryFilter] = useState<string>(ALL_COUNTRIES);
   useEffect(() => {
@@ -259,18 +324,39 @@ export function BankingOverview({
               <span className="tabular-nums text-muted-foreground">{maskValue(base.format(group.total))}</span>
             </h2>
           )}
-        {group.institutions.map(({ institution, rows: accounts }) => {
+        {inOrder(group.institutions, order.banks, (i) => i.institution).map(({ institution, rows: unordered }) => {
+          const accounts = inOrder(unordered, order.accounts[institution], (r) => r.key);
+          const bankNames = group.institutions.map((i) => i.institution);
+          const open = expanded.includes(institution);
           const total = accounts.reduce((s, r) => s + r.baseBalance, 0);
           const staleCount = countStaleBalances(accounts, today);
           return (
-            <Card key={institution} className="border-border bg-card">
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <Card
+              key={institution}
+              className={cn("border-border bg-card", dragging?.kind === "bank" && dragging.id === institution && "opacity-50")}
+              onDragOver={(e) => dragging?.kind === "bank" && e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                dropBank(bankNames, institution);
+              }}
+            >
+              <CardHeader
+                className="flex cursor-pointer flex-row items-center justify-between gap-2"
+                draggable
+                onDragStart={() => setDragging({ kind: "bank", id: institution })}
+                onDragEnd={() => setDragging(null)}
+                onClick={() => toggleBank(institution)}
+                aria-expanded={open}
+                title={tx("bank_drag_hint")}
+              >
                 <CardTitle className="flex items-center gap-2 text-sm text-foreground">
+                  <GripVertical className="size-4 cursor-grab text-muted-foreground" aria-hidden="true" />
+                  {open ? <ChevronDown className="size-4" aria-hidden="true" /> : <ChevronRight className="size-4" aria-hidden="true" />}
                   <BankLogoByName name={institution} />
                   {institution === t("banking_group_other") ? (
                     institution
                   ) : (
-                    <Link href={`/dashboard/banking/bank/${encodeURIComponent(institution)}`} className="hover:underline" title={tx("bank_detail_total")}>
+                    <Link href={`/dashboard/banking/bank/${encodeURIComponent(institution)}`} className="hover:underline" title={tx("bank_detail_total")} onClick={(e) => e.stopPropagation()}>
                       {institution}
                     </Link>
                   )}
@@ -287,6 +373,7 @@ export function BankingOverview({
                   </span>
                 </span>
               </CardHeader>
+              {open && (
               <CardContent className="p-0">
                 <ul className="divide-y divide-border border-t border-border">
                   {accounts.map((a) => {
@@ -295,9 +382,22 @@ export function BankingOverview({
                     return (
                       <li
                         key={a.key}
+                        draggable
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          setDragging({ kind: "account", id: a.key, bank: institution });
+                        }}
+                        onDragEnd={() => setDragging(null)}
+                        onDragOver={(e) => dragging?.kind === "account" && dragging.bank === institution && e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          dropAccount(institution, accounts.map((x) => x.key), a.key);
+                        }}
                         className={cn(
-                          "flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between",
+                          "flex cursor-grab flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between",
                           a.kind === "sandbox" && "bg-muted/30",
+                          dragging?.kind === "account" && dragging.id === a.key && "opacity-50",
                         )}
                       >
                         <div className="min-w-0">
@@ -373,6 +473,7 @@ export function BankingOverview({
                   })}
                 </ul>
               </CardContent>
+              )}
             </Card>
           );
         })}

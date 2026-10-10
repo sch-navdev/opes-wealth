@@ -128,6 +128,17 @@ describe("chainBalanceRows", () => {
   });
 });
 
+describe("chainBalanceRows with printed statement balances", () => {
+  it("anchors each statement on its own printed closing balance, not on the account's recorded 0", () => {
+    const row = (date: string, amount: number) => ({ date, description: "x", amount, balance: null });
+    const older = { accountRef: "", currency: "EUR", rows: [row("2026-08-20", -100)], openingBalance: 467.83, closingBalance: 367.83, periodEnd: "2026-08-10" };
+    const newer = { accountRef: "", currency: "EUR", rows: [row("2026-09-05", -157.66)], openingBalance: 367.83, closingBalance: 210.17, periodEnd: "2026-09-10" };
+    const out = chainBalanceRows([{ key: "o", group: older }, { key: "n", group: newer }], 0);
+    expect(out.get("n")?.map((r) => [r.recorded_date, r.value])).toEqual([["2026-09-05", 210.17], ["2026-09-10", 210.17]]);
+    expect(out.get("o")?.[0].value).toBe(367.83);
+  });
+});
+
 describe("history source helpers", () => {
   it("keeps the base name only, trimmed and capped", () => {
     expect(cleanSourceRef("C:\\docs\\March 2026.pdf")).toBe("March 2026.pdf");

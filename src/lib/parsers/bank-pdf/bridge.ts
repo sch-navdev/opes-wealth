@@ -16,13 +16,15 @@ const PROFILE_ID: Record<PdfBankId, string> = {
   cbd: "cbd",
   hsbc_uae_card: "hsbc_uae_card",
   fab_card: "fab_card",
+  wio_card: "wio_card",
   banque_populaire_card: "banque_populaire_card",
 };
 
 /** An account without transactions still prints its balance brought forward and closing balance: keep them (dated) so the import can record them. */
 function emptyAccountBalances(a: PdfAccountStatement): { balances?: { date: string; balance: number }[] } {
   const out = new Map<string, number>();
-  if (a.periodStart && a.openingBalance !== null) out.set(a.periodStart, a.openingBalance);
+  // An account opened after the period started has no balance before it existed.
+  if (a.periodStart && a.openingBalance !== null && !(a.openedOn && a.openedOn > a.periodStart)) out.set(a.periodStart, a.openingBalance);
   if (a.periodEnd && a.closingBalance !== null) out.set(a.periodEnd, a.closingBalance);
   const balances = [...out.entries()].sort(([x], [y]) => x.localeCompare(y)).map(([date, balance]) => ({ date, balance }));
   return balances.length > 0 ? { balances } : {};
@@ -43,6 +45,8 @@ export function statementToParseResult(statement: PdfStatement): StatementParseR
     ...(a.accountName ? { accountName: a.accountName } : {}),
     ...(a.openedOn ? { openedOn: a.openedOn } : {}),
     ...(a.periodEnd ? { periodEnd: a.periodEnd } : {}),
+    // Cards are left out: what is owed on a card is settled on the current account, not carried as a balance.
+    ...(a.transactions.length > 0 && !statement.bank.endsWith("_card") ? { openingBalance: a.openingBalance, closingBalance: a.closingBalance } : {}),
     ...(a.parentRef ? { parentRef: a.parentRef } : {}),
   }));
 

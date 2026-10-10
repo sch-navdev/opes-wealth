@@ -61,6 +61,7 @@ export const BATCH_EN = {
   batch_edited_mismatch: "After your edits the totals still do not match the statement.",
   batch_rollover_q: "{n} accounts named “{name}” ({refs}) were closed and reopened on the same day. Is this one savings space renewed under a new number (for example to add the interest to the capital)?",
   batch_card_chain_q: "These cards ({refs}) are settled on the same account, so {current} replaces the older ones. All their statements go to ONE card account named after the most recent card, with the old numbers kept in its history. Correct?",
+  batch_balance_repaired: "Balance history of {account} recomputed from the balances printed on the statement (no transaction added).",
   batch_rollover_yes: "Yes, treat them as one account",
   batch_rollover_no: "No, keep them separate",
   batch_rollover_note: "Part of the renewed account “{name}”: all its statements go to one account, with the old numbers kept in its history.",

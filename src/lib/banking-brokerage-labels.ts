@@ -56,6 +56,7 @@ export const BANKING_EN = {
   bank_hide_closed: "Hide closed accounts",
   bank_closed_badge: "Closed {date}",
   bank_delete_all_placeholder: "Type the bank name here to unlock the button",
+  bank_drag_hint: "Click to show or hide the accounts. Drag to move the bank.",
   bank_source_pdf: "PDF statement",
   bank_source_csv: "CSV import",
   bank_asof_legend:

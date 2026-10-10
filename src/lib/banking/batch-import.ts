@@ -136,15 +136,26 @@ export function chainBalanceRows(
   let anchor = currentValue;
   for (let i = groups.length - 1; i >= 0; i--) {
     const { key, group } = groups[i];
-    const rows = toBalanceRows(group, anchor);
+    // A statement that prints its closing balance anchors its own rows: the account's recorded value (0 for a
+    // brand-new account) is only a fallback for statements that do not.
+    const printed = typeof group.closingBalance === "number" && Number.isFinite(group.closingBalance) ? group.closingBalance : null;
+    const groupAnchor = printed ?? anchor;
+    const rows = toBalanceRows(group, groupAnchor);
+    // The balance on the statement date itself, when no row falls on it.
+    if (printed !== null && group.periodEnd && rows.length > 0 && !rows.some((r) => r.recorded_date >= (group.periodEnd as string))) {
+      rows.push({ recorded_date: group.periodEnd, value: printed });
+    }
     out.set(key, rows);
     if (rows.length > 0) {
       const sorted = [...group.rows].sort((a, b) => a.date.localeCompare(b.date));
       const total = sorted.reduce((s, r) => s + r.amount, 0);
       const ownBalances = sorted.length > 0 && sorted.every((r) => r.balance !== null);
-      anchor = ownBalances
-        ? Math.round(((sorted[0].balance as number) - sorted[0].amount) * 100) / 100
-        : Math.round((anchor - total) * 100) / 100;
+      anchor =
+        typeof group.openingBalance === "number" && Number.isFinite(group.openingBalance)
+          ? group.openingBalance
+          : ownBalances
+            ? Math.round(((sorted[0].balance as number) - sorted[0].amount) * 100) / 100
+            : Math.round((groupAnchor - total) * 100) / 100;
     }
   }
   return out;

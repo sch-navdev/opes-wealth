@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { LanguageProvider } from "@/context/language-context";
 import { PrivacyProvider } from "@/context/privacy-context";
@@ -23,7 +23,7 @@ const row = (key: string, institution: string, balanceAsOf: string | null | unde
   ...extra,
 });
 
-function renderOverview(rows: BankingAccountRow[]) {
+function renderCollapsed(rows: BankingAccountRow[]) {
   return render(
     <LanguageProvider>
       <PrivacyProvider>
@@ -31,6 +31,13 @@ function renderOverview(rows: BankingAccountRow[]) {
       </PrivacyProvider>
     </LanguageProvider>,
   );
+}
+
+/** Banks start collapsed (name and total only): open them all to read the accounts. */
+function renderOverview(rows: BankingAccountRow[]) {
+  const view = renderCollapsed(rows);
+  document.querySelectorAll('[aria-expanded="false"]').forEach((el) => fireEvent.click(el));
+  return view;
 }
 
 describe("Banking overview: balance as-of marker", () => {
@@ -65,5 +72,35 @@ describe("Banking overview: balance as-of marker", () => {
     renderOverview([row("a", "Wio Bank", null), row("s", "Wio Bank", "2020-01-01", { kind: "sandbox" })]);
     expect(screen.getByText("Balance date unknown")).toBeInTheDocument();
     expect(screen.queryByText(/Stale: d+ days old/)).toBeNull();
+  });
+});
+
+describe("Banking overview: collapsed banks and drag to reorder", () => {
+  const rows = () => [
+    row("a", "Wio Bank", "2026-10-08", { name: "Wio current" }),
+    row("b", "Wio Bank", "2026-10-08", { name: "Wio savings" }),
+    row("c", "ADCB", "2026-10-08", { name: "ADCB current" }),
+  ];
+
+  it("shows only the bank name and total until the bank is opened", () => {
+    window.localStorage.clear();
+    renderCollapsed(rows());
+    expect(screen.getAllByText("Wio Bank").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Wio current")).toBeNull();
+    fireEvent.click(document.querySelector('[aria-expanded="false"]') as Element);
+    expect(document.querySelector('[aria-expanded="true"]')).not.toBeNull();
+  });
+
+  it("moves a bank above another when it is dropped on it, and remembers the order", () => {
+    window.localStorage.clear();
+    renderCollapsed(rows());
+    const headers = () => [...document.querySelectorAll("[aria-expanded]")];
+    const names = () => headers().map((h) => h.textContent ?? "");
+    const first = names()[0];
+    const second = names()[1];
+    fireEvent.dragStart(headers()[1]);
+    fireEvent.drop(headers()[0].closest('[class*="border-border"]') as Element);
+    expect([names()[0], names()[1]]).toEqual([second, first]);
+    expect(window.localStorage.getItem("opes-banking-order")).toContain('"banks"');
   });
 });

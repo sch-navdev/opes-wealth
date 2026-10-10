@@ -29,7 +29,7 @@ describe("wioProfile.detect", () => {
 });
 
 describe("wioProfile.parse (synthetic multi-account fixture)", () => {
-  it("returns one account per account with transactions, in order", () => {
+  it("returns the accounts with transactions in order, then the ones only the summary lists", () => {
     const s = parseOk();
     expect(s.bank).toBe("wio");
     expect(s.bankName).toBe("Wio Bank");
@@ -37,6 +37,8 @@ describe("wioProfile.parse (synthetic multi-account fixture)", () => {
       ["AE000000000000123456789", "AED"],
       ["AE000000000000987654321", "USD"],
       ["0000000003", "AED"],
+      ["0000000001", "AED"],
+      ["0000000002", "AED"],
     ]);
     expect(s.warnings).toEqual([]);
   });
@@ -161,5 +163,15 @@ describe("wioProfile account closure", () => {
 
   it("leaves every account open when no closure is printed", () => {
     expect(parseOk().accounts.every((a) => !a.closedOn)).toBe(true);
+  });
+});
+
+describe("wioProfile.parse: accounts with no transaction", () => {
+  it("keeps an account the summary lists on its printed balance, with no transactions", () => {
+    const quiet = parseOk().accounts.find((a) => a.accountRef === "0000000001");
+    expect(quiet?.transactions).toEqual([]);
+    expect([quiet?.openingBalance, quiet?.closingBalance]).toEqual([1005.25, 1005.25]);
+    expect(quiet?.accountName).toBe("Rainy Day");
+    expect(quiet?.periodEnd).toBe("2026-02-26");
   });
 });

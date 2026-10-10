@@ -98,6 +98,13 @@ export function IncomeCalendar({
   const shown = (m: IncomeCalendarData["months"][number]) =>
     view === "gross" ? combined(m) : view === "liabilities" ? m.liabilityTotal : view === "net" ? Math.abs(netOf(m)) : Math.max(combined(m), m.liabilityTotal, Math.abs(netOf(m)));
   const max = Math.max(0, ...calendar.months.map(shown));
+  // Running net: what you are ahead (or behind) at the end of each month, counted from the first.
+  const running = new Map<string, number>();
+  calendar.months.reduce((sum, mo) => {
+    const next = sum + netOf(mo);
+    running.set(mo.month, next);
+    return next;
+  }, 0);
   const grossAnnual = calendar.annualTotal + (showEarned ? earnedAnnual : 0);
   const netAnnual = grossAnnual - calendar.liabilityAnnual;
   const empty = calendar.annualTotal <= 0 && !(showEarned && earnedAnnual > 0) && calendar.liabilityAnnual <= 0;
@@ -285,6 +292,9 @@ export function IncomeCalendar({
                             <span className="block text-success">{maskValue(money.format(combined(m)))}</span>
                             <span className="block text-destructive">{maskValue(money.format(-m.liabilityTotal))}</span>
                             <span className={cn("block font-medium", netOf(m) < 0 ? "text-destructive" : "text-foreground")}>{maskValue(money.format(netOf(m)))}</span>
+                            <span className={cn("block border-t border-border pt-0.5", (running.get(m.month) ?? 0) < 0 ? "text-destructive" : "text-muted-foreground")} title={tt("cf_cal_running_hint")}>
+                              Σ {maskValue(money.format(running.get(m.month) ?? 0))}
+                            </span>
                           </>
                         ) : (
                           maskValue(money.format(view === "net" ? netOf(m) : view === "liabilities" ? -m.liabilityTotal : combined(m)))
@@ -334,8 +344,14 @@ export function IncomeCalendar({
             <div aria-live="polite" className="rounded-md border border-border">
               {open ? (
                 <div className="space-y-2 p-3">
-                  <p className="text-sm font-medium text-foreground">
+                  <p className="flex flex-wrap items-center gap-3 text-sm font-medium text-foreground">
                     {t("ical_month_detail", { month: monthLabel.long(open.month) })}
+                    <Link
+                      href={`/dashboard/income-calendar?from=${open.month}&months=12&month=${open.month}`}
+                      className="text-xs font-normal text-primary hover:underline"
+                    >
+                      {tt("cf_cal_day_by_day")}
+                    </Link>
                   </p>
                   {(view === "liabilities" || view === "all") && (
                     open.liabilityItems.length === 0 ? (

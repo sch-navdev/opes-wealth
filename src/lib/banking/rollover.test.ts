@@ -72,3 +72,35 @@ describe("findCardChains", () => {
     expect(findCardChains([m("a", "CB 7592", "2026-01-02", "111111"), m("b", "CB 5609", "2026-07-10", "222222")])).toEqual([]);
   });
 });
+
+describe("findRolloverChains: name variants and repeated accounts", () => {
+  it("treats the same name in another case or word order as the same space (Papa Fixed Saving Space)", () => {
+    const chains = findRolloverChains([
+      { key: "a", ref: "1", name: "Papa Fixed Saving Space", openedOn: "2026-07-25", closedOn: "2026-08-24" },
+      { key: "b", ref: "2", name: "Fixed Saving Space PAPA", openedOn: "2026-08-24", closedOn: "2026-08-24" },
+      { key: "c", ref: "3", name: "Fixed Saving Space Papa", openedOn: "2026-08-24" },
+    ]);
+    expect(chains).toHaveLength(1);
+    expect(chains[0].refs).toEqual(["1", "2", "3"]);
+  });
+
+  it("keeps a space with another name apart, even when it is closed the same day", () => {
+    const chains = findRolloverChains([
+      { key: "a", ref: "1", name: "Fixed Saving Space", openedOn: "2026-02-01", closedOn: "2026-02-21" },
+      { key: "b", ref: "2", name: "Fixed Saving Space Papa", openedOn: "2026-02-21" },
+    ]);
+    expect(chains).toEqual([]);
+  });
+
+  it("follows one account across the several statements it appears in", () => {
+    const chains = findRolloverChains([
+      { key: "aug:3", ref: "3", name: "Papa Fixed Saving Space", openedOn: "2026-08-24" },
+      { key: "sep:0", ref: "3", name: "Papa Fixed Saving Space", openedOn: "2026-08-24", closedOn: "2026-09-23" },
+      { key: "aug:1", ref: "1", name: "Papa Fixed Saving Space", openedOn: "2026-07-25", closedOn: "2026-08-24" },
+      { key: "sep:1", ref: "4", name: "Papa Fixed Saving Space", openedOn: "2026-09-23" },
+    ]);
+    expect(chains).toHaveLength(1);
+    expect(chains[0].refs).toEqual(["1", "3", "4"]);
+    expect([...chains[0].keys].sort()).toEqual(["aug:1", "aug:3", "sep:0", "sep:1"]);
+  });
+});

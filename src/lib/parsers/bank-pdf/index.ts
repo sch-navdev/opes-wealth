@@ -15,13 +15,14 @@ import { hsbcProfile } from "./hsbc";
 import { hsbcCardProfile } from "./hsbc-card";
 import type { BankPdfProfile, PdfBankId, PdfFailureCode, PdfParseOutcome } from "./types";
 import { wioProfile } from "./wio";
+import { wioCardProfile } from "./wio-card";
 
 export * from "./types";
 export { classifyPdfText } from "./classify";
 export type { PdfTextKind } from "./classify";
 
 /** Detection order matters: the first profile whose `detect` is true wins. */
-export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioProfile, fabCardProfile, fabProfile, banquePopulaireCardProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
+export const PDF_BANK_PROFILES: BankPdfProfile[] = [wioCardProfile, wioProfile, fabCardProfile, fabProfile, banquePopulaireCardProfile, banquePopulaireProfile, hsbcCardProfile, hsbcProfile, cbiProfile, cbdProfile];
 
 export const PDF_FAILURE_MESSAGE_KEYS = {
   encrypted: "bank_pdf_error_encrypted",

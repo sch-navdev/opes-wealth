@@ -626,7 +626,10 @@ export function BankStatementBatch({
     const selectedCount = group.rows.reduce((n, _r, j) => n + (isSelected(j) ? 1 : 0), 0);
     const routed = !!account && !mismatch;
     const balanceOnly = group.rows.length === 0 && (group.balances?.length ?? 0) > 0;
-    return { state, account, mismatch, check, flags, batchDup, batchDupCount, overlapWith: bc?.overlapWith ?? [], alreadyCount, fullyImported, isSelected, selectedCount, routed, balanceOnly };
+    // Already imported, but the statement prints its closing balance and its rows carry none: the stored balance
+    // history may have been anchored on 0 by an earlier import, so it is recomputed from the printed balances.
+    const repairsBalance = fullyImported && typeof group.closingBalance === "number" && group.rows.some((r) => r.balance === null);
+    return { state, account, mismatch, check, flags, batchDup, batchDupCount, overlapWith: bc?.overlapWith ?? [], alreadyCount, fullyImported, isSelected, selectedCount, routed, balanceOnly, repairsBalance };
   }
 
   function setTicks(it: BatchItem, gi: number, values: boolean[]) {
@@ -696,14 +699,14 @@ export function BankStatementBatch({
           push(job, line("error", t("stmt_currency_mismatch", { file: group.currency, account: plan.account.currency })));
           continue;
         }
-        if (plan.fullyImported) {
+        if (plan.fullyImported && !plan.repairsBalance) {
           // Nothing new, but the statement still proves the account is open as of its end date.
           const through = group.periodEnd ?? groupPeriod(group)?.end;
           if (through && plan.state.target !== NEW) await recordStatementCoverage(plan.account.id, through);
           push(job, line("skip", t("stmt_result_all_imported")), { dup: group.rows.length });
           continue;
         }
-        if (plan.selectedCount === 0 && !plan.balanceOnly) {
+        if (plan.selectedCount === 0 && !plan.balanceOnly && !plan.repairsBalance) {
           push(job, line("skip", t("stmt_result_none_selected")), { ...unselectedStats(plan, group) });
           continue;
         }
@@ -743,7 +746,7 @@ export function BankStatementBatch({
       const closeIfDue = async (accountId: string, job: { it: BatchItem; gi: number; group: StatementGroup }) => {
         if (!job.group.closedOn) return;
         const chain = mergedChain(`${job.it.id}:${job.gi}`);
-        if (chain && chain.keys[chain.keys.length - 1] !== `${job.it.id}:${job.gi}`) return;
+        if (chain && accountTail(chain.refs[chain.refs.length - 1]) !== accountTail(job.group.accountRef)) return;
         await markCashAccountClosed(accountId, job.group.closedOn);
       };
       for (const job of ordered) {
@@ -803,6 +806,10 @@ export function BankStatementBatch({
         addRefHistory(account.id, job);
         await markCovered(account.id, group);
         await closeIfDue(account.id, job);
+        if (plan.repairsBalance) {
+          push(job, line("ok", bt("batch_balance_repaired", { account: account.name })), { dup: group.rows.length });
+          continue;
+        }
         const all = toImportTx(group);
         const occurrences = occurrenceIndexes(all);
         const chosen = all.flatMap((tx, j) => (plan.isSelected(j) ? [{ ...tx, occurrence: occurrences[j] }] : []));
@@ -853,8 +860,8 @@ export function BankStatementBatch({
   const plansByItem = new Map(readyItems.map((it) => [it.id, (it.parsed as StatementParseResult).groups.map((g, gi) => groupPlan(it, g, gi))]));
   const allPlans = Array.from(plansByItem.values()).flat();
   const routed = allPlans.filter((pl) => pl.routed);
-  const importCount = routed.reduce((n, pl) => n + (pl.balanceOnly ? 1 : pl.selectedCount), 0);
-  const importFiles = readyItems.filter((it) => (plansByItem.get(it.id) ?? []).some((pl) => pl.routed && (pl.balanceOnly || pl.selectedCount > 0))).length;
+  const importCount = routed.reduce((n, pl) => n + (pl.balanceOnly || pl.repairsBalance ? 1 : pl.selectedCount), 0);
+  const importFiles = readyItems.filter((it) => (plansByItem.get(it.id) ?? []).some((pl) => pl.routed && (pl.balanceOnly || pl.repairsBalance || pl.selectedCount > 0))).length;
   const checking = allPlans.some((pl) => pl.check?.status === "loading");
   // Groups quietly set to "Don't import" (not by the user's own "never import" choice) are named, never silently dropped.
   const leftOut = readyItems.flatMap((it) =>

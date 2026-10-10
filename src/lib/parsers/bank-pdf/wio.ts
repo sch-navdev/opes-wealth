@@ -144,6 +144,45 @@ function parseBlocks(lines: string[]): DetailBlock[] {
   return blocks;
 }
 
+type SummaryAccount = {
+  ref: string;
+  currency: string;
+  closing: number;
+  openedOn: string | null;
+  closedOn: string | null;
+  /** Name of a savings space; null for a current account. */
+  name: string | null;
+};
+
+/**
+ * "Summary of Accounts" (current accounts: IBAN, rate, opened, then "closing CCY") and "Summary of Savings" (name +
+ * account number + rate, opened, closure, then "closing CCY"). It lists EVERY account of the customer, including the
+ * ones that had no transaction in the month and so have no detail block or table: those still exist, with that balance.
+ */
+function parseSummary(lines: string[]): SummaryAccount[] {
+  const out: SummaryAccount[] = [];
+  let section: "accounts" | "savings" | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (/^Summary of Accounts/.test(line)) section = "accounts";
+    else if (/^Summary of Savings/.test(line)) section = "savings";
+    else if (/^(ACCOUNT STATEMENT|Please review|DateRef)/.test(line)) section = null;
+    if (!section) continue;
+    const amount = /^(-?[\d,]+(?:\.\d+)?)\s+([A-Z]{3})$/.exec((lines[i + 1] ?? "").trim());
+    if (!amount) continue;
+    const closing = parseMoney(amount[1]);
+    if (closing === null) continue;
+    if (section === "accounts") {
+      const m = /^([A-Z]{2}\d{21})\d+(?:\.\d+)?%(\d{2}\/\d{2}\/\d{4})$/.exec(line);
+      if (m) out.push({ ref: m[1], currency: amount[2], closing, openedOn: parseDmy(m[2]), closedOn: null, name: null });
+    } else {
+      const m = /^(.+?)(\d{10})\d+(?:\.\d+)?%(\d{2}\/\d{2}\/\d{4})(\d{2}\/\d{2}\/\d{4})?$/.exec(line);
+      if (m) out.push({ ref: m[2], currency: amount[2], closing, openedOn: parseDmy(m[3]), closedOn: m[4] ? parseDmy(m[4]) : null, name: squash(m[1]) });
+    }
+  }
+  return out;
+}
+
 function parseTables(lines: string[]): RawTable[] {
   const tables: RawTable[] = [];
   let cur: RawTable | null = null;
@@ -349,6 +388,29 @@ function parse(text: string): PdfParseOutcome {
           : {}),
       }),
     );
+
+  // Accounts the summary lists but that had no transaction this month: they still exist, on the printed balance.
+  // Without this a quiet account (a EUR account with no movement) would look abandoned.
+  const seen = new Set(outAccounts.map((a) => a.accountRef));
+  for (const s of parseSummary(lines)) {
+    // A closed account with no movement is not an account to create from this statement.
+    if (seen.has(s.ref) || s.closedOn || (periodEnd && s.openedOn && s.openedOn > periodEnd)) continue;
+    seen.add(s.ref);
+    outAccounts.push(
+      buildAccount({
+        accountRef: s.ref,
+        currency: s.currency,
+        periodStart,
+        periodEnd,
+        openingBalance: s.closing,
+        closingBalance: s.closing,
+        transactions: [],
+        ...(s.name ? { accountName: s.name } : {}),
+        ...(s.openedOn ? { openedOn: s.openedOn } : {}),
+        ...(s.closedOn && periodEnd && s.closedOn <= periodEnd && s.closing === 0 ? { closedOn: s.closedOn } : {}),
+      }),
+    );
+  }
 
   outAccounts.forEach((a, i) => {
     if (a.reconciliation.status === "mismatch") {

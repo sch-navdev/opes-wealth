@@ -164,6 +164,8 @@ describe("Banking page: Company accounts group", () => {
 
   it("lists company accounts apart, labelled with the company, and still counts them in the real total", () => {
     overview([row("p1"), row("c1", { companyName: "Acme Trading LLC", baseBalance: 900, balance: 900 })]);
+    // Banks start collapsed: open the personal one to read its accounts.
+    document.querySelectorAll('[aria-expanded="false"]').forEach((el) => fireEvent.click(el));
     const section = screen.getByTestId("banking-company-accounts");
     expect(within(section).getByRole("heading", { name: /Company accounts/ })).toBeInTheDocument();
     expect(within(section).getByText("Company: Acme Trading LLC")).toBeInTheDocument();

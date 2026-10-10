@@ -63,3 +63,24 @@ describe("IncomeCalendarExplorer", () => {
     expect(nav.push).toHaveBeenLastCalledWith("?from=2026-11&months=3");
   });
 });
+
+describe("IncomeCalendarExplorer day by day and what-if", () => {
+  it("shows the chosen month as a day grid", async () => {
+    renderIt();
+    expect(screen.getByTestId("income-days")).toBeTruthy();
+    expect(document.querySelectorAll("[data-day]").length).toBe(30);
+    await userEvent.click(screen.getByRole("button", { name: "Dec 26" }));
+    expect(document.querySelectorAll("[data-day]").length).toBe(31);
+  });
+
+  it("adds a what-if income and counts it", async () => {
+    window.localStorage.clear();
+    renderIt();
+    await userEvent.type(screen.getByPlaceholderText("Rent of the new flat"), "Marina rent");
+    await userEvent.type(screen.getByLabelText(/Amount \(USD\)/), "5000");
+    await userEvent.type(screen.getByPlaceholderText("Marina flat (simulation)"), "Marina flat");
+    await userEvent.click(screen.getByRole("button", { name: "Add to the simulation" }));
+    expect(screen.getByText(/Marina rent/)).toBeTruthy();
+    expect(screen.getByText(/The what-if entries add/)).toBeTruthy();
+  });
+});

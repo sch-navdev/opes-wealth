@@ -217,6 +217,7 @@ export const PROFILE_LOGO_BANKS: LogoBank[] = [
   { key: "hsbc_uae_card", name: "HSBC UAE credit card", domain: "hsbc.ae" },
   { key: "cbi", name: "Commercial Bank International (CBI)", domain: "cbi.ae" },
   { key: "cbd", name: "Commercial Bank of Dubai (CBD)", domain: "cbd.ae" },
+  { key: "wio_card", name: "Wio Bank credit card", domain: "wio.io" },
   { key: "fab_card", name: "First Abu Dhabi Bank credit card", domain: "bankfab.com" },
   { key: "banque_populaire_card", name: "Banque Populaire card", domain: "www.banquepopulaire.fr" },
 ];

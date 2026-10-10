@@ -265,7 +265,7 @@ describe("BankStatementImportDialog bank picker, PDF success", () => {
     await userEvent.click(await screen.findByRole("button", { name: /Read 1 scanned PDF\(s\) with OCR/ }));
     await userEvent.click(await screen.findByRole("button", { name: /Yes, read 1 file\(s\) with OCR/ }));
     await screen.findByText("FAKE SHOP");
-    await choose("batch-bank-0", /Wio Bank/);
+    await choose("batch-bank-0", /Wio Bank$/);
     expect(await screen.findByText("WIO SHOP")).toBeTruthy();
     expect(sentForm(2).get("bank")).toBe("wio");
     expect(sentForm(2).get("ocr")).toBe("1");
@@ -329,7 +329,7 @@ describe("BankStatementImportDialog bank picker, PDF failures", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     const options = await openSelect("batch-bank-0");
     expect(options.some((n) => /HSBC UAE/.test(n))).toBe(true);
-    await userEvent.click(screen.getByRole("option", { name: /Wio Bank/ }));
+    await userEvent.click(screen.getByRole("option", { name: /Wio Bank$/ }));
 
     expect(await screen.findByText("WIO SHOP")).toBeTruthy();
     const second = sentForm(1);
@@ -349,7 +349,7 @@ describe("BankStatementImportDialog bank picker, PDF failures", () => {
     await choose("batch-bank-0", /First Abu Dhabi Bank \(FAB\)/);
     await screen.findByRole("alert");
     expect(screen.getByTestId("batch-bank-0")).toHaveTextContent(/First Abu Dhabi Bank/);
-    await choose("batch-bank-0", /Wio Bank/);
+    await choose("batch-bank-0", /Wio Bank$/);
     expect(await screen.findByText("WIO SHOP")).toBeTruthy();
     expect(sentForm(2).get("bank")).toBe("wio");
   });

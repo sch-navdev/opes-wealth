@@ -23,7 +23,19 @@ export type RolloverChain = {
   refs: string[];
 };
 
-const normalName = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * The name of a space as a comparison key: case, word order, spacing and stray digits are ignored, so "Papa Fixed
+ * Saving Space", "Fixed Saving Space Papa", "Fixed Saving Space PAPA" and "Papa 2Fixed Saving Space" are the same
+ * space written four ways. A name with an extra or missing word ("Fixed Saving Space" without "Papa") is another one.
+ */
+const normalName = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\d+/g, " ")
+    .split(/[^\p{L}]+/u)
+    .filter(Boolean)
+    .sort()
+    .join(" ");
 
 function dayNumber(iso: string): number {
   return Math.round(Date.parse(`${iso}T00:00:00Z`) / 86_400_000);
@@ -41,7 +53,23 @@ function renews(prev: RolloverMember, next: RolloverMember): boolean {
  * opened. An account that is still open ends its chain; two unrelated accounts that share a name (no matching
  * dates) are never joined.
  */
-export function findRolloverChains(members: RolloverMember[]): RolloverChain[] {
+export function findRolloverChains(allMembers: RolloverMember[]): RolloverChain[] {
+  // The same account printed on several statements (it stays open across months) is ONE account: its dates are
+  // widened (earliest opening, any closure) and every statement group of it follows the chain.
+  const merged = new Map<string, RolloverMember & { allKeys: string[] }>();
+  for (const m of allMembers) {
+    if (!m.name) continue;
+    const cur = merged.get(m.ref);
+    if (!cur) {
+      merged.set(m.ref, { ...m, allKeys: [m.key] });
+      continue;
+    }
+    cur.allKeys.push(m.key);
+    cur.openedOn = [cur.openedOn, m.openedOn].filter((x): x is string => !!x).sort()[0];
+    cur.closedOn = cur.closedOn ?? m.closedOn;
+  }
+  const keysOf = new Map<string, string[]>([...merged.values()].map((m) => [m.key, m.allKeys]));
+  const members = [...merged.values()];
   const byName = new Map<string, RolloverMember[]>();
   for (const m of members) {
     if (!m.name) continue;
@@ -66,7 +94,7 @@ export function findRolloverChains(members: RolloverMember[]): RolloverChain[] {
       }
       if (chain.length >= 2) {
         chain.forEach((m) => used.add(m.key));
-        chains.push({ name: start.name as string, keys: chain.map((m) => m.key), refs: chain.map((m) => m.ref) });
+        chains.push({ name: start.name as string, keys: chain.flatMap((m) => keysOf.get(m.key) ?? [m.key]), refs: chain.map((m) => m.ref) });
       }
     }
   }

@@ -53,10 +53,10 @@ export function buildLiabilitySchedule(
   const put = (index: number, item: LiabilityCalendarItem) => {
     if (index >= 0 && index < months.length && item.amount > 0) months[index].push(item);
   };
-  const monthly = (asset: PassiveIncomeAsset, kind: LiabilityKind, payment: number, until?: string) => {
+  const monthly = (asset: PassiveIncomeAsset, kind: LiabilityKind, payment: number, until?: string, day = 1) => {
     keys.forEach((key, i) => {
       if (until && key >= until) return;
-      put(i, { assetId: asset.id, name: asset.name, kind, amount: toBase(payment, asset.currency), date: `${key}-01` });
+      put(i, { assetId: asset.id, name: asset.name, kind, amount: toBase(payment, asset.currency), date: `${key}-${String(day).padStart(2, "0")}` });
     });
   };
   const dated = (asset: PassiveIncomeAsset, kind: LiabilityKind, due: string, amount: number) => {
@@ -83,7 +83,9 @@ export function buildLiabilitySchedule(
       const payment = loan?.monthly_payment;
       if (typeof payment === "number" && payment > 0) {
         const until = isIso(loan?.start_date) && loan?.duration_months ? monthAfter(loan.start_date, loan.duration_months) : undefined;
-        monthly(asset, "mortgage", payment, until);
+        // Instalments fall on the day of the month the loan started (capped at the 28th so every month has it).
+        const day = isIso(loan?.start_date) ? Math.min(28, Math.max(1, Number(loan.start_date.slice(8, 10)) || 1)) : 1;
+        monthly(asset, "mortgage", payment, until, day);
       }
       if (re.is_offplan) {
         for (const m of re.payment_schedule) {
