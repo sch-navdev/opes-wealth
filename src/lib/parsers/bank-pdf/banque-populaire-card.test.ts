@@ -45,6 +45,7 @@ describe("banquePopulaireCardProfile", () => {
     const [acc] = out.statement.accounts;
     expect(out.statement.bank).toBe("banque_populaire_card");
     expect(acc.accountRef).toBe("CB 1234");
+    expect(acc.parentRef).toBe("00000000001");
     expect(acc.currency).toBe("EUR");
     expect(acc.periodEnd).toBe("2026-02-02");
     expect(acc.transactions).toHaveLength(2);

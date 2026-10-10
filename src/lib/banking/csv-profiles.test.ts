@@ -339,3 +339,11 @@ describe("routeGroup", () => {
     });
   });
 });
+
+describe("routeGroup replaced card", () => {
+  it("routes a new card number to the saved card settled on the same account", () => {
+    const accounts = [{ id: "old", name: "Card", currency: "EUR", bankProfile: "banque_populaire_card", accountRef: "CB 7592", parentRef: "31719621257" }];
+    expect(routeGroup({ accountRef: "CB 5609", currency: "EUR", parentRef: "31719621257" }, "banque_populaire_card", accounts)).toEqual({ kind: "matched", assetId: "old", reason: "parent_account" });
+    expect(routeGroup({ accountRef: "CB 5609", currency: "EUR", parentRef: "999999" }, "banque_populaire_card", accounts).kind).toBe("unmatched");
+  });
+});

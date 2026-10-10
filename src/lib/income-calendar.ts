@@ -92,6 +92,8 @@ export type IncomeCalendarMonth = {
 export type IncomeCalendar = {
   months: IncomeCalendarMonth[];
   annualTotal: number;
+  /** Number of months built. */
+  monthCount: number;
   /** Payments due over the 12 months (see `liabilities` of each month). */
   liabilityAnnual: number;
   monthlyAverage: number;
@@ -113,12 +115,15 @@ export type IncomeCalendarInput = {
   baseCurrency: string;
   /** ISO date (YYYY-MM-DD); the calendar starts with this date's month. */
   startDate: string;
+  /** How many calendar months to build (default 12, at most 120). */
+  months?: number;
   /** Optional earned-income streams (salary, bonus...) for the separate earned-income layer. */
   streams?: IncomeStream[];
 };
 
-const MONTHS = 12;
-const QUARTER_INDEXES = [2, 5, 8, 11];
+/** Months of the default calendar (the dashboard card); the full-page calendar can ask for more. */
+export const DEFAULT_CALENDAR_MONTHS = 12;
+export const MAX_CALENDAR_MONTHS = 120;
 
 const emptyBySource = (): Record<PassiveIncomeSource, number> => ({
   reit: 0,
@@ -184,6 +189,8 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
 
   const startYear = Number(startDate.slice(0, 4));
   const startMonth = Number(startDate.slice(5, 7)) - 1;
+  const MONTHS = Math.min(MAX_CALENDAR_MONTHS, Math.max(1, Math.round(input.months ?? DEFAULT_CALENDAR_MONTHS)));
+  const years = MONTHS / 12;
   const months: IncomeCalendarMonth[] = Array.from({ length: MONTHS }, (_, i) => ({
     month: monthKey(startYear, startMonth + i),
     total: 0,
@@ -240,7 +247,8 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
       }
     } else if (row.projected > 0) {
       const receipts = receiptsOf(asset, row.source);
-      const perMonth = keys.map((key) => {
+      // The first 12 months copy what was paid a year earlier; every later year repeats that pattern.
+      const firstYear = keys.slice(0, 12).map((key) => {
         const prev = yearAgoKey(key);
         const hits = receipts.filter((r) => r.date.slice(0, 7) === prev && r.amount > 0);
         return {
@@ -248,19 +256,22 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
           date: hits.length ? shiftYear(hits.map((h) => h.date).sort().at(-1) as string, 1) : undefined,
         };
       });
-      const histTotal = perMonth.reduce((s, m) => s + m.amount, 0);
+      const histTotal = firstYear.reduce((s, m) => s + m.amount, 0);
       if (histTotal > 0) {
-        perMonth.forEach((m, i) => {
+        keys.forEach((_k, i) => {
+          const m = firstYear[i % 12];
           const amount = (row.projected * m.amount) / histTotal;
-          add({ ...base, amount, date: m.date, basis: "history" }, i);
+          add({ ...base, amount, date: m.date ? shiftYear(m.date, Math.floor(i / 12)) : undefined, basis: "history" }, i);
           annual += amount;
         });
       } else {
-        for (const i of QUARTER_INDEXES) {
-          const amount = row.projected / QUARTER_INDEXES.length;
+        // Four quarterly payments a year (months 3, 6, 9 and 12 of each 12-month stretch).
+        keys.forEach((_k, i) => {
+          if (i % 3 !== 2) return;
+          const amount = row.projected / 4;
           add({ ...base, amount, basis: "estimate" }, i);
           annual += amount;
-        }
+        });
       }
     }
 
@@ -294,7 +305,7 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
     if (!(cost > 0)) continue;
     costBasis += cost;
     marketValue += toBase(grossAssetValue(p.asset), p.asset.currency);
-    costedIncome += p.annual;
+    costedIncome += p.annual / years;
   }
 
   // Earned-income layer: attached to the months but kept out of every passive figure above.
@@ -317,6 +328,7 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
     annualTotal,
     liabilityAnnual,
     monthlyAverage: annualTotal / MONTHS,
+    monthCount: MONTHS,
     peakMonth,
     yieldOnCostPct: costBasis > 0 ? (costedIncome / costBasis) * 100 : null,
     currentYieldPct: marketValue > 0 ? (costedIncome / marketValue) * 100 : null,

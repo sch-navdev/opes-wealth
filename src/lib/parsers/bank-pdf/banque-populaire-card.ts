@@ -31,6 +31,7 @@ const TOTAL = new RegExp(`^TOTAL\\s*(${AMOUNT})\\s*€\\s*$`);
 const ORIGIN = /^\s*ORIGINE\s*:\s*(.+?)\s*$/;
 const RATE = /^\s*1\s*EURO\s*=\s*([\d,]+)\s*$/;
 const CARD = /^CB\*(\d{4})\b/;
+const PARENT = /VOTRE COMPTE N°\s*(\d{6,})/i;
 const TITLE = /relev[ée] mensuel d'op[ée]rations par carte bancaire au (\d{2})\/(\d{2})\/(\d{4})/i;
 
 export function isBanquePopulaireCardStatement(text: string): boolean {
@@ -118,6 +119,7 @@ function parse(text: string): PdfParseOutcome {
   const title = lines.map((l) => TITLE.exec(l)).find(Boolean) ?? null;
   const periodEnd = title ? isoDate(Number(title[3]), Number(title[2]), Number(title[1])) : null;
 
+  const parent = lines.map((l) => PARENT.exec(l)).find(Boolean)?.[1];
   let card: string | null = null;
   const totals: number[] = [];
   type Raw = GluedRow & { date: string; extra: string[]; originAmount?: number; rate?: number };
@@ -184,6 +186,7 @@ function parse(text: string): PdfParseOutcome {
               openingBalance: 0,
               closingBalance: total === null ? null : -total,
               transactions: [],
+              ...(parent ? { parentRef: parent } : {}),
             }),
           ],
         },
@@ -232,6 +235,7 @@ function parse(text: string): PdfParseOutcome {
           openingBalance: 0,
           closingBalance: total === null ? null : roundMoney(-total),
           transactions,
+          ...(parent ? { parentRef: parent } : {}),
         }),
       ],
     },

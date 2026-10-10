@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currentRef, findRolloverChains, mergeRefHistory, parseRefHistory } from "@/lib/banking/rollover";
+import { currentRef, findCardChains, findRolloverChains, mergeRefHistory, parseRefHistory } from "@/lib/banking/rollover";
 
 describe("findRolloverChains", () => {
   it("joins a savings space closed and reopened the same day, oldest first (the Wio 'Papa Fixed Saving Space' case)", () => {
@@ -56,5 +56,19 @@ describe("ref history", () => {
     expect(parseRefHistory([{ ref: "A", from: "2026-01-01", to: null }, { nope: 1 }, "x", null])).toEqual([{ ref: "A", from: "2026-01-01", to: null }]);
     expect(parseRefHistory("x")).toEqual([]);
     expect(currentRef([])).toBeNull();
+  });
+});
+
+describe("findCardChains", () => {
+  const m = (key: string, ref: string, periodEnd: string, parentRef = "31719621257") => ({ key, ref, parentRef, profileId: "banque_populaire_card", currency: "EUR", periodEnd });
+  it("chains cards settled on the same account, oldest statement first, the latest card last", () => {
+    const chains = findCardChains([m("c", "CB 5609", "2026-09-10"), m("a", "CB 7592", "2026-01-02"), m("b", "CB 7592", "2026-05-11"), m("d", "CB 5609", "2026-07-10")]);
+    expect(chains).toHaveLength(1);
+    expect(chains[0].keys).toEqual(["a", "b", "d", "c"]);
+    expect(chains[0].refs).toEqual(["CB 7592", "CB 5609"]);
+  });
+  it("does not chain one card, or cards of different accounts", () => {
+    expect(findCardChains([m("a", "CB 7592", "2026-01-02"), m("b", "CB 7592", "2026-02-10")])).toEqual([]);
+    expect(findCardChains([m("a", "CB 7592", "2026-01-02", "111111"), m("b", "CB 5609", "2026-07-10", "222222")])).toEqual([]);
   });
 });

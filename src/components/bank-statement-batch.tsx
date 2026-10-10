@@ -19,7 +19,7 @@ import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
 import { createStatementCashAccount, markCashAccountClosed, mergeAccountRefs, recordBalanceSnapshots, recordStatementCoverage, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import { readSkippedAccounts, setAccountSkipped, skipKey } from "@/lib/banking/skipped-accounts";
-import { findRolloverChains, type RefHistoryEntry } from "@/lib/banking/rollover";
+import { findCardChains, findRolloverChains, type RefHistoryEntry } from "@/lib/banking/rollover";
 import { checkExistingTransactions, importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import {
   accountTail,
@@ -511,7 +511,17 @@ export function BankStatementBatch({
         members.push({ key: `${it.id}:${gi}`, ref: g.accountRef, name: g.accountName, openedOn: g.openedOn, closedOn: g.closedOn }),
       );
     }
-    return findRolloverChains(members).map((c) => ({ ...c, id: c.keys[0] }));
+    const cards: Parameters<typeof findCardChains>[0] = [];
+    for (const it of items) {
+      if (it.status !== "ready" || !it.parsed) continue;
+      it.parsed.groups.forEach((g, gi) =>
+        cards.push({ key: `${it.id}:${gi}`, ref: g.accountRef, parentRef: g.parentRef, profileId: it.profileId || "", currency: g.currency, periodEnd: g.periodEnd ?? groupPeriod(g)?.end }),
+      );
+    }
+    return [
+      ...findRolloverChains(members).map((c) => ({ ...c, id: c.keys[0], card: false })),
+      ...findCardChains(cards).map((c) => ({ ...c, id: c.keys[0], card: true })),
+    ];
   }, [items]);
   const [chainMerge, setChainMerge] = useState<Record<string, boolean>>({});
   const [chainTarget, setChainTarget] = useState<Record<string, string>>({});
@@ -754,6 +764,7 @@ export function BankStatementBatch({
               bankProfile: it.profileId || "",
               institutionName: getBankProfile(it.profileId || "")?.name ?? "",
               accountRef: group.accountRef,
+              parentRef: group.parentRef,
             });
             if (!made.ok) {
               push(job, line("error", t("stmt_result_create_failed", { error: made.error })));
@@ -774,7 +785,7 @@ export function BankStatementBatch({
             push(job, line("error", snap.error));
             continue;
           }
-          if (it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
+          if (it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef, group.parentRef);
           addRefHistory(account.id, job);
           await markCovered(account.id, group);
           await closeIfDue(account.id, job);
@@ -788,7 +799,7 @@ export function BankStatementBatch({
           push(job, line("error", history.error));
           continue;
         }
-        if (plan.state.remember && it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
+        if (plan.state.remember && it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef, group.parentRef);
         addRefHistory(account.id, job);
         await markCovered(account.id, group);
         await closeIfDue(account.id, job);
@@ -951,9 +962,11 @@ export function BankStatementBatch({
       )}
 
       {chains.map((c) => (
-        <div key={c.id} role="group" aria-label={c.name} className="space-y-2 rounded-md border border-border bg-muted/30 p-3" data-testid={`rollover-${c.id}`}>
+        <div key={c.id} role="group" aria-label={c.name || c.refs.join(", ")} className="space-y-2 rounded-md border border-border bg-muted/30 p-3" data-testid={`rollover-${c.id}`}>
           <p className="text-sm text-foreground">
-            {bt("batch_rollover_q", { n: c.keys.length, name: c.name, refs: c.refs.map((r) => "···" + accountTail(r)).join(", ") })}
+            {c.card
+              ? bt("batch_card_chain_q", { refs: c.refs.map((r) => "···" + accountTail(r)).join(", "), current: "···" + accountTail(c.refs[c.refs.length - 1]) })
+              : bt("batch_rollover_q", { n: c.keys.length, name: c.name, refs: c.refs.map((r) => "···" + accountTail(r)).join(", ") })}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant={(chainMerge[c.id] ?? true) ? "default" : "outline"} aria-pressed={chainMerge[c.id] ?? true} onClick={() => setChainMerge((p) => ({ ...p, [c.id]: true }))}>

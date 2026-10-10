@@ -67,6 +67,7 @@ export const CF_EN = {
   cf_demo_note: "Demo mode: changes are not saved.",
   cf_cal_toggle: "Include earned income",
   cf_cal_view_label: "Calendar view",
+  cf_cal_open_full: "Open the full calendar: multi-year, charts and analysis",
   cf_cal_view_gross: "Gross income",
   cf_cal_view_liabilities: "Liabilities",
   cf_cal_view_net: "Net income",

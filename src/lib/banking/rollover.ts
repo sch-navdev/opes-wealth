@@ -73,6 +73,39 @@ export function findRolloverChains(members: RolloverMember[]): RolloverChain[] {
   return chains;
 }
 
+export type CardMember = {
+  key: string;
+  ref: string;
+  /** Account the card is settled on, as printed. */
+  parentRef?: string;
+  profileId: string;
+  currency: string;
+  /** Statement date: the most recent one belongs to the current card. */
+  periodEnd?: string | null;
+};
+
+/**
+ * Cards settled on the SAME account (same bank layout and currency) under different card numbers are one card that
+ * was replaced. Every statement group of those cards joins one chain, oldest statement first; the last one is the
+ * current card.
+ */
+export function findCardChains(members: CardMember[]): RolloverChain[] {
+  const byParent = new Map<string, CardMember[]>();
+  for (const m of members) {
+    if (!m.parentRef || !m.ref || !m.profileId) continue;
+    const k = [m.profileId, m.parentRef, m.currency.toUpperCase()].join("|");
+    byParent.set(k, [...(byParent.get(k) ?? []), m]);
+  }
+  const chains: RolloverChain[] = [];
+  for (const list of byParent.values()) {
+    const sorted = [...list].sort((a, b) => (a.periodEnd ?? "").localeCompare(b.periodEnd ?? ""));
+    const refs: string[] = [];
+    for (const m of sorted) if (!refs.includes(m.ref)) refs.push(m.ref);
+    if (refs.length >= 2) chains.push({ name: "", keys: sorted.map((m) => m.key), refs });
+  }
+  return chains;
+}
+
 /** One period during which an account number / card number belonged to the account. */
 export type RefHistoryEntry = { ref: string; from: string | null; to: string | null };
 

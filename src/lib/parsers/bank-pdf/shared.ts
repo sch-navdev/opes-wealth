@@ -96,6 +96,7 @@ export function buildAccount(input: {
   closedOn?: string | null;
   accountName?: string;
   openedOn?: string;
+  parentRef?: string;
 }): PdfAccountStatement {
   return { ...input, reconciliation: reconcile(input.openingBalance, input.closingBalance, input.transactions) };
 }

@@ -180,6 +180,7 @@ export default async function BankingPage({
     bankProfile: typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : undefined,
     accountRef: typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : undefined,
     refHistory: parseRefHistory(a.metadata?.ref_history).map((e) => e.ref),
+    parentRef: typeof a.metadata?.parent_ref === "string" ? a.metadata.parent_ref : undefined,
   }));
 
   return (

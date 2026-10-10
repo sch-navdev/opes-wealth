@@ -30,6 +30,7 @@ function data(over: Partial<Data> = {}): Data {
     months,
     annualTotal: 1500,
     liabilityAnnual: 0,
+    monthCount: 12,
     monthlyAverage: 125,
     peakMonth: "2025-11",
     yieldOnCostPct: 7.5,
@@ -163,5 +164,17 @@ describe("IncomeCalendar views", () => {
     expect(screen.getAllByText("Home loan").length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole("button", { name: /Net income/ }));
     expect(document.querySelector('[data-net="positive"]')).not.toBeNull();
+  });
+});
+
+describe("IncomeCalendar all-in-one view", () => {
+  it("shows gross, liabilities and net bars for each month by default", () => {
+    const calendar = data({ liabilityAnnual: 300 });
+    calendar.months[0] = { ...calendar.months[0], liabilityTotal: 300, liabilities: { ...calendar.months[0].liabilities, mortgage: 300 } };
+    renderIt(calendar);
+    expect(document.querySelector('[data-col="gross"]')).not.toBeNull();
+    expect(document.querySelector('[data-col="liabilities"] [data-liability="total"]')).not.toBeNull();
+    expect(document.querySelector('[data-col="net"] [data-net="positive"]')).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Income calendar" }).getAttribute("href")).toBe("/dashboard/income-calendar");
   });
 });

@@ -589,6 +589,8 @@ export type StatementGroup = {
   closedOn?: string;
   /** Name of a savings space / deposit as printed (Wio). Accounts of one bank with the same name may be one account renewed. */
   accountName?: string;
+  /** Account a card is settled on: the same one under another card number means the card was replaced. */
+  parentRef?: string;
   /** ISO date the account was opened, when printed. */
   openedOn?: string;
   /** ISO date of the statement period end (the card statement date for card layouts); the latest statement tells the current card. */
@@ -769,10 +771,12 @@ export type RoutableAccount = {
   accountRef?: string;
   /** Earlier account / card numbers of the same account (renewed savings space, replaced card). */
   refHistory?: string[];
+  /** Saved `metadata.parent_ref` of a card account. */
+  parentRef?: string;
 };
 
 export type RouteMatch =
-  | { kind: "matched"; assetId: string; reason: "account_ref" | "bank_and_currency" }
+  | { kind: "matched"; assetId: string; reason: "account_ref" | "bank_and_currency" | "parent_account" }
   | { kind: "unmatched"; candidates: string[] };
 
 /**
@@ -784,7 +788,7 @@ export type RouteMatch =
  * Never guesses between several candidates.
  */
 export function routeGroup(
-  group: Pick<StatementGroup, "accountRef" | "currency">,
+  group: Pick<StatementGroup, "accountRef" | "currency"> & { parentRef?: string },
   profileId: BankProfileId,
   accounts: RoutableAccount[],
 ): RouteMatch {
@@ -794,6 +798,13 @@ export function routeGroup(
       (a) => (a.accountRef && accountTail(a.accountRef) === tail) || (a.refHistory ?? []).some((r) => accountTail(r) === tail),
     );
     if (byRef.length === 1) return { kind: "matched", assetId: byRef[0].id, reason: "account_ref" };
+  }
+  // A card settled on the same account as a saved one, under a new card number: the replacement card.
+  if (group.parentRef) {
+    const sameParent = accounts.filter(
+      (a) => a.bankProfile === profileId && a.parentRef === group.parentRef && a.currency.toUpperCase() === group.currency.toUpperCase(),
+    );
+    if (sameParent.length === 1) return { kind: "matched", assetId: sameParent[0].id, reason: "parent_account" };
   }
   // Same bank and currency, but never an account with a DIFFERENT account number (a second account of the same bank).
   const byBank = accounts.filter(

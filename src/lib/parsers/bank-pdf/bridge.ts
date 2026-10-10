@@ -43,6 +43,7 @@ export function statementToParseResult(statement: PdfStatement): StatementParseR
     ...(a.accountName ? { accountName: a.accountName } : {}),
     ...(a.openedOn ? { openedOn: a.openedOn } : {}),
     ...(a.periodEnd ? { periodEnd: a.periodEnd } : {}),
+    ...(a.parentRef ? { parentRef: a.parentRef } : {}),
   }));
 
   return {

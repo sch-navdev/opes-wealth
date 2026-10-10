@@ -83,6 +83,8 @@ export type PdfAccountStatement = {
   accountName?: string;
   /** ISO date the account was opened, when printed. */
   openedOn?: string;
+  /** The account a card is settled on (Banque Populaire cards print it): two card numbers on the same one are a replaced card. */
+  parentRef?: string;
 };
 
 export type PdfStatement = {

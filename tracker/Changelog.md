@@ -312,3 +312,8 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - Banking: each manual account shows how its data came in (PDF statement / CSV import / Manual). Migration 0043 re-tags earlier imports (all PDF) without re-uploading.
 - Stale vs quiet: an imported statement records `metadata.statement_through` (its period end) even with no transaction, so an open account with no activity is dated as of that statement instead of flagged out of date. Re-import the statement once to set it for existing accounts.
 - Bank page: the "Delete everything" field now says what to type (the grey bank name was a placeholder); the match ignores capitals.
+
+## OW13 (Action plan 2, part 2)
+- Income calendar card shows gross, liabilities and net for every month at once; the heading opens `/dashboard/income-calendar`: any start month and 1 to 120 months, charts (monthly gross/liabilities/net, running net, composition), year-by-year table, analysis and the full monthly table.
+- Banque Populaire cards settled on the same account (printed `VOTRE COMPTE N°`) under different card numbers are one replaced card: one import question in a batch, and `metadata.parent_ref` routes later statements of a new card to the saved account, renamed after the latest number.
+- Fixed `recordStatementCoverage` (date regex lost its backslashes in 0ea55cb).

@@ -437,6 +437,7 @@ export async function rememberCashAccountBank(
   assetId: string,
   bankProfile: string,
   accountRef: string,
+  parentRef?: string,
 ): Promise<{ ok: true } | Fail> {
   const auth = await requireUser(true);
   if (!auth.ok) return auth;
@@ -455,6 +456,7 @@ export async function rememberCashAccountBank(
     ...(asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {}),
     bank_profile: bankProfile,
     ...(accountRef ? { account_ref: accountRef } : {}),
+    ...(parentRef ? { parent_ref: parentRef.slice(0, 40) } : {}),
   };
   const { error } = await auth.userClient
     .from("assets")
@@ -571,19 +573,23 @@ export async function mergeAccountRefs(
 
   const { data: asset } = await auth.userClient
     .from("assets")
-    .select("id, metadata, asset_categories(name)")
+    .select("id, name, metadata, asset_categories(name)")
     .eq("id", assetId)
     .eq("profile_id", auth.userId)
-    .single<{ id: string; metadata: Record<string, unknown> | null; asset_categories: { name: string } | null }>();
+    .single<{ id: string; name: string; metadata: Record<string, unknown> | null; asset_categories: { name: string } | null }>();
   if (!asset || asset.asset_categories?.name !== "Cash") {
     return { ok: false, code: "invalid", error: "Cash account not found." };
   }
   const current = asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {};
   const history = mergeRefHistory(parseRefHistory(current.ref_history), clean);
   const latest = currentRef(history);
+  // The account is named after its most recent number: "... card EUR ···7592" becomes "... card EUR ···5609".
+  const oldTail = typeof current.account_ref === "string" ? current.account_ref.replace(/[^0-9A-Za-z]/g, "").slice(-4) : "";
+  const newTail = latest ? latest.replace(/[^0-9A-Za-z]/g, "").slice(-4) : "";
+  const renamed = oldTail && newTail && oldTail !== newTail && asset.name.endsWith("···" + oldTail) ? asset.name.slice(0, -oldTail.length) + newTail : null;
   const { error } = await auth.userClient
     .from("assets")
-    .update({ metadata: { ...current, ref_history: history, ...(latest ? { account_ref: latest } : {}) } as never })
+    .update({ metadata: { ...current, ref_history: history, ...(latest ? { account_ref: latest } : {}) } as never, ...(renamed ? { name: renamed } : {}) })
     .eq("id", assetId)
     .eq("profile_id", auth.userId);
   if (error) return { ok: false, code: "db_error", error: error.message };
@@ -629,7 +635,7 @@ export async function markCashAccountClosed(assetId: string, closedOn: string): 
  * out of date. Only ever moves the date forward.
  */
 export async function recordStatementCoverage(assetId: string, through: string): Promise<{ ok: true } | Fail> {
-  if (!/^d{4}-d{2}-d{2}$/.test(through)) return { ok: false, code: "invalid", error: "Invalid statement date." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(through)) return { ok: false, code: "invalid", error: "Invalid statement date." };
   const auth = await requireUser(true);
   if (!auth.ok) return auth;
 
@@ -665,6 +671,7 @@ export async function createStatementCashAccount(input: {
   bankProfile: string;
   institutionName: string;
   accountRef: string;
+  parentRef?: string;
 }): Promise<{ ok: true; id: string } | Fail> {
   const auth = await requireUser(true);
   if (!auth.ok) return auth;
@@ -697,6 +704,7 @@ export async function createStatementCashAccount(input: {
         account_type: "current",
         bank_profile: input.bankProfile.slice(0, 40),
         ...(accountRef ? { account_ref: accountRef } : {}),
+        ...(input.parentRef ? { parent_ref: input.parentRef.slice(0, 40) } : {}),
       } as never,
       images: [],
       ticker_symbol: null,
