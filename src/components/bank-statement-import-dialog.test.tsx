@@ -26,6 +26,8 @@ const banking = vi.hoisted(() => ({
   rememberCashAccountBank: vi.fn(),
   createStatementCashAccount: vi.fn(),
   recordBalanceSnapshots: vi.fn(),
+  markCashAccountClosed: vi.fn(),
+  mergeAccountRefs: vi.fn(),
 }));
 vi.mock("@/app/dashboard/banking/actions", () => banking);
 

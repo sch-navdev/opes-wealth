@@ -94,6 +94,8 @@ export function buildAccount(input: {
   closingBalance: number | null;
   transactions: TransactionFingerprint[];
   closedOn?: string | null;
+  accountName?: string;
+  openedOn?: string;
 }): PdfAccountStatement {
   return { ...input, reconciliation: reconcile(input.openingBalance, input.closingBalance, input.transactions) };
 }

@@ -380,3 +380,23 @@ describe("hsbcProfile.detectOcr", () => {
     expect(hsbcProfile.detectOcr!(doc(page))).toBe(true);
   });
 });
+
+describe("hsbcProfile OCR: every account of the summary table is accounted for", () => {
+  it("names the product from the block title and says so when a summary account has no readable details block", () => {
+    const page = layoutPage([
+      ...top(),
+      { text: "Summary of Your Portfolio" },
+      { text: "CURRENT ACCOUNT AED 001-123456-001 2,850.00 2,850.00" },
+      { text: "EUR 001-123456-100 120.50 480.20" },
+      ...simpleMonth().slice(3),
+      // (simpleMonth already starts with `top`; its first three items are the statement header lines)
+    ].filter((it, i, all) => !(typeof it === "object" && "text" in it && it.text === "HSBC" && all.indexOf(it) !== i)));
+    const s = ok(hsbcProfile.parseOcr!(doc(page)));
+    expect(s.accounts).toHaveLength(1);
+    expect(s.accounts[0].accountName).toBe("Current account");
+    const missing = s.warnings.filter((w) => w.includes("001-123456-100"));
+    expect(missing).toHaveLength(1);
+    expect(missing[0]).toContain("NOT imported");
+    expect(s.warnings.some((w) => w.includes("001-123456-001"))).toBe(false);
+  });
+});

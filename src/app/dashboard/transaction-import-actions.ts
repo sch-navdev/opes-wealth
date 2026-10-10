@@ -150,3 +150,88 @@ export async function checkExistingTransactions(
   });
   return { success: true, existing };
 }
+
+export type StoredTransactionResult = { success: true } | { error: string };
+
+async function ownedTransaction(assetId: string, transactionId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "You must be signed in." } as const;
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("id, currency")
+    .eq("id", assetId)
+    .eq("profile_id", user.id)
+    .single<{ id: string; currency: string }>();
+  if (!asset) return { error: "Account not found." } as const;
+  const { data: row } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("id", transactionId)
+    .eq("asset_id", assetId)
+    .eq("profile_id", user.id)
+    .maybeSingle<Record<string, unknown>>();
+  if (!row) return { error: "Transaction not found." } as const;
+  return { supabase, user, asset, row } as const;
+}
+
+/**
+ * Deletes ONE stored transaction of the user's own Cash account. It does not touch the recorded balance
+ * history (balances come from the statements). Re-importing the same statement would add the row again unless
+ * it is unticked in the import preview.
+ */
+export async function deleteStoredTransaction(assetId: string, transactionId: string): Promise<StoredTransactionResult> {
+  const owned = await ownedTransaction(assetId, transactionId);
+  if ("error" in owned) return { error: owned.error as string };
+  const { error } = await owned.supabase.from("transactions").delete().eq("id", transactionId).eq("profile_id", owned.user.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/dashboard/assets/${assetId}`);
+  return { success: true };
+}
+
+/**
+ * Corrects ONE stored transaction (date, description, amount). The table has no update policy, so the row is
+ * replaced: the old one is deleted and the corrected one inserted with its new content fingerprint (source and
+ * file name kept). If a different transaction with the same content already exists the correction is refused
+ * and nothing changes.
+ */
+export async function updateStoredTransaction(
+  assetId: string,
+  transactionId: string,
+  edit: { date: string; description: string; amount: number },
+): Promise<StoredTransactionResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(edit.date) || !Number.isFinite(edit.amount)) return { error: "Invalid date or amount." };
+  const owned = await ownedTransaction(assetId, transactionId);
+  if ("error" in owned) return { error: owned.error as string };
+  const { supabase, user, asset, row } = owned;
+
+  const currency = typeof row.currency === "string" && row.currency ? row.currency : asset.currency;
+  const [fp] = fingerprintTransactions([{ date: edit.date, amount: edit.amount, description: edit.description }], currency);
+  if (fp.fingerprint !== row.fingerprint) {
+    const { data: clash } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("fingerprint", fp.fingerprint)
+      .maybeSingle();
+    if (clash) return { error: "A transaction with the same date, amount and description already exists." };
+  }
+
+  const { id: _id, created_at: _created, ...rest } = row;
+  void _id;
+  void _created;
+  const replacement = { ...rest, booked_date: edit.date, amount: edit.amount, description: edit.description.trim(), fingerprint: fp.fingerprint };
+
+  const { error: delError } = await supabase.from("transactions").delete().eq("id", transactionId).eq("profile_id", user.id);
+  if (delError) return { error: delError.message };
+  const { error: insError } = await supabase.from("transactions").insert(replacement as never);
+  if (insError) {
+    // Put the original back so a failed correction never loses the row.
+    await supabase.from("transactions").insert(rest as never);
+    return { error: insError.message };
+  }
+  revalidatePath(`/dashboard/assets/${assetId}`);
+  return { success: true };
+}

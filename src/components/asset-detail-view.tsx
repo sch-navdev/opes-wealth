@@ -180,6 +180,7 @@ import {
 } from "@/lib/asset-detail-scaling";
 import { OwnerShareNote } from "@/components/owner-share-note";
 import { TransactionsList } from "@/components/transactions-list";
+import { useBankingText } from "@/components/banking-text";
 import { AttributionCard } from "@/components/attribution-card";
 import type { AssetAttributionView } from "@/lib/asset-attribution-view";
 import type { StoredTransactionRow } from "@/lib/transaction-detail";
@@ -324,6 +325,7 @@ export function AssetDetailView({
   const { maskValue } = usePrivacy();
   const { t, intlLocale } = useLanguage();
   const bt = useBatchText();
+  const bankText = useBankingText();
   // Governance Vault "Documents" tab: Professional tier and up (a UI preference; access is enforced server-side).
   const vt = useVaultText();
   const showVault = tierRank(useUiTier()) >= tierRank("professional");
@@ -1233,14 +1235,119 @@ export function AssetDetailView({
     });
   }
 
+  /** The deletable Valuation Log: on Overview for most classes, under Specifications for a bank account (whose Overview shows its transactions). */
+  const renderValuationLog = () => (
+    <Card className="border-border bg-card">
+      <CardHeader>
+        <CardTitle className="text-foreground">{t("valuation_log")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          {t("valuation_log_notice")}
+        </p>
+        {historyMutationError && (
+          <p className="text-sm text-destructive" role="alert">
+            {historyMutationError}
+          </p>
+        )}
+        {historyLogEntries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t("no_valuation_log_entries")}
+          </p>
+        ) : (
+          <div className="border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("date")}</TableHead>
+                  <TableHead>{t("source")}</TableHead>
+                  <TableHead className="text-end">{t("amount")}</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {historyLogEntries.map((point) => (
+                  <TableRow key={point.id}>
+                    <TableCell className="text-muted-foreground">
+                      {point.recorded_date}
+                    </TableCell>
+                    <TableCell className="text-foreground">
+                      {historySourceLabel(point.source, bt)}
+                      {point.source_ref && (
+                        <span className="block max-w-56 truncate text-xs text-muted-foreground" dir="auto" title={point.source_ref}>
+                          {bt("hist_file_name", { name: point.source_ref })}
+                        </span>
+                      )}
+                      {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          {(logTransactionsByDate.get(point.recorded_date) ?? []).slice(0, 5).map((tr, i) => (
+                            <li key={`${tr.fingerprint ?? i}-${i}`} className="flex max-w-96 justify-between gap-3">
+                              <span className="truncate" dir="auto" title={tr.description || undefined}>
+                                {tr.description || t("txd_no_description")}
+                              </span>
+                              <span className="shrink-0 tabular-nums">{maskValue(currencyFormatter.format(Number(tr.amount)))}</span>
+                            </li>
+                          ))}
+                          {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 5 && (
+                            <li>+{(logTransactionsByDate.get(point.recorded_date) ?? []).length - 5}</li>
+                          )}
+                        </ul>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-end text-foreground">
+                      {maskValue(currencyFormatter.format(point.value))}
+                    </TableCell>
+                    <TableCell>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label={t("delete")}
+                            disabled={isHistoryMutationPending}
+                          >
+                            <Minus className="size-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="border-border bg-card">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-foreground">
+                              {t("delete_valuation_point_title")}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-muted-foreground">
+                              {t("delete_valuation_point_desc")}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{t("csv_cancel")}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteHistoryPoint(point.id)}
+                            >
+                              {t("delete")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="w-full px-4 py-10 sm:px-6 lg:px-8">
       <Link
-        href="/dashboard"
+        href={isCash && !asset.is_liability ? "/dashboard/banking" : "/dashboard"}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
-        {t("back_to_portfolio")}
+        {isCash && !asset.is_liability ? bankText("back_to_banking") : t("back_to_portfolio")}
       </Link>
 
       <div className="w-full space-y-6">
@@ -2066,107 +2173,10 @@ export function AssetDetailView({
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card">
-              <CardHeader>
-                <CardTitle className="text-foreground">{t("valuation_log")}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {t("valuation_log_notice")}
-                </p>
-                {historyMutationError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {historyMutationError}
-                  </p>
-                )}
-                {historyLogEntries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t("no_valuation_log_entries")}
-                  </p>
-                ) : (
-                  <div className="border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t("date")}</TableHead>
-                          <TableHead>{t("source")}</TableHead>
-                          <TableHead className="text-end">{t("amount")}</TableHead>
-                          <TableHead className="w-10" />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {historyLogEntries.map((point) => (
-                          <TableRow key={point.id}>
-                            <TableCell className="text-muted-foreground">
-                              {point.recorded_date}
-                            </TableCell>
-                            <TableCell className="text-foreground">
-                              {historySourceLabel(point.source, bt)}
-                              {point.source_ref && (
-                                <span className="block max-w-56 truncate text-xs text-muted-foreground" dir="auto" title={point.source_ref}>
-                                  {bt("hist_file_name", { name: point.source_ref })}
-                                </span>
-                              )}
-                              {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 0 && (
-                                <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                                  {(logTransactionsByDate.get(point.recorded_date) ?? []).slice(0, 5).map((tr, i) => (
-                                    <li key={`${tr.fingerprint ?? i}-${i}`} className="flex max-w-96 justify-between gap-3">
-                                      <span className="truncate" dir="auto" title={tr.description || undefined}>
-                                        {tr.description || t("txd_no_description")}
-                                      </span>
-                                      <span className="shrink-0 tabular-nums">{maskValue(currencyFormatter.format(Number(tr.amount)))}</span>
-                                    </li>
-                                  ))}
-                                  {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 5 && (
-                                    <li>+{(logTransactionsByDate.get(point.recorded_date) ?? []).length - 5}</li>
-                                  )}
-                                </ul>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-end text-foreground">
-                              {maskValue(currencyFormatter.format(point.value))}
-                            </TableCell>
-                            <TableCell>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon-sm"
-                                    aria-label={t("delete")}
-                                    disabled={isHistoryMutationPending}
-                                  >
-                                    <Minus className="size-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="border-border bg-card">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-foreground">
-                                      {t("delete_valuation_point_title")}
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription className="text-muted-foreground">
-                                      {t("delete_valuation_point_desc")}
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>{t("csv_cancel")}</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteHistoryPoint(point.id)}
-                                    >
-                                      {t("delete")}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {!isCash && renderValuationLog()}
+            {isCash && !asset.is_liability && (
+              <TransactionsList transactions={transactions} currency={asset.currency} assetId={asset.id} />
+            )}
 
             <AttributionCard attribution={attribution} />
 
@@ -2871,7 +2881,7 @@ export function AssetDetailView({
                 )}
                 <DeleteAssetButton
                   id={asset.id}
-                  onSuccess={() => router.push("/dashboard")}
+                  onSuccess={() => router.push(isCash && !asset.is_liability ? "/dashboard/banking" : "/dashboard")}
                 />
               </CardContent>
             </Card>
@@ -3062,9 +3072,7 @@ export function AssetDetailView({
               />
             )}
 
-            {isCash && !asset.is_liability && (
-              <TransactionsList transactions={transactions} currency={asset.currency} />
-            )}
+            {isCash && renderValuationLog()}
 
             {isCrypto && cryptoMetadata && (
               <CryptoSettings

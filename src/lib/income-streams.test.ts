@@ -7,6 +7,7 @@ import {
   totalsByKind,
   totalsByMonth,
   validateIncomeStream,
+  earnedGroupOf,
   windowMonths,
   type IncomeStream,
 } from "@/lib/income-streams";
@@ -176,5 +177,26 @@ describe("totals", () => {
     const s = summarizeIncomeStreams(streams, "2026-01-10", rates, "USD");
     expect(s.monthlyEquivalent).toBeCloseTo(1000 + 4000 / 12, 6);
     expect(s.next12Months).toBe(16000);
+  });
+});
+
+describe("employers and the gratuity kind", () => {
+  const base = { kind: "gratuity", label: "End of service", source_name: "", amount: 90000, currency: "AED", frequency: "one_off", pay_day: 1, pay_month: 6, start_date: "2026-01-01" };
+
+  it("accepts a gratuity paid by one of the user's own companies", () => {
+    const v = validateIncomeStream({ ...base, employer_asset_id: "7b0a8f0e-3c1d-4e1a-9f55-2f6d4f7f9a11" });
+    expect(v.ok).toBe(true);
+    if (v.ok) expect(v.value.employer_asset_id).toBe("7b0a8f0e-3c1d-4e1a-9f55-2f6d4f7f9a11");
+  });
+
+  it("treats a missing employer as an outside employer (null) and rejects a malformed id", () => {
+    const v = validateIncomeStream({ ...base, source_name: "Outside Co" });
+    expect(v.ok && v.value.employer_asset_id).toBeNull();
+    expect(validateIncomeStream({ ...base, employer_asset_id: "not-a-uuid" })).toEqual({ ok: false, error: "cf_err_source" });
+  });
+
+  it("groups a gratuity separately from salary and bonus", () => {
+    expect(earnedGroupOf("gratuity")).toBe("gratuity");
+    expect(earnedGroupOf("salary")).toBe("salary");
   });
 });

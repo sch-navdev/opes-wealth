@@ -587,6 +587,12 @@ export type StatementGroup = {
   balances?: { date: string; balance: number }[];
   /** The statement says this account was closed on that date (ISO). */
   closedOn?: string;
+  /** Name of a savings space / deposit as printed (Wio). Accounts of one bank with the same name may be one account renewed. */
+  accountName?: string;
+  /** ISO date the account was opened, when printed. */
+  openedOn?: string;
+  /** ISO date of the statement period end (the card statement date for card layouts); the latest statement tells the current card. */
+  periodEnd?: string;
 };
 
 export type StatementParseResult = {
@@ -761,6 +767,8 @@ export type RoutableAccount = {
   /** Saved from an earlier import (see `rememberCashAccountBank`). */
   bankProfile?: string;
   accountRef?: string;
+  /** Earlier account / card numbers of the same account (renewed savings space, replaced card). */
+  refHistory?: string[];
 };
 
 export type RouteMatch =
@@ -782,7 +790,9 @@ export function routeGroup(
 ): RouteMatch {
   const tail = accountTail(group.accountRef);
   if (tail.length === 4) {
-    const byRef = accounts.filter((a) => a.accountRef && accountTail(a.accountRef) === tail);
+    const byRef = accounts.filter(
+      (a) => (a.accountRef && accountTail(a.accountRef) === tail) || (a.refHistory ?? []).some((r) => accountTail(r) === tail),
+    );
     if (byRef.length === 1) return { kind: "matched", assetId: byRef[0].id, reason: "account_ref" };
   }
   // Same bank and currency, but never an account with a DIFFERENT account number (a second account of the same bank).
@@ -790,7 +800,7 @@ export function routeGroup(
     (a) =>
       a.bankProfile === profileId &&
       a.currency.toUpperCase() === group.currency.toUpperCase() &&
-      !(tail.length === 4 && a.accountRef && accountTail(a.accountRef) !== tail),
+      !(tail.length === 4 && a.accountRef && accountTail(a.accountRef) !== tail && !(a.refHistory ?? []).some((r) => accountTail(r) === tail)),
   );
   if (byBank.length === 1) return { kind: "matched", assetId: byBank[0].id, reason: "bank_and_currency" };
   return { kind: "unmatched", candidates: byBank.map((a) => a.id) };

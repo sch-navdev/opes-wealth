@@ -31,6 +31,8 @@ export type GroupState = {
   skippedByPreference?: boolean;
   /** The user ticked "never import this account" on this import. */
   neverImport?: boolean;
+  /** The user said this card / account is the replacement of an existing one: both numbers go into its history. */
+  replacement?: boolean;
 };
 
 export type BatchFileKind = "csv" | "pdf" | "unsupported";

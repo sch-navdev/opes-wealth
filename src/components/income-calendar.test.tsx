@@ -99,34 +99,45 @@ describe("IncomeCalendar earned-income layer", () => {
     const d = data();
     d.months[0] = {
       ...d.months[0],
-      earned: { salary: 3000, bonus: 0, other: 0 },
-      earnedItems: [{ streamId: "s", name: "Main job", group: "salary", amount: 3000, date: "2025-11-25" }],
+      earned: { salary: 3000, bonus: 0, gratuity: 0, other: 0 },
+      earnedItems: [{ streamId: "s", name: "Main job", source: "ACME LLC", group: "salary", amount: 3000, date: "2025-11-25" }],
     };
     d.months[4] = {
       ...d.months[4],
-      earned: { salary: 0, bonus: 1000, other: 250 },
+      earned: { salary: 0, bonus: 1000, gratuity: 0, other: 250 },
       earnedItems: [],
     };
     return d;
   }
+
+  it("lists the employers behind the salary line in the month's hover breakdown", () => {
+    renderIt(withEarned());
+    const tip = document.querySelector('[aria-hidden="true"][class*="group-hover:visible"]') as HTMLElement;
+    expect(tip).toBeTruthy();
+    expect(tip.textContent).toContain("Salary");
+    expect(tip.textContent).toContain("ACME LLC");
+  });
 
   it("has no toggle when there are no earned streams, and passive figures are untouched", () => {
     renderIt(data());
     expect(screen.queryByRole("switch")).toBeNull();
   });
 
-  it("is off by default, and the toggle adds separate earned segments and legend entries", async () => {
+  it("counts earned income by default in its own colours, and the toggle switches it off", async () => {
     const { container } = renderIt(withEarned());
     const toggle = screen.getByRole("switch", { name: "Include earned income" });
-    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(container.querySelectorAll("[data-earned]")).toHaveLength(3);
+    // Salary has its own colour token, distinct from every passive source.
+    expect(container.querySelector('[data-earned="salary"]')?.className).toContain("bg-chart-5");
+    await userEvent.click(toggle);
     expect(container.querySelectorAll("[data-earned]")).toHaveLength(0);
     expect(screen.queryByText("Salary")).toBeNull();
-
     await userEvent.click(toggle);
     expect(container.querySelectorAll("[data-earned]")).toHaveLength(3);
-    expect(screen.getByText("Salary")).toBeInTheDocument();
-    expect(screen.getByText("Bonus")).toBeInTheDocument();
-    expect(screen.getByText("Other earned")).toBeInTheDocument();
+    expect(screen.getAllByText("Salary").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bonus").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Other earned").length).toBeGreaterThan(0);
     // Passive stats keep their value: the annual card still reads the passive USD 1,500.
     expect(screen.getAllByText("USD 1,500").length).toBeGreaterThan(0);
     // Month total in its label includes earned: 1,000 passive + 3,000 salary.

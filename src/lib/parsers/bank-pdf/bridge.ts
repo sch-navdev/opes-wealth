@@ -40,6 +40,9 @@ export function statementToParseResult(statement: PdfStatement): StatementParseR
     ),
     ...(a.transactions.length === 0 && !statement.bank.endsWith("_card") ? emptyAccountBalances(a) : {}),
     ...(a.closedOn ? { closedOn: a.closedOn } : {}),
+    ...(a.accountName ? { accountName: a.accountName } : {}),
+    ...(a.openedOn ? { openedOn: a.openedOn } : {}),
+    ...(a.periodEnd ? { periodEnd: a.periodEnd } : {}),
   }));
 
   return {

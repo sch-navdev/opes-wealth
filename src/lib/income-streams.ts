@@ -16,7 +16,7 @@ import { convertAmount } from "@/lib/fx";
  * Monthly equivalent (run-rate): monthly x1, quarterly /3, annual /12; one-off 0 (it is not recurring;
  * it IS part of the 12-month window total). Streams already ended at `asOf` have no run-rate.
  */
-export const INCOME_KINDS = ["salary", "bonus", "freelance", "rental", "pension", "dividend_other", "other"] as const;
+export const INCOME_KINDS = ["salary", "bonus", "gratuity", "freelance", "rental", "pension", "dividend_other", "other"] as const;
 export type IncomeKind = (typeof INCOME_KINDS)[number];
 
 export const INCOME_FREQUENCIES = ["monthly", "quarterly", "annual", "one_off"] as const;
@@ -26,6 +26,8 @@ export type IncomeStreamInput = {
   kind: IncomeKind;
   label: string;
   source_name: string;
+  /** Company / entity of the user that pays this stream (migration 0042); null = an outside employer named in `source_name`. */
+  employer_asset_id?: string | null;
   /** NET amount per payment, in `currency`. */
   amount: number;
   currency: string;
@@ -81,6 +83,10 @@ export function validateIncomeStream(raw: unknown): IncomeStreamValidation {
   if (label.length < 1 || label.length > 120) return fail("cf_err_label");
   const source = typeof r.source_name === "string" ? r.source_name.trim() : r.source_name == null ? "" : null;
   if (source === null || source.length > 120) return fail("cf_err_source");
+  const employerRaw = r.employer_asset_id == null || r.employer_asset_id === "" ? null : r.employer_asset_id;
+  if (employerRaw !== null && (typeof employerRaw !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(employerRaw))) {
+    return fail("cf_err_source");
+  }
 
   const amount = typeof r.amount === "number" ? r.amount : typeof r.amount === "string" && r.amount.trim() !== "" ? Number(r.amount) : NaN;
   if (!Number.isFinite(amount) || amount < 0 || amount > MAX_AMOUNT) return fail("cf_err_amount");
@@ -110,6 +116,7 @@ export function validateIncomeStream(raw: unknown): IncomeStreamValidation {
       kind: r.kind as IncomeKind,
       label,
       source_name: source,
+      employer_asset_id: employerRaw,
       amount: Math.round(amount * 100) / 100,
       currency,
       frequency,
@@ -152,6 +159,8 @@ export type IncomeOccurrence = {
   streamId: string;
   kind: IncomeKind;
   label: string;
+  /** Who pays it (the stream's source / employer name). */
+  source: string;
   /** YYYY-MM-DD */
   date: string;
   /** YYYY-MM */
@@ -229,6 +238,7 @@ export function expandIncomeStreams(
         streamId: s.id,
         kind: s.kind,
         label: s.label,
+        source: s.source_name,
         date,
         month: date.slice(0, 7),
         amount: s.amount,
@@ -253,10 +263,10 @@ export function totalsByKind(occurrences: IncomeOccurrence[]): Record<IncomeKind
 }
 
 /** The three legend groups of the earned-income layer in the income calendar. */
-export type EarnedGroup = "salary" | "bonus" | "other";
+export type EarnedGroup = "salary" | "bonus" | "gratuity" | "other";
 
 export function earnedGroupOf(kind: IncomeKind): EarnedGroup {
-  return kind === "salary" ? "salary" : kind === "bonus" ? "bonus" : "other";
+  return kind === "salary" ? "salary" : kind === "bonus" ? "bonus" : kind === "gratuity" ? "gratuity" : "other";
 }
 
 export type IncomeStreamsSummary = {

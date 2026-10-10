@@ -113,7 +113,7 @@ export default async function AssetDetailsPage({
     try {
       const { data, error } = await supabase
         .from("transactions")
-        .select("booked_date, amount, currency, description, source, fingerprint, created_at, source_file")
+        .select("id, booked_date, amount, currency, description, source, fingerprint, created_at, source_file")
         .eq("asset_id", id)
         .order("booked_date", { ascending: false })
         .limit(200)
@@ -124,7 +124,7 @@ export default async function AssetDetailsPage({
         // `source_file` needs migration 0041: read again without it until it is applied.
         const retry = await supabase
           .from("transactions")
-          .select("booked_date, amount, currency, description, source, fingerprint, created_at")
+          .select("id, booked_date, amount, currency, description, source, fingerprint, created_at")
           .eq("asset_id", id)
           .order("booked_date", { ascending: false })
           .limit(200)

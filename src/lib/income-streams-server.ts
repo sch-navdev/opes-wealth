@@ -22,11 +22,12 @@ export type IncomeStreamsLoad = { streams: IncomeStream[]; available: boolean };
 
 export async function loadIncomeStreams(client: unknown, userId: string): Promise<IncomeStreamsLoad> {
   try {
-    const { data, error } = await (client as SupabaseClient)
-      .from("income_streams")
-      .select("id, kind, label, source_name, amount, currency, frequency, pay_day, pay_month, start_date, end_date, notes")
-      .eq("profile_id", userId)
-      .order("created_at", { ascending: true });
+    const select = (cols: string) =>
+      (client as SupabaseClient).from("income_streams").select(cols).eq("profile_id", userId).order("created_at", { ascending: true });
+    const base = "id, kind, label, source_name, amount, currency, frequency, pay_day, pay_month, start_date, end_date, notes";
+    let { data, error } = await select(`${base}, employer_asset_id`);
+    // Migration 0042 (employer link) not applied yet: read without it.
+    if (error && /employer_asset_id/i.test(error.message ?? "")) ({ data, error } = await select(base));
     if (error) return { streams: [], available: !isMissingIncomeStreamsTable(error) };
     const streams = ((data ?? []) as unknown[]).map(parseIncomeStreamRow).filter((s): s is IncomeStream => s !== null);
     return { streams, available: true };

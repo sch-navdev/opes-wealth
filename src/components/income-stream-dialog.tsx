@@ -31,6 +31,7 @@ type FormState = {
   kind: string;
   label: string;
   source_name: string;
+  employer_asset_id: string;
   amount: string;
   currency: string;
   frequency: string;
@@ -47,6 +48,7 @@ function initialState(stream: IncomeStream | null, baseCurrency: string): FormSt
       kind: "salary",
       label: "",
       source_name: "",
+      employer_asset_id: "",
       amount: "",
       currency: baseCurrency,
       frequency: "monthly",
@@ -61,6 +63,7 @@ function initialState(stream: IncomeStream | null, baseCurrency: string): FormSt
     kind: stream.kind,
     label: stream.label,
     source_name: stream.source_name,
+    employer_asset_id: stream.employer_asset_id ?? "",
     amount: String(stream.amount),
     currency: stream.currency,
     frequency: stream.frequency,
@@ -78,17 +81,20 @@ export function IncomeStreamDialog({
   onOpenChange,
   stream,
   baseCurrency,
+  employers = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stream: IncomeStream | null;
   baseCurrency: string;
+  /** The user's own companies / entities that can be the employer. */
+  employers?: { id: string; name: string }[];
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         {open && (
-          <StreamForm key={stream?.id ?? "new"} stream={stream} baseCurrency={baseCurrency} onDone={() => onOpenChange(false)} />
+          <StreamForm key={stream?.id ?? "new"} stream={stream} baseCurrency={baseCurrency} employers={employers} onDone={() => onOpenChange(false)} />
         )}
       </DialogContent>
     </Dialog>
@@ -98,10 +104,12 @@ export function IncomeStreamDialog({
 function StreamForm({
   stream,
   baseCurrency,
+  employers,
   onDone,
 }: {
   stream: IncomeStream | null;
   baseCurrency: string;
+  employers: { id: string; name: string }[];
   onDone: () => void;
 }) {
   const tt = useCashFlowText();
@@ -129,8 +137,12 @@ function StreamForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const employer = employers.find((c) => c.id === form.employer_asset_id);
     const v = validateIncomeStream({
       ...form,
+      // An employer chosen from the user's own companies gives the source name.
+      source_name: employer ? employer.name : form.source_name,
+      employer_asset_id: employer ? employer.id : null,
       amount: form.amount,
       pay_day: form.pay_day,
       pay_month: needsMonth ? form.pay_month : "",
@@ -171,10 +183,25 @@ function StreamForm({
           <Label htmlFor="cf-label">{tt("cf_field_label")}</Label>
           <Input id="cf-label" value={form.label} onChange={set("label")} maxLength={120} aria-invalid={invalid(["cf_err_label"])} />
         </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="cf-source">{tt("cf_field_source")}</Label>
-          <Input id="cf-source" value={form.source_name} onChange={set("source_name")} maxLength={120} aria-invalid={invalid(["cf_err_source"])} />
-        </div>
+        {employers.length > 0 && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="cf-employer">{tt("cf_field_employer")}</Label>
+            <select id="cf-employer" className={SELECT_CLASS} value={form.employer_asset_id} onChange={set("employer_asset_id")}>
+              <option value="">{tt("cf_employer_other")}</option>
+              {employers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {!form.employer_asset_id && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="cf-source">{tt("cf_field_source")}</Label>
+            <Input id="cf-source" value={form.source_name} onChange={set("source_name")} maxLength={120} aria-invalid={invalid(["cf_err_source"])} />
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="cf-amount">{tt("cf_field_amount")}</Label>
           <Input

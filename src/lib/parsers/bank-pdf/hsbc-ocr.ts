@@ -199,6 +199,8 @@ function lineRow(line: string): Row {
 type Draft = { date: string; desc: string; raw: string; amount: number; balance: number | null; ref: string | null };
 type Acct = {
   num: string;
+  /** "Current account" / "Savings account" from the block title, when recognisable. */
+  kind: string | null;
   iban: string | null;
   currency: string | null;
   opening: number | null;
@@ -219,6 +221,7 @@ const freshBlock = () => ({ desc: [] as string[], raw: [] as string[], ref: null
 function newAcct(num: string): Acct {
   return {
     num,
+    kind: null,
     iban: null,
     currency: null,
     opening: null,
@@ -252,13 +255,20 @@ function ibanOf(text: string): string | null {
   return /^[A-Z]{2}\d{2}[A-Z0-9]{10,}$/.test(acc) ? acc : null;
 }
 
-function titleOf(row: Row): { num: string; iban: string | null } | null {
+/** The product named by a block title: a current account or a savings account. */
+function kindOfTitle(full: string): string | null {
+  if (/^\s*current\s*account/i.test(full)) return "Current account";
+  if (/^\s*(statement\s*)?sav/i.test(full) || /^\s*(call|deposit)/i.test(full)) return "Savings account";
+  return null;
+}
+
+function titleOf(row: Row): { num: string; iban: string | null; kind: string | null } | null {
   if (/\d[\d,]*\.\d{2}/.test(row.full)) return null;
   const m = row.full.match(/\b(\d{3}-\d{6}-\d{3})\b/);
   if (!m) return null;
   const iban = ibanOf(row.full);
   if (!iban && !/^(current account|statement sav|sav|call account|deposit|account)/i.test(row.full)) return null;
-  return { num: m[1], iban };
+  return { num: m[1], iban, kind: kindOfTitle(row.full) };
 }
 
 export type HsbcParseResult = {
@@ -273,7 +283,9 @@ export function parseHsbcComposite(doc: OcrDocument): HsbcParseResult {
   const accounts = new Map<string, Acct>();
   const order: Acct[] = [];
   let cur: Acct | null = null;
-  let pendingTitle: { num: string; iban: string | null } | null = null;
+  let pendingTitle: { num: string; iban: string | null; kind: string | null } | null = null;
+  /** Accounts listed in the "Summary of Your Portfolio" table (number, currency): every one must get a details block. */
+  const summaryAccounts = new Map<string, string | null>();
   let inBlock = false;
   let awaiting: "summary" | "count" | null = null;
   let statementDate: string | null = null;
@@ -299,6 +311,7 @@ export function parseHsbcComposite(doc: OcrDocument): HsbcParseResult {
         order.push(a);
       }
       if (pt.iban && !a.iban) a.iban = pt.iban;
+      if (pt.kind && !a.kind) a.kind = pt.kind;
       if (cur && cur !== a) dropPending(cur);
       cur = a;
     } else if (!cur) {
@@ -375,6 +388,13 @@ export function parseHsbcComposite(doc: OcrDocument): HsbcParseResult {
     if (title) {
       pendingTitle = title;
       if (inBlock && cur && cur.num !== title.num) endBlock();
+      return;
+    }
+    // A summary-table row: an account number together with amounts, outside any details block.
+    const summaryNum = row.full.match(/\b(\d{3}-\d{6}-\d{3})\b/);
+    if (summaryNum && /\d[\d,]*\.\d{2}/.test(row.full) && !inBlock) {
+      const cur3 = row.full.split(/\s+/).find((w) => CURRENCIES.has(w)) ?? null;
+      if (!summaryAccounts.has(summaryNum[1]) || cur3) summaryAccounts.set(summaryNum[1], cur3);
       return;
     }
     if (!inBlock || !cur) return;
@@ -484,6 +504,7 @@ export function parseHsbcComposite(doc: OcrDocument): HsbcParseResult {
       index: i,
     }));
     const account = buildAccount({
+      ...(a.kind ? { accountName: a.kind } : {}),
       accountRef: ref,
       currency,
       periodStart: txs[0]?.date ?? a.openingDate,
@@ -522,6 +543,14 @@ export function parseHsbcComposite(doc: OcrDocument): HsbcParseResult {
       if ((a.summary.dep !== null && !sameMoney(dep, a.summary.dep)) || (a.summary.wd !== null && !sameMoney(wd, a.summary.wd))) {
         warnings.push(`Deposit/withdrawal totals of ${label(a)} differ from the printed Transaction Summary.`);
       }
+    }
+  }
+
+  // An account the summary table lists but that has no details block is never dropped silently.
+  const readNums = new Set(order.map((a) => a.num));
+  for (const [num, cur3] of summaryAccounts) {
+    if (!readNums.has(num)) {
+      warnings.push(`Account ${num}${cur3 ? ` (${cur3})` : ""} is listed in the statement summary but its details could not be read: it was NOT imported. Check the original statement.`);
     }
   }
 

@@ -101,6 +101,8 @@ High-net-worth individuals
 - [x] OW13 import fixes: transaction descriptions in the Valuation Log, Banque Populaire glued amounts, wrong-bank routing, cards under their bank, dialog reset, manual row editing, never-import preference, closed accounts — [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - [x] Add Real Estate starts from the title deed / Tawtheeq / Ejari upload; market valuation after the purchase price — [[Portfolio-Dashboard|Portfolio Dashboard]]
 
+- [x] OW13 round 2: Wio renewed accounts and replaced cards with number history, HSBC safeguards, bank page and transaction edit/delete, salary in the income calendar with employer breakdown (migration 0042 drafted), landing page second pass — [[CSV-Bank-Uploads|CSV Bank Uploads]], [[Personal-Cash-Flow|Personal Cash Flow]], [[Design-System|Design System]]
+
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth

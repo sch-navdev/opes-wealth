@@ -39,6 +39,7 @@ export function IncomeStreamsManager({
   asOf,
   available,
   readOnly,
+  employers = [],
 }: {
   streams: IncomeStream[];
   baseCurrency: string;
@@ -48,6 +49,8 @@ export function IncomeStreamsManager({
   /** False while migration 0037 is not applied. */
   available: boolean;
   readOnly?: boolean;
+  /** The user's own companies / entities that can be the employer of a stream. */
+  employers?: { id: string; name: string }[];
 }) {
   const tt = useCashFlowText();
   const { intlLocale } = useLanguage();
@@ -219,7 +222,7 @@ export function IncomeStreamsManager({
         {tt("cf_net_note")} {streams.length > 0 && tt("cf_totals_note")}
       </p>
 
-      <IncomeStreamDialog open={dialogOpen} onOpenChange={setDialogOpen} stream={editing} baseCurrency={baseCurrency} />
+      <IncomeStreamDialog open={dialogOpen} onOpenChange={setDialogOpen} stream={editing} baseCurrency={baseCurrency} employers={employers} />
 
       <Dialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
         <DialogContent>

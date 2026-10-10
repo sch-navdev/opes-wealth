@@ -28,11 +28,12 @@ const SOURCES: { source: PassiveIncomeSource; label: TranslationKey; bar: string
 const EARNED: { group: EarnedGroup; label: CashFlowKey; bar: string }[] = [
   { group: "salary", label: "cf_cal_salary", bar: "bg-chart-5" },
   { group: "bonus", label: "cf_cal_bonus", bar: "bg-primary" },
+  { group: "gratuity", label: "cf_cal_gratuity", bar: "bg-foreground/60" },
   { group: "other", label: "cf_cal_other", bar: "bg-muted-foreground" },
 ];
 
 const earnedSum = (m: IncomeCalendarData["months"][number]) =>
-  m.earned ? m.earned.salary + m.earned.bonus + m.earned.other : 0;
+  m.earned ? m.earned.salary + m.earned.bonus + m.earned.gratuity + m.earned.other : 0;
 
 /**
  * Forward 12-month passive-income calendar (see `lib/income-calendar.ts`): one
@@ -53,7 +54,8 @@ export function IncomeCalendar({
   const motion = useTierMotion();
   const [selected, setSelected] = useState<string | null>(null);
   const tt = useCashFlowText();
-  const [includeEarned, setIncludeEarned] = useState(false);
+  // Salary is earned, not passive, but it IS income: it is counted by default (in its own colour) and can be switched off.
+  const [includeEarned, setIncludeEarned] = useState(true);
   const hasEarned = calendar.months.some((m) => m.earned !== undefined);
   const showEarned = includeEarned && hasEarned;
   const earnedOf = (m: IncomeCalendarData["months"][number]) => (showEarned ? earnedSum(m) : 0);
@@ -144,7 +146,8 @@ export function IncomeCalendar({
                 const active = selected === m.month;
                 const label = t("ical_bar_label", { month: monthLabel.long(m.month), total: money.format(combined(m)) });
                 return (
-                  <li key={m.month}>
+                  <li key={m.month} className="group relative">
+                    <MonthBreakdown month={m} showEarned={showEarned} money={money} maskValue={maskValue} earnedLabel={(g) => tt(EARNED.find((e) => e.group === g)?.label ?? "cf_cal_other")} passiveLabel={tt("cf_cal_hover_passive")} />
                     <button
                       type="button"
                       aria-pressed={active}
@@ -288,5 +291,73 @@ export function IncomeCalendar({
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Hover / keyboard-focus breakdown of one month: each earned group (salary, bonus, gratuity...) as ONE line
+ * with the employers that make it up listed under it, then the passive total. Purely visual (aria-hidden):
+ * the month's button carries its total, and clicking the month opens the full list below the chart.
+ */
+function MonthBreakdown({
+  month,
+  showEarned,
+  money,
+  maskValue,
+  earnedLabel,
+  passiveLabel,
+}: {
+  month: IncomeCalendarData["months"][number];
+  showEarned: boolean;
+  money: { format: (n: number) => string };
+  maskValue: (v: string) => string;
+  earnedLabel: (group: EarnedGroup) => string;
+  passiveLabel: string;
+}) {
+  const earnedGroups = showEarned
+    ? EARNED.flatMap((e) => {
+        const items = (month.earnedItems ?? []).filter((i) => i.group === e.group);
+        const total = month.earned?.[e.group] ?? 0;
+        if (!(total > 0)) return [];
+        // One line per employer (several payments from the same employer in a month are added up).
+        const byEmployer = new Map<string, number>();
+        for (const i of items) byEmployer.set(i.source || i.name, (byEmployer.get(i.source || i.name) ?? 0) + i.amount);
+        return [{ group: e.group, bar: e.bar, total, employers: [...byEmployer.entries()] }];
+      })
+    : [];
+  if (earnedGroups.length === 0 && !(month.total > 0)) return null;
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none invisible absolute bottom-full start-1/2 z-20 mb-1 w-56 -translate-x-1/2 border border-border bg-popover p-2 text-xs text-popover-foreground opacity-0 shadow-md transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 rtl:translate-x-1/2"
+    >
+      {earnedGroups.map((g) => (
+        <div key={g.group} className="mb-1.5">
+          <p className="flex items-center justify-between gap-2 font-medium">
+            <span className="flex items-center gap-1.5">
+              <span className={cn("size-2 rounded-sm", g.bar)} />
+              {earnedLabel(g.group)}
+            </span>
+            <span className="tabular-nums">{maskValue(money.format(g.total))}</span>
+          </p>
+          {g.employers.length > 1 || (g.employers.length === 1 && g.employers[0][0]) ? (
+            <ul className="ms-3.5 text-muted-foreground">
+              {g.employers.map(([name, amount]) => (
+                <li key={name} className="flex justify-between gap-2">
+                  <span className="truncate">{name}</span>
+                  <span className="tabular-nums">{maskValue(money.format(amount))}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ))}
+      {month.total > 0 && (
+        <p className="flex items-center justify-between gap-2 font-medium">
+          <span>{passiveLabel}</span>
+          <span className="tabular-nums">{maskValue(money.format(month.total))}</span>
+        </p>
+      )}
+    </div>
   );
 }

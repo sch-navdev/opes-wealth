@@ -16,10 +16,10 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <main className="flex-1">
-        <section className="landing-field relative isolate overflow-hidden">
+        <section className="landing-field relative isolate flex min-h-[100svh] flex-col justify-center overflow-hidden">
           <LandingField />
 
-          <header className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 px-6 py-5 sm:px-8">
+          <header className="absolute inset-x-0 top-0 z-10 flex flex-wrap items-center justify-between gap-3 px-6 py-6 sm:px-10 lg:px-16">
             <span className="flex items-center gap-3 text-lg font-semibold tracking-tight text-foreground">
               <Image src="/logo.png" alt="" width={36} height={36} priority className="size-9" />
               Opes Wealth
@@ -34,19 +34,19 @@ export default function Home() {
             </div>
           </header>
 
-          <div className="mx-auto grid w-full max-w-6xl items-center gap-14 px-6 pb-24 pt-44 sm:px-8 sm:pb-32 sm:pt-40 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:pt-36">
+          <div className="mx-auto grid w-full max-w-[1480px] items-center gap-14 px-6 pb-20 pt-40 sm:px-10 sm:pb-24 lg:grid-cols-[1.15fr_0.85fr] lg:gap-20 lg:px-16 lg:pt-32">
             <div>
-              <p className="font-index text-[11px] uppercase tracking-[0.2em] text-primary">
+              <p className="landing-rise font-index text-[11px] uppercase tracking-[0.28em] text-primary" style={{ animationDelay: "60ms" }}>
                 <LT k="landing_tagline_v2" />
               </p>
-              <h1 className="mt-5 max-w-[14ch] text-balance text-4xl font-medium tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              <h1 className="landing-rise landing-foil mt-6 max-w-[13ch] text-balance text-5xl font-medium leading-[1.04] tracking-tight sm:text-6xl lg:text-7xl xl:text-8xl" style={{ animationDelay: "160ms" }}>
                 <T k="landing_headline" />
               </h1>
-              <div aria-hidden="true" className="tick-rule mt-8 max-w-sm" />
-              <p className="mt-6 max-w-prose text-lg text-muted-foreground">
+              <div aria-hidden="true" className="tick-rule landing-rise mt-10 max-w-md" style={{ animationDelay: "260ms" }} />
+              <p className="landing-rise mt-7 max-w-xl text-lg leading-relaxed text-muted-foreground lg:text-xl" style={{ animationDelay: "340ms" }}>
                 <LT k="landing_body_v2" />
               </p>
-              <div className="mt-9 flex flex-wrap items-center gap-x-8 gap-y-4">
+              <div className="landing-rise mt-10 flex flex-wrap items-center gap-x-8 gap-y-4" style={{ animationDelay: "440ms" }}>
                 <Button asChild size="lg">
                   <Link href="/login"><T k="landing_cta" /></Link>
                 </Button>
@@ -59,7 +59,7 @@ export default function Home() {
                 </a>
               </div>
             </div>
-            <div className="flex justify-center lg:justify-end">
+            <div className="landing-rise landing-float flex justify-center lg:justify-end" style={{ animationDelay: "520ms" }}>
               <LandingSpecimen />
             </div>
           </div>

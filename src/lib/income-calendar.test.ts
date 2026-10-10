@@ -236,9 +236,9 @@ describe("buildIncomeCalendar earned-income layer", () => {
     });
     expect(cal.annualTotal).toBe(0);
     const dec = cal.months[1]; // 2025-12: salary + one-off freelance
-    expect(dec.earned).toEqual({ salary: 1000, bonus: 0, other: 500 });
+    expect(dec.earned).toEqual({ salary: 1000, bonus: 0, gratuity: 0, other: 500 });
     const mar = cal.months[4]; // 2026-03: salary + bonus (4000 EUR = 8000 USD)
-    expect(mar.earned).toEqual({ salary: 1000, bonus: 8000, other: 0 });
+    expect(mar.earned).toEqual({ salary: 1000, bonus: 8000, gratuity: 0, other: 0 });
     expect(mar.earnedItems?.map((i) => i.date)).toEqual(["2026-03-15", "2026-03-25"]);
   });
 });

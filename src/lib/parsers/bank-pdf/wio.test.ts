@@ -139,17 +139,27 @@ describe("wioProfile.parse (synthetic multi-account fixture)", () => {
 });
 
 describe("wioProfile account closure", () => {
-  it("reads the printed ACCOUNT CLOSURE date of a closed account and leaves open accounts unmarked", () => {
-    const lf = TEXT.split("\r").join("");
-    const closed = lf.replace(
-      "ACCOUNT OPENED\n27/11/2023\nIBAN\nAE000000000000123456789",
-      "ACCOUNT OPENED\n27/11/2023\nACCOUNT CLOSURE\n23/09/2026\nIBAN\nAE000000000000123456789",
-    );
-    expect(closed).not.toBe(lf);
-    const out = wioProfile.parse(closed);
+  const lf = TEXT.split("\r").join("");
+  const block = "ACCOUNT OPENED\n27/11/2023\nIBAN\nAE000000000000123456789\nOPENING BALANCE\n500\nCLOSING BALANCE\n800";
+  const withClosure = (date: string, closing: string) =>
+    lf.replace(block, `ACCOUNT OPENED\n27/11/2023\nACCOUNT CLOSURE\n${date}\nIBAN\nAE000000000000123456789\nOPENING BALANCE\n500\nCLOSING BALANCE\n${closing}`);
+
+  it("marks an emptied account whose printed closure date is inside the statement period as closed", () => {
+    const text = withClosure("20/02/2026", "0");
+    expect(text).not.toBe(lf);
+    const out = wioProfile.parse(text);
     if (!out.ok) throw new Error("parse failed");
-    expect(out.statement.accounts.some((a) => a.closedOn === "2026-09-23")).toBe(true);
+    expect(out.statement.accounts.some((a) => a.closedOn === "2026-02-20")).toBe(true);
     expect(out.statement.accounts.some((a) => !a.closedOn)).toBe(true);
+  });
+
+  it("does not mark a fixed deposit closed when the printed date is its future maturity and it still holds money", () => {
+    const out = wioProfile.parse(withClosure("20/10/2026", "800"));
+    if (!out.ok) throw new Error("parse failed");
+    expect(out.statement.accounts.every((a) => !a.closedOn)).toBe(true);
+  });
+
+  it("leaves every account open when no closure is printed", () => {
     expect(parseOk().accounts.every((a) => !a.closedOn)).toBe(true);
   });
 });

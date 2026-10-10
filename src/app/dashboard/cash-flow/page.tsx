@@ -33,6 +33,16 @@ export default async function CashFlowPage({
     loadIncomeStreams(supabase, user.id),
   ]);
   const gratuity = await loadGratuityPlans(supabase, user.id);
+  // The user's own companies / entities: any of them can be the employer of an income stream.
+  const { data: companyRows } = await supabase
+    .from("assets")
+    .select("id, name, asset_categories!inner(name)")
+    .eq("profile_id", user.id)
+    .eq("status", "active")
+    .eq("asset_categories.name", "Companies")
+    .order("name")
+    .returns<{ id: string; name: string }[]>();
+  const employers = (companyRows ?? []).map((c) => ({ id: c.id, name: c.name }));
   const baseCurrency = currency || profile?.default_currency || DEFAULT_BASE_CURRENCY;
   const waterfall = await loadWaterfallData(supabase, user.id, new Date().toISOString().slice(0, 10));
 
@@ -45,6 +55,7 @@ export default async function CashFlowPage({
         asOf={new Date().toISOString().slice(0, 10)}
         available={available}
         readOnly={isDemoUser(user.id)}
+        employers={employers}
       />
       <CashFlowWaterfall
         streams={streams}

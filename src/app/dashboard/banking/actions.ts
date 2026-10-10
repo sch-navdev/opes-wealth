@@ -21,6 +21,7 @@ import {
 import { decryptSecret, encryptSecret, isTokenCryptoConfigured } from "@/lib/banking/token-crypto";
 import { cleanSourceRef, isMissingColumnError, type AssetHistorySource } from "@/lib/asset-history";
 import { isDemoUser } from "@/lib/demo-mode";
+import { currentRef, mergeRefHistory, parseRefHistory } from "@/lib/banking/rollover";
 
 type Fail = { ok: false; code: AltareqErrorCode | "unauthenticated" | "invalid" | "db_error" | "crypto_not_configured"; error: string };
 
@@ -458,6 +459,43 @@ export async function rememberCashAccountBank(
   const { error } = await auth.userClient
     .from("assets")
     .update({ metadata: metadata as never })
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId);
+  if (error) return { ok: false, code: "db_error", error: error.message };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+/**
+ * Records the account / card numbers that belong to ONE Cash account (a savings space renewed under a new number,
+ * a replaced card): each entry is the period a number was in use. The account's current number becomes the one
+ * whose period ends latest (the most recent statement date wins), the older ones stay in `metadata.ref_history`
+ * so old statements still route here. Own profile only.
+ */
+export async function mergeAccountRefs(
+  assetId: string,
+  entries: { ref: string; from: string | null; to: string | null }[],
+): Promise<{ ok: true } | Fail> {
+  const clean = entries.filter((e) => e.ref.trim() !== "" && e.ref.length <= 64);
+  if (clean.length === 0) return { ok: true };
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+
+  const { data: asset } = await auth.userClient
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId)
+    .single<{ id: string; metadata: Record<string, unknown> | null; asset_categories: { name: string } | null }>();
+  if (!asset || asset.asset_categories?.name !== "Cash") {
+    return { ok: false, code: "invalid", error: "Cash account not found." };
+  }
+  const current = asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {};
+  const history = mergeRefHistory(parseRefHistory(current.ref_history), clean);
+  const latest = currentRef(history);
+  const { error } = await auth.userClient
+    .from("assets")
+    .update({ metadata: { ...current, ref_history: history, ...(latest ? { account_ref: latest } : {}) } as never })
     .eq("id", assetId)
     .eq("profile_id", auth.userId);
   if (error) return { ok: false, code: "db_error", error: error.message };

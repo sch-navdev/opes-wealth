@@ -44,17 +44,23 @@ function failure(error: unknown): IncomeStreamResult {
 
 const isId = (id: unknown): id is string => typeof id === "string" && id.trim().length > 0 && id.length <= 64;
 
+/** Migration 0042 (employer link, gratuity kind) not applied yet: the column / kind is unknown to the database. */
+const missingEmployerColumn = (error: unknown) => /employer_asset_id/i.test((error as { message?: string } | null)?.message ?? "");
+const withoutEmployer = <T extends { employer_asset_id?: unknown }>(v: T) => {
+  const { employer_asset_id: _e, ...rest } = v;
+  void _e;
+  return rest;
+};
+
 export async function createIncomeStream(input: unknown): Promise<IncomeStreamResult> {
   try {
     const g = await gate();
     if (!g.ok) return g;
     const v = validateIncomeStream(input);
     if (!v.ok) return v;
-    const { data, error } = await g.db
-      .from("income_streams")
-      .insert({ ...v.value, profile_id: g.userId })
-      .select("id")
-      .single();
+    const insert = (row: Record<string, unknown>) => g.db.from("income_streams").insert(row).select("id").single();
+    let { data, error } = await insert({ ...v.value, profile_id: g.userId });
+    if (error && missingEmployerColumn(error)) ({ data, error } = await insert({ ...withoutEmployer(v.value), profile_id: g.userId }));
     if (error) return failure(error);
     revalidatePath("/dashboard", "layout");
     return { ok: true, id: (data as { id?: string } | null)?.id };
@@ -70,12 +76,10 @@ export async function updateIncomeStream(id: string, input: unknown): Promise<In
     if (!isId(id)) return { ok: false, error: "cf_err_not_found" };
     const v = validateIncomeStream(input);
     if (!v.ok) return v;
-    const { data, error } = await g.db
-      .from("income_streams")
-      .update({ ...v.value, updated_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("profile_id", g.userId)
-      .select("id");
+    const update = (row: Record<string, unknown>) =>
+      g.db.from("income_streams").update({ ...row, updated_at: new Date().toISOString() }).eq("id", id).eq("profile_id", g.userId).select("id");
+    let { data, error } = await update(v.value);
+    if (error && missingEmployerColumn(error)) ({ data, error } = await update(withoutEmployer(v.value)));
     if (error) return failure(error);
     if (!data || data.length === 0) return { ok: false, error: "cf_err_not_found" };
     revalidatePath("/dashboard", "layout");

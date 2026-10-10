@@ -10,6 +10,7 @@ import { BankingOverview, type BankingAccountRow } from "@/components/banking-ov
 import { T } from "@/components/translated-text";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
+import { parseRefHistory } from "@/lib/banking/rollover";
 import { accountCountry, bankGroupName, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
 import { companyIdOf } from "@/lib/company-cash";
 import { pickBalanceDate } from "@/lib/bank-staleness";
@@ -166,6 +167,7 @@ export default async function BankingPage({
     nativeValue: a.current_value,
     bankProfile: typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : undefined,
     accountRef: typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : undefined,
+    refHistory: parseRefHistory(a.metadata?.ref_history).map((e) => e.ref),
   }));
 
   return (

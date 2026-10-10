@@ -10,6 +10,8 @@
 import type { TransactionFingerprint } from "@/lib/parsers/bank-pdf/types";
 
 export type TransactionDetail = {
+  /** `transactions.id` of a stored row (absent for previews): what edit and delete act on. */
+  id?: string;
   /** Booking date, ISO YYYY-MM-DD. */
   date: string;
   valueDate?: string | null;
@@ -41,6 +43,7 @@ export type TransactionDetail = {
 
 /** A stored `transactions` row as selected by the asset page (numeric columns may arrive as strings). */
 export type StoredTransactionRow = {
+  id?: string;
   booked_date: string;
   amount: number | string;
   currency: string;
@@ -54,6 +57,7 @@ export type StoredTransactionRow = {
 
 export function detailFromRow(row: StoredTransactionRow): TransactionDetail {
   return {
+    ...(row.id ? { id: row.id } : {}),
     date: row.booked_date,
     description: row.description ?? "",
     amount: Number(row.amount),

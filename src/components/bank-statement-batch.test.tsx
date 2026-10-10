@@ -27,6 +27,7 @@ const banking = vi.hoisted(() => ({
   createStatementCashAccount: vi.fn(),
   recordBalanceSnapshots: vi.fn(),
   markCashAccountClosed: vi.fn(),
+  mergeAccountRefs: vi.fn(),
 }));
 vi.mock("@/app/dashboard/banking/actions", () => banking);
 
@@ -102,6 +103,7 @@ beforeEach(() => {
   banking.recordBalanceSnapshots.mockReset().mockResolvedValue({ ok: true, added: 2, skipped: 0 });
   banking.rememberCashAccountBank.mockReset();
   banking.markCashAccountClosed.mockReset().mockResolvedValue({ ok: true });
+  banking.mergeAccountRefs.mockReset().mockResolvedValue({ ok: true });
   try {
     window.localStorage.clear();
   } catch {
@@ -353,5 +355,64 @@ describe("batch import: closed accounts", () => {
     expect((await screen.findAllByText(/This account was closed on 2026-09-23/)).length).toBeGreaterThan(0);
     await userEvent.click(await screen.findByRole("button", { name: /Import \d+ row\(s\) from 2 file\(s\)/ }));
     await waitFor(() => expect(banking.markCashAccountClosed).toHaveBeenCalledWith("new1", "2026-09-23"));
+  });
+});
+
+describe("batch import: a savings space renewed under a new number", () => {
+  // The Wio "Papa Fixed Saving Space" pattern: closed and reopened the same day, twice.
+  function renewedStatement(): PdfStatement {
+    const base = pdfStatement("wio", "Wio Bank", "2026-09-23", "x").accounts[0];
+    const acct = (ref: string, over: Partial<typeof base>, desc: string) => ({
+      ...base,
+      accountRef: ref,
+      accountName: "Papa Fixed Saving Space",
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-30",
+      transactions: [{ ...base.transactions[0], accountRef: ref, date: "2026-09-23", description: desc }],
+      ...over,
+    });
+    return {
+      ...pdfStatement("wio", "Wio Bank", "2026-09-23", "x"),
+      accounts: [
+        acct("2801366317", { openedOn: "2026-08-24", closedOn: "2026-09-23" }, "CLOSE OLD"),
+        acct("2684141353", { openedOn: "2026-09-23", closedOn: "2026-09-23" }, "SWAP"),
+        acct("2884871877", { openedOn: "2026-09-23" }, "OPEN NEW"),
+      ],
+    };
+  }
+  const second = () => csv("other.csv", JAN_CSV);
+
+  it("asks, and by default imports them into ONE account that keeps the old numbers in its history", async () => {
+    action.readBankStatementPdf.mockResolvedValue({ ok: true, statement: renewedStatement() });
+    await openAndChoose([pdf("wio.pdf"), second()], []);
+    expect(await screen.findByText(/3 accounts named “Papa Fixed Saving Space”/)).toBeTruthy();
+    await userEvent.click(await screen.findByRole("button", { name: /Import \d+ row\(s\) from \d+ file\(s\)/ }));
+    await waitFor(() => expect(banking.mergeAccountRefs).toHaveBeenCalled());
+    const wioCreates = banking.createStatementCashAccount.mock.calls.filter((c) => /Papa Fixed Saving Space/.test(c[0].name));
+    expect(wioCreates).toHaveLength(1);
+    expect(wioCreates[0][0].name).toContain("···1877");
+    const entries = banking.mergeAccountRefs.mock.calls[0][1] as { ref: string }[];
+    expect(entries.map((e) => e.ref).sort()).toEqual(["2684141353", "2801366317", "2884871877"]);
+    // The earlier numbers were closed by the renewal, not by the bank: the account itself stays open.
+    expect(banking.markCashAccountClosed).not.toHaveBeenCalled();
+  });
+
+  it("keeps them as separate accounts when the user says so", async () => {
+    action.readBankStatementPdf.mockResolvedValue({ ok: true, statement: renewedStatement() });
+    await openAndChoose([pdf("wio.pdf"), second()], []);
+    await userEvent.click(await screen.findByRole("button", { name: "No, keep them separate" }));
+    await userEvent.click(await screen.findByRole("button", { name: /Import \d+ row\(s\) from \d+ file\(s\)/ }));
+    await waitFor(() => expect(banking.createStatementCashAccount.mock.calls.filter((c) => /Papa Fixed Saving Space/.test(c[0].name))).toHaveLength(3));
+    expect(banking.mergeAccountRefs).not.toHaveBeenCalled();
+    // Separate accounts: the closed ones are marked closed.
+    expect(banking.markCashAccountClosed).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("batch import: groups left on Don't import are named", () => {
+  it("lists the accounts that will be left out so nothing is dropped silently", async () => {
+    // A file whose account number is missing gets no default account: it stays on Don't import.
+    await openAndChoose([csv("a.csv", JAN_CSV), csv("b.csv", MARCH_CSV)], [MAIN, { id: "a2", name: "Second", currency: "AED", nativeValue: 5 }]);
+    expect(await screen.findByText(/Left out because the account is set to Don.t import/)).toBeTruthy();
   });
 });

@@ -79,6 +79,10 @@ export type PdfAccountStatement = {
   reconciliation: Reconciliation;
   /** ISO date the bank printed as "account closure" (the account is closed), when present. */
   closedOn?: string | null;
+  /** Name of a savings space / deposit as printed (Wio), when the bank gives one. */
+  accountName?: string;
+  /** ISO date the account was opened, when printed. */
+  openedOn?: string;
 };
 
 export type PdfStatement = {

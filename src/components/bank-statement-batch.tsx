@@ -15,10 +15,12 @@ import { useBatchText } from "@/components/batch-import-text";
 import { useLanguage } from "@/context/language-context";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
-import { createStatementCashAccount, markCashAccountClosed, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
+import { createStatementCashAccount, markCashAccountClosed, mergeAccountRefs, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import { readSkippedAccounts, setAccountSkipped, skipKey } from "@/lib/banking/skipped-accounts";
+import { findRolloverChains, type RefHistoryEntry } from "@/lib/banking/rollover";
 import { checkExistingTransactions, importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import {
+  accountTail,
   detectProfile,
   getBankProfile,
   parseStatement,
@@ -428,7 +430,7 @@ export function BankStatementBatch({
         : cur.parsed,
       edited: { ...cur.edited, [`${gi}:${j}`]: true },
     }));
-    const state = it.groupState[gi];
+    const state = stateOf(it, gi);
     const group = it.parsed?.groups[gi];
     if (group && state && state.target !== NONE && state.target !== NEW) {
       const next = { ...group, rows: group.rows.map((r, x) => (x === j ? { ...r, ...row } : r)) };
@@ -436,7 +438,27 @@ export function BankStatementBatch({
     }
   }
 
+  /** The user says this card / account replaces an existing one: pick it as the target and remember the replacement. */
+  function markReplacement(it: BatchItem, gi: number, group: StatementGroup, accountId: string) {
+    changeTarget(it, gi, group, accountId);
+    patch(it.id, (cur) => ({ groupState: cur.groupState.map((s, j) => (j === gi ? { ...s, replacement: true } : s)) }));
+  }
+
   function changeTarget(it: BatchItem, gi: number, group: StatementGroup, target: string) {
+    const chain = mergedChain(`${it.id}:${gi}`);
+    if (chain) {
+      // All the groups of a renewed account follow the same choice, each with its own duplicate check.
+      setChainTarget((prev) => ({ ...prev, [chain.id]: target }));
+      for (const k of chain.keys) {
+        const [fid, g] = k.split(":").map(Number);
+        const other = items.find((i) => i.id === fid);
+        const og = other?.parsed?.groups[g];
+        if (!other || !og) continue;
+        patch(fid, (cur) => ({ checks: target === NONE ? omit(cur.checks, g) : cur.checks, selection: omit(cur.selection, g) }));
+        if (target !== NONE && target !== NEW) void runCheck(fid, g, og, target);
+      }
+      return;
+    }
     patch(it.id, (cur) => ({
       groupState: cur.groupState.map((st, j) =>
         j === gi ? { ...st, target, autoPicked: false, ...(target !== NONE ? { skippedByPreference: false, neverImport: false } : {}) } : st,
@@ -457,12 +479,60 @@ export function BankStatementBatch({
 
   // ---- plans: per group, what will happen on Import ----
 
+  // ---- renewed accounts: a savings space closed and reopened under a new number is ONE account ----
+
+  const chains = useMemo(() => {
+    const members: { key: string; ref: string; name?: string; openedOn?: string; closedOn?: string }[] = [];
+    for (const it of items) {
+      if (it.status !== "ready" || !it.parsed) continue;
+      it.parsed.groups.forEach((g, gi) =>
+        members.push({ key: `${it.id}:${gi}`, ref: g.accountRef, name: g.accountName, openedOn: g.openedOn, closedOn: g.closedOn }),
+      );
+    }
+    return findRolloverChains(members).map((c) => ({ ...c, id: c.keys[0] }));
+  }, [items]);
+  const [chainMerge, setChainMerge] = useState<Record<string, boolean>>({});
+  const [chainTarget, setChainTarget] = useState<Record<string, string>>({});
+
+  /** The renewed-account chain a group belongs to, unless the user chose to keep them separate. */
+  function mergedChain(key: string) {
+    const c = chains.find((x) => x.keys.includes(key));
+    return c && (chainMerge[c.id] ?? true) ? c : undefined;
+  }
+  function derivedChainTarget(c: { keys: string[] }): string {
+    let sawNew = false;
+    for (const k of c.keys) {
+      const [id, g] = k.split(":").map(Number);
+      const st = items.find((i) => i.id === id)?.groupState[g];
+      if (!st) continue;
+      if (st.target !== NONE && st.target !== NEW) return st.target;
+      if (st.target === NEW) sawNew = true;
+    }
+    return sawNew ? NEW : NONE;
+  }
+  /** A group's state; the groups of a renewed account share ONE target. */
+  function stateOf(it: BatchItem, gi: number): GroupState {
+    const own = it.groupState[gi] ?? { target: NONE, remember: true };
+    const c = mergedChain(`${it.id}:${gi}`);
+    if (!c) return own;
+    return { ...own, target: chainTarget[c.id] ?? derivedChainTarget(c), autoPicked: false };
+  }
+
   function newKeyOf(it: BatchItem, group: StatementGroup) {
+    const gi = it.parsed ? it.parsed.groups.indexOf(group) : -1;
+    const c = gi >= 0 ? mergedChain(`${it.id}:${gi}`) : undefined;
+    if (c) return `new:chain:${c.id}`;
     return `new:${it.profileId}|${group.currency.toUpperCase()}|${group.accountRef}`;
   }
+  /** Current-account layouts that do not print a product name: named "current account" so it is not mistaken for a card. */
+  const CURRENT_ACCOUNT_PROFILES = new Set(["banque_populaire"]);
   function newAccountName(it: BatchItem, group: StatementGroup): string {
-    const tail = group.accountRef.replace(/[^0-9A-Za-z]/g, "").slice(-4);
-    return [getBankProfile(it.profileId || "")?.name ?? "", group.currency, tail ? "···" + tail : ""].filter(Boolean).join(" ");
+    const gi = it.parsed ? it.parsed.groups.indexOf(group) : -1;
+    const c = gi >= 0 ? mergedChain(`${it.id}:${gi}`) : undefined;
+    const ref = c ? c.refs[c.refs.length - 1] : group.accountRef;
+    const tail = ref.replace(/[^0-9A-Za-z]/g, "").slice(-4);
+    const product = c ? c.name : group.accountName ?? (CURRENT_ACCOUNT_PROFILES.has(it.profileId) ? "current account" : "");
+    return [getBankProfile(it.profileId || "")?.name ?? "", product, group.currency, tail ? "···" + tail : ""].filter(Boolean).join(" ");
   }
   function targetKeyOf(it: BatchItem, group: StatementGroup, state: GroupState | undefined): string | null {
     if (!state || state.target === NONE) return null;
@@ -476,14 +546,13 @@ export function BankStatementBatch({
     const inputs: BatchGroupInput[] = [];
     for (const it of items) {
       if (it.status !== "ready" || !it.parsed) continue;
-      const profileId = it.profileId;
       it.parsed.groups.forEach((g, gi) => {
-        const st = it.groupState[gi];
+        const st = stateOf(it, gi);
         const target =
           !st || st.target === NONE
             ? null
             : st.target === NEW
-              ? `new:${profileId}|${g.currency.toUpperCase()}|${g.accountRef}`
+              ? newKeyOf(it, g)
               : (() => {
                   const a = accounts.find((x) => x.id === st.target);
                   return a && a.currency.toUpperCase() === g.currency.toUpperCase() ? a.id : null;
@@ -501,10 +570,11 @@ export function BankStatementBatch({
       });
     }
     return findBatchDuplicates(inputs);
-  }, [items, accounts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, accounts, chains, chainMerge, chainTarget]);
 
   function groupPlan(it: BatchItem, group: StatementGroup, gi: number) {
-    const state = it.groupState[gi] ?? { target: NONE, remember: true };
+    const state = stateOf(it, gi);
     const account =
       state.target === NONE
         ? undefined
@@ -615,6 +685,27 @@ export function BankStatementBatch({
       }
 
       const created = new Map<string, string>();
+      // Numbers that belong to ONE account (renewed savings space, replaced card): written once per account at the end.
+      const refEntries = new Map<string, RefHistoryEntry[]>();
+      const addRefHistory = (accountId: string, job: { it: BatchItem; gi: number; group: StatementGroup; plan: ReturnType<typeof groupPlan> }) => {
+        const g = job.group;
+        if (!g.accountRef) return;
+        const existingRef = accounts.find((a) => a.id === job.plan.state.target)?.accountRef;
+        const differs = !!existingRef && accountTail(existingRef) !== accountTail(g.accountRef);
+        if (!(mergedChain(`${job.it.id}:${job.gi}`) || job.plan.state.replacement || differs)) return;
+        const period = groupPeriod(g);
+        const list = refEntries.get(accountId) ?? [];
+        list.push({ ref: g.accountRef, from: g.openedOn ?? period?.start ?? null, to: g.closedOn ?? g.periodEnd ?? period?.end ?? null });
+        if (existingRef && differs) list.push({ ref: existingRef, from: null, to: null });
+        refEntries.set(accountId, list);
+      };
+      // A closure only closes the account when nothing renewed it: in a renewed chain only the LAST account's closure counts.
+      const closeIfDue = async (accountId: string, job: { it: BatchItem; gi: number; group: StatementGroup }) => {
+        if (!job.group.closedOn) return;
+        const chain = mergedChain(`${job.it.id}:${job.gi}`);
+        if (chain && chain.keys[chain.keys.length - 1] !== `${job.it.id}:${job.gi}`) return;
+        await markCashAccountClosed(accountId, job.group.closedOn);
+      };
       for (const job of ordered) {
         if (!go.has(job.key)) continue;
         const { it, group, plan } = job;
@@ -654,7 +745,8 @@ export function BankStatementBatch({
             continue;
           }
           if (it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
-          if (group.closedOn) await markCashAccountClosed(account.id, group.closedOn);
+          addRefHistory(account.id, job);
+          await closeIfDue(account.id, job);
           push(job, line("ok", t("stmt_balance_recorded", { account: account.name, added: snap.added, skipped: snap.skipped })));
           continue;
         }
@@ -666,7 +758,8 @@ export function BankStatementBatch({
           continue;
         }
         if (plan.state.remember && it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
-        if (group.closedOn) await markCashAccountClosed(account.id, group.closedOn);
+        addRefHistory(account.id, job);
+        await closeIfDue(account.id, job);
         const all = toImportTx(group);
         const occurrences = occurrenceIndexes(all);
         const chosen = all.flatMap((tx, j) => (plan.isSelected(j) ? [{ ...tx, occurrence: occurrences[j] }] : []));
@@ -685,6 +778,7 @@ export function BankStatementBatch({
           push(job, line("ok", t("stmt_imported", { n: rows.length, account: account.name })), { ...un, errors: 1 });
         }
       }
+      for (const [accountId, entries] of refEntries) await mergeAccountRefs(accountId, entries);
       setResults(items.map((it) => byFile.get(it.id) as FileResult));
     });
   }
@@ -719,6 +813,14 @@ export function BankStatementBatch({
   const importCount = routed.reduce((n, pl) => n + (pl.balanceOnly ? 1 : pl.selectedCount), 0);
   const importFiles = readyItems.filter((it) => (plansByItem.get(it.id) ?? []).some((pl) => pl.routed && (pl.balanceOnly || pl.selectedCount > 0))).length;
   const checking = allPlans.some((pl) => pl.check?.status === "loading");
+  // Groups quietly set to "Don't import" (not by the user's own "never import" choice) are named, never silently dropped.
+  const leftOut = readyItems.flatMap((it) =>
+    (it.parsed as StatementParseResult).groups.flatMap((g, gi) => {
+      const pl = plansByItem.get(it.id)?.[gi];
+      const has = g.rows.length > 0 || (g.balances?.length ?? 0) > 0;
+      return pl && has && pl.state.target === NONE && !pl.state.neverImport && !pl.state.skippedByPreference ? [g.accountRef || t("stmt_account_unnamed")] : [];
+    }),
+  );
   const importDisabled = isPending || reading || ocrRunning || checking || importCount === 0;
   const importHint = isPending
     ? ""
@@ -816,10 +918,32 @@ export function BankStatementBatch({
         </div>
       )}
 
+      {chains.map((c) => (
+        <div key={c.id} role="group" aria-label={c.name} className="space-y-2 rounded-md border border-border bg-muted/30 p-3" data-testid={`rollover-${c.id}`}>
+          <p className="text-sm text-foreground">
+            {bt("batch_rollover_q", { n: c.keys.length, name: c.name, refs: c.refs.map((r) => "···" + accountTail(r)).join(", ") })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant={(chainMerge[c.id] ?? true) ? "default" : "outline"} aria-pressed={chainMerge[c.id] ?? true} onClick={() => setChainMerge((p) => ({ ...p, [c.id]: true }))}>
+              {bt("batch_rollover_yes")}
+            </Button>
+            <Button type="button" size="sm" variant={(chainMerge[c.id] ?? true) ? "outline" : "default"} aria-pressed={!(chainMerge[c.id] ?? true)} onClick={() => setChainMerge((p) => ({ ...p, [c.id]: false }))}>
+              {bt("batch_rollover_no")}
+            </Button>
+          </div>
+        </div>
+      ))}
+
       {items.map((it) => renderFile(it))}
 
       {readyItems.length > 1 && <p className="text-xs text-muted-foreground">{bt("batch_order_note")}</p>}
       {pendingFiles > 0 && <p className="text-xs text-muted-foreground">{bt("batch_pending_note", { n: pendingFiles })}</p>}
+
+      {leftOut.length > 0 && !isPending && (
+        <p className="text-xs text-muted-foreground" role="status">
+          {bt("batch_left_out_note", { list: leftOut.join(", ") })}
+        </p>
+      )}
 
       <div className="flex flex-col items-end gap-1">
         <Button type="button" onClick={handleImport} disabled={importDisabled} aria-describedby={importDisabled && importHint ? "batch-import-hint" : undefined}>
@@ -981,6 +1105,23 @@ export function BankStatementBatch({
           </Select>
         </div>
         {state.target === NEW && <p className="text-xs text-muted-foreground">{t("stmt_new_account_note")}</p>}
+        {mergedChain(`${it.id}:${gi}`) && (
+          <p className="text-xs text-muted-foreground">{bt("batch_rollover_note", { name: group.accountName ?? "" })}</p>
+        )}
+        {it.profileId.endsWith("_card") && state.target === NEW && group.accountRef && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{bt("batch_replace_hint", { ref: group.accountRef })}</span>
+            {accounts
+              .filter((a) => a.bankProfile === it.profileId && a.currency.toUpperCase() === group.currency.toUpperCase() && a.accountRef && accountTail(a.accountRef) !== accountTail(group.accountRef))
+              .slice(0, 3)
+              .map((a) => (
+                <Button key={a.id} type="button" variant="outline" size="xs" onClick={() => markReplacement(it, gi, group, a.id)}>
+                  {bt("batch_replace_yes", { name: a.name })}
+                </Button>
+              ))}
+          </div>
+        )}
+        {state.replacement && <p className="text-xs text-muted-foreground">{bt("batch_replace_note")}</p>}
         {group.closedOn && <p className="text-xs text-muted-foreground">{bt("batch_closed_note", { date: group.closedOn })}</p>}
         {state.skippedByPreference && (
           <p className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 p-2 text-xs font-medium text-foreground" role="status">

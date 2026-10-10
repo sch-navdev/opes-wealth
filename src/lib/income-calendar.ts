@@ -63,6 +63,8 @@ export type IncomeCalendarItem = {
 export type EarnedCalendarItem = {
   streamId: string;
   name: string;
+  /** Who pays it (employer / source name); may be empty. */
+  source: string;
   group: EarnedGroup;
   /** Base Currency, NET. */
   amount: number;
@@ -277,7 +279,7 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
   // Earned-income layer: attached to the months but kept out of every passive figure above.
   if (input.streams && input.streams.length > 0) {
     for (const m of months) {
-      m.earned = { salary: 0, bonus: 0, other: 0 };
+      m.earned = { salary: 0, bonus: 0, gratuity: 0, other: 0 };
       m.earnedItems = [];
     }
     for (const o of expandIncomeStreams(input.streams, keys[0], rates, baseCurrency, MONTHS)) {
@@ -285,7 +287,7 @@ export function buildIncomeCalendar(input: IncomeCalendarInput): IncomeCalendar 
       if (!bucket?.earned || !bucket.earnedItems) continue;
       const group = earnedGroupOf(o.kind);
       bucket.earned[group] += o.baseAmount;
-      bucket.earnedItems.push({ streamId: o.streamId, name: o.label, group, amount: o.baseAmount, date: o.date });
+      bucket.earnedItems.push({ streamId: o.streamId, name: o.label, source: o.source, group, amount: o.baseAmount, date: o.date });
     }
   }
 

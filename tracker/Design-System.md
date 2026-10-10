@@ -113,3 +113,6 @@ Components retrieved from 21st.dev for reference (patterns only, restyled): Anim
 
 ## Light-theme gold contrast (2026-10-09)
 Light `--primary`/`--ring`/`--chart-1` darkened from `#8E6A1C` to `#876418` (4.38 -> 4.79:1 on the silver background `#EEF1F5`, 5.43:1 on white). Dark theme unchanged.
+
+## Landing page, second pass (2026-10-10)
+Full-screen hero (min-h 100svh, content column up to 1480 px), larger headline with a gold-foil sheen (`.landing-foil`), staged entrance (`.landing-rise`), floating specimen card, and a layered background in `landing-field.tsx`: two drifting gold washes, the breathing lattice, a sheen that sweeps now and then, eight rising motes, the dial and rosette plus a seconds hand that turns once a minute in 60 steps. All decoration, off under prefers-reduced-motion, positions fixed (no randomness) so server and client agree. Checked in light and dark at 1440 px; not checked on a real phone, RTL, or against the 21st.dev catalog (patterns were rebuilt by hand in the existing token system).

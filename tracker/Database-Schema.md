@@ -157,3 +157,5 @@ The 8-year constant, the allowances (EUR 4,600 single / EUR 9,200 couple), `asOf
 
 ### Pending migrations (2026-10-09)
 `0041_history_source_ref.sql` is DRAFTED and NOT applied (asset_history.source_ref, transactions.source_file, `pdf_import` in the asset_history source CHECK). 0037 to 0040 were applied by Steve (0039 FX tables and 0040 end-of-service plans confirmed present).
+
+`0042_income_employer.sql` is DRAFTED and NOT applied (`income_streams.employer_asset_id` uuid references assets on delete set null, and the kind check widened with 'gratuity'). The code degrades without it.

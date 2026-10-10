@@ -265,7 +265,13 @@ export function BankingOverview({
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-sm text-foreground">
                   <BankLogoByName name={institution} />
-                  {institution}
+                  {institution === t("banking_group_other") ? (
+                    institution
+                  ) : (
+                    <Link href={`/dashboard/banking/bank/${encodeURIComponent(institution)}`} className="hover:underline" title={tx("bank_detail_total")}>
+                      {institution}
+                    </Link>
+                  )}
                 </CardTitle>
                 <span className="flex flex-wrap items-center justify-end gap-2">
                   {staleCount > 0 && (

@@ -30,6 +30,10 @@ type DetailBlock = {
   closing: number | null;
   /** Printed "ACCOUNT CLOSURE" date (ISO) of an account that has been closed. */
   closedOn: string | null;
+  /** Name of a savings space / deposit ("Papa Fixed Saving Space"); null for a current account (its name is the holder). */
+  accountName: string | null;
+  /** Printed "ACCOUNT OPENED" date (ISO). */
+  openedOn: string | null;
 };
 
 const DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
@@ -108,7 +112,7 @@ function resolveRow(prev: number | null, text: string): Resolved | null {
  * name leads in 2025+ and trails in 2023-24), so a block is the run of `LABEL / value` pairs
  * that ends when a label repeats.
  */
-const BLOCK_LABELS = ["CURRENCY", "ACCOUNT NUMBER", "IBAN", "OPENING BALANCE", "CLOSING BALANCE", "ACCOUNT CLOSURE"] as const;
+const BLOCK_LABELS = ["CURRENCY", "ACCOUNT NUMBER", "IBAN", "OPENING BALANCE", "CLOSING BALANCE", "ACCOUNT CLOSURE", "ACCOUNT TYPE", "ACCOUNT NAME", "ACCOUNT OPENED"] as const;
 
 function parseBlocks(lines: string[]): DetailBlock[] {
   const blocks: DetailBlock[] = [];
@@ -122,6 +126,8 @@ function parseBlocks(lines: string[]): DetailBlock[] {
         opening: parseMoney(cur["OPENING BALANCE"]),
         closing: parseMoney(cur["CLOSING BALANCE"]),
         closedOn: parseDmy(cur["ACCOUNT CLOSURE"] ?? ""),
+        accountName: cur["ACCOUNT TYPE"] && !/^current[ _]account$/i.test(cur["ACCOUNT TYPE"]) && cur["ACCOUNT NAME"] ? squash(cur["ACCOUNT NAME"]) : null,
+        openedOn: parseDmy(cur["ACCOUNT OPENED"] ?? ""),
       });
     }
     cur = null;
@@ -282,7 +288,7 @@ function parse(text: string): PdfParseOutcome {
     if (!target) {
       warnings.push("A transaction table could not be matched to any account block.");
       target = {
-        block: { currency: table.currency, accountNumber: null, iban: null, opening: null, closing: null, closedOn: null },
+        block: { currency: table.currency, accountNumber: null, iban: null, opening: null, closing: null, closedOn: null, accountName: null, openedOn: null },
         rows: [],
         running: null,
         closed: false,
@@ -334,7 +340,13 @@ function parse(text: string): PdfParseOutcome {
         openingBalance: a.block.opening,
         closingBalance: a.block.closing,
         transactions: a.rows,
-        ...(a.block.closedOn ? { closedOn: a.block.closedOn } : {}),
+        // The printed "ACCOUNT CLOSURE" of a fixed deposit that is still open is its MATURITY date (in the
+        // future, balance not zero): only a date inside the statement period on an emptied account is a closure.
+        ...(a.block.accountName ? { accountName: a.block.accountName } : {}),
+        ...(a.block.openedOn ? { openedOn: a.block.openedOn } : {}),
+        ...(a.block.closedOn && periodEnd && a.block.closedOn <= periodEnd && (a.block.closing === 0 || a.block.closing === null)
+          ? { closedOn: a.block.closedOn }
+          : {}),
       }),
     );
 
