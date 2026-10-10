@@ -585,6 +585,8 @@ export type StatementGroup = {
   rows: NormalizedTx[];
   /** PDF accounts with NO transactions: dated balances printed on the statement (balance brought forward, closing), recorded as history when imported. */
   balances?: { date: string; balance: number }[];
+  /** The statement says this account was closed on that date (ISO). */
+  closedOn?: string;
 };
 
 export type StatementParseResult = {
@@ -783,8 +785,12 @@ export function routeGroup(
     const byRef = accounts.filter((a) => a.accountRef && accountTail(a.accountRef) === tail);
     if (byRef.length === 1) return { kind: "matched", assetId: byRef[0].id, reason: "account_ref" };
   }
+  // Same bank and currency, but never an account with a DIFFERENT account number (a second account of the same bank).
   const byBank = accounts.filter(
-    (a) => a.bankProfile === profileId && a.currency.toUpperCase() === group.currency.toUpperCase(),
+    (a) =>
+      a.bankProfile === profileId &&
+      a.currency.toUpperCase() === group.currency.toUpperCase() &&
+      !(tail.length === 4 && a.accountRef && accountTail(a.accountRef) !== tail),
   );
   if (byBank.length === 1) return { kind: "matched", assetId: byBank[0].id, reason: "bank_and_currency" };
   return { kind: "unmatched", candidates: byBank.map((a) => a.id) };

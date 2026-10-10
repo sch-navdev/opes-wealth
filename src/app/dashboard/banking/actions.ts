@@ -466,6 +466,38 @@ export async function rememberCashAccountBank(
 }
 
 /**
+ * Marks a Cash account as closed (`metadata.closed_on`, ISO date) after a statement printed an account
+ * closure date. The account is hidden on the Banking page unless "Show closed accounts" is on; its
+ * history stays. Never overwrites an earlier closure date. Own profile only.
+ */
+export async function markCashAccountClosed(assetId: string, closedOn: string): Promise<{ ok: true } | Fail> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(closedOn)) return { ok: false, code: "invalid", error: "Invalid closure date." };
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+
+  const { data: asset } = await auth.userClient
+    .from("assets")
+    .select("id, metadata, asset_categories(name)")
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId)
+    .single<{ id: string; metadata: Record<string, unknown> | null; asset_categories: { name: string } | null }>();
+  if (!asset || asset.asset_categories?.name !== "Cash") {
+    return { ok: false, code: "invalid", error: "Cash account not found." };
+  }
+  const current = asset.metadata && typeof asset.metadata === "object" ? asset.metadata : {};
+  if (typeof current.closed_on === "string") return { ok: true };
+
+  const { error } = await auth.userClient
+    .from("assets")
+    .update({ metadata: { ...current, closed_on: closedOn } as never })
+    .eq("id", assetId)
+    .eq("profile_id", auth.userId);
+  if (error) return { ok: false, code: "db_error", error: error.message };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
+/**
  * Creates an empty manual Cash account for a statement group that has no account yet (balance 0; the
  * import then records the statement's history and balance). Own profile only, never the demo account.
  */

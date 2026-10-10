@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Loader2, ScanText } from "lucide-react";
+import { Loader2, Pencil, ScanText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +15,8 @@ import { useBatchText } from "@/components/batch-import-text";
 import { useLanguage } from "@/context/language-context";
 import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
-import { createStatementCashAccount, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
+import { createStatementCashAccount, markCashAccountClosed, recordBalanceSnapshots, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
+import { readSkippedAccounts, setAccountSkipped, skipKey } from "@/lib/banking/skipped-accounts";
 import { checkExistingTransactions, importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import {
   detectProfile,
@@ -93,6 +95,8 @@ type BatchItem = {
   /** Per group: the user's own ticks. Missing = the default (not stored yet, not repeated by an earlier file). */
   selection: Record<number, boolean[]>;
   expanded: Record<number, boolean>;
+  /** Rows the user corrected by hand, keyed "group:row". */
+  edited: Record<string, boolean>;
 };
 
 function newItem(file: File, id: number): BatchItem {
@@ -120,6 +124,7 @@ function newItem(file: File, id: number): BatchItem {
     checks: {},
     selection: {},
     expanded: {},
+    edited: {},
   };
 }
 
@@ -169,6 +174,7 @@ export function BankStatementBatch({
   const bt = useBatchText();
   const [items, setItems] = useState<BatchItem[]>(() => files.map((file, id) => newItem(file, id)));
   const [results, setResults] = useState<FileResult[] | null>(null);
+  const [editing, setEditing] = useState<{ id: number; gi: number; j: number } | null>(null);
   const [ocrAsking, setOcrAsking] = useState(false);
   const [ocrRunning, setOcrRunning] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -212,7 +218,8 @@ export function BankStatementBatch({
 
   /** Stores a successful read and routes its groups (remembered account, else the only account in the currency) and starts their stored-duplicate checks. */
   function applyParsed(id: number, parsed: StatementParseResult, profileId: BankProfileId, extra: Partial<BatchItem>) {
-    const states = parsed.groups.map((g) => initialGroupState(g, profileId, accounts));
+    const skipped = readSkippedAccounts();
+    const states = parsed.groups.map((g) => initialGroupState(g, profileId, accounts, skipped));
     patch(id, {
       ...extra,
       status: "ready",
@@ -223,6 +230,7 @@ export function BankStatementBatch({
       checks: {},
       selection: {},
       expanded: {},
+      edited: {},
       incorrectPassword: false,
       pickerFailure: false,
       ocrMissing: false,
@@ -398,11 +406,47 @@ export function BankStatementBatch({
     await readPdf(it.id, it.file, { password: passwords.current.get(it.id), ocr: it.ocrRead, bank: bankId, quiet: true });
   }
 
+  /** "Never import this account": remembered on this device, and immediately reflected in the group's state. */
+  function setNeverImport(it: BatchItem, gi: number, group: StatementGroup, on: boolean) {
+    const key = skipKey(it.profileId, group);
+    if (key) setAccountSkipped(key, on);
+    patch(it.id, (cur) => ({
+      groupState: cur.groupState.map((s, j) => (j === gi ? { ...s, neverImport: on, skippedByPreference: on ? s.skippedByPreference : false } : s)),
+    }));
+  }
+
+  /** Corrects one row by hand (the reader sometimes mis-splits a glued amount); the stored-duplicate check is re-run. */
+  function saveRowEdit(it: BatchItem, gi: number, j: number, row: { date: string; description: string; amount: number }) {
+    patch(it.id, (cur) => ({
+      parsed: cur.parsed
+        ? {
+            ...cur.parsed,
+            groups: cur.parsed.groups.map((g, k) =>
+              k === gi ? { ...g, rows: g.rows.map((r, x) => (x === j ? { ...r, date: row.date, description: row.description, amount: row.amount } : r)) } : g,
+            ),
+          }
+        : cur.parsed,
+      edited: { ...cur.edited, [`${gi}:${j}`]: true },
+    }));
+    const state = it.groupState[gi];
+    const group = it.parsed?.groups[gi];
+    if (group && state && state.target !== NONE && state.target !== NEW) {
+      const next = { ...group, rows: group.rows.map((r, x) => (x === j ? { ...r, ...row } : r)) };
+      void runCheck(it.id, gi, next, state.target);
+    }
+  }
+
   function changeTarget(it: BatchItem, gi: number, group: StatementGroup, target: string) {
     patch(it.id, (cur) => ({
-      groupState: cur.groupState.map((st, j) => (j === gi ? { ...st, target, autoPicked: false } : st)),
+      groupState: cur.groupState.map((st, j) =>
+        j === gi ? { ...st, target, autoPicked: false, ...(target !== NONE ? { skippedByPreference: false, neverImport: false } : {}) } : st,
+      ),
       selection: omit(cur.selection, gi),
     }));
+    if (target !== NONE) {
+      const key = skipKey(it.profileId, group);
+      if (key && it.groupState[gi]?.neverImport) setAccountSkipped(key, false);
+    }
     if (target === NONE) {
       checkLatest.current[`${it.id}:${gi}`] = ++checkSeq.current;
       patch(it.id, (cur) => ({ checks: omit(cur.checks, gi) }));
@@ -610,6 +654,7 @@ export function BankStatementBatch({
             continue;
           }
           if (it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
+          if (group.closedOn) await markCashAccountClosed(account.id, group.closedOn);
           push(job, line("ok", t("stmt_balance_recorded", { account: account.name, added: snap.added, skipped: snap.skipped })));
           continue;
         }
@@ -621,6 +666,7 @@ export function BankStatementBatch({
           continue;
         }
         if (plan.state.remember && it.profileId) await rememberCashAccountBank(account.id, it.profileId, group.accountRef);
+        if (group.closedOn) await markCashAccountClosed(account.id, group.closedOn);
         const all = toImportTx(group);
         const occurrences = occurrenceIndexes(all);
         const chosen = all.flatMap((tx, j) => (plan.isSelected(j) ? [{ ...tx, occurrence: occurrences[j] }] : []));
@@ -906,6 +952,11 @@ export function BankStatementBatch({
     const fmt = new Intl.NumberFormat(intlLocale, { style: "currency", currency: group.currency });
     const reconciliation = it.pdfStatement?.accounts[gi]?.reconciliation;
     const state = plan.state;
+    const editedGroup = group.rows.some((_r, j) => it.edited[`${gi}:${j}`]);
+    const editedOk =
+      reconciliation && reconciliation.openingBalance !== null && reconciliation.closingBalance !== null
+        ? Math.abs(reconciliation.openingBalance + group.rows.reduce((s, r) => s + r.amount, 0) - reconciliation.closingBalance) < 0.005
+        : false;
     const defaults = group.rows.map((_r, j) => !(plan.flags?.[j] ?? false) && !plan.batchDup[j]);
     return (
       <div key={gi} className="space-y-2 border border-border p-3" data-testid={`batch-group-${it.id}-${gi}`}>
@@ -930,6 +981,21 @@ export function BankStatementBatch({
           </Select>
         </div>
         {state.target === NEW && <p className="text-xs text-muted-foreground">{t("stmt_new_account_note")}</p>}
+        {group.closedOn && <p className="text-xs text-muted-foreground">{bt("batch_closed_note", { date: group.closedOn })}</p>}
+        {state.skippedByPreference && (
+          <p className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 p-2 text-xs font-medium text-foreground" role="status">
+            {bt("batch_skipped_pref")}
+            <Button type="button" variant="outline" size="xs" onClick={() => changeTarget(it, gi, group, NEW)}>
+              {bt("batch_change_pref")}
+            </Button>
+          </p>
+        )}
+        {state.target === NONE && !state.skippedByPreference && skipKey(it.profileId, group) && (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox checked={state.neverImport === true} onCheckedChange={(v) => setNeverImport(it, gi, group, v === true)} />
+            {bt("batch_never_import")}
+          </label>
+        )}
         {plan.balanceOnly && group.balances && (
           <p className="text-xs text-muted-foreground" role="status">
             {t("stmt_balance_only", { balances: group.balances.map((b) => `${fmt.format(b.balance)} (${b.date})`).join(", ") })}
@@ -948,9 +1014,14 @@ export function BankStatementBatch({
           </p>
         )}
         {plan.overlapWith.length > 0 && <p className="text-xs text-muted-foreground">{bt("batch_overlap_note", { files: plan.overlapWith.join(", ") })}</p>}
-        {reconciliation && (
+        {reconciliation && !editedGroup && (
           <p className={reconciliation.status === "mismatch" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
             {reconciliation.status === "ok" ? t("bank_pdf_verified") : reconciliation.status === "mismatch" ? t("bank_pdf_mismatch") : t("bank_pdf_unverified")}
+          </p>
+        )}
+        {reconciliation && editedGroup && reconciliation.openingBalance !== null && reconciliation.closingBalance !== null && (
+          <p className={editedOk ? "text-xs text-muted-foreground" : "text-xs text-destructive"}>
+            {editedOk ? bt("batch_edited_verified") : bt("batch_edited_mismatch")}
           </p>
         )}
         {state.target !== NONE && (
@@ -996,7 +1067,25 @@ export function BankStatementBatch({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visible.map(({ j, r }) => (
+                  {visible.map(({ j, r }) =>
+                    editing && editing.id === it.id && editing.gi === gi && editing.j === j ? (
+                      <RowEditor
+                        key={j}
+                        row={r}
+                        labels={{
+                          date: bt("batch_edit_date"),
+                          description: bt("batch_edit_description"),
+                          amount: bt("batch_edit_amount"),
+                          save: bt("batch_edit_save"),
+                          cancel: bt("batch_edit_cancel"),
+                        }}
+                        onCancel={() => setEditing(null)}
+                        onSave={(next) => {
+                          saveRowEdit(it, gi, j, next);
+                          setEditing(null);
+                        }}
+                      />
+                    ) : (
                     <TableRow key={j}>
                       <TableCell className="w-8">
                         <Checkbox
@@ -1013,17 +1102,33 @@ export function BankStatementBatch({
                       <TableCell className="tabular-nums text-foreground">{r.date}</TableCell>
                       <TableCell className="max-w-56 text-muted-foreground">
                         <span className="block truncate">{r.description || "—"}</span>
-                        {(plan.flags?.[j] || plan.batchDup[j] || identical[j]) && (
+                        {(plan.flags?.[j] || plan.batchDup[j] || identical[j] || it.edited[`${gi}:${j}`]) && (
                           <span className="mt-0.5 flex flex-wrap gap-1">
+                            {it.edited[`${gi}:${j}`] && <Badge variant="secondary">{bt("batch_edited_badge")}</Badge>}
                             {plan.flags?.[j] && <Badge variant="outline">{t("stmt_already_badge")}</Badge>}
                             {plan.batchDup[j] && <Badge variant="outline">{bt("batch_dup_badge")}</Badge>}
                             {identical[j] && <Badge variant="secondary">{t("stmt_identical_badge")}</Badge>}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className={r.amount < 0 ? "text-end tabular-nums text-destructive" : "text-end tabular-nums text-foreground"}>{fmt.format(r.amount)}</TableCell>
+                      <TableCell className={r.amount < 0 ? "text-end tabular-nums text-destructive" : "text-end tabular-nums text-foreground"}>
+                        {fmt.format(r.amount)}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          className="ms-1 align-middle"
+                          disabled={plan.fullyImported}
+                          aria-label={bt("batch_edit_row_aria", { date: r.date, description: r.description || "—" })}
+                          title={bt("batch_edit_row")}
+                          onClick={() => setEditing({ id: it.id, gi, j })}
+                        >
+                          <Pencil className="size-3" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  ))}
+                    ),
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -1037,6 +1142,51 @@ export function BankStatementBatch({
       </div>
     );
   }
+}
+
+/** Inline editor of one preview row: date, description and signed amount. */
+function RowEditor({
+  row,
+  labels,
+  onSave,
+  onCancel,
+}: {
+  row: { date: string; description: string; amount: number };
+  labels: { date: string; description: string; amount: string; save: string; cancel: string };
+  onSave: (row: { date: string; description: string; amount: number }) => void;
+  onCancel: () => void;
+}) {
+  const [date, setDate] = useState(row.date);
+  const [description, setDescription] = useState(row.description);
+  const [amount, setAmount] = useState(String(row.amount));
+  const parsed = Number(amount.replace(",", "."));
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(date) && amount.trim() !== "" && Number.isFinite(parsed);
+  return (
+    <TableRow>
+      <TableCell colSpan={4}>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="grid gap-1 text-xs text-muted-foreground">
+            {labels.date}
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 w-40" />
+          </label>
+          <label className="grid min-w-40 flex-1 gap-1 text-xs text-muted-foreground">
+            {labels.description}
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} className="h-8" />
+          </label>
+          <label className="grid gap-1 text-xs text-muted-foreground">
+            {labels.amount}
+            <Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 w-40" />
+          </label>
+          <Button type="button" size="sm" disabled={!valid} onClick={() => onSave({ date, description: description.trim(), amount: Math.round(parsed * 100) / 100 })}>
+            {labels.save}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+            {labels.cancel}
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 function omit<T>(record: Record<number, T>, key: number): Record<number, T> {

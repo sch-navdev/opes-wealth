@@ -59,6 +59,8 @@ export type BankingAccountRow = {
   balanceAsOf?: string | null;
   /** ISO country code (metadata.country, else the bank's); groups and filters the list. */
   country?: string;
+  /** ISO date the account was closed (a statement said so): hidden unless "Show closed accounts" is on. */
+  closedOn?: string | null;
   /** Name of the company this account belongs to (Cash account with metadata.company_id): shown under "Company accounts". */
   companyName?: string;
 };
@@ -92,6 +94,7 @@ export function BankingOverview({
   const tx = useBankingText();
   const { maskValue } = usePrivacy();
   const [filter, setFilter] = useState<Filter>("real");
+  const [showClosed, setShowClosed] = useState(false);
   const ebk = useEditBankText();
   // Country filter chip, remembered per device (read after mount so the server and client markup agree).
   const [countryFilter, setCountryFilter] = useState<string>(ALL_COUNTRIES);
@@ -109,11 +112,13 @@ export function BankingOverview({
   });
   const base = new Intl.NumberFormat(intlLocale, { style: "currency", currency: baseCurrency });
 
-  const real = rows.filter((r) => r.kind !== "sandbox");
-  const sandbox = rows.filter((r) => r.kind === "sandbox");
+  const closedCount = rows.filter((r) => r.closedOn).length;
+  const openRows = showClosed ? rows : rows.filter((r) => !r.closedOn);
+  const real = openRows.filter((r) => r.kind !== "sandbox");
+  const sandbox = openRows.filter((r) => r.kind === "sandbox");
   const realTotal = real.reduce((s, r) => s + r.baseBalance, 0);
   const sandboxTotal = sandbox.reduce((s, r) => s + r.baseBalance, 0);
-  const visibleAll = filter === "real" ? real : filter === "sandbox" ? sandbox : rows;
+  const visibleAll = filter === "real" ? real : filter === "sandbox" ? sandbox : openRows;
   // Company accounts stay in the real total (they are in net worth) but are listed apart, under their company.
   const visible = visibleAll.filter((r) => !r.companyName);
   const companyVisible = visibleAll.filter((r) => r.companyName);
@@ -218,6 +223,12 @@ export function BankingOverview({
 
       <p className="text-xs text-muted-foreground">{tx("bank_asof_legend")}</p>
 
+      {closedCount > 0 && (
+        <Button type="button" size="sm" variant="outline" aria-pressed={showClosed} onClick={() => setShowClosed((v) => !v)}>
+          {showClosed ? tx("bank_hide_closed") : tx("bank_show_closed", { n: closedCount })}
+        </Button>
+      )}
+
       {hasCountries && (
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label={ebk("ebk_country_filter_label")}>
           {[ALL_COUNTRIES, ...availableCountries].map((c) => (
@@ -291,6 +302,7 @@ export function BankingOverview({
                               a.name
                             )}{" "}
                             <span className="font-normal text-muted-foreground">{a.masked}</span>
+                            {a.closedOn && <Badge variant="secondary" className="ms-2">{tx("bank_closed_badge", { date: a.closedOn })}</Badge>}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             {a.kind === "sandbox" ? (

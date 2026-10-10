@@ -169,6 +169,12 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
     }
   }
 
+  /** Closing through a button skips the dialog's onOpenChange, so the finished import must be cleared here: the next import starts empty. */
+  function closeAndReset() {
+    setOpen(false);
+    reset();
+  }
+
   function reset() {
     setBatch(null);
     setOcrLayout(null);
@@ -647,7 +653,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
                 </li>
               ))}
             </ul>
-            <Button type="button" onClick={() => setOpen(false)}>
+            <Button type="button" onClick={closeAndReset}>
               {t("csv_done")}
             </Button>
           </div>
@@ -659,7 +665,7 @@ export function BankStatementImportDialog({ accounts }: { accounts: StatementTar
             total={batch.total}
             accounts={accounts}
             onChooseOther={() => setBatch(null)}
-            onDone={() => setOpen(false)}
+            onDone={closeAndReset}
           />
         ) : (
           <div className="space-y-4">

@@ -26,6 +26,7 @@ const banking = vi.hoisted(() => ({
   rememberCashAccountBank: vi.fn(),
   createStatementCashAccount: vi.fn(),
   recordBalanceSnapshots: vi.fn(),
+  markCashAccountClosed: vi.fn(),
 }));
 vi.mock("@/app/dashboard/banking/actions", () => banking);
 
@@ -100,6 +101,7 @@ beforeEach(() => {
   banking.createStatementCashAccount.mockReset().mockResolvedValue({ ok: true, id: "new1" });
   banking.recordBalanceSnapshots.mockReset().mockResolvedValue({ ok: true, added: 2, skipped: 0 });
   banking.rememberCashAccountBank.mockReset();
+  banking.markCashAccountClosed.mockReset().mockResolvedValue({ ok: true });
   try {
     window.localStorage.clear();
   } catch {
@@ -292,5 +294,64 @@ describe("batch import: bank override per file", () => {
     expect(action.readBankStatementPdf).toHaveBeenCalledTimes(3);
     expect(formOf(2).get("bank")).toBe("fab");
     expect((formOf(2).get("file") as File).name).toBe("odd.pdf");
+  });
+});
+
+const MARCH_CSV = HEAD + "2026-03-05,SHOP C,-5.00,565.00,AED\n";
+
+describe("batch import: manual correction of a row", () => {
+  it("lets the user fix a wrongly read amount before importing, and imports the corrected value", async () => {
+    await openAndChoose([csv("jan.csv", JAN_CSV), csv("mar.csv", MARCH_CSV)]);
+    await screen.findByText("SHOP A");
+    await userEvent.click(screen.getByRole("button", { name: /Edit the row of 2026-01-05: SHOP A/ }));
+    const amount = await screen.findByLabelText("Amount (negative = money out)");
+    await userEvent.clear(amount);
+    await userEvent.type(amount, "-22");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Edited")).toBeTruthy();
+    await userEvent.click(await screen.findByRole("button", { name: /Import \d+ row\(s\) from 2 file\(s\)/ }));
+    await waitFor(() => expect(imports.importBankTransactions).toHaveBeenCalled());
+    const sent = imports.importBankTransactions.mock.calls.flatMap((c) => c[1] as { description: string; amount: number }[]);
+    expect(sent.find((t) => t.description === "SHOP A")?.amount).toBe(-22);
+  });
+});
+
+describe("batch import: never import an account", () => {
+  const wio = (date: string, description: string) => pdfStatement("wio", "Wio Bank", date, description);
+  const two = () => {
+    action.readBankStatementPdf
+      .mockResolvedValueOnce({ ok: true, statement: wio("2026-02-02", "WIO SHOP") })
+      .mockResolvedValueOnce({ ok: true, statement: wio("2026-03-02", "WIO OTHER") });
+    return [pdf("a.pdf"), pdf("b.pdf")];
+  };
+
+  it("remembers the choice on this device", async () => {
+    await openAndChoose(two(), []);
+    await screen.findByText("WIO SHOP");
+    await userEvent.click(await screen.findByTestId("batch-target-0-0"));
+    await userEvent.click(await screen.findByRole("option", { name: /Don.t import/ }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /Never import this account/ }));
+    expect(window.localStorage.getItem("opes-stmt-skipped-accounts")).toContain("wio|6789|AED");
+  });
+
+  it("leaves the account out next time, says so, and offers to change the preference", async () => {
+    window.localStorage.setItem("opes-stmt-skipped-accounts", JSON.stringify(["wio|6789|AED"]));
+    await openAndChoose(two(), []);
+    expect((await screen.findAllByText("This account will not be imported, based on your preference.")).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getAllByRole("button", { name: "Change preference" })[0]);
+    expect(screen.getByTestId("batch-target-0-0").textContent).toMatch(/Create new account/);
+  });
+});
+
+describe("batch import: closed accounts", () => {
+  it("marks an account closed after importing a statement that prints a closure date", async () => {
+    const s = pdfStatement("wio", "Wio Bank", "2026-09-23", "CLOSING TRANSFER");
+    action.readBankStatementPdf
+      .mockResolvedValueOnce({ ok: true, statement: { ...s, accounts: [{ ...s.accounts[0], closedOn: "2026-09-23" }] } })
+      .mockResolvedValueOnce({ ok: true, statement: pdfStatement("wio", "Wio Bank", "2026-08-02", "AUG SHOP") });
+    await openAndChoose([pdf("closed.pdf"), pdf("aug.pdf")], []);
+    expect((await screen.findAllByText(/This account was closed on 2026-09-23/)).length).toBeGreaterThan(0);
+    await userEvent.click(await screen.findByRole("button", { name: /Import \d+ row\(s\) from 2 file\(s\)/ }));
+    await waitFor(() => expect(banking.markCashAccountClosed).toHaveBeenCalledWith("new1", "2026-09-23"));
   });
 });

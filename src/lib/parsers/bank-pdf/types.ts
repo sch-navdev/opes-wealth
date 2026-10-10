@@ -77,6 +77,8 @@ export type PdfAccountStatement = {
   closingBalance: number | null;
   transactions: TransactionFingerprint[];
   reconciliation: Reconciliation;
+  /** ISO date the bank printed as "account closure" (the account is closed), when present. */
+  closedOn?: string | null;
 };
 
 export type PdfStatement = {

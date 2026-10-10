@@ -30,6 +30,16 @@ export function institutionOfMetadata(metadata: Meta): string {
   return str(metadata?.institution_name) || getBankProfile(str(metadata?.bank_profile))?.name || "";
 }
 
+/**
+ * The bank an institution name belongs to: a card layout's name ("First Abu Dhabi Bank credit card",
+ * "Banque Populaire card") is the same bank as its account layout, so a bank's current accounts and
+ * cards are listed together under one bank.
+ */
+export function bankGroupName(name: string): string {
+  const base = name.replace(/\s+(credit\s+|debit\s+)?cards?$/i, "").trim();
+  return base || name;
+}
+
 /** Country of an institution known by display name (registry or profile logo list), or "". */
 export function countryOfInstitutionName(name: string): string {
   const bank = bankByName(name);

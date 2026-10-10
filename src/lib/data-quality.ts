@@ -322,7 +322,8 @@ export function runDataQualityChecks(input: DataQualityInput): DataQualityReport
 
   for (const asset of assets) {
     const category = categoryOf(asset);
-    const closedEquity = isClosedEquity(asset);
+    // A closed position or a closed bank account (a statement printed its closure date) is history only.
+    const closedEquity = isClosedEquity(asset) || typeof asset.metadata?.closed_on === "string";
 
     if (asset.currency !== base && !hasUsableRate(rates, asset.currency)) {
       assetIssue(asset, "fx_missing", cfg.severity.fx_missing, { currency: asset.currency, base });

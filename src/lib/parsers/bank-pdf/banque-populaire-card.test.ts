@@ -109,3 +109,32 @@ describe("other Banque Populaire documents", () => {
     if (!out.ok) expect(out.failure).toMatchObject({ code: "not_account_statement", bank: "banque_populaire" });
   });
 });
+
+describe("glued location digits (the 'INDIGO640207' case)", () => {
+  it("uses the ORIGINE line to recover the real amount and keeps the digits in the label", () => {
+    const text = statement([
+      "29/07/26INDIGO640207FR SAINT 64020722,00 €",
+      "    ORIGINE:22,00 EUR",
+      "     1EURO =        1,00000000",
+      "30/07/26AUTOROUTES DU SFR 84VEDENE2,00 €",
+      "    ORIGINE:2,00 EUR",
+      "TOTAL24,00 €",
+      "TOTAL24,00 €",
+    ]);
+    const out = banquePopulaireCardProfile.parse(text);
+    if (!out.ok) throw new Error("parse failed");
+    const [acc] = out.statement.accounts;
+    expect(acc.transactions[0].amount).toBe(-22);
+    expect(acc.transactions[0].description).toContain("640207");
+    expect(acc.transactions[1].amount).toBe(-2);
+    expect(acc.reconciliation.status).toBe("ok");
+  });
+
+  it("without an ORIGINE line, picks the reading that matches the printed total", () => {
+    const text = statement(["29/07/26INDIGO640207FR SAINT 64020722,00 €", "TOTAL22,00 €", "TOTAL22,00 €"]);
+    const out = banquePopulaireCardProfile.parse(text);
+    if (!out.ok) throw new Error("parse failed");
+    expect(out.statement.accounts[0].transactions[0].amount).toBe(-22);
+    expect(out.statement.accounts[0].reconciliation.status).toBe("ok");
+  });
+});

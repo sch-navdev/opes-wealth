@@ -93,6 +93,7 @@ export function buildAccount(input: {
   openingBalance: number | null;
   closingBalance: number | null;
   transactions: TransactionFingerprint[];
+  closedOn?: string | null;
 }): PdfAccountStatement {
   return { ...input, reconciliation: reconcile(input.openingBalance, input.closingBalance, input.transactions) };
 }

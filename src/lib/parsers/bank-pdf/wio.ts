@@ -28,6 +28,8 @@ type DetailBlock = {
   iban: string | null;
   opening: number | null;
   closing: number | null;
+  /** Printed "ACCOUNT CLOSURE" date (ISO) of an account that has been closed. */
+  closedOn: string | null;
 };
 
 const DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
@@ -106,7 +108,7 @@ function resolveRow(prev: number | null, text: string): Resolved | null {
  * name leads in 2025+ and trails in 2023-24), so a block is the run of `LABEL / value` pairs
  * that ends when a label repeats.
  */
-const BLOCK_LABELS = ["CURRENCY", "ACCOUNT NUMBER", "IBAN", "OPENING BALANCE", "CLOSING BALANCE"] as const;
+const BLOCK_LABELS = ["CURRENCY", "ACCOUNT NUMBER", "IBAN", "OPENING BALANCE", "CLOSING BALANCE", "ACCOUNT CLOSURE"] as const;
 
 function parseBlocks(lines: string[]): DetailBlock[] {
   const blocks: DetailBlock[] = [];
@@ -119,6 +121,7 @@ function parseBlocks(lines: string[]): DetailBlock[] {
         iban: /^[A-Z]{2}\d{10,32}$/.test(cur.IBAN ?? "") ? (cur.IBAN as string) : null,
         opening: parseMoney(cur["OPENING BALANCE"]),
         closing: parseMoney(cur["CLOSING BALANCE"]),
+        closedOn: parseDmy(cur["ACCOUNT CLOSURE"] ?? ""),
       });
     }
     cur = null;
@@ -279,7 +282,7 @@ function parse(text: string): PdfParseOutcome {
     if (!target) {
       warnings.push("A transaction table could not be matched to any account block.");
       target = {
-        block: { currency: table.currency, accountNumber: null, iban: null, opening: null, closing: null },
+        block: { currency: table.currency, accountNumber: null, iban: null, opening: null, closing: null, closedOn: null },
         rows: [],
         running: null,
         closed: false,
@@ -331,6 +334,7 @@ function parse(text: string): PdfParseOutcome {
         openingBalance: a.block.opening,
         closingBalance: a.block.closing,
         transactions: a.rows,
+        ...(a.block.closedOn ? { closedOn: a.block.closedOn } : {}),
       }),
     );
 

@@ -137,3 +137,19 @@ describe("wioProfile.parse (synthetic multi-account fixture)", () => {
     expect(out.failure.bank).toBe("wio");
   });
 });
+
+describe("wioProfile account closure", () => {
+  it("reads the printed ACCOUNT CLOSURE date of a closed account and leaves open accounts unmarked", () => {
+    const lf = TEXT.split("\r").join("");
+    const closed = lf.replace(
+      "ACCOUNT OPENED\n27/11/2023\nIBAN\nAE000000000000123456789",
+      "ACCOUNT OPENED\n27/11/2023\nACCOUNT CLOSURE\n23/09/2026\nIBAN\nAE000000000000123456789",
+    );
+    expect(closed).not.toBe(lf);
+    const out = wioProfile.parse(closed);
+    if (!out.ok) throw new Error("parse failed");
+    expect(out.statement.accounts.some((a) => a.closedOn === "2026-09-23")).toBe(true);
+    expect(out.statement.accounts.some((a) => !a.closedOn)).toBe(true);
+    expect(parseOk().accounts.every((a) => !a.closedOn)).toBe(true);
+  });
+});

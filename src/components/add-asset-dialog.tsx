@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OwnerShareNote } from "@/components/owner-share-note";
+import { RealEstateDocumentStart } from "@/components/real-estate-document-start";
 import { RealEstateFields } from "@/components/real-estate-fields";
 import { VehicleFields } from "@/components/vehicle-fields";
 import { PrivateEquityFields } from "@/components/private-equity-fields";
@@ -247,6 +248,63 @@ export function AddAssetDialog({
   const isCompany = selectedCategory?.name === "Companies";
   const isScpi = selectedCategory?.name === "SCPI";
   const isAssuranceVie = selectedCategory?.name === "Assurance-Vie";
+
+  /** The value input. A Real Estate asset renders it after its Purchase Price (see RealEstateFields), other classes in the top row. */
+  const renderValueField = () => (
+    <div className="min-w-0 space-y-2">
+      <Label htmlFor="current_value">
+        {isRealEstate
+          ? tf("af_dlg_market_valuation", "Current Market Valuation")
+          : isCompany
+            ? t("company_equity_value")
+            : isPrivateEquity
+              ? t("pe_nav_label")
+              : isScpi
+                ? t("scpi_value_label")
+                : isStartup
+                  ? t("startup_value_label")
+                  : isAssuranceVie
+                    ? avT("av_contract_value")
+                    : t("value")}
+      </Label>
+      <div className="relative w-full min-w-0">
+        <span className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+          {getCurrencySymbol(currency)}
+        </span>
+        <Input
+          id="current_value"
+          name="current_value"
+          type="number"
+          step="any"
+          min="0"
+          placeholder="0.00"
+          className="ps-12"
+          defaultValue={
+            asset && isRealEstate
+              ? realEstateMetadata.market_valuation ?? asset.current_value
+              : asset && isCompany
+                ? companyMetadata.company_value ?? asset.current_value
+                : asset?.current_value ?? ""
+          }
+          required={!isScpi && !isStartup}
+          onChange={(e) => setValueInput(e.target.value)}
+        />
+      </div>
+      {isRealEstate && (
+        <p className="text-xs text-muted-foreground">
+          {tf(
+            "af_dlg_net_equity_hint",
+            "Saved as net equity (this minus any linked loan{extra}).",
+            {
+              extra: realEstateMetadata.is_offplan
+                ? tf("af_dlg_net_equity_offplan", " and the outstanding contract balance")
+                : "",
+            },
+          )}
+        </p>
+      )}
+    </div>
+  );
 
   function resetState() {
     setCategoryId(
@@ -619,6 +677,10 @@ export function AddAssetDialog({
             </Select>
           </div>
 
+          {isRealEstate && !asset && (
+            <RealEstateDocumentStart value={realEstateMetadata} onChange={setRealEstateMetadata} />
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="purchase_date">{t("purchase_date")}</Label>
             <Input
@@ -677,7 +739,7 @@ export function AddAssetDialog({
                 value={asset ? asset.current_value : (vehicleMetadata.purchase_price ?? 0)}
                 readOnly
               />
-            ) : (
+            ) : isRealEstate ? null : (
             <div className="min-w-0 space-y-2">
               <Label htmlFor="current_value">
                 {isRealEstate
@@ -754,6 +816,7 @@ export function AddAssetDialog({
               value={realEstateMetadata}
               onChange={setRealEstateMetadata}
               currency={currency}
+              afterPurchase={renderValueField()}
             />
           )}
 

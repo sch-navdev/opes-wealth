@@ -621,6 +621,15 @@ export function AssetDetailView({
   // most recent one.
   const historyLogEntries = [...sortedHistory].reverse();
 
+  // Cash accounts: the stored transactions booked on each valuation date, shown under that log row
+  // so the imported descriptions are visible where the balance history is.
+  const logTransactionsByDate = new Map<string, StoredTransactionRow[]>();
+  for (const tr of transactions) {
+    const list = logTransactionsByDate.get(tr.booked_date);
+    if (list) list.push(tr);
+    else logTransactionsByDate.set(tr.booked_date, [tr]);
+  }
+
   // Real Estate: the curve should never show a valuation predating the
   // purchase — drop anything earlier, and pin whatever lands on the purchase
   // date itself to the actual market value at purchase (not the cost basis —
@@ -2097,6 +2106,21 @@ export function AssetDetailView({
                                 <span className="block max-w-56 truncate text-xs text-muted-foreground" dir="auto" title={point.source_ref}>
                                   {bt("hist_file_name", { name: point.source_ref })}
                                 </span>
+                              )}
+                              {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 0 && (
+                                <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                                  {(logTransactionsByDate.get(point.recorded_date) ?? []).slice(0, 5).map((tr, i) => (
+                                    <li key={`${tr.fingerprint ?? i}-${i}`} className="flex max-w-96 justify-between gap-3">
+                                      <span className="truncate" dir="auto" title={tr.description || undefined}>
+                                        {tr.description || t("txd_no_description")}
+                                      </span>
+                                      <span className="shrink-0 tabular-nums">{maskValue(currencyFormatter.format(Number(tr.amount)))}</span>
+                                    </li>
+                                  ))}
+                                  {(logTransactionsByDate.get(point.recorded_date) ?? []).length > 5 && (
+                                    <li>+{(logTransactionsByDate.get(point.recorded_date) ?? []).length - 5}</li>
+                                  )}
+                                </ul>
                               )}
                             </TableCell>
                             <TableCell className="text-end text-foreground">

@@ -10,7 +10,7 @@ import { BankingOverview, type BankingAccountRow } from "@/components/banking-ov
 import { T } from "@/components/translated-text";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
-import { accountCountry, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
+import { accountCountry, bankGroupName, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
 import { companyIdOf } from "@/lib/company-cash";
 import { pickBalanceDate } from "@/lib/bank-staleness";
 import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
@@ -115,8 +115,9 @@ export default async function BankingPage({
     const link = linkByAsset.get(a.id);
     const profileId = typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : "";
     const ref = typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : "";
-    const institution =
-      link?.bank_connections?.institution_name ?? (institutionOfMetadata(a.metadata) || getBankProfile(profileId)?.name) ?? "";
+    const institution = bankGroupName(
+      link?.bank_connections?.institution_name ?? (institutionOfMetadata(a.metadata) || getBankProfile(profileId)?.name) ?? "",
+    );
     rows.push({
       key: a.id,
       name: a.name,
@@ -133,6 +134,7 @@ export default async function BankingPage({
       assetId: a.id,
       balanceAsOf: pickBalanceDate({ ...dateSources.get(a.id), updatedAt: a.updated_at }),
       companyName: companyNameById.get(companyIdOf(a.metadata)),
+      closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
     });
   }
 

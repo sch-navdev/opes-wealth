@@ -39,6 +39,7 @@ export function statementToParseResult(statement: PdfStatement): StatementParseR
       (t): NormalizedTx => ({ date: t.date, description: t.description, amount: t.amount, balance: t.balance }),
     ),
     ...(a.transactions.length === 0 && !statement.bank.endsWith("_card") ? emptyAccountBalances(a) : {}),
+    ...(a.closedOn ? { closedOn: a.closedOn } : {}),
   }));
 
   return {

@@ -10,6 +10,9 @@ export const BANKING_EN = {
   bank_asof_unknown: "Balance date unknown",
   bank_asof_stale: "Stale: {n} days old",
   bank_asof_group_stale: "{n} out of date",
+  bank_show_closed: "Show closed accounts ({n})",
+  bank_hide_closed: "Hide closed accounts",
+  bank_closed_badge: "Closed {date}",
   bank_asof_legend:
     "Each balance shows the date it is as of. A balance more than one month (31 days) old is shown in red and marked Stale: import a newer statement or refresh the account.",
   brokerage_page_title: "Brokerage",

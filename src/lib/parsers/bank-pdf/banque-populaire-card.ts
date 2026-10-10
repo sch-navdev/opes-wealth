@@ -43,6 +43,74 @@ function euros(s: string): number {
   return neg ? -n : n;
 }
 
+/** "27,00 EUR" -> 27 (the purchase amount in its own currency), null when unreadable. */
+function originNumber(s: string): number | null {
+  const m = /([\d .\u00a0\u202f]*\d),(\d{2})/.exec(s);
+  return m ? Number(`${m[1].replace(/\D/g, "")}.${m[2]}`) : null;
+}
+
+type GluedRow = { label: string; amount: number; amountRaw: string; expected: number | null };
+
+/**
+ * Candidate readings of a glued "<digits><amount>" cell. The page prints the merchant name,
+ * location and amount in separate cells that the text layer glues together, so a location ending
+ * in digits ("FR SAINT 640207" + "22,00") reads as one number "64020722,00". Each candidate keeps
+ * the last k integer digits as the amount and gives the rest back to the label.
+ */
+function gluedCandidates(raw: string): { amount: number; moved: string }[] {
+  const neg = raw.trim().startsWith("-");
+  const m = /^-?\s*(\d+),(\d{2})$/.exec(raw.trim());
+  if (!m || m[1].length < 4) return [];
+  const out: { amount: number; moved: string }[] = [];
+  for (let k = m[1].length - 1; k >= 1; k--) {
+    const kept = m[1].slice(m[1].length - k);
+    if (k > 1 && kept.startsWith("0")) continue;
+    const value = Number(`${kept}.${m[2]}`);
+    out.push({ amount: neg ? -value : value, moved: m[1].slice(0, m[1].length - k) });
+  }
+  return out;
+}
+
+function applyCandidate(row: GluedRow, c: { amount: number; moved: string }) {
+  row.amount = c.amount;
+  row.label = squash(`${row.label}${c.moved}`);
+}
+
+/**
+ * Fix amounts that swallowed digits of the location. First choice: the "ORIGINE" line of the same
+ * row (purchase amount / rate) names the real amount. Otherwise a statement whose rows do not add
+ * up to the printed total tries the other readings of the suspicious rows (smallest change that
+ * reconciles). Nothing is changed when no reading reconciles.
+ */
+function repairGluedAmounts(raws: GluedRow[], total: number | null) {
+  const unresolved: { row: GluedRow; cands: { amount: number; moved: string }[] }[] = [];
+  for (const row of raws) {
+    const cands = gluedCandidates(row.amountRaw);
+    if (cands.length === 0) continue;
+    const hit = row.expected != null ? cands.find((c) => Math.abs(c.amount - row.expected!) < 0.011) : undefined;
+    if (hit) applyCandidate(row, hit);
+    else if (row.expected == null) unresolved.push({ row, cands });
+  }
+  if (total === null || unresolved.length === 0) return;
+  const sum = () => roundMoney(raws.reduce((s, r) => s + r.amount, 0));
+  if (sum() === total) return;
+  const picked: number[] = unresolved.map(() => -1);
+  const search = (i: number): boolean => {
+    if (i === unresolved.length) return sum() === total;
+    for (const idx of [-1, ...unresolved[i].cands.keys()]) {
+      const u = unresolved[i];
+      const before = { amount: u.row.amount, label: u.row.label };
+      if (idx >= 0) applyCandidate(u.row, u.cands[idx]);
+      picked[i] = idx;
+      if (search(i + 1)) return true;
+      u.row.amount = before.amount;
+      u.row.label = before.label;
+    }
+    return false;
+  };
+  if (unresolved.length <= 6) search(0);
+}
+
 function parse(text: string): PdfParseOutcome {
   const lines = text.split(/\r?\n/).map((l) => l.trimEnd());
   const warnings: string[] = [];
@@ -52,7 +120,7 @@ function parse(text: string): PdfParseOutcome {
 
   let card: string | null = null;
   const totals: number[] = [];
-  type Raw = { date: string; label: string; amount: number; extra: string[] };
+  type Raw = GluedRow & { date: string; extra: string[]; originAmount?: number; rate?: number };
   const raws: Raw[] = [];
   let badRows = 0;
   let started = false;
@@ -75,7 +143,11 @@ function parse(text: string): PdfParseOutcome {
     const origin = ORIGIN.exec(line);
     const rate = RATE.exec(line);
     if ((origin || rate) && raws.length > 0) {
-      raws[raws.length - 1].extra.push(origin ? `origin ${origin[1]}` : `rate ${rate![1]}`);
+      const last = raws[raws.length - 1];
+      last.extra.push(origin ? `origin ${origin[1]}` : `rate ${rate![1]}`);
+      if (origin) last.originAmount = originNumber(origin[1]) ?? undefined;
+      if (rate) last.rate = Number(rate[1].replace(",", "."));
+      if (last.originAmount != null && last.rate) last.expected = roundMoney(last.originAmount / last.rate);
       continue;
     }
     if (DATE_START.test(t)) {
@@ -88,11 +160,12 @@ function parse(text: string): PdfParseOutcome {
       }
       let amount = euros(m[5]);
       if (m[6]) amount = -amount; // a trailing CR would mark a credit (refund); never seen in a sample
-      raws.push({ date, label, amount, extra: [] });
+      raws.push({ date, label, amount, amountRaw: m[5], extra: [], expected: null });
     }
   }
 
   const total = totals.length > 0 ? totals[totals.length - 1] : null;
+  repairGluedAmounts(raws, total);
   if (raws.length === 0) {
     if (total === 0 || (title && started && badRows === 0)) {
       warnings.push("This statement has no transactions.");

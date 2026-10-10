@@ -621,10 +621,8 @@ describe("BankStatementImportDialog, no matching Cash account", () => {
     action.readBankStatementPdf.mockResolvedValue({ ok: true, statement: wioStatement });
     await openAndUpload(undefined, []);
     await screen.findByText("WIO SHOP");
-    expect(screen.getByRole("button", { name: "Import" }).hasAttribute("disabled")).toBe(true);
-    const options = await openSelect("stmt-target-0");
-    expect(options.some((n) => /Create new account/.test(n))).toBe(true);
-    await userEvent.click(screen.getByRole("option", { name: /Create new account/ }));
+    // A recognised statement for an account Opes does not have yet defaults to creating it.
+    expect(screen.getByTestId("stmt-target-0").textContent).toMatch(/Create new account/);
     await userEvent.click(await screen.findByRole("button", { name: /Import 1 transaction/ }));
     await screen.findAllByText(/1 new transaction/);
     expect(banking.createStatementCashAccount).toHaveBeenCalledWith(

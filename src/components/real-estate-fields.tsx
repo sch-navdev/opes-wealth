@@ -155,10 +155,13 @@ export function RealEstateFields({
   value,
   onChange,
   currency,
+  afterPurchase,
 }: {
   value: RealEstateMetadata;
   onChange: (next: RealEstateMetadata) => void;
   currency: string;
+  /** Rendered right after the purchase price / fees block (the Add Asset form puts the market valuation here). */
+  afterPurchase?: React.ReactNode;
 }) {
   const currencySymbol = getCurrencySymbol(currency);
   const { t, intlLocale } = useLanguage();
@@ -826,6 +829,8 @@ export function RealEstateFields({
           currency={currency}
         />
       </div>
+
+      {afterPurchase}
 
       <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-4">
         <NumberField

@@ -4,7 +4,8 @@
  * chronological import order, and the WITHIN-BATCH duplicate / overlap check. No I/O, no React.
  */
 import { computeRunningBalance, type ParsedBankCsvRow, type ParsedTransactionRow } from "@/lib/bank-csv";
-import { routeGroup, type BankProfileId, type RoutableAccount, type StatementGroup } from "@/lib/banking/csv-profiles";
+import { accountTail, routeGroup, type BankProfileId, type RoutableAccount, type StatementGroup } from "@/lib/banking/csv-profiles";
+import { skipKey } from "@/lib/banking/skipped-accounts";
 import { occurrenceIndexes, transactionBaseKey } from "@/lib/transaction-keys";
 
 /** Most files one batch accepts; the rest of a larger selection is dropped with a message. */
@@ -24,8 +25,12 @@ export type StatementTargetAccount = RoutableAccount & { nativeValue: number };
 export type GroupState = {
   target: string;
   remember: boolean;
-  /** Pre-selected because it is the only Cash account in the group's currency. */
+  /** Pre-selected because it is the only Cash account in the group's currency (and no other bank / account number). */
   autoPicked?: boolean;
+  /** Left out because the user chose "never import this account" earlier; the dialog says so and offers to change it. */
+  skippedByPreference?: boolean;
+  /** The user ticked "never import this account" on this import. */
+  neverImport?: boolean;
 };
 
 export type BatchFileKind = "csv" | "pdf" | "unsupported";
@@ -85,11 +90,27 @@ export function toImportTx(group: StatementGroup) {
 }
 
 /** Initial target of a group: remembered route first, else the only Cash account in the group's currency (never a guess between several). */
-export function initialGroupState(group: StatementGroup, id: BankProfileId, accounts: RoutableAccount[]): GroupState {
+export function initialGroupState(
+  group: StatementGroup,
+  id: BankProfileId,
+  accounts: RoutableAccount[],
+  skipped?: ReadonlySet<string>,
+): GroupState {
   const route = routeGroup(group, id, accounts);
   if (route.kind === "matched") return { target: route.assetId, remember: true };
-  const sameCurrency = accounts.filter((a) => a.currency.toUpperCase() === group.currency.toUpperCase());
-  if (sameCurrency.length === 1) return { target: sameCurrency[0].id, remember: true, autoPicked: true };
+  const key = skipKey(id, group);
+  if (key && skipped?.has(key)) return { target: NONE, remember: false, skippedByPreference: true, neverImport: true };
+  // Only an account that could be this one: it carries no other bank's layout and no other account number.
+  const tail = accountTail(group.accountRef);
+  const candidates = accounts.filter(
+    (a) =>
+      a.currency.toUpperCase() === group.currency.toUpperCase() &&
+      (!a.bankProfile || a.bankProfile === id) &&
+      (!a.accountRef || !tail || accountTail(a.accountRef) === tail),
+  );
+  if (candidates.length === 1) return { target: candidates[0].id, remember: true, autoPicked: true };
+  // A recognised statement for an account Opes does not have yet: offer to create it, never to guess another bank's account.
+  if (id && tail) return { target: NEW, remember: true };
   return { target: NONE, remember: true };
 }
 
