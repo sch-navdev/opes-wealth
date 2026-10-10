@@ -1,6 +1,12 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const nav = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => nav }));
+const act = vi.hoisted(() => ({ mergeCashAccounts: vi.fn(), batchDeleteAssets: vi.fn() }));
+vi.mock("@/app/dashboard/banking/actions", () => ({ mergeCashAccounts: act.mergeCashAccounts }));
+vi.mock("@/app/dashboard/actions", () => ({ batchDeleteAssets: act.batchDeleteAssets }));
 import { LanguageProvider } from "@/context/language-context";
 import { PrivacyProvider } from "@/context/privacy-context";
 import { BankDetailView, type BankDetailAccount, type BankDetailTransaction } from "@/components/bank-detail-view";
@@ -51,5 +57,50 @@ describe("BankDetailView", () => {
     expect(within(list).queryByText("COFFEE SHOP")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /Show closed accounts \(1\)/ }));
     expect(screen.getAllByText(/FAB old AED/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("BankDetailView: merge accounts and delete the whole bank", () => {
+  beforeEach(() => {
+    nav.refresh.mockReset();
+    nav.push.mockReset();
+    act.mergeCashAccounts.mockReset().mockResolvedValue({ ok: true, keptId: "a1" });
+    act.batchDeleteAssets.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("merges the selected accounts into one under the chosen name", async () => {
+    view();
+    expect(screen.queryByRole("button", { name: /Merge selected accounts/ })).toBeNull();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Select FAB current AED/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Select FAB card AED/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Merge selected accounts (2)" }));
+    const name = await screen.findByLabelText("Name of the merged account");
+    await userEvent.clear(name);
+    await userEvent.type(name, "FAB main account");
+    await userEvent.click(screen.getByRole("button", { name: "Merge accounts" }));
+    await vi.waitFor(() => expect(act.mergeCashAccounts).toHaveBeenCalledWith(["a1", "a2"], "FAB main account"));
+    await vi.waitFor(() => expect(nav.refresh).toHaveBeenCalled());
+  });
+
+  it("deletes every account of the bank only after the bank name is typed", async () => {
+    view();
+    await userEvent.click(screen.getByRole("button", { name: "Delete this bank and its accounts" }));
+    const confirm = await screen.findByRole("button", { name: "Delete everything" });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(screen.getByPlaceholderText("First Abu Dhabi Bank (FAB)"), "First Abu Dhabi Bank (FAB)");
+    expect(confirm).toBeEnabled();
+    await userEvent.click(confirm);
+    await vi.waitFor(() => expect(act.batchDeleteAssets).toHaveBeenCalledWith(["a1", "a2", "a3"]));
+    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith("/dashboard/banking"));
+  });
+
+  it("shows the reason when a merge is refused", async () => {
+    act.mergeCashAccounts.mockResolvedValue({ ok: false, code: "invalid", error: "The accounts must all be in the same currency." });
+    view();
+    await userEvent.click(screen.getByRole("checkbox", { name: /Select FAB current AED/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Select FAB card AED/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Merge selected accounts (2)" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Merge accounts" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("same currency");
   });
 });

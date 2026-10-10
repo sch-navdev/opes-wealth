@@ -11,7 +11,7 @@ import { T } from "@/components/translated-text";
 import { getBankSyncMode } from "@/lib/banking/altareq";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
 import { parseRefHistory } from "@/lib/banking/rollover";
-import { accountCountry, bankGroupName, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
+import { accountCountry, bankGroupName, bankKey, countryOfInstitutionName, institutionOfMetadata } from "@/lib/banking/account-country";
 import { companyIdOf } from "@/lib/company-cash";
 import { pickBalanceDate } from "@/lib/bank-staleness";
 import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
@@ -138,6 +138,15 @@ export default async function BankingPage({
       closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
     });
   }
+
+  // One bank, one group: "First Abu Dhabi Bank (FAB)" and its credit card layout share a key; the fullest name is shown.
+  const displayByKey = new Map<string, string>();
+  for (const r of rows) {
+    const k = bankKey(r.institution);
+    const cur = displayByKey.get(k);
+    if (!cur || r.institution.length > cur.length) displayByKey.set(k, r.institution);
+  }
+  for (const r of rows) r.institution = displayByKey.get(bankKey(r.institution)) ?? r.institution;
 
   (links ?? [])
     .filter((l) => l.is_sandbox)

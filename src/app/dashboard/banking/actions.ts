@@ -467,6 +467,94 @@ export async function rememberCashAccountBank(
 }
 
 /**
+ * Merges several of the user's Cash accounts of the same currency into ONE (the accounts of a savings space that
+ * was closed and reopened under new numbers, a replaced card): the account with the most recent balance date is
+ * kept and renamed, the others' transactions and balance history move into it (a date it already has is kept
+ * as is), every old number goes into its `ref_history`, and the emptied accounts are deleted. Own accounts only;
+ * uses the service client for the move because the transactions table has no update policy, after checking
+ * ownership of every account explicitly.
+ */
+export async function mergeCashAccounts(
+  accountIds: string[],
+  name: string,
+): Promise<{ ok: true; keptId: string } | Fail> {
+  const ids = [...new Set(accountIds)];
+  const newName = name.trim();
+  if (ids.length < 2 || ids.length > 30) return { ok: false, code: "invalid", error: "Choose between 2 and 30 accounts to merge." };
+  if (newName.length < 1 || newName.length > 120) return { ok: false, code: "invalid", error: "Give the merged account a name." };
+  const auth = await requireUser(true);
+  if (!auth.ok) return auth;
+  const db = createServiceClient();
+
+  type Row = { id: string; name: string; currency: string; current_value: number; metadata: Record<string, unknown> | null; updated_at: string | null; is_liability: boolean; asset_categories: { name: string } | null };
+  const { data: found } = await db
+    .from("assets")
+    .select("id, name, currency, current_value, metadata, updated_at, is_liability, asset_categories(name)")
+    .in("id", ids)
+    .eq("profile_id", auth.userId)
+    .returns<Row[]>();
+  const rows = found ?? [];
+  if (rows.length !== ids.length || rows.some((r) => r.asset_categories?.name !== "Cash" || r.is_liability)) {
+    return { ok: false, code: "invalid", error: "Only your own bank (Cash) accounts can be merged." };
+  }
+  if (new Set(rows.map((r) => r.currency.toUpperCase())).size !== 1) {
+    return { ok: false, code: "invalid", error: "The accounts must all be in the same currency." };
+  }
+
+  const { data: historyRows, error: histError } = await db.from("asset_history").select("*").in("asset_id", ids);
+  if (histError) return { ok: false, code: "db_error", error: histError.message };
+  const history = (historyRows ?? []) as Record<string, unknown>[];
+  const datesOf = (assetId: string) => history.filter((h) => h.asset_id === assetId).map((h) => String(h.recorded_date)).sort();
+  const lastDate = (r: Row) => datesOf(r.id).at(-1) ?? (r.updated_at ?? "").slice(0, 10);
+
+  const kept = [...rows].sort((a, b) => lastDate(b).localeCompare(lastDate(a)))[0];
+  const others = rows.filter((r) => r.id !== kept.id);
+  const otherIds = others.map((r) => r.id);
+
+  // Every account's own number(s), each with the period its statements covered.
+  let refHistory = parseRefHistory(kept.metadata?.ref_history);
+  for (const r of rows) {
+    const dates = datesOf(r.id);
+    const ref = typeof r.metadata?.account_ref === "string" ? r.metadata.account_ref : "";
+    const own = [...(ref ? [ref] : []), ...parseRefHistory(r.metadata?.ref_history).map((e) => e.ref)];
+    refHistory = mergeRefHistory(refHistory, [
+      ...own.map((x) => ({ ref: x, from: dates[0] ?? null, to: dates.at(-1) ?? null })),
+    ]);
+  }
+  const latest = currentRef(refHistory);
+
+  // Move the transactions, then the balance dates the kept account does not have yet.
+  const { error: txError } = await db.from("transactions").update({ asset_id: kept.id }).in("asset_id", otherIds).eq("profile_id", auth.userId);
+  if (txError && !/relation .* does not exist|schema cache/i.test(txError.message)) return { ok: false, code: "db_error", error: txError.message };
+  const have = new Set(datesOf(kept.id));
+  const toCopy = history
+    .filter((h) => h.asset_id !== kept.id && !have.has(String(h.recorded_date)))
+    .map((h) => {
+      const { id: _id, asset_id: _asset, ...rest } = h;
+      void _id;
+      void _asset;
+      return { ...rest, asset_id: kept.id };
+    });
+  for (let i = 0; i < toCopy.length; i += 500) {
+    const { error } = await db.from("asset_history").insert(toCopy.slice(i, i + 500) as never);
+    if (error) return { ok: false, code: "db_error", error: error.message };
+  }
+
+  const keptMeta = kept.metadata && typeof kept.metadata === "object" ? kept.metadata : {};
+  const { error: updError } = await db
+    .from("assets")
+    .update({ name: newName, metadata: { ...keptMeta, ref_history: refHistory, ...(latest ? { account_ref: latest } : {}) } as never })
+    .eq("id", kept.id)
+    .eq("profile_id", auth.userId);
+  if (updError) return { ok: false, code: "db_error", error: updError.message };
+
+  const { error: delError } = await db.from("assets").delete().in("id", otherIds).eq("profile_id", auth.userId);
+  if (delError) return { ok: false, code: "db_error", error: delError.message };
+  revalidatePath("/dashboard", "layout");
+  return { ok: true, keptId: kept.id };
+}
+
+/**
  * Records the account / card numbers that belong to ONE Cash account (a savings space renewed under a new number,
  * a replaced card): each entry is the period a number was in use. The account's current number becomes the one
  * whose period ends latest (the most recent statement date wins), the older ones stay in `metadata.ref_history`

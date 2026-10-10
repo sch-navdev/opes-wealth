@@ -4,7 +4,7 @@ import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { createMockAdminClient, getMockUserId, isMockAuthEnabled } from "@/utils/supabase/mock-auth";
 import { BankDetailView, type BankDetailAccount, type BankDetailTransaction } from "@/components/bank-detail-view";
 import { getBankProfile } from "@/lib/banking/csv-profiles";
-import { bankGroupName, institutionOfMetadata } from "@/lib/banking/account-country";
+import { bankGroupName, bankKey, institutionOfMetadata } from "@/lib/banking/account-country";
 import { pickBalanceDate } from "@/lib/bank-staleness";
 import { loadBalanceDateSources } from "@/lib/bank-staleness-load";
 import { DEFAULT_BASE_CURRENCY, convertToBaseCurrency, getExchangeRatesFromUsd } from "@/lib/fx";
@@ -77,7 +77,7 @@ export default async function BankDetailPage({
     const institution = bankGroupName(
       linkByAsset.get(a.id)?.bank_connections?.institution_name ?? (institutionOfMetadata(a.metadata) || getBankProfile(profileId)?.name) ?? "",
     );
-    return institution === bankName;
+    return bankKey(institution) === bankKey(bankName);
   });
   if (mine.length === 0) notFound();
 

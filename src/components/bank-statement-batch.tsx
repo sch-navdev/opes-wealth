@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InstitutionLogo } from "@/components/institution-logo";
+import { TransactionDetailsSheet } from "@/components/transaction-details-sheet";
+import { detailFromFingerprint, detailFromNormalized, type TransactionDetail } from "@/lib/transaction-detail";
 import { PdfPasswordPrompt } from "@/components/pdf-password-prompt";
 import { useBatchText } from "@/components/batch-import-text";
 import { useLanguage } from "@/context/language-context";
@@ -89,6 +91,8 @@ type BatchItem = {
   detectedId: BankProfileId | "";
   ambiguous: boolean;
   country: string;
+  /** Masked OCR layout of a failed read (numbers and names hidden): shown for support, never sent anywhere. */
+  layout: string | null;
   /** No bank layout recognised: the bank picker can fix it. */
   pickerFailure: boolean;
   rereading: boolean;
@@ -113,6 +117,7 @@ function newItem(file: File, id: number): BatchItem {
     unlocking: false,
     ocrMissing: false,
     ocrRead: false,
+    layout: null,
     text: null,
     parsed: null,
     pdfStatement: null,
@@ -177,6 +182,22 @@ export function BankStatementBatch({
   const [items, setItems] = useState<BatchItem[]>(() => files.map((file, id) => newItem(file, id)));
   const [results, setResults] = useState<FileResult[] | null>(null);
   const [editing, setEditing] = useState<{ id: number; gi: number; j: number } | null>(null);
+  /** The transaction details drawer: which file / group, and the position in that group's newest-first list. */
+  const [sheet, setSheet] = useState<{ id: number; gi: number; index: number } | null>(null);
+
+  /** One group's rows, newest first, as drawer view-models. PDF imports carry the full parsed metadata (rows map 1:1 to the statement's transactions); CSV rows only have date / description / amount / balance. */
+  function sheetRows(it: BatchItem, group: StatementGroup, gi: number): TransactionDetail[] {
+    const bankName = getBankProfile(it.profileId || "")?.name;
+    const pdfTxs = it.pdfStatement?.accounts[gi]?.transactions;
+    return group.rows
+      .map((r, j) => {
+        const full = pdfTxs?.[j];
+        return full
+          ? detailFromFingerprint(full, { bankName, sourceFile: it.file.name })
+          : detailFromNormalized(r, { currency: group.currency, bankName, accountRef: group.accountRef, sourceFile: it.file.name });
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
   const [ocrAsking, setOcrAsking] = useState(false);
   const [ocrRunning, setOcrRunning] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -271,7 +292,7 @@ export function BankStatementBatch({
     if (password) passwords.current.set(id, password);
     if (!result.ok) {
       const f = result.failure;
-      const base = { parsed: null, pdfStatement: null, groupState: [], checks: {}, selection: {}, unlocking: false, rereading: false };
+      const base = { parsed: null, pdfStatement: null, groupState: [], checks: {}, selection: {}, unlocking: false, rereading: false, layout: null };
       if (f.code === "encrypted" || f.code === "password_incorrect") {
         patch(id, { ...base, status: "needs_password", incorrectPassword: f.code === "password_incorrect", message: null });
         return;
@@ -295,6 +316,7 @@ export function BankStatementBatch({
         status,
         message: detail ? `${message} [${detail}]` : message,
         ocrMissing: ocrState === "unconfigured",
+        layout: "layout" in f && typeof f.layout === "string" ? f.layout : null,
         // Only "no layout recognised" (or "recognised but empty" after a forced bank) can be helped by choosing a bank.
         pickerFailure: status === "unsupported",
         ...(bank ? { profileId: bank as BankProfileId, country: defaultCountry("pdf", bank, readStoredCountry()) } : {}),
@@ -939,6 +961,20 @@ export function BankStatementBatch({
       {readyItems.length > 1 && <p className="text-xs text-muted-foreground">{bt("batch_order_note")}</p>}
       {pendingFiles > 0 && <p className="text-xs text-muted-foreground">{bt("batch_pending_note", { n: pendingFiles })}</p>}
 
+      {sheet &&
+        (() => {
+          const it = items.find((i) => i.id === sheet.id);
+          const group = it?.parsed?.groups[sheet.gi];
+          if (!it || !group) return null;
+          return (
+            <TransactionDetailsSheet
+              transactions={sheetRows(it, group, sheet.gi)}
+              index={sheet.index}
+              onIndexChange={(next) => setSheet(next === null ? null : { ...sheet, index: next })}
+            />
+          );
+        })()}
+
       {leftOut.length > 0 && !isPending && (
         <p className="text-xs text-muted-foreground" role="status">
           {bt("batch_left_out_note", { list: leftOut.join(", ") })}
@@ -1006,6 +1042,7 @@ export function BankStatementBatch({
           </p>
         )}
         {it.ocrMissing && it.status !== "ready" && <p className="text-xs text-muted-foreground">{bt("batch_ocr_unconfigured")}</p>}
+        {it.message && it.status !== "ready" && it.layout && <LayoutBox layout={it.layout} />}
 
         {showPicker && (
           <div className="space-y-1">
@@ -1090,7 +1127,11 @@ export function BankStatementBatch({
             <span className="font-normal text-muted-foreground">({t("stmt_rows", { n: count })})</span>
           </p>
           <Select value={state.target} onValueChange={(v) => changeTarget(it, gi, group, v)}>
-            <SelectTrigger data-testid={`batch-target-${it.id}-${gi}`} className="h-8 w-64">
+            <SelectTrigger
+              data-testid={`batch-target-${it.id}-${gi}`}
+              className="h-8 w-64"
+              aria-invalid={state.target === NONE && !state.neverImport && !state.skippedByPreference ? true : undefined}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1104,6 +1145,9 @@ export function BankStatementBatch({
             </SelectContent>
           </Select>
         </div>
+        {state.target === NONE && !state.neverImport && !state.skippedByPreference && (
+          <p className="text-xs text-destructive">{t("stmt_account_needed")}</p>
+        )}
         {state.target === NEW && <p className="text-xs text-muted-foreground">{t("stmt_new_account_note")}</p>}
         {mergedChain(`${it.id}:${gi}`) && (
           <p className="text-xs text-muted-foreground">{bt("batch_rollover_note", { name: group.accountName ?? "" })}</p>
@@ -1240,7 +1284,15 @@ export function BankStatementBatch({
                           }}
                         />
                       </TableCell>
-                      <TableCell className="tabular-nums text-foreground">{r.date}</TableCell>
+                      <TableCell className="tabular-nums text-foreground">
+                        <button
+                          type="button"
+                          className="underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                          onClick={() => setSheet({ id: it.id, gi, index: entries.findIndex((e) => e.j === j) })}
+                        >
+                          {r.date}
+                        </button>
+                      </TableCell>
                       <TableCell className="max-w-56 text-muted-foreground">
                         <span className="block truncate">{r.description || "—"}</span>
                         {(plan.flags?.[j] || plan.batchDup[j] || identical[j] || it.edited[`${gi}:${j}`]) && (
@@ -1283,6 +1335,50 @@ export function BankStatementBatch({
       </div>
     );
   }
+}
+
+/** The masked OCR layout of a failed read, in a read-only box with a Copy button (for support). */
+function LayoutBox({ layout }: { layout: string }) {
+  const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(layout);
+      setCopied(true);
+    } catch {
+      // Clipboard blocked: select the text so Ctrl+C works.
+      ref.current?.select();
+    }
+  }
+  return (
+    <details className="rounded-md border border-border p-2 text-sm">
+      <summary className="cursor-pointer text-muted-foreground">{t("stmt_ocrlayout_summary")}</summary>
+      <div className="mt-2 space-y-2">
+        <p className="text-xs text-muted-foreground">{t("stmt_ocrlayout_explain")}</p>
+        <textarea
+          ref={ref}
+          readOnly
+          dir="ltr"
+          rows={10}
+          value={layout}
+          aria-label={t("stmt_ocrlayout_summary")}
+          className="w-full rounded-md border border-border bg-muted/30 p-2 font-mono text-xs text-foreground"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+            {t("stmt_ocrlayout_copy")}
+          </Button>
+          {copied && (
+            <span className="text-xs text-muted-foreground" role="status">
+              {t("stmt_ocrlayout_copied")}
+            </span>
+          )}
+        </div>
+      </div>
+    </details>
+  );
 }
 
 /** Inline editor of one preview row: date, description and signed amount. */

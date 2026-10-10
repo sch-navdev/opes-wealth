@@ -120,10 +120,10 @@ describe("batch import: multi-select", () => {
     expect(status(1)).toHaveTextContent("Ready");
   });
 
-  it("keeps the single-file flow when exactly one file is chosen", async () => {
+  it("uses the same review for exactly one file, so every import gets row editing, renewals and the rest", async () => {
     await openAndChoose([csv("a.csv", JAN_CSV)]);
-    expect(await screen.findByTestId("stmt-target-0")).toBeTruthy();
-    expect(screen.queryByTestId("batch-root")).toBeNull();
+    expect(await screen.findByTestId("batch-target-0-0")).toBeTruthy();
+    expect(screen.getByTestId("batch-root")).toBeTruthy();
   });
 
   it("keeps the first 30 files and says so", async () => {

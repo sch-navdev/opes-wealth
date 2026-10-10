@@ -180,6 +180,8 @@ import {
 } from "@/lib/asset-detail-scaling";
 import { OwnerShareNote } from "@/components/owner-share-note";
 import { TransactionsList } from "@/components/transactions-list";
+import { TimeRangeSelector } from "@/components/time-range-selector";
+import { filterByRange, type TimeRange } from "@/lib/time-range";
 import { useBankingText } from "@/components/banking-text";
 import { AttributionCard } from "@/components/attribution-card";
 import type { AssetAttributionView } from "@/lib/asset-attribution-view";
@@ -363,6 +365,7 @@ export function AssetDetailView({
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expenseAmount, setExpenseAmount] = useState("");
   const [chartView, setChartView] = useState<"history" | "forward" | "both">("history");
+  const [timeRange, setTimeRange] = useState<TimeRange>({ preset: "all" });
   const [growthInput, setGrowthInput] = useState("");
   const [certOpen, setCertOpen] = useState(false);
   const [certificate, setCertificate] = useState<DldCertificate | null>(null);
@@ -889,9 +892,11 @@ export function AssetDetailView({
           today,
         })
       : null;
+  // The chosen time range limits the recorded history; the forward projection is never cut.
+  const rangedHistory = (vehicleRows ?? historySeries) as { date: string }[];
   const combinedChartData = [
     ...(showHistory
-      ? ((vehicleRows ?? historySeries) as { date: string }[]).map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
+      ? filterByRange(rangedHistory, timeRange, today).map((p) => ({ ...p, ts: new Date(p.date).getTime() }))
       : []),
     ...(showForward
       ? [...projectionBridge, ...projection].map((p) => ({
@@ -1934,6 +1939,7 @@ export function AssetDetailView({
                 <CardTitle className="text-foreground">
                   {t("valuation_history")}
                 </CardTitle>
+                <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
                 {isRealEstate && (
                   <div className="flex flex-wrap items-center gap-3">
                     {showForward && (
@@ -1971,7 +1977,7 @@ export function AssetDetailView({
                     {t("no_valuation_history")}
                   </p>
                 ) : isVehicle && vehicleRows ? (
-                  <VehicleValuationChart rows={vehicleRows} currency={asset.currency} heightClassName="h-64" />
+                  <VehicleValuationChart rows={filterByRange(vehicleRows, timeRange, today)} currency={asset.currency} heightClassName="h-64" />
                 ) : (
                   <div className={cn("w-full", isRealEstate ? "h-80" : "h-64")}>
                     <ResponsiveContainer width="100%" height="100%">

@@ -40,6 +40,14 @@ export function bankGroupName(name: string): string {
   return base || name;
 }
 
+/**
+ * The key two names of the same bank share: card words and a trailing "(FAB)" style abbreviation are dropped, so
+ * "First Abu Dhabi Bank (FAB)" and "First Abu Dhabi Bank credit card" group together.
+ */
+export function bankKey(name: string): string {
+  return bankGroupName(name).replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
+}
+
 /** Country of an institution known by display name (registry or profile logo list), or "". */
 export function countryOfInstitutionName(name: string): string {
   const bank = bankByName(name);

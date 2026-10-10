@@ -89,3 +89,13 @@ describe("resolveCountryFilter", () => {
     expect(resolveCountryFilter("AE", ["AE", "FR"])).toBe("AE");
   });
 });
+
+describe("bankKey / bankGroupName: one bank, one group", () => {
+  it("puts a bank's card layout and its short-form name under the same key", async () => {
+    const { bankKey } = await import("./account-country");
+    expect(bankKey("First Abu Dhabi Bank (FAB)")).toBe("first abu dhabi bank");
+    expect(bankKey("First Abu Dhabi Bank credit card")).toBe("first abu dhabi bank");
+    expect(bankKey("Banque Populaire card")).toBe(bankKey("Banque Populaire"));
+    expect(bankKey("Wio Bank")).not.toBe(bankKey("HSBC UAE"));
+  });
+});
