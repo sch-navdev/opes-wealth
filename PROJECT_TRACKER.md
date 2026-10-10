@@ -94,7 +94,13 @@ High-net-worth individuals
 - [x] Phase 2 batch: IRR comparison tool, Global exposure bar, Assurance-Vie asset class (migration 0036 to apply), retirement passive income simulator — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Database-Schema|Database Schema]], [[Future-Projects|Future Projects]]
 - [x] Income calendar, table density and category pills, Ctrl/Cmd+K command palette — [[Portfolio-Dashboard|Portfolio Dashboard]], [[Design-System|Design System]]
 - [x] FX vs capital performance attribution (asset page + Expert panel) — [[Real-Estate-Multi-Currency|Real Estate & Multi-Currency]]
-- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 88 files / 1626 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
+- [x] Automated unit and component tests: Vitest 5 (node + jsdom projects), 209 files / 3022 tests passing, no `it.fails` left; the 13 bugs first recorded as `it.fails` are fixed — [[Testing|Testing]]
+### OW12-OW13 — Import, banking and cash flow (2026-10-09 to 2026-10-10)
+- [x] Batch statement import (2+ files), import source and file name in the Valuation Log (migration 0041 drafted, NOT applied), Edit Bank Account modal with Country — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Company bank accounts, Analysis tab for every class, Blue Book line, SCPI Phase 1 — [[Entity-Structures|Entity Structures]], [[Portfolio-Dashboard|Portfolio Dashboard]], [[Scpi-Tracking|SCPI Tracking]]
+- [x] OW13 import fixes: transaction descriptions in the Valuation Log, Banque Populaire glued amounts, wrong-bank routing, cards under their bank, dialog reset, manual row editing, never-import preference, closed accounts — [[CSV-Bank-Uploads|CSV Bank Uploads]]
+- [x] Add Real Estate starts from the title deed / Tawtheeq / Ejari upload; market valuation after the purchase price — [[Portfolio-Dashboard|Portfolio Dashboard]]
+
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth
@@ -137,7 +143,7 @@ opes-wealth/
 │   └── middleware.ts            # Wires Supabase session refresh into Next.js middleware
 ├── supabase/
 │   └── migrations/
-│       └── 0001 … 0033_*.sql    # 33 migrations, all applied to the live project (verified 2026-10-06); see Database-Schema
+│       └── 0001 … 0041_*.sql    # 0001-0040 applied to the live project; 0041 (history_source_ref) drafted, not applied; see Database-Schema
 ├── components.json              # shadcn/ui config (style: new-york, baseColor: zinc)
 ├── .env.local                   # Supabase URL/anon key (gitignored)
 ├── PROJECT_TRACKER.md           # hub note — start here (this file)

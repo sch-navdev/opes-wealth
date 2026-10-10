@@ -298,3 +298,4 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - 2026-10-10: "Never import this account" preference (per device) with a notice and Change preference button on later imports - [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - 2026-10-10: Closed accounts: Wio ACCOUNT CLOSURE date detected, account marked closed after import, hidden on Banking behind "Show closed accounts", skipped by Data quality - [[CSV-Bank-Uploads|CSV Bank Uploads]]
 - 2026-10-10: Add Real Estate asset starts with title deed / Tawtheeq / Ejari upload that fills the form, and Market Valuation now sits after the purchase price - [[Portfolio-Dashboard|Portfolio Dashboard]]
+- 2026-10-10: Documentation refresh: handoff, project tracker, testing note and next-session prompt brought up to date after the OW13 push - [[Testing|Testing]]
