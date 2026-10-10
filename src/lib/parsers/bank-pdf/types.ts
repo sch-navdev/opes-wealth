@@ -93,6 +93,8 @@ export type PdfStatement = {
   accounts: PdfAccountStatement[];
   /** Human-readable notes (skipped lines, reconciliation mismatches...). Never contain amounts of other accounts. */
   warnings: string[];
+  /** The statement lists EVERY account of the customer, with or without activity: an account missing from it is closed. */
+  listsAllAccounts?: boolean;
   /** Where the text came from: the PDF text layer (default when absent) or OCR (must be verified row by row). */
   source?: "text" | "ocr";
 };

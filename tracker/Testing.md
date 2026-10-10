@@ -47,3 +47,6 @@
 ## Related
 - [[Deployment|Deployment]] — pre-deployment checks (`tsc`, `eslint`, build) now sit alongside `npm test`
 - [[Codebase-Audits|Codebase Audits]]
+
+## Status 2026-10-10 (OW13 round 3)
+221 test files / 3104 tests, all passing; `eslint .` and `npm run build` green. New suites: wio-card, vanished-accounts, rollover (card chains, name variants), income-calendar (liabilities, analysis, simulation, daily, cash/settle, explorer), banking-overview (collapse and drag), dashboard-csv-card. Real statements (Wio Jan to Sep 2026 and card statements, Banque Populaire extracts and card statements) were checked locally only; none are in the repo.

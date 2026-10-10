@@ -481,3 +481,8 @@ New category **Assurance-Vie** (French life-insurance contract), added the same 
 
 ### Add Real Estate: documents first (2026-10-10)
 `real-estate-document-start.tsx` (shown under Category for a NEW Real Estate asset) + server action `readRealEstateDocument` (`real-estate-document-actions.ts`): upload a title deed / sale contract / Form F / Oqood / DLD receipt, or a Tawtheeq / Ejari contract, and the form is filled (empty fields only, never overwriting typed values; a tenancy contract is added to the tenancy list). Same parsers as the asset page import, so only the verified formats read; a scanned deed reads as nothing, and an Abu Dhabi title deed carries no purchase price (use the sale contract or type it). Current Market Valuation moved below the Purchase Price block (`RealEstateFields` `afterPurchase`), also when editing. Not yet seen in a browser.
+
+## 2026-10-10 additions
+- Income calendar card: three bars per month (gross, liabilities, net), bottom line "Cash <amount>" (bank cash basis), link to the full page.
+- Bank Statement Import card: several files, same batch review as Banking.
+- Banking page: banks collapsed to name + total, drag to reorder banks and accounts, PDF/CSV source badge.

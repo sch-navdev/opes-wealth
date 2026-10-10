@@ -14,6 +14,7 @@ import { useLanguage } from "@/context/language-context";
 import { usePrivacy } from "@/context/privacy-context";
 import { tileEntranceStyle } from "@/lib/dashboard-tiers";
 import type { IncomeCalendar as IncomeCalendarData } from "@/lib/income-calendar";
+import { analyseIncomeCalendar } from "@/lib/income-calendar-analysis";
 import type { LiabilityKind } from "@/lib/income-calendar-liabilities";
 import type { PassiveIncomeSource } from "@/lib/passive-income";
 import type { TranslationKey } from "@/lib/i18n";
@@ -61,10 +62,17 @@ export function IncomeCalendar({
   calendar,
   baseCurrency,
   className,
+  openingCash = 0,
+  actualCloses,
+  todayMonth,
 }: {
   calendar: IncomeCalendarData;
   baseCurrency: string;
   className?: string;
+  /** Cash in the personal bank accounts per the latest statements: the bottom line of the card is your cash position. */
+  openingCash?: number;
+  actualCloses?: Record<string, number>;
+  todayMonth?: string;
 }) {
   const { t, intlLocale } = useLanguage();
   const { maskValue } = usePrivacy();
@@ -98,13 +106,12 @@ export function IncomeCalendar({
   const shown = (m: IncomeCalendarData["months"][number]) =>
     view === "gross" ? combined(m) : view === "liabilities" ? m.liabilityTotal : view === "net" ? Math.abs(netOf(m)) : Math.max(combined(m), m.liabilityTotal, Math.abs(netOf(m)));
   const max = Math.max(0, ...calendar.months.map(shown));
-  // Running net: what you are ahead (or behind) at the end of each month, counted from the first.
-  const running = new Map<string, number>();
-  calendar.months.reduce((sum, mo) => {
-    const next = sum + netOf(mo);
-    running.set(mo.month, next);
-    return next;
-  }, 0);
+  // Bottom line: your cash at the end of each month. A month that has ended shows what the banks reported; the current
+  // month starts from today's cash (what the statements already show is not counted again); later months follow.
+  const cashBasis = openingCash > 0;
+  const running = new Map<string, number>(
+    analyseIncomeCalendar(calendar, showEarned, { openingCash, cashBasis, actualCloses, todayMonth }).rows.map((r) => [r.month, r.position]),
+  );
   const grossAnnual = calendar.annualTotal + (showEarned ? earnedAnnual : 0);
   const netAnnual = grossAnnual - calendar.liabilityAnnual;
   const empty = calendar.annualTotal <= 0 && !(showEarned && earnedAnnual > 0) && calendar.liabilityAnnual <= 0;
@@ -293,7 +300,7 @@ export function IncomeCalendar({
                             <span className="block text-destructive">{maskValue(money.format(-m.liabilityTotal))}</span>
                             <span className={cn("block font-medium", netOf(m) < 0 ? "text-destructive" : "text-foreground")}>{maskValue(money.format(netOf(m)))}</span>
                             <span className={cn("block border-t border-border pt-0.5", (running.get(m.month) ?? 0) < 0 ? "text-destructive" : "text-muted-foreground")} title={tt("cf_cal_running_hint")}>
-                              Σ {maskValue(money.format(running.get(m.month) ?? 0))}
+                              {cashBasis ? tt("cf_cal_cash_label") : "Σ"} {maskValue(money.format(running.get(m.month) ?? 0))}
                             </span>
                           </>
                         ) : (

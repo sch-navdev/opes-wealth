@@ -18,6 +18,8 @@ export type LiabilityCalendarItem = {
   /** Base Currency, positive. */
   amount: number;
   date?: string;
+  /** Already debited per the latest statements (current month only). */
+  settled?: boolean;
 };
 
 export const emptyByKind = (): Record<LiabilityKind, number> => ({

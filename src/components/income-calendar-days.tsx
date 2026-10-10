@@ -25,6 +25,7 @@ export function IncomeCalendarDays({
   money,
   mask,
   startPosition,
+  note,
 }: {
   days: DayFlow[];
   monthLabel: string;
@@ -32,6 +33,8 @@ export function IncomeCalendarDays({
   mask: (v: string) => string;
   /** Position at the start of the month. */
   startPosition: number;
+  /** Extra line under the summary (e.g. that paid items are not counted). */
+  note?: string;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
   const m = (n: number) => mask(money.format(n));
@@ -58,6 +61,7 @@ export function IncomeCalendarDays({
       <p className="text-xs text-muted-foreground">
         {monthLabel}: you start at {m(startPosition)} and finish at {m(days[days.length - 1].balance)}; the lowest point is {m(low.balance)} on day {low.day}.
       </p>
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
       <div role="group" aria-label={monthLabel} className="grid grid-cols-7 gap-1 text-xs">
         {WEEKDAYS.map((d) => (
           <div key={d} className="px-1 text-center text-muted-foreground">
@@ -108,12 +112,13 @@ export function IncomeCalendarDays({
             ) : (
               <ul className="divide-y divide-border">
                 {open.items.map((item, i) => (
-                  <li key={`${item.label}-${i}`} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                  <li key={`${item.label}-${i}`} className={cn("flex items-center justify-between gap-3 py-1.5 text-sm", item.settled && "opacity-60")}>
                     <span className="min-w-0 text-foreground">
-                      <span className="truncate">{item.label}</span>
+                      <span className={cn("truncate", item.settled && "line-through")}>{item.label}</span>
                       <span className="block text-xs text-muted-foreground">
                         {KIND_LABEL[item.kind]}
                         {item.sub ? ` · ${item.sub}` : ""}
+                        {item.settled ? " · already in your statements" : ""}
                       </span>
                     </span>
                     <span className={cn("shrink-0 tabular-nums", item.amount >= 0 ? "text-success" : "text-destructive")}>{m(item.amount)}</span>

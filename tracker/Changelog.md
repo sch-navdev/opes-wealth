@@ -323,3 +323,8 @@ Flat, chronological log. One line per unit of work — details live in the relev
 - Banque Populaire (and any PDF whose rows have no running balance): the printed closing balance anchors the history, so a new account no longer sits on 0; re-importing a fully imported statement recomputes the stored history.
 - Banking page: banks collapsed to name + total, click to open, drag to reorder banks and accounts (remembered per device).
 - Income calendar: position (cumulative cash flow, optional opening cash), day-by-day month view, what-if income/payments linked to an asset or a simulated asset (device-local).
+
+## OW13 (Action plan 2, part 4)
+- Wio: an account that a later full listing no longer shows is closed on its last covered date (`vanished-accounts.ts`; the Big Day case), also for saved accounts.
+- Income calendar: the bottom line is your bank cash (cash today for the current month, real month-end cash for past months); projected items already visible in the statements are marked settled and not counted twice.
+- Dashboard: the Bank Statement Import card takes several files into the same batch review as Banking.

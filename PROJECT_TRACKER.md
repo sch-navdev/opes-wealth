@@ -103,6 +103,8 @@ High-net-worth individuals
 
 - [x] OW13 round 2: Wio renewed accounts and replaced cards with number history, HSBC safeguards, bank page and transaction edit/delete, salary in the income calendar with employer breakdown (migration 0042 drafted), landing page second pass — [[CSV-Bank-Uploads|CSV Bank Uploads]], [[Personal-Cash-Flow|Personal Cash Flow]], [[Design-System|Design System]]
 
+- [x] OW13 round 3: income calendar (three views, full multi-year page, day by day, what-if, bank-cash position with paid items not counted twice), Wio credit card parser and summary-only/closed-by-absence accounts, replaced cards, printed-balance anchoring (Banque Populaire), collapsible draggable banks, PDF/CSV source label (migration 0043 applied), dashboard batch statement import — [[CSV-Bank-Uploads|CSV Bank Uploads]], [[Personal-Cash-Flow|Personal Cash Flow]], [[Portfolio-Dashboard|Portfolio Dashboard]]
+
 ## Modules
 
 - [[Architecture|Architecture]] — quick-orientation reference: stack, verified live schema, financial formulas, theming, localization, mock auth

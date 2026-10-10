@@ -19,6 +19,7 @@ import { importBankCsvHistory } from "@/app/dashboard/actions";
 import { readBankStatementPdf } from "@/app/dashboard/bank-pdf-actions";
 import { createStatementCashAccount, markCashAccountClosed, mergeAccountRefs, recordBalanceSnapshots, recordStatementCoverage, rememberCashAccountBank } from "@/app/dashboard/banking/actions";
 import { readSkippedAccounts, setAccountSkipped, skipKey } from "@/lib/banking/skipped-accounts";
+import { absentAccountClosures, impliedClosures, type ListingStatement } from "@/lib/banking/vanished-accounts";
 import { findCardChains, findRolloverChains, type RefHistoryEntry } from "@/lib/banking/rollover";
 import { checkExistingTransactions, importBankTransactions } from "@/app/dashboard/transaction-import-actions";
 import {
@@ -503,12 +504,41 @@ export function BankStatementBatch({
 
   // ---- renewed accounts: a savings space closed and reopened under a new number is ONE account ----
 
+  // Accounts a later statement no longer lists were closed (see lib/banking/vanished-accounts.ts).
+  const listings = useMemo(() => {
+    const out: ListingStatement[] = [];
+    for (const it of items) {
+      if (it.status !== "ready" || !it.parsed || !it.pdfStatement) continue;
+      const end = it.parsed.groups.map((g) => g.periodEnd ?? "").filter(Boolean).sort().at(-1);
+      if (!end) continue;
+      out.push({
+        fileId: it.id,
+        profileId: it.profileId || "",
+        periodEnd: end,
+        listsAll: it.pdfStatement.listsAllAccounts === true,
+        refs: it.pdfStatement.accounts.map((a) => a.accountRef).filter(Boolean),
+      });
+    }
+    return out;
+  }, [items]);
+  const implied = useMemo(() => impliedClosures(listings), [listings]);
+  const absent = useMemo(
+    () =>
+      absentAccountClosures(
+        listings,
+        accounts.flatMap((a) => (a.bankProfile && a.accountRef ? [{ id: a.id, ref: a.accountRef, profileId: a.bankProfile, lastDate: a.lastDate ?? null, closedOn: a.closedOn ?? null }] : [])),
+      ),
+    [listings, accounts],
+  );
+  /** The closure date of a group: printed on the statement, or implied by a later statement that no longer lists it. */
+  const closedOnOf = (it: BatchItem, g: StatementGroup) => g.closedOn ?? implied.get(`${it.id}:${g.accountRef}`);
+
   const chains = useMemo(() => {
     const members: { key: string; ref: string; name?: string; openedOn?: string; closedOn?: string }[] = [];
     for (const it of items) {
       if (it.status !== "ready" || !it.parsed) continue;
       it.parsed.groups.forEach((g, gi) =>
-        members.push({ key: `${it.id}:${gi}`, ref: g.accountRef, name: g.accountName, openedOn: g.openedOn, closedOn: g.closedOn }),
+        members.push({ key: `${it.id}:${gi}`, ref: g.accountRef, name: g.accountName, openedOn: g.openedOn, closedOn: g.closedOn ?? implied.get(`${it.id}:${g.accountRef}`) }),
       );
     }
     const cards: Parameters<typeof findCardChains>[0] = [];
@@ -522,7 +552,7 @@ export function BankStatementBatch({
       ...findRolloverChains(members).map((c) => ({ ...c, id: c.keys[0], card: false })),
       ...findCardChains(cards).map((c) => ({ ...c, id: c.keys[0], card: true })),
     ];
-  }, [items]);
+  }, [items, implied]);
   const [chainMerge, setChainMerge] = useState<Record<string, boolean>>({});
   const [chainTarget, setChainTarget] = useState<Record<string, string>>({});
 
@@ -733,7 +763,7 @@ export function BankStatementBatch({
         if (!(mergedChain(`${job.it.id}:${job.gi}`) || job.plan.state.replacement || differs)) return;
         const period = groupPeriod(g);
         const list = refEntries.get(accountId) ?? [];
-        list.push({ ref: g.accountRef, from: g.openedOn ?? period?.start ?? null, to: g.closedOn ?? g.periodEnd ?? period?.end ?? null });
+        list.push({ ref: g.accountRef, from: g.openedOn ?? period?.start ?? null, to: closedOnOf(job.it, g) ?? g.periodEnd ?? period?.end ?? null });
         if (existingRef && differs) list.push({ ref: existingRef, from: null, to: null });
         refEntries.set(accountId, list);
       };
@@ -744,10 +774,11 @@ export function BankStatementBatch({
         if (through) await recordStatementCoverage(accountId, through);
       };
       const closeIfDue = async (accountId: string, job: { it: BatchItem; gi: number; group: StatementGroup }) => {
-        if (!job.group.closedOn) return;
+        const closedOn = closedOnOf(job.it, job.group);
+        if (!closedOn) return;
         const chain = mergedChain(`${job.it.id}:${job.gi}`);
         if (chain && accountTail(chain.refs[chain.refs.length - 1]) !== accountTail(job.group.accountRef)) return;
-        await markCashAccountClosed(accountId, job.group.closedOn);
+        await markCashAccountClosed(accountId, closedOn);
       };
       for (const job of ordered) {
         if (!go.has(job.key)) continue;
@@ -829,6 +860,8 @@ export function BankStatementBatch({
         }
       }
       for (const [accountId, entries] of refEntries) await mergeAccountRefs(accountId, entries);
+      // Saved accounts that these statements no longer list: closed, history kept.
+      for (const [accountId, date] of absent) await markCashAccountClosed(accountId, date);
       setResults(items.map((it) => byFile.get(it.id) as FileResult));
     });
   }
@@ -1197,6 +1230,7 @@ export function BankStatementBatch({
         )}
         {state.replacement && <p className="text-xs text-muted-foreground">{bt("batch_replace_note")}</p>}
         {group.closedOn && <p className="text-xs text-muted-foreground">{bt("batch_closed_note", { date: group.closedOn })}</p>}
+        {!group.closedOn && closedOnOf(it, group) && <p className="text-xs text-muted-foreground">{bt("batch_closed_implied_note", { date: closedOnOf(it, group) as string })}</p>}
         {state.skippedByPreference && (
           <p className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 p-2 text-xs font-medium text-foreground" role="status">
             {bt("batch_skipped_pref")}

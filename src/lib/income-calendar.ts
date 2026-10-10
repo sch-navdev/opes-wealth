@@ -60,6 +60,8 @@ export type IncomeCalendarItem = {
   amount: number;
   date?: string;
   basis: IncomeCalendarBasis;
+  /** Already in the bank per the latest statements (current month only): kept out of the cash position. */
+  settled?: boolean;
 };
 
 /** One earned-income payment (a salary, a bonus...) in a month. Never part of the passive totals. */
@@ -72,6 +74,8 @@ export type EarnedCalendarItem = {
   /** Base Currency, NET. */
   amount: number;
   date: string;
+  /** Already in the bank per the latest statements (current month only). */
+  settled?: boolean;
 };
 
 export type IncomeCalendarMonth = {
@@ -87,6 +91,9 @@ export type IncomeCalendarMonth = {
   liabilities: Record<LiabilityKind, number>;
   liabilityTotal: number;
   liabilityItems: LiabilityCalendarItem[];
+  /** Part of this month's income / payments the statements already show (current month only; see income-calendar-settle). */
+  settledIncome?: number;
+  settledPayments?: number;
 };
 
 export type IncomeCalendar = {

@@ -3,7 +3,9 @@ import { createClient } from "@/utils/supabase/server";
 import { needsMfaStepUp } from "@/utils/supabase/mfa";
 import { createMockAdminClient, getMockUserId, isMockAuthEnabled } from "@/utils/supabase/mock-auth";
 import { IncomeCalendarExplorer } from "@/components/income-calendar-explorer";
-import { DEFAULT_BASE_CURRENCY, convertAmount, getExchangeRatesFromUsd } from "@/lib/fx";
+import { DEFAULT_BASE_CURRENCY, getExchangeRatesFromUsd } from "@/lib/fx";
+import { loadCashBasis } from "@/lib/income-calendar-cash";
+import { settleCurrentMonth } from "@/lib/income-calendar-settle";
 import { buildIncomeCalendar, DEFAULT_CALENDAR_MONTHS, MAX_CALENDAR_MONTHS } from "@/lib/income-calendar";
 import { loadIncomeStreams } from "@/lib/income-streams-server";
 import type { PassiveIncomeAsset } from "@/lib/passive-income";
@@ -46,11 +48,10 @@ export default async function IncomeCalendarPage({
   const assets = applyOwnershipFactors(unscaled, await loadOwnershipFactors(supabase, user.id, unscaled));
   const baseCurrency = params.currency || profile?.default_currency || DEFAULT_BASE_CURRENCY;
 
-  const calendar = buildIncomeCalendar({ assets, rates, baseCurrency, startDate: `${from}-01`, months, streams });
-  // Cash on hand today (personal, open accounts): where the position line starts.
-  const openingCash = assets
-    .filter((a) => a.asset_categories?.name === "Cash" && !a.is_liability && !a.metadata?.company_id && typeof a.metadata?.closed_on !== "string")
-    .reduce((s, a) => s + convertAmount(a.current_value, a.currency, baseCurrency, rates), 0);
+  // Cash in the bank per the latest statements, what the banks reported at each past month-end, and what this month's
+  // statements already show (so a salary or instalment already paid is not counted again).
+  const cash = await loadCashBasis(supabase, assets, rates, baseCurrency, today, from);
+  const calendar = settleCurrentMonth(buildIncomeCalendar({ assets, rates, baseCurrency, startDate: `${from}-01`, months, streams }), cash.transactions, today);
   const simAssets = assets
     .filter((a) => !a.is_liability)
     .map((a) => ({ id: a.id, name: a.name, category: a.asset_categories?.name ?? "" }))
@@ -65,7 +66,9 @@ export default async function IncomeCalendarPage({
       months={months}
       hasEarned={calendar.months.some((m) => m.earned !== undefined)}
       backHref={back}
-      openingCash={Math.max(0, openingCash)}
+      openingCash={Math.max(0, cash.openingCash)}
+      actualCloses={cash.actualCloses}
+      todayMonth={today.slice(0, 7)}
       assets={simAssets}
       selectedMonth={params.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.month) ? params.month : undefined}
     />

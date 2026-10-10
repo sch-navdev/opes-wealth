@@ -175,3 +175,9 @@ describe("wioProfile.parse: accounts with no transaction", () => {
     expect(quiet?.periodEnd).toBe("2026-02-26");
   });
 });
+
+describe("wioProfile.parse: full account listing", () => {
+  it("says the statement lists every account, so an account missing from it is closed", () => {
+    expect(parseOk().listsAllAccounts).toBe(true);
+  });
+});

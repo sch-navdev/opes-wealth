@@ -20,7 +20,12 @@ export const NONE = "__none__";
 /** Target value meaning "create a new Cash account for this group when importing". */
 export const NEW = "__new__";
 
-export type StatementTargetAccount = RoutableAccount & { nativeValue: number };
+export type StatementTargetAccount = RoutableAccount & {
+  nativeValue: number;
+  /** Newest date the account has a balance or statement for, and its closure date when it has one. */
+  lastDate?: string | null;
+  closedOn?: string | null;
+};
 
 export type GroupState = {
   target: string;

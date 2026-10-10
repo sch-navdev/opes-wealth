@@ -59,9 +59,20 @@ const SOURCES: PassiveIncomeSource[] = ["rental", "stocks", "reit", "private_equ
 export function analyseIncomeCalendar(
   calendar: IncomeCalendar,
   includeEarned: boolean,
-  opts: { sims?: readonly (readonly SimItem[])[]; openingCash?: number } = {},
+  opts: {
+    sims?: readonly (readonly SimItem[])[];
+    openingCash?: number;
+    /**
+     * The position is the cash in the banks: today's cash carries the current month (what the statements already show is
+     * not counted again) and the months after it; a month that has ended shows the real closing cash the banks reported.
+     */
+    cashBasis?: boolean;
+    actualCloses?: Record<string, number>;
+    todayMonth?: string;
+  } = {},
 ): CalendarAnalysis {
   let running = 0;
+  let prevPosition: number | null = null;
   const opening = opts.openingCash ?? 0;
   const rows: CalendarRow[] = calendar.months.map((m, i) => {
     const earned = includeEarned && m.earned ? m.earned.salary + m.earned.bonus + m.earned.gratuity + m.earned.other : 0;
@@ -72,7 +83,17 @@ export function analyseIncomeCalendar(
     const liabilities = m.liabilityTotal + simPayments;
     const net = gross - liabilities;
     running += net;
-    return { month: m.month, earned, passive: m.total, bySource: m.bySource, gross, liabilities, byKind: m.liabilities, net, cumulative: running, simIncome, simPayments, position: opening + running };
+    let position: number;
+    const actual = opts.actualCloses?.[m.month];
+    if (opts.cashBasis && opts.todayMonth && m.month < opts.todayMonth && actual !== undefined) {
+      position = actual;
+    } else if (opts.cashBasis && opts.todayMonth && m.month === opts.todayMonth) {
+      position = opening + net - ((m.settledIncome ?? 0) - (m.settledPayments ?? 0));
+    } else {
+      position = (opts.cashBasis ? (prevPosition ?? opening) : opening + (running - net)) + net;
+    }
+    prevPosition = position;
+    return { month: m.month, earned, passive: m.total, bySource: m.bySource, gross, liabilities, byKind: m.liabilities, net, cumulative: running, simIncome, simPayments, position };
   });
 
   const sum = (pick: (r: CalendarRow) => number) => rows.reduce((s, r) => s + pick(r), 0);

@@ -73,6 +73,8 @@ export function IncomeCalendarExplorer({
   hasEarned,
   backHref,
   openingCash = 0,
+  actualCloses,
+  todayMonth,
   assets = [],
   selectedMonth,
 }: {
@@ -84,6 +86,10 @@ export function IncomeCalendarExplorer({
   backHref: string;
   /** Cash on hand today (Base Currency): the starting point of the position line. */
   openingCash?: number;
+  /** "YYYY-MM" -> the cash the banks showed on the last day of that (past) month. */
+  actualCloses?: Record<string, number>;
+  /** The current month, "YYYY-MM". */
+  todayMonth?: string;
   /** Assets a what-if entry can be linked to. */
   assets?: SimAsset[];
   /** Month ("YYYY-MM") to open in the day-by-day view. */
@@ -136,18 +142,39 @@ export function IncomeCalendarExplorer({
   const simByMonth = useMemo(() => expandSimulations(showSims ? sims : [], calendar.months.map((x) => x.month)), [sims, showSims, calendar]);
   const startCash = includeCash ? openingCash : 0;
   const a = useMemo(
-    () => analyseIncomeCalendar(calendar, includeEarned && hasEarned, { sims: simByMonth, openingCash: startCash }),
-    [calendar, includeEarned, hasEarned, simByMonth, startCash],
+    () =>
+      analyseIncomeCalendar(calendar, includeEarned && hasEarned, {
+        sims: simByMonth,
+        openingCash: startCash,
+        cashBasis: includeCash,
+        actualCloses,
+        todayMonth,
+      }),
+    [calendar, includeEarned, hasEarned, simByMonth, startCash, includeCash, actualCloses, todayMonth],
   );
+  // Where the picked month starts: the cash today for the current month, the bank's closing cash of the month before
+  // for a past one, otherwise the previous month's position.
+  const startOf = (i: number): number => {
+    const key = calendar.months[i].month;
+    if (includeCash && todayMonth && key === todayMonth) return openingCash;
+    if (i > 0) return a.rows[i - 1].position;
+    if (includeCash && actualCloses) {
+      const prev = actualCloses[`${Number(key.slice(5, 7)) === 1 ? Number(key.slice(0, 4)) - 1 : key.slice(0, 4)}-${String(Number(key.slice(5, 7)) === 1 ? 12 : Number(key.slice(5, 7)) - 1).padStart(2, "0")}`];
+      if (prev !== undefined) return prev;
+    }
+    return startCash;
+  };
   const pickedIndex = Math.max(0, calendar.months.findIndex((x) => x.month === pickedMonth));
   const days = useMemo(
     () =>
       buildDays(calendar.months[pickedIndex], {
         includeEarned: includeEarned && hasEarned,
         sims: simByMonth[pickedIndex],
-        startPosition: pickedIndex === 0 ? startCash : a.rows[pickedIndex - 1].position,
+        startPosition: startOf(pickedIndex),
+        skipSettled: includeCash,
       }),
-    [calendar, pickedIndex, includeEarned, hasEarned, simByMonth, startCash, a],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calendar, pickedIndex, includeEarned, hasEarned, simByMonth, startCash, a, includeCash, openingCash, todayMonth, actualCloses],
   );
 
   const chartData = a.rows.map((r) => ({
@@ -222,7 +249,7 @@ export function IncomeCalendarExplorer({
           {openingCash > 0 && (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <Switch size="sm" checked={includeCash} onCheckedChange={setIncludeCash} aria-label="Start from the cash I hold today" />
-              Start from the cash I hold today ({m(openingCash)})
+              Start from my bank cash ({m(openingCash)} on the latest statements)
             </label>
           )}
           {hasEarned && (
@@ -306,7 +333,7 @@ export function IncomeCalendarExplorer({
                   </Button>
                 ))}
               </div>
-              <IncomeCalendarDays days={days} monthLabel={longMonth(pickedMonth)} money={money} mask={maskValue} startPosition={pickedIndex === 0 ? startCash : a.rows[pickedIndex - 1].position} />
+              <IncomeCalendarDays days={days} monthLabel={longMonth(pickedMonth)} money={money} mask={maskValue} startPosition={startOf(pickedIndex)} note={includeCash && todayMonth === pickedMonth ? "Starts from the cash you hold today. Items the latest statements already show are crossed out and not counted again." : includeCash && todayMonth && pickedMonth < todayMonth ? "This month has ended: your closing cash is the balance the banks reported." : undefined} />
             </CardContent>
           </Card>
 

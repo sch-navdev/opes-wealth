@@ -181,6 +181,8 @@ export default async function BankingPage({
     accountRef: typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : undefined,
     refHistory: parseRefHistory(a.metadata?.ref_history).map((e) => e.ref),
     parentRef: typeof a.metadata?.parent_ref === "string" ? a.metadata.parent_ref : undefined,
+    lastDate: rows.find((r) => r.assetId === a.id)?.balanceAsOf ?? null,
+    closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
   }));
 
   return (

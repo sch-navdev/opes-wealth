@@ -392,7 +392,8 @@ function parse(text: string): PdfParseOutcome {
   // Accounts the summary lists but that had no transaction this month: they still exist, on the printed balance.
   // Without this a quiet account (a EUR account with no movement) would look abandoned.
   const seen = new Set(outAccounts.map((a) => a.accountRef));
-  for (const s of parseSummary(lines)) {
+  const summary = parseSummary(lines);
+  for (const s of summary) {
     // A closed account with no movement is not an account to create from this statement.
     if (seen.has(s.ref) || s.closedOn || (periodEnd && s.openedOn && s.openedOn > periodEnd)) continue;
     seen.add(s.ref);
@@ -424,7 +425,8 @@ function parse(text: string): PdfParseOutcome {
       failure: { code: "no_transactions", bank: "wio", message: "Wio statement recognised but no transaction rows were found." },
     };
   }
-  return { ok: true, statement: { bank: "wio", bankName: "Wio Bank", accounts: outAccounts, warnings } };
+  // The summaries name every account, quiet or not (and not a closed one a month later): absence means closed.
+  return { ok: true, statement: { bank: "wio", bankName: "Wio Bank", accounts: outAccounts, warnings, ...(summary.length > 0 ? { listsAllAccounts: true } : {}) } };
 }
 
 export const wioProfile: BankPdfProfile = { id: "wio", name: "Wio Bank", detect, parse };

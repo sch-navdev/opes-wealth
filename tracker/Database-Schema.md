@@ -159,3 +159,5 @@ The 8-year constant, the allowances (EUR 4,600 single / EUR 9,200 couple), `asOf
 `0041_history_source_ref.sql` is DRAFTED and NOT applied (asset_history.source_ref, transactions.source_file, `pdf_import` in the asset_history source CHECK). 0037 to 0040 were applied by Steve (0039 FX tables and 0040 end-of-service plans confirmed present).
 
 `0042_income_employer.sql` is DRAFTED and NOT applied (`income_streams.employer_asset_id` uuid references assets on delete set null, and the kind check widened with 'gratuity'). The code degrades without it.
+
+`0043_backfill_pdf_import_source.sql` is APPLIED (confirmed 2026-10-10: no `csv_import` rows remain; 714 history rows and 2819 transactions are `pdf_import`). It re-tags earlier imports (all PDFs) unless a recorded file name ends in .csv. New `assets.metadata` keys written by the import: `statement_through` (latest statement period end covering the account), `parent_ref` (account a card is settled on), `ref_history`, `closed_on`.

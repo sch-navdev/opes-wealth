@@ -22,3 +22,7 @@
 
 ## Employers and gratuity (2026-10-10)
 Salary is counted by default in the income calendar (own colour, switch to hide) and each month's hover breakdown lists the employers behind the salary, bonus, gratuity and other lines plus the passive total. `income_streams.employer_asset_id` links a stream to one of the user's Companies (or null = an outside employer named in `source_name`) and the kind `gratuity` exists: **migration `0042_income_employer.sql` is drafted, NOT applied**. Without it the app keeps working (the employer link is not stored, the free-text source name is; a gratuity type is refused by the database until the constraint is widened). A stream per employer, so salary, bonus and gratuity from several companies add up as one salary line in the graph.
+
+## Income calendar round 3 (2026-10-10)
+- Three views (gross, liabilities, net) per month, full page `/dashboard/income-calendar` (1 to 120 months), day-by-day month view, what-if entries (device-local), analysis (coverage, margin, weakest month, main liability and source).
+- **Cash position**: opening cash = personal open non-card Cash accounts at their latest balance; past months use the banks' month-end cash (`asset_history`); the current month starts from today's cash and projected items already booked in the statements (same direction, within 3%, close in date) are settled and not counted twice. Code: `income-calendar-cash.ts`, `income-calendar-settle.ts`, `income-calendar-analysis.ts`.

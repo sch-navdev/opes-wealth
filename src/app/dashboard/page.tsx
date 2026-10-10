@@ -28,6 +28,7 @@ import { PortfolioGroups } from "@/components/portfolio-groups";
 import { AllocationCard } from "@/components/allocation-card";
 import { DashboardBasicOverview } from "@/components/dashboard-basic-overview";
 import { DashboardCsvCard } from "@/components/dashboard-csv-card";
+import { parseRefHistory } from "@/lib/banking/rollover";
 import {
   ExpertExposureBlock,
   ExpertPrivateEquityBlock,
@@ -66,6 +67,8 @@ import { IncomeCalendar } from "@/components/income-calendar";
 import { ScpiDashboardBlock } from "@/components/scpi-dashboard-block";
 import { buildScpiBlockData } from "@/lib/scpi-dashboard";
 import { buildIncomeCalendar } from "@/lib/income-calendar";
+import { loadCashBasis } from "@/lib/income-calendar-cash";
+import { settleCurrentMonth } from "@/lib/income-calendar-settle";
 import {
   applyOwnershipFactors,
   loadCoOwnedAssets,
@@ -523,13 +526,19 @@ export default async function DashboardPage({
   // `assets` the passive-income card uses, spread over the real payment schedule.
   // The earned-income layer (private income streams, migration 0037; [] until applied) is optional.
   const { streams: incomeStreams } = await loadIncomeStreams(supabase, user.id);
-  const incomeCalendar = buildIncomeCalendar({
-    assets: assets ?? [],
-    rates,
-    baseCurrency: displayCurrency,
-    startDate: today,
-    streams: incomeStreams,
-  });
+  // Bank cash per the latest statements (personal, open accounts) and what this month's statements already show.
+  const cashBasis = await loadCashBasis(supabase, assets ?? [], rates, displayCurrency, today, today.slice(0, 7));
+  const incomeCalendar = settleCurrentMonth(
+    buildIncomeCalendar({
+      assets: assets ?? [],
+      rates,
+      baseCurrency: displayCurrency,
+      startDate: today,
+      streams: incomeStreams,
+    }),
+    cashBasis.transactions,
+    today,
+  );
 
   // Bento header: net contribution + holding count for the three headline
   // classes (same netWorth breakdown rows the metric cards use, so they agree),
@@ -630,7 +639,15 @@ export default async function DashboardPage({
         />
       </>
     ),
-    incomeCalendar: <IncomeCalendar calendar={incomeCalendar} baseCurrency={displayCurrency} />,
+    incomeCalendar: (
+      <IncomeCalendar
+        calendar={incomeCalendar}
+        baseCurrency={displayCurrency}
+        openingCash={Math.max(0, cashBasis.openingCash)}
+        actualCloses={cashBasis.actualCloses}
+        todayMonth={today.slice(0, 7)}
+      />
+    ),
     // Only when the user holds SCPI: an empty block would be noise for everyone else.
     scpi: scpiData.holdings.length > 0 ? <ScpiDashboardBlock data={scpiData} baseCurrency={displayCurrency} /> : undefined,
     csvUpload: (
@@ -643,6 +660,13 @@ export default async function DashboardPage({
             name: company ? `${a.name} (${company})` : a.name,
             currency: a.currency,
             nativeValue: a.current_value,
+            // What the statement review needs to recognise the account (same as the Banking page).
+            bankProfile: typeof a.metadata?.bank_profile === "string" ? a.metadata.bank_profile : undefined,
+            accountRef: typeof a.metadata?.account_ref === "string" ? a.metadata.account_ref : undefined,
+            refHistory: parseRefHistory(a.metadata?.ref_history).map((e) => e.ref),
+            parentRef: typeof a.metadata?.parent_ref === "string" ? a.metadata.parent_ref : undefined,
+            closedOn: typeof a.metadata?.closed_on === "string" ? a.metadata.closed_on : null,
+            lastDate: typeof a.metadata?.statement_through === "string" ? a.metadata.statement_through : null,
           };
         })}
       />
